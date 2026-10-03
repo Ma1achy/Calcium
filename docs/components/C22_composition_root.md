@@ -3159,7 +3159,7 @@ ground, which holds at rest, and a trace for the preview and the search, which c
 2. **The chip preview is §101's menu panel** (I113, I143): the upper rule, a header naming the
    chip as `chipLabel` spells it, the box with its bar, and the key row — no `panel` block. The
    name is bold and the size muted. §101's `pick` ground on the name is not drawn: no block kind
-   carries a ground on a span (6s.5).
+   carries a ground on a span (6s.5). *Amended by §6t ruling 6: the name takes `pick` (I155).*
 3. **The box's cap counts its residue row** (I143): `floor(h / 2) − 3` where the content fits,
    `floor(h / 2) − 4` where it overflows, floored at 1.
 4. **The key row names `←→ other chips` while there is another chip** (I143). §101 draws it, and
@@ -3170,18 +3170,116 @@ ground, which holds at rest, and a trace for the preview and the search, which c
    `⏎` sends (I51).
 5. **Find is C20 I30's**: the upper rule, no `width`, the caret on row 1.
 6. **The transcript half is unchanged** (§6l.12): the general peek, which draws for any element
-   carrying a `detail`. No chip reaches the transcript, which is 6s.5's first item.
+   carrying a `detail`. No chip reaches the transcript, which is 6s.5's first item. *Answered by
+   §6t: the echo keeps its chips as elements (I153, I154).*
 
 ### 6s.5 — what the rulings leave behind, named so it is not read as coverage
 
 - **No chip reaches the transcript**, so §101's *focus in the TRANSCRIPT — a PEEK beside the
   element* has no element to stand beside. Whether a submitted line's echo keeps its chips — the
   label drawn, the content as the element's `detail` — is a ruling the registry does not make.
+  *Ruled by 104(c) and built by §6t.*
 - **The header's `pick` ground.** `Raw` spans carry a tone and no ground (C04 I89). Drawing §101's
   header exactly needs a ground on a span, or a kind that draws a chip as the prompt does.
+  *Ruled and built by §6t ruling 6: a ground on a span.*
 - **A peek and an overlay take no ground** (6s.2 row 6).
 - **The residue row stays** (C04 I49). §101 draws none; the scroll kind draws one whenever it
   overflows, and the bar alone does not say how many rows are hidden.
+
+## 6t. The echo's chips and the header's ground, walked by hand (lane b5-chips; F1521, F1522; §099, §101, ruling 104 c)
+
+Ruling 104(c) keeps a submitted line's chips in its echo — *drawn as the prompt draws them, with
+the content as the peek* — and F1522 owes §101's header its `pick` ground. Both are a chip drawn
+somewhere other than the prompt, so the rules that meet are the prompt's walk, the echo's wrap,
+the element list and the two layers that read it. The echo holds still once drawn, so the table
+carries most of the weight; the trace takes what happens to an entry between its first append and
+its settle, which is where a record kept beside the document goes stale.
+
+### 6t.1 — measured before ruling (at a83b1b30, the built session's 100 × 30, `echo hi ` then a six-line paste)
+
+- **The prompt** reads `❯ echo hi  #1 pasted · 6L ` on one row, the chip's cells `meta` on
+  `bgDeep` (I62's `chipRanges`).
+- **The echo**, after `⏎`, reads `❯ echo hi alpha 0` and five continuation rows `alpha 1` …
+  `alpha 5`: six rows for the one row the reader saw, and no element in them — the entry's list
+  is its blocks' and the echo is chrome (I33). A 200-line paste echoes 200 rows.
+- **The preview's header** reads `#1 pasted · 6L` from column 0, the name bold and the size
+  `muted`, both on the panel's `bgElev`. §101 draws ` #1 package.json ` in `pickInk`, bold, on
+  `pick` — the ground's own space either side — and ` 47L ` muted beside it.
+
+### 6t.2 — the classification table: what a chip in the echo is (structural)
+
+| # | the cell | rule A | rule B | ruling |
+|---|---|---|---|---|
+| 1 | a chip whose label does not fit the rest of its row | I33 wraps the echo through `hardWrapCells`, which cuts at the cell | a chip is one wrap unit (C17 I26) | **C17's walk**, the prompt's own, wherever the echo holds a chip; the chip moves whole. A command with none keeps `hardWrapCells` byte for byte |
+| 2 | a chip wider than the whole row | the echo overflows nothing (I33) | C17 I32 elides a label to the row | **elided in the middle**, by the walk, as the prompt did at that width |
+| 3 | a chip whose content holds `\n` | I33 draws a command's lines as rows | the chip is one cluster | **one cluster**: the content never reaches the walk, so its breaks are not rows. The six-line paste is one row |
+| 4 | `\r\n` or `\r` in the text between chips | I33 splits on all three | the walk splits on `\n` alone | **normalised to `\n` segment by segment** before the walk; the ranges index `command`, so the normalising cannot shift a chip |
+| 5 | a bidi format character between chips | I33's form can break across two rows | C17 I36 moves the form whole | **whole**, the walk's picture: the echo of a chip line is the prompt's rows (rule 1), not a block's |
+| 6 | a private-use character typed in the line | the walk substitutes a sentinel cluster | the reader's character is text | **sentinels are drawn from private-use code points the command does not hold**, so a typed one is text |
+| 7 | the chip's cells at rest | the echo is chrome, unstyled | the prompt grounds a chip `meta` on `bgDeep` (`R-BLK-628`, `R-BLK-116`) | **the prompt's painter** — `chipRanges` and its style — over the walk's spans; at 1 bit the bracketed rung and no ground (C17 I25) |
+| 8 | a focused chip | its own ground, `bgDeep` | a chip is a BOX (§017 `R-COL-005`), and a box takes `focusShapeStyle` (C09 I137) | **`meta` over `focusGround`**, and whole-shape inversion where no ground resolves. The resting ground does not outlive focus |
+| 9 | an adapter's document stating its own command (C07 I16) | the echo is drawn from `command` | the ranges index the line | **no chips**: C23 writes them only onto a document whose `command` is the line (C23 I104), so the entry draws the adapter's command as text |
+| 10 | an app line holding a chip | I15 displays `/argv` joined | the ranges index the line, and the joined argv is another string | **the line as typed** when it holds a chip and no `$_` (C23 I104). With `$_` as well, the argv form and the chips drawn as their content (6t.5) |
+| 11 | the chip as an element | elements come from blocks (C26 §5) | §101: *a PEEK, anchored BESIDE the element* | **an element of the entry, ahead of the blocks'** (C26 I33): `cell` level, under a reserved block id holding U+0000, its rows the echo row less the echo's height — negative in block space, so `chromeRows + rows.from` places it as it places every other |
+| 12 | the element's `detail` | the general peek wants a `Block` | the content is a paste, line breaks its own | **a `code` block of the content**, as the preview's box holds it (I143). A long one is C15's to cut and C16 I74's to scroll, as any detail is |
+| 13 | `y` on the chip, and `⌃a y` | a chip copies its content, not its label (`R-SEL-004`) | the card's head copies the command (I90), which holds the content | **`y` copies the content; `⌃a` selects the document's elements**, so the content is not copied twice. `⇧↓` from a chip into the body takes both, because the reader chose both |
+| 14 | an entry whose document declares no element | `↓` does not enter an entry with nothing focusable (C16 I22) | the echo's chips are elements | **it enters on the chip**. A shell route's terminal is such an entry, and was the measured case |
+| 15 | the header's name in the chip preview | `Raw` spans carry no ground (C04 I89) | §101 grounds the name in `pick` | **a ground on a span** (C04 I151, C09 I139), ruled in 6t.4 item 6 |
+
+### 6t.3 — the sequence trace: one submission, from the keystroke to the settle (event-mediated)
+
+| # | sequence | rules that meet | ruling |
+|---|---|---|---|
+| 1 | `echo hi `, a six-line paste, `⏎` (shell route) | C14 caches an entry's height on `(id, rev, width)` × the route appends after an `await` | **the chips ride on the document**, `meta.echo`, written before the append. A record kept beside the entry and keyed by its id is written after C14 has measured the resolved six rows, and the index is self-consistent about a document the frame is not showing (I33) |
+| 2 | the shell route settles into its pending entry | the settle is `{ line, into: pendingId }`, built fresh × the chips are the submission's | **the settle carries them**: `Settle.echo`, spread with `into` rather than rebuilt |
+| 3 | `⏎` while a verb runs, then the drain | the queued notice is appended at the keystroke × the route settles into it later | **both write them**: the notice states the line, and the route's documents state it again |
+| 4 | the same, then `⌃c` | `clearQueue` settles a cancelled document × the queue item's chips | **the item carries them**, as it carries the line |
+| 5 | `⇧⇥` to the transcript | `enterLiveBlock(id, null)` resolves to the first element × the echo's chips lead the list | **the chip**, and the peek opens beside it on the next reconcile (§6l.12) |
+| 6 | `↓` from the chip | C26 I30: `↓` leaves the row | **the body's first element**; the peek moves to it, or closes when it declares no `detail` |
+| 7 | two chips on one row, `→` | C26 I30 | **the second chip**, and the peek follows |
+| 8 | a resize narrower | the chip's row moves × the element list is a pull at the region's width (C26 I11) | **re-derived**: C14 re-measures on the width, `elementsOf` re-lays the walk, and the peek's row is reconciled on the viewport change |
+| 9 | re-run of the entry (`rerunEntry`) | `submit(entry.doc.command)` × the chips are on the document | **`submit(command, meta.echo)`**: the new entry keeps them |
+| 10 | the settle's document states a command the line is not | row 9 of the table × focus is on a chip | the chips go with the document; **focus falls forward** to the next element (C26 I10) and the peek follows it |
+| 11 | `↑` recalls the line | C20 records the line as a string (C23 I29) | **unchanged**: the recall is the content, as it was before this ruling (6t.5) |
+
+**The rejection path.** Writing the chips is a spread on a value and cannot throw, so no step
+leaves half a record. C13 refusing a settle into a slot `/clear` removed appends the document
+instead (C22 I99), and the document is the stamped one.
+
+### 6t.4 — the rulings
+
+1. **The echo of a line that held chips is the prompt's rows** (I153): C17's walk over the
+   command with each chip's range as one cluster drawn as its label, and the prompt's chip style
+   over the walk's spans. The measurer and the composer call one function (I33).
+2. **The chips are document data, written by C23** (C04 I152, C23 I104), because the height is
+   cached on the document's revision (trace row 1). C17 answers where they are in the line it
+   resolves (C17 I37), from the one loop that resolves it.
+3. **A chip in the echo is an element ahead of the document's** (I154, C26 I33), with the content
+   as its `detail` and its `copy`. §101's transcript half is the general peek arriving at it, as
+   §6l.12 said it would.
+4. **A focused chip takes the box's treatment** (C09 I137), `meta` over `focusGround`.
+5. **`⌃a` is the document's elements** (table row 13).
+6. **F1522: a ground on a span, `pick` and nothing else** (I155, C04 I151, C09 I139). The other
+   remedy F1522 names — a kind that draws a chip as the prompt does — draws a different picture:
+   the prompt's chip is `meta` on `bgDeep` with its size inside the well (§099), §101's header is
+   the name alone on `pick` with the size outside it, and *the picture decides*. **The premise
+   that the echo would want the same drawing is corrected**: ruling 104(c) says *as the prompt
+   draws them*, the echo is chrome the frame paints, and the prompt's own painter serves it with
+   neither mechanism.
+7. **An app line holding a chip displays as typed** (C23 I104), where no `$_` is in it.
+
+### 6t.5 — what the rulings leave behind, named so it is not read as coverage
+
+- **A click on an echo chip** reaches `elementAt`'s `blockRow < 0` and resolves nothing: the
+  pointer resolves elements to blocks, and the echo has none. The keyboard reaches every chip.
+- **An app line holding a chip and `$_`** displays the argv form, and its chips draw as their
+  content (table row 10). The owed piece is C18 token offsets, so the display can resolve `$_` in
+  the text between chips.
+- **History recalls the content** (trace row 11). C20 records strings, so `↑` over a line that
+  held a 200-line chip puts 200 lines in the prompt.
+- **The header's leading space** is the ground's padding, so the name stands one cell in from the
+  preview's box; §101 draws the box's content one cell further in to match. The box's column is
+  §6s's and unchanged here.
 
 ## 7. Health and identity
 
@@ -3363,7 +3461,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I30** — A box that escapes the region refuses the frame rather than being clipped into it. C15's clamp is what makes this unreachable, which is why it is asserted rather than assumed: a clip repairs the symptom and leaves a placement defect drawing something plausible, and one row past the last row scrolls the alternate screen (S01 §3, `heightsSum`'s shape).
 - **I31** — **A state change that happens outside a decoded batch commits when it happens.** I27's rule covers the synchronous effects of a keystroke and nothing else: an asynchronous continuation has no batch to be counted in, so a completion menu pushed when its source settles, or an identity refreshed on its five-minute cadence, changes state that no frame is composed from. The symptom is the one the read loop's `arm()` already names for the decoder's own deadlines — *a key that appears to do nothing until you press another one* — arriving one layer up, where the trigger is not a key at all and the next keystroke is what reveals it. Every such producer takes an injected commit and calls it; the reason is `"completion"`, whose window is zero because the screen is already wrong by the time it fires (C03 I2).
 - **I32** — The read loop re-arms its deadline on **every** chunk, including one that decodes to no events. An empty batch is not an absence of work: a lone `Esc` is held for C16's 50 ms disambiguation window and emits nothing at all, so it is precisely the state that needs a wake. Guarding the loop with an early return on `events.length === 0` puts that guard above the arming and reproduces the symptom the arming was written to prevent — a key that appears to do nothing until you press another one. The commit stays inside the non-empty branch, because nothing changed and nothing needs drawing.
-- **I33** — **The transcript draws each entry with the command that produced it**, as frame chrome above the entry's blocks. It is *the displayed command* — `entry.doc.command`, the line the user typed — and never `meta.argv`, which is the spawned form (`widget ps --json`) and is `/debug`'s to show. It is **not a block**: an adapter did not produce it, `--json` must not contain it, and it must not count toward C13's cap. Its rows are supplied to C14 through `chromeRows` (C14 I20) so that the height the index virtualises against is the height the composer draws; computing it in one place and not the other is a viewport that is arithmetically self-consistent about a document it is not showing. **Without this the transcript is results with no record of what produced them** — three tables and no way to tell which command made which — and C23 I15's *displayed command* had nothing to constrain, which is A03 §2's vacuity class arriving at the level of an invariant. **Amended (review batch 4, found reading C17 T5.2's frame under M11 item 1): a command of several lines is drawn as its lines, each wrapped under the continuation gutter, and no row carries a line break.** The command is what the editor held, and a bracketed paste — or a chip resolving on submission (C17 I25) — puts `\n` in it, which the input decoder's C0 filter never sees. `hardWrapCells` measured the break as nothing, so the echo wrote it raw inside one frame row: the terminal moved down a line mid-row, and near the bottom it **scrolled the alternate screen**, the one failure that corrupts state the frame can no longer see. A 200-line paste wrote 127 bare line feeds in one submission. Split rather than neutralised, for a consistent picture: the prompt draws the same buffer as rows, and the echo is the record of that buffer. Both the measurer and the composer read `commandRows`, so the height stays one number. **Amended (review batch 4, F1401): each line is neutralised before it is wrapped** (C09 I128), so a bidi format character in the typed command is drawn as its `<U+XXXX>` form. The echo and the prompt were the two rows of the frame that wrote the reader's own line raw, and neither is a block, so C09 I127 never reached them (C17 §5g). `entry.doc.command` keeps the character — only the row is neutralised — and because the measurer calls the same function, the eight cells each form takes are in the height C14 virtualises against. At a row's end the form can break across two rows where the prompt moves it whole; the echo wraps as a block would (C17 §5g). → T1.179, T6.150
+- **I33** — **The transcript draws each entry with the command that produced it**, as frame chrome above the entry's blocks. It is *the displayed command* — `entry.doc.command`, the line the user typed — and never `meta.argv`, which is the spawned form (`widget ps --json`) and is `/debug`'s to show. It is **not a block**: an adapter did not produce it, `--json` must not contain it, and it must not count toward C13's cap. Its rows are supplied to C14 through `chromeRows` (C14 I20) so that the height the index virtualises against is the height the composer draws; computing it in one place and not the other is a viewport that is arithmetically self-consistent about a document it is not showing. **Without this the transcript is results with no record of what produced them** — three tables and no way to tell which command made which — and C23 I15's *displayed command* had nothing to constrain, which is A03 §2's vacuity class arriving at the level of an invariant. **Amended (review batch 4, found reading C17 T5.2's frame under M11 item 1): a command of several lines is drawn as its lines, each wrapped under the continuation gutter, and no row carries a line break.** The command is what the editor held, and a bracketed paste — or a chip resolving on submission (C17 I25) — puts `\n` in it, which the input decoder's C0 filter never sees. `hardWrapCells` measured the break as nothing, so the echo wrote it raw inside one frame row: the terminal moved down a line mid-row, and near the bottom it **scrolled the alternate screen**, the one failure that corrupts state the frame can no longer see. A 200-line paste wrote 127 bare line feeds in one submission. Split rather than neutralised, for a consistent picture: the prompt draws the same buffer as rows, and the echo is the record of that buffer. Both the measurer and the composer read `commandRows`, so the height stays one number. **Amended (review batch 4, F1401): each line is neutralised before it is wrapped** (C09 I128), so a bidi format character in the typed command is drawn as its `<U+XXXX>` form. The echo and the prompt were the two rows of the frame that wrote the reader's own line raw, and neither is a block, so C09 I127 never reached them (C17 §5g). `entry.doc.command` keeps the character — only the row is neutralised — and because the measurer calls the same function, the eight cells each form takes are in the height C14 virtualises against. At a row's end the form can break across two rows where the prompt moves it whole; the echo wraps as a block would (C17 §5g). **Amended (lane b5-chips, ruling 104 c): an echo holding chips is I153's** — the prompt's walk, so a chip is one row's label rather than its content's lines. → T1.179, T6.150
 - **I34** — **The viewport's height is the composed frame's region height, set from the frame and nowhere else.** C14 is told what to be as tall as (C14 I22), and only the compose step knows the answer: the region is `rows − header − footer − promptRows` (S01 §3), and the prompt's height changes with what is typed rather than with the terminal. So the value is pushed in `#render`, from the frame just composed and before the visible rows are read — one owner, and the one that has the number.
   - **The resize handler must not also set it.** Two writers with different ideas of the same quantity is the defect this replaces, not a redundancy: `onResize` had the terminal's height and ran on SIGWINCH, so the viewport was three rows too tall from the first frame and stayed that way. The handler keeps the width — that is what invalidates the cache (C14 I8) — and issues its commit; the height comes from the frame.
   - **Setting it per frame is safe because C14 refuses a resize to the size it holds** (C14 I21). Without that guard this is a `Change` per frame arriving back at the thing that composed the frame. The guard is C14's and is argued there on its own terms; this invariant depends on it rather than justifying it.
@@ -3523,6 +3621,9 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I150** — *(ruling 96, ruling 99, F1486, I51, I133, I145, C19 I20, C19 I29, `binding.004`)* **The completion substate's owner line names what each key does in the state the frame shows.** While the menu holds no selection the prompt's keys resolve first (C19 I20), so `⏎` submits and `↑` walks history, and the line is `complete · ⏎ run · ⇥ complete · esc close`: `⏎` is the chord the session keymap binds to the prompt's `submit`, named for what it does to the line at rest (ruling 99, §029), `⇥` is the chord the session keymap binds to the prompt's `complete` (the registry's `binding.004`, *complete in the prompt*), and `esc` is the panel's `dismiss`, which the prompt does not bind. Once `⇥` has made a selection the menu owns its keys and the line is `complete · ↑↓ move · ⏎ accept · esc close`. `↓` at rest is the prompt's and selects nothing (C19 §6a). **The line reads the router's answer, not the menu's state**: `OwnerHints.promptUnderMenu` is `promptUnderMenu()`, the top layer's `promptLive` (I145), so the footer, the cursor and the dispatch read one predicate and a footer cannot name a key that goes somewhere else. **It is the one visible difference between rest and a selection**: ruling 89 marks the current candidate in both (C19 I29), and the two frames were otherwise identical. Absent is *the menu owns its keys*, which is every line drawn with no session behind it. → T1.182, T4.120, T6.152
 - **I151** — *(§097, `R-BLK-569`, `R-BLK-628`, `R-BLK-775`, F1501; §6s ruling 1)* **A panel's rows between its edges take `surface.bgElev`.** The compositor paints `surface.bgElev` behind every line of a `kind: "panel"` layer except the lines of its leading `rule` blocks — the upper edge; the lower edge is the prompt's rule (I81) and is not in the layer — through `based`, so a span that sets its own background keeps its cells (the menu's `pick` row), and the padding to the box's width is grounded (I29). The exemption is by content line, so a row-scrolled panel keeps it (§6s.2 row 7). Where no ground resolves — 1 bit, a theme whose `bgElev` inherits — the rows are byte for byte what they were. A `peek` and an `overlay` take none. → T1.184, T4.121, T6.153, T6.154
 - **I152** — *(§6m.2, ruling 103 b, F1517, C23 I101, C23 §8a A6.9)* **A completion line says `exit N` only of a child's own ending.** Where the settled head's word is one the shell writes — `denied`, `expired`, `cancelled`, `truncated`, `failed` — the verdict names it and appends no code, because the code beside it is the shell's: 126 for a denial and an expiry, 130 for a cancel, 1 for a malformed patch and a throw (C23 I101). A `cancelled` head's word is the verdict's first part — `/ps — denied`, `/ps — expired`, `/ps — cancelled` — and a `failed` head's follows its state, `failed, truncated`. A head whose word is `exit N` keeps it, so a child that ended 130 on its own still reads `failed, exit 130`. C20 records every one of these codes as before (C23 I29). *As it stood:* ~~`exit N` for any non-zero code on a document that is not the shell's own~~ — a denial read `/ps — failed, exit 126` and a cancel `cancelled, exit 130` (F1517). → T1.186, T6.157
+- **I153** — *(§6t rulings 1, 2, §099, §101, ruling 104 c, F1521, I33, C17 I26, C17 I32, C17 I36, C04 I152)* **The echo of a line that held chips draws them as the prompt drew them.** Where `meta.echo` holds chips whose ranges lie in `command`, `commandRows` walks the command through C17's walk with each chip's range standing as one cluster drawn as its label (C17 I25): a chip is one wrap unit, a label wider than its row is elided (C17 I32), and the content's line breaks never reach the frame — `echo hi ` and a six-line paste echo as `❯ echo hi  #1 pasted · 6L `, one row, as the prompt showed it. The text between chips is normalised to `\n` line breaks segment by segment, and the sentinels are private-use code points the command does not hold (§6t.2 rows 4, 6). The measurer and the composer call the one function (I33). Each chip's cells take the prompt's chip style through the prompt's painter — `tone.meta` on `surface.bgDeep` — and at 1 bit the bracketed rung with no ground. Where `meta.echo` is absent, or a range does not lie in `command` in order, the rows are `hardWrapCells`' byte for byte. → T1.187, T4.123, T6.158
+- **I154** — *(§6t rulings 3–5, §101, ruling 104 c, F1521, §6l.12, C26 I33, C09 I137, C15 §2a, I90)* **A chip in the echo is an element, and focusing it peeks its content.** The entry's element list leads with one element per drawn chip (C26 I33), so `⇧⇥` and `↓` from the prompt land on the first, `→` and `←` walk the chips of one row (C26 I30), and the general peek anchors beside the focused one with the content as a `code` block — §101's *focus in the TRANSCRIPT — a PEEK beside the element*, through no mechanism of its own. A focused chip takes the box shape's treatment (C09 I137): `tone.meta` over `surface.focusGround`, whole-shape inversion where no ground resolves. `y` copies the chip's content; `⌃a` selects the document's elements and not the echo's, whose content the head's copy already holds (I90). A re-run submits the entry's chips with its command (C23 I104). → T4.123, T6.159
+- **I155** — *(§6t ruling 6, §101, F1522, C04 I151, C09 I139, I143, §6s ruling 2)* **The chip preview's header draws the chip's name on `pick`.** The header is `raw` text — the painted label with its trailing space dropped, ` #1 pasted · 6L` — whose name, frame space either side, carries `ground: "pick"` and `bold`, and whose size, `· 6L`, is `muted` on the panel's ground. A chip with no size grounds its whole label. At 1 bit the bracketed label as before, the name bold and the size muted, with no ground to carry. → T1.188, T6.160
 
 ## 11. Commitments
 
@@ -4151,6 +4252,12 @@ PTY harness.
 - **T6.156** (I143): the chip count dropped, so `←→ other chips` is offered with one chip → **T1.185** fails.
 - **T1.186** (I152, ruling 103 b, F1517): `completionLine` over a settled card whose head reads `denied`, `expired`, `cancelled`, `truncated` and `failed`, with `meta.exitCode` 126, 126, 130, 1 and 1 on a `subprocess` document → `/ps — denied`, `/ps — expired`, `/ps — cancelled`, `/ps — failed, truncated`, `/ps — failed`; a head reading `exit 130` over 130 → `/ps — failed, exit 130`; `exit 1` → `failed, exit 1`. At the ASCII separator `:` the same.
 - **T6.157** (I152): the verdict reading `outcomeOf` alone again → **T1.186** fails on each of the five shell words, and not on the two `exit N` rows.
+- **T1.187** (I153, §6t.2 rows 1–7): `commandRows` over `echo hi ` and a six-line paste with `meta.echo`'s one chip over the paste, at 80 columns and full capabilities → one row, `❯ echo hi  #1 pasted · 6L `; at 1 bit → `❯ echo hi [#1 pasted · 6L]`; the same command with no echo → the six rows it draws without one; an echo whose range runs past the command → those six rows; at 24 columns the chip moves whole to the second row; `echoRows`' chip cells cover the label exactly and, painted, carry `bgDeep`'s background and nothing else on the row does.
+- **T1.188** (I155, §6t ruling 6): the header for a six-line paste chip at 256 colours → text ` #1 pasted · 6L`, the span `[0, 11)` with `ground: "pick"` and `bold`, `[11, 15)` `muted`; rendered, the name's cells carry `pick`'s background and the size's do not; at 1 bit → `[#1 pasted · 6L]` with no `ground`.
+- **T4.123** (I153, I154, C23 I104, C26 I33, §6t.3 rows 1, 5): through a built session at 100 × 30, `echo hi ` and a six-line paste, `⏎` → the echo is one row reading `❯ echo hi  #1 pasted · 6L `, no row reads `alpha 1`, and the chip's cells carry `bgDeep`. `⇧⇥` → the chip's cells carry `focusGround`, and a peek is up holding `alpha 0` through `alpha 5`; `y` → the kill buffer is the six lines. The control is a two-line paste, which is text: its echo holds `alpha 1` and `⇧⇥` opens no peek.
+- **T6.158** (I153): `commandRows` ignoring `echo` → **T1.187** fails on the row count.
+- **T6.159** (I154): the echo's elements left out of `elementsOf` → **T4.123** fails: no peek opens.
+- **T6.160** (I155): the header's `ground` dropped → **T1.188** fails.
 
 ---
 

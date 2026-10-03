@@ -540,3 +540,9 @@ function channelsOf(hex: string): readonly [number, number, number] {
   const n = Number.parseInt(hex.slice(1), 16);
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
 }
+
+describe("C09 I139 — a grounded run (F1522)", () => {
+  it.todo(
+    "T1.153 (C09 I139): a run with ground pick paints pickInk on pick at 24-bit and no background at 1 bit, its bold kept — not deferred on a component: lands with lane b5-chips' code commit",
+  );
+});

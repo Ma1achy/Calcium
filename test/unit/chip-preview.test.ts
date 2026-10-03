@@ -358,3 +358,9 @@ describe("C22 §6s — the preview's key row names the other chips (I143)", () =
     expect(keyRow(), "the legend is back").toBe(WANT);
   });
 });
+
+describe("C22 I155 — the header grounds the name in pick (F1522)", () => {
+  it.todo(
+    "T1.188 (C22 I155): the header names the chip on pick, bold, and the size muted beside it; at 1 bit the brackets and no ground — not deferred on a component: lands with lane b5-chips' code commit",
+  );
+});

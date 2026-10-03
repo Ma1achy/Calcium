@@ -409,3 +409,9 @@ describe("C10 §4h — the categorical cycle, one copy", () => {
     }
   });
 });
+
+describe("C04 I151 — a ground on a span (F1522)", () => {
+  it.todo(
+    "T2.156 (C04 I151): ground pick is accepted with bold and refused beside tone, value and ramp, on a hunk line, and as any other value; measure ignores it — not deferred on a component: lands with lane b5-chips' code commit",
+  );
+});

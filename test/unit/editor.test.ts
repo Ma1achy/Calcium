@@ -1121,3 +1121,9 @@ describe("C17 I36 — the reader's own bidi characters, drawn visible and kept a
     expect(e.chipAt()?.name, "the chip keeps its name").toBe(name);
   });
 });
+
+describe("C17 I37 — resolvedChips (ruling 104 c)", () => {
+  it.todo(
+    "T1.63 (C17 I37): resolvedChips ranges index resolved, past a surrogate pair, in buffer order, and come back with undo — not deferred on a component: lands with lane b5-chips' code commit",
+  );
+});

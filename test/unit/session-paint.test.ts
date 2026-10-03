@@ -1469,3 +1469,9 @@ describe("C22 I33 — the echo neutralised (F1401)", () => {
     expect(commandRows("/show abc", 20, FULL_CAPS)).toEqual(["❯ /show abc"]);
   });
 });
+
+describe("C22 I153 — the echo draws its chips (ruling 104 c, F1521)", () => {
+  it.todo(
+    "T1.187 (C22 I153): an echo holding a chip is the prompt row, one wrap unit, grounded bgDeep; without an echo the rows are unchanged — not deferred on a component: lands with lane b5-chips' code commit",
+  );
+});

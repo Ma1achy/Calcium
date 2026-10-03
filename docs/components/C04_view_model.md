@@ -44,7 +44,17 @@ type ViewDocument = Readonly<{
     stderr:     string;               // usually empty
     transport:  "emulated" | "fixture" | "subprocess" | "local";
     origin:     "user" | "action" | "agent" | "refresh" | "defect";
+    echo?:      readonly EchoChip[];  // the submitted line's chips, ranges into `command` (I152)
   }>;
+}>;
+
+type EchoChip = Readonly<{
+  from:     number;                   // code units into `command`, [from, to), sorted, disjoint
+  to:       number;
+  ordinal:  number;
+  kind:     ChipKind;                 // "paste" | "file" | "image"
+  name:     string;
+  lines?:   number;
 }>;
 ```
 
@@ -55,6 +65,14 @@ type ViewDocument = Readonly<{
 `argv`, `stderr` and `transport` answer the question a rendered block cannot: *did the far side return something unexpected, or did the adapter mishandle it?* They live in `meta` rather than in a block because a block is content and the invocation is *about* the document — in `meta` it is uniformly available to any inspector, including one an app writes. C23 renders them through `/debug`.
 
 **`origin` is not a debugging field, and it is required.** It is what makes a transcript legible once more than one thing is putting entries into it. Shipped optional it would be unset, then unreliable, and the first agent feature is the one that needs to trust it — so it is always present, always set by C23 (`user` for a typed submission, `action` for an exec action, `refresh` for a time-driven tick, `defect` for a failure the framework contained and is reporting, `agent` reserved). A string now costs less than a schema migration later.
+
+**`echo` is the shell's record of the chips a submitted line held** (I152, ruling 104 c, F1521).
+A chip is one character in the prompt standing for a block of content (C17 §5c); the line C23
+hands the far side has each chip's content in its place, and `command` states that line. `echo`
+says where each chip stood: a code-unit range of `command` covering exactly the content, with the
+parts C17 composes a label from. The content is `command.slice(from, to)` and is not carried
+twice. Shell-owned, as `origin` is — `ProducedMeta` refuses it, so a producer cannot draw a chip
+into an echo — and absent on every document whose line held none. C22 draws it (C22 I153).
 
 `partial` exists for streaming documents that have not finished. **A partial document is renderable at every point in its life** — there is no assembly state in which it cannot be drawn.
 
@@ -2881,6 +2899,24 @@ an `elide` span wraps as it always did, because the member says *shorten me firs
 row shortens nothing. Admitted by one consumer, the head, and the member the first pass could not
 have named because the token it serves did not exist.
 
+**`ground`** (I151). §101 draws the chip preview's header with the chip's name on `pick` in
+`pickInk`, bold, and its size muted beside it on the panel's ground — a ground on a run inside a
+line, which no member could say (F1522). `ground: "pick"` paints the run's cells on
+`surface.pick` with `surface.pickInk` as its ink, **the pair resolved together**, as C11's
+current row and a focused button resolve it (C10 I51); so it replaces the run's tone rather than
+composing with one. A `tone` beside it is an ink nothing measured against that ground, and is
+refused, as `value` (a second background) and `ramp` (a second ink) are; a hunk line refuses it
+(I91). **One member of one value, because one consumer**: `pick` is the one ground the design
+draws on a run, and a wider union is the next consumer's to argue (I85). Where `pick` does not
+resolve — 1 bit, a theme declaring none — the run paints as though it carried no ground, its
+attributes kept (→ C09 I139). Appearance only: `measure` never reads it (I83).
+
+*F1522 named two remedies — a ground on a span, or a kind that draws a chip as the prompt does —
+and the second draws a different picture*: the prompt's chip is `meta` on `bgDeep` with its size
+inside the well (§099), and §101's header is the name alone on `pick` with the size outside it.
+The echo, the other place F1522 expected to need one, is chrome painted by the prompt's own
+painter and needs neither (C22 §6t ruling 6).
+
 
 ### 3am.2 — a ramp: an ink that is a function of position, on a span and on the bar
 
@@ -4192,7 +4228,7 @@ nothing at 4-bit and 1-bit — the step of two draws `from` or `to` and has no c
 - **I82** — **`lineRange` is view state written only by `code`'s `window`, refused on an inbound document, and honoured by both halves of the definition.** The window keeps `text` whole — the same string, no copy — and sets the source-line range `[from, to)`; `measure` counts the lines in range and `render` tokenises the whole text and produces only those rows, so a block comment opening above the window still colours the rows inside it (C09 I25a, F426). Units are source lines and never rows, so a window never opens inside a wrapped line and the surplus is `skipRows`/`dropRows` (C09 I26). It is the third member of I67's refused set and the first whose writer is a definition rather than an op; `raw` windows by slicing `text` and carries no field (§3d, C14 §4a, C14 I23).
 - **I83** — **A span is a parallel decoration and never a second carrier of text.** `spans?: readonly TextSpan[]` sits beside `text` (or `label`) and addresses it by offset; the member's string is unchanged and every existing reader of it stays valid. A span carries no characters, so the measurer's input is the string it always was — §5's *independent of theme* clause holds by construction and no kind's `measure` reads `spans` (→ C09 I1, C09 I8). The union form `text: string | readonly Run[]` was measured against 17 readers and 57 writers and refused on that count; the run list is what a renderer *builds* and is C09's `Span`, not this type's (§3am).
 - **I84** — **Offsets are UTF-16 code units, half-open, and the gate refuses every malformation it can decide.** `from` and `to` are integers with `0 ≤ from < to ≤ text.length`; the array is sorted by `from` and no two spans overlap; a boundary between the halves of a surrogate pair is refused. Each fault is one error naming the span's index. What the gate cannot see — a boundary inside a grapheme cluster that is not a surrogate split — is snapped outward by the renderer — `from` to the cluster's start, `to` to its end — which preserves the width (→ C09). The unit is the one `Token`, `sliceTokens`, `truncateParts.kept.length` and `codeRows.start` already use, so the row-slicing mechanism is shared rather than reimplemented.
-- **I85** — **A span's attributes are `bold`, `italic`, `underline`, set by the renderer from the span and never resolved from a palette slot; its four other members are I89's, I90's, I105's and I107's.** No `tone`: it would collapse at 1-bit onto the attributes the span itself uses and its one consumer is ruled onto `underline` (C25 I10). No colour, no `dim`, no `inverse`, no `value` — each a deferral with a symbol, and each admitted only by a consumer appearing (F85's narrower type). At 1-bit a span's `bold` on a block whose tone already collapses to bold is **absorbed and not compensated**: no fallback onto `underline`, which is spoken for, and no return to literal markers, which the view model cannot decide because it never sees a capability (→ C10 I33).
+- **I85** — **A span's attributes are `bold`, `italic`, `underline`, set by the renderer from the span and never resolved from a palette slot; its five other members are I89's, I90's, I105's, I107's and I151's.** No `tone`: it would collapse at 1-bit onto the attributes the span itself uses and its one consumer is ruled onto `underline` (C25 I10). No colour, no `dim`, no `inverse`, no `value` — each a deferral with a symbol, and each admitted only by a consumer appearing (F85's narrower type). At 1-bit a span's `bold` on a block whose tone already collapses to bold is **absorbed and not compensated**: no fallback onto `underline`, which is spoken for, and no return to literal markers, which the view model cannot decide because it never sees a capability (→ C10 I33).
 - **I86** — **A span changes no geometry at any stage: it continues across a wrap, clips to the kept text at a cut, and follows a substituted cluster.** A wrapped span is carried by source offset — every wrapped row is an exact contiguous slice of the source from a known `start`, and `wrapCells` drops break spaces, so prefix sums of row lengths drift one unit per break and are the wrong arithmetic. A truncated span is clipped to `truncateParts.kept`; the marker and its padding are never inside a span. A cluster the wrapper replaces with `?` keeps its span. `measure` is the same number with and without `spans` at every width (→ C09 I1, I19).
 - **I87** — **A span travels with its text through every patch and stops at the copy buffer.** `replace` carries a whole `Block` and `merge` a whole `Cell`, so no `ViewPatch` arm can write `text` without its `spans`; a patch that widened to a text-only arm would reopen the class this closes. Copy takes `text` and drops `spans`, as it drops tone. A `TextSpan` is plain data and survives `JSON.parse(JSON.stringify(d))` (§5a). C17's `CellSpan` is a result in display cells over the editor's rows and shares a name only.
 - **I88** — **Four members carry spans in the first pass and `code` is refused one.** `Raw.text`, `Notice.text`, `Rule.label` and `Cell.text` — the four the markdown translator emits text into. A `code` block with `spans` is refused at the gate: its syntax tokens are a run stream over the same text, and two streams over one string is the collision the mechanism exists to prevent. Every other text member is deferred with its symbol (`CALCIUM_SPANS_DESIGN.md` §7) and admitted by a writer appearing, never by symmetry.
@@ -4284,6 +4320,8 @@ nothing at 4-bit and 1-bit — the step of two draws `from` or `to` and has no c
 - **I148** — *(§5c.1, §026, `R-BLK-191`, I106, I107, C10 I36; review batch 4 M13.4, D5)* **A gradient ramp over a slot pair may carry `overshoot: { lift, share }`: over the last `share` of the axis `to` is lifted, channel by channel and clamped at 255, from ×1 up to ×`lift` at `t = 1`, and `from` mixes to `to` over the rest.** `lift` is finite in `(1, 2]` and `share` in `(0, 1)`; the member is refused on a colormap, a palette, a centred or stepped fill, and on a span. C10 draws the lifted hex at 24-bit, quantises it at 8-bit and ignores it below. It is how `hotEdge` draws the design's own profile (C09 I133). → T2.152, T1.82, T6.112
 - **I149** — *(R-BLK-214, F1260, C23 I94, → I141)* **`CallState` has a sixth member, `waiting` — *blocked on you*.** Its tone is `warn` and its glyph is `work-unit`; I141's agreement check covers it like the other five. An approval's call head carries it while its question is open (C23 I94). R-BLK-214 draws the dot blinking; the blink is not built (C23 §7g ruling 8), and the word and the tone carry the state at every motion level. **Where tone cannot carry it — 1 bit and ASCII — its shape is `warn`, `▲`/`!`** (C09's `CALL_STATE_GLYPH`, §030's *each state takes its own mark*): `work-unit` there is `running`'s, and a waiting head drawn as a running one says the tool is working when it is waiting on the reader. Found implementing the spec; the six shape marks are distinct, as the five were. → T2.154
 - **I150** — *(§097, `R-BLK-775`, ruling 89, F1474, → C11 I33, C19 I29, I124)* **A table's `current` is a row id or absent, and nothing `measure` or the plan reads follows it.** A non-string is refused naming the field; a string naming no row is valid and draws no mark. Its presence reserves the `current` mark's cells in the first column on every row (C11 I33), so which row it names moves no label and no height: `measure(block, width)` is the same number with the field absent, naming any row, or naming none. → T2.155, C11 T1.43
+- **I151** — *(§3am.1, §101, F1522, C22 §6t, → C09 I139, C10 I51)* **A span's `ground` is `"pick"` or absent, and is refused beside `tone`, `value` or `ramp`, and on a hunk line.** `TEXT_SPAN_KEYS` takes it as its tenth member, so I85's gate names it. A tone beside it is an ink the ground's matched ink replaces, and `value` and `ramp` are a second background and a second ink. Appearance only: `measure` is the same number with and without it (I83). → T2.156
+- **I152** — *(§2, ruling 104 c, F1521, C17 I25, C17 I37, C22 I153, C23 I104)* **`meta.echo` is the submitted line's chips, as sorted, disjoint code-unit ranges into `command`, each with the parts a label is composed from, and nothing else.** `EchoChip` is `{ from, to, ordinal, kind, name, lines? }`, and `kind` is `ChipKind`, declared here and re-exported by C17, so the editor's union and the record's cannot drift. The content is the range of `command` and is not carried. Shell-owned: `ProducedMeta` refuses the key, so a producer cannot put a chip in an echo. Absent where the line held none. → T2.157
 
 
 ## 7. Commitments
@@ -4575,6 +4613,8 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.153** (I109, §5c; ruling 81): accepted — `trailSince: 0` and `trailSince: 12` on a notice with `trail: "ripple"`, streaming and not. Refused — `trailSince` on a notice with no `trail`, with `trail: "hotEdge"` and with `trail: "weight"`, the message naming the forms that read it; `trailSince` of `-1`, `NaN` and `"3"`.
 - **T2.154** (I149, I141): `CALL_STATE_TONE.waiting` is `warn` and `CALL_HEAD_GLYPH.waiting` is `work-unit`; `headMark("waiting")` at 1 bit and in ASCII is `warn` and differs from every other state's; a notice claiming `state: "waiting"` in another tone is refused naming the field.
 - **T2.155** (I150): refused — `current: 3` on a table, naming the field; accepted — `current: "r1"` naming a row and `current: "gone"` naming none; and `measure` over one table at 40 and 80 columns is one number with `current` absent, naming each row in turn, and naming none.
+- **T2.156** (I151): accepted — `ground: "pick"` on a raw span, with `bold`. Refused, each naming the member — `ground: "bgDeep"`; `ground` beside `tone`, beside `value` (on a block with a `colormap`) and beside `ramp`; `ground` on a hunk line's span. `measure` over one raw block at 20 and 80 columns is the same number with the ground and without it.
+- **T2.157** (I152): `ProducedMeta` naming `echo` does not type-check (a `@ts-expect-error` row), and a `DocumentMeta` with `echo` does; `ChipKind` from C17's index and from C04's is one type — each of the three values assigns through both, and C17's `layout.ts` declares no union of its own.
 
 ### Tier 3 — edge cases
 

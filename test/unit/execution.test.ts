@@ -2377,3 +2377,9 @@ function srcFiles(dir: string, out: string[] = []): string[] {
   }
   return out;
 }
+
+describe("C23 I104 — a submission carries its chips (ruling 104 c)", () => {
+  it.todo(
+    "T1.108 (C23 I104): every document written for a submission whose command is the line carries its echo, and an adapter command or a dollar-underscore line carries none — not deferred on a component: lands with lane b5-chips' code commit",
+  );
+});
