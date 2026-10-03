@@ -169,10 +169,17 @@ const results = runPass({
       expect: "T1.105",
     },
     {
+      // **Re-aimed at the word, because the gate became the equivalent
+      // program** (F1495). This dropped `answer.outcome !== "answered"` from the
+      // branch, and was reached only by T4.92's widened set with `allow` marked
+      // default, so a withdrawal resolved `y`. `approvalPrompt` refuses that set
+      // now, every unanswered resolution carries `deny`'s key, and the clause
+      // cannot fire — it survived. The clause stays as a second wall; the wall
+      // that holds is T6.125's, in c23-ruling-103.
       name: "a withdrawn approval settles as denied",
       file: EX,
-      from: '      if (answer.outcome !== "answered" || answer.key === DENY_KEY) {',
-      to: "      if (answer.key === DENY_KEY) {",
+      from: '        finishCard(answer.outcome === "answered" ? "denied" : answer.outcome);',
+      to: '        finishCard("denied");',
       expect: "T4.92",
     },
     {
