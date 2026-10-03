@@ -12,8 +12,13 @@
  *   48;2;R;G;Bm · 48;5;Nm   background, both
  *   30-37 · 90-97           foreground, the sixteen
  *   40-47 · 100-107         background, the sixteen
- *   1m · 2m · 22m           bold, dim, normal intensity
+ *   1m · 2m · 22m           bold, dim (faded by the theme's own ratio), normal intensity
+ *   3m · 23m · 4m · 24m     italic and underline, on and off
+ *   7m · 27m                reverse video, on and off
  *   39m · 49m · 0m          defaults and reset
+ *
+ * **Every parameter of a compound sequence**, left to right — `1;38;2;R;G;B` is
+ * bold *and* a colour, and this read the first number and stopped.
  *
  * **That list is complete for what the framework emits, and the claim is
  * checked rather than made here** — `unparsedSgr` below, swept over every
@@ -56,9 +61,20 @@ import { join } from "node:path";
 import sharp from "sharp";
 import { defaultTheme, loadTheme } from "../src/presentation/theme/index.js";
 
-const loadedTheme = loadTheme(defaultTheme, "dark");
-if (!loadedTheme.ok) throw new Error("theme failed to load");
-const THEME = loadedTheme.value.current.tokens;
+/**
+ * **Both modes, because a frame carries its own.** This loaded `"dark"` alone and
+ * every image was drawn on the dark page — so a light frame's painted cells sat
+ * on a dark sheet, and the page showed through as a border and as a seam at
+ * every span boundary (design check R3). Which mode a frame is in is read off
+ * the frame by `groundOf` below; the two token sets are what it chooses between.
+ */
+const tokensOf = (mode) => {
+  const loaded = loadTheme(defaultTheme, mode);
+  if (!loaded.ok) throw new Error(`theme failed to load: ${mode}`);
+  return loaded.value.current.tokens;
+};
+const MODES = { dark: tokensOf("dark"), light: tokensOf("light") };
+const THEME = MODES.dark;
 
 const CATALOGUE = join(import.meta.dirname, "..", "docs", "catalogue");
 
@@ -99,6 +115,47 @@ const GAP = 10;
 const BG = THEME.surfaces.bg;
 const FG = THEME.palettes.tone.slots.default ?? "#d4d4d4";
 
+/** `#rrggbb` or `rgb(r,g,b)` to three channels; anything else is `null`. */
+function rgbOf(c) {
+  const hex = /^#([0-9a-f]{6})$/iu.exec(c);
+  if (hex !== null) return [0, 2, 4].map((i) => parseInt(hex[1].slice(i, i + 2), 16));
+  const fn = /^rgb\((\d+),(\d+),(\d+)\)$/u.exec(c);
+  return fn === null ? null : [Number(fn[1]), Number(fn[2]), Number(fn[3])];
+}
+
+/**
+ * The ink a mode resolves an unstyled cell to, and how far it fades a dim one.
+ *
+ * **`fade` is read off the theme rather than chosen** (design check R4). Dim was
+ * a fixed `#666666` whatever the colour and whatever the ground — so a dim
+ * accent and a dim error drew the same grey, and on the light page dim *raised*
+ * the contrast it exists to lower. A terminal draws faint as the colour moved
+ * toward the ground; the theme states how far in its own two slots, `dim`
+ * against `default` over `bg`, so the fraction is that ratio averaged over the
+ * channels — 0.60 dark, 0.73 light. Dim over the default ink is the theme's
+ * `dim` slot exactly, which is the one case a reader can check by eye.
+ */
+function inkOf(mode) {
+  const t = MODES[mode];
+  const fg = t.palettes.tone.slots.default;
+  const dim = t.palettes.tone.slots.dim;
+  const bg = t.surfaces.bg;
+  const [f, d, g] = [fg, dim, bg].map(rgbOf);
+  const fade = [0, 1, 2].reduce((acc, i) => acc + (d[i] - g[i]) / (f[i] - g[i]), 0) / 3;
+  return { mode, fg, dim, bg, fade };
+}
+const INKS = { dark: inkOf("dark"), light: inkOf("light") };
+
+/** A colour faded toward the ground by the mode's own fraction. */
+function dimmed(colour, ink) {
+  if (colour === ink.fg) return ink.dim;
+  const c = rgbOf(colour);
+  const g = rgbOf(ink.bg);
+  if (c === null || g === null) return ink.dim;
+  const [r, gg, b] = c.map((v, i) => Math.round(g[i] + (v - g[i]) * ink.fade));
+  return `rgb(${r},${gg},${b})`;
+}
+
 const ESC = /\x1b\[([0-9;]*)m/g;
 
 /** The sheet canvas fill, as sharp wants it — same source as every panel's. */
@@ -112,80 +169,110 @@ export function sheetBg() {
   };
 }
 
-export function parseLine(raw) {
+export function parseLine(raw, ink = INKS.dark) {
   const spans = [];
-  let colour = FG;
+  let colour = ink.fg;
   let background = null;
   let bold = false;
+  // **Dim, italic and underline are flags applied at emit time**, for inverse's
+  // reason below: `2` then `39` must still draw faint, and `22` has to undo dim
+  // as well as bold — which it could not while dim was a colour substituted on
+  // the spot ("dim has no reliable inverse" was this parser's, not SGR's).
+  let dim = false;
+  let italic = false;
+  let underline = false;
   // Reverse video (`7`/`27`): the channels swap, and the swap is undone by
   // swapping back rather than by resetting — a `39` inside an inverse run must
   // still land on the right channel. Held as a flag and applied at emit time.
   let inverse = false;
   let pos = 0;
   const emit = (text) => {
+    const ink_ = dim ? dimmed(colour, ink) : colour;
+    const style = { bold, dim, italic, underline };
     if (inverse) {
-      spans.push({ text, colour: background ?? sheetBgHex(), background: colour, bold });
+      spans.push({ text, colour: background ?? ink.bg, background: ink_, ...style });
     } else {
-      spans.push({ text, colour, background, bold });
+      spans.push({ text, colour: ink_, background, ...style });
     }
   };
   for (const m of raw.matchAll(ESC)) {
     if (m.index > pos) emit(raw.slice(pos, m.index));
     pos = m.index + m[0].length;
-    const params = m[1].split(";").map(Number);
-    if (params[0] === 0) {
-      colour = FG;
-      background = null;
-      bold = false;
-      inverse = false;
-    } else if (params[0] === 7) {
-      inverse = true;
-    } else if (params[0] === 27) {
-      inverse = false;
-    } else if (params[0] === 39) {
-      colour = FG;
-    } else if (params[0] === 49) {
-      background = null;
-    } else if (params[0] === 48 && params[1] === 2 && params.length >= 5) {
-      background = `rgb(${params[2]},${params[3]},${params[4]})`;
-    } else if (params[0] === 48 && params[1] === 5 && params.length >= 3) {
-      background = colour256(params[2]);
-    } else if (params[0] === 38 && params[1] === 2 && params.length >= 5) {
-      colour = `rgb(${params[2]},${params[3]},${params[4]})`;
-    } else if (params[0] === 38 && params[1] === 5 && params.length >= 3) {
-      colour = colour256(params[2]);
-    } else if (params[0] >= 30 && params[0] <= 37) {
-      colour = colour256(params[0] - 30);
-    } else if (params[0] >= 90 && params[0] <= 97) {
-      colour = colour256(params[0] - 82);
-    } else if (params[0] >= 40 && params[0] <= 47) {
-      background = colour256(params[0] - 40);
-    } else if (params[0] >= 100 && params[0] <= 107) {
-      background = colour256(params[0] - 92);
-    } else if (params[0] === 1) {
-      // **Bold, and at one bit it is the entire signal.** `tone("error")`
-      // resolves to `{ bold: true }` below `colourDepth: 4` — no colour at all —
-      // so a renderer dropping this draws a 1-bit error frame identically to
-      // plain text and the image shows the failure the design exists to prevent
-      // while looking correct. An instrument reassembling real bytes with a
-      // wrong model, which this file has shipped once before.
-      bold = true;
-    } else if (params[0] === 2) {
-      // dim — darken current colour; approximate by halving
-      colour = dimColour(colour);
-    } else if (params[0] === 22) {
-      // normal intensity — undoes bold; dim has no reliable inverse
-      bold = false;
+    // **Every parameter, not the first** (design check, latent). This read
+    // `params[0]` and stopped, so `1;38;2;R;G;B` — which `sgr()` writes, bold
+    // first in numeric order — set bold and dropped the colour. A compound SGR
+    // is a list of instructions applied left to right, and `38`/`48` consume
+    // their own arguments.
+    const params = m[1] === "" ? [0] : m[1].split(";").map(Number);
+    for (let i = 0; i < params.length; i += 1) {
+      const p = params[i];
+      if (p === 0) {
+        colour = ink.fg;
+        background = null;
+        bold = false;
+        dim = false;
+        italic = false;
+        underline = false;
+        inverse = false;
+      } else if (p === 38 || p === 48) {
+        let value = null;
+        if (params[i + 1] === 2 && i + 4 < params.length) {
+          value = `rgb(${params[i + 2]},${params[i + 3]},${params[i + 4]})`;
+          i += 4;
+        } else if (params[i + 1] === 5 && i + 2 < params.length) {
+          value = colour256(params[i + 2]);
+          i += 2;
+        }
+        if (value !== null) {
+          if (p === 38) colour = value;
+          else background = value;
+        }
+      } else if (p === 7) {
+        inverse = true;
+      } else if (p === 27) {
+        inverse = false;
+      } else if (p === 39) {
+        colour = ink.fg;
+      } else if (p === 49) {
+        background = null;
+      } else if (p >= 30 && p <= 37) {
+        colour = colour256(p - 30);
+      } else if (p >= 90 && p <= 97) {
+        colour = colour256(p - 82);
+      } else if (p >= 40 && p <= 47) {
+        background = colour256(p - 40);
+      } else if (p >= 100 && p <= 107) {
+        background = colour256(p - 92);
+      } else if (p === 1) {
+        // **Bold, and at one bit it is the entire signal.** `tone("error")`
+        // resolves to `{ bold: true }` below `colourDepth: 4` — no colour at all —
+        // so a renderer dropping this draws a 1-bit error frame identically to
+        // plain text and the image shows the failure the design exists to prevent
+        // while looking correct. An instrument reassembling real bytes with a
+        // wrong model, which this file has shipped once before.
+        bold = true;
+      } else if (p === 2) {
+        dim = true;
+      } else if (p === 22) {
+        // Normal intensity — SGR's one code for undoing both bold and faint.
+        bold = false;
+        dim = false;
+      } else if (p === 3) {
+        italic = true;
+      } else if (p === 23) {
+        italic = false;
+      } else if (p === 4) {
+        // **Underline was dropped, and it hid the diff's word-level marks**
+        // (design check R2): C25 underlines the changed words inside a changed
+        // line, and the image showed the line with nothing marked in it.
+        underline = true;
+      } else if (p === 24) {
+        underline = false;
+      }
     }
   }
   if (pos < raw.length) emit(raw.slice(pos));
   return spans;
-}
-
-/** The sheet's ground as `rgb(...)`, for an inverse run over no background. */
-function sheetBgHex() {
-  const { r, g, b } = sheetBg();
-  return `rgb(${r},${g},${b})`;
 }
 
 /**
@@ -198,7 +285,7 @@ function sheetBgHex() {
  * arm gets built then, against something that exercises it.
  */
 const KNOWN_SGR = new Set([
-  0, 1, 2, 7, 22, 27, 38, 39, 48, 49,
+  0, 1, 2, 3, 4, 7, 22, 23, 24, 27, 38, 39, 48, 49,
   30, 31, 32, 33, 34, 35, 36, 37, 90, 91, 92, 93, 94, 95, 96, 97,
   40, 41, 42, 43, 44, 45, 46, 47, 100, 101, 102, 103, 104, 105, 106, 107,
 ]);
@@ -206,8 +293,14 @@ const KNOWN_SGR = new Set([
 export function unparsedSgr(raw) {
   const seen = new Set();
   for (const m of raw.matchAll(ESC)) {
-    const first = Number(m[1].split(";")[0]);
-    if (!KNOWN_SGR.has(first)) seen.add(first);
+    // Every parameter, as `parseLine` reads them: a watcher reading only the
+    // first would pass `1;5` while the parser silently ignored the `5`.
+    const params = m[1] === "" ? [0] : m[1].split(";").map(Number);
+    for (let i = 0; i < params.length; i += 1) {
+      const p = params[i];
+      if (!KNOWN_SGR.has(p)) seen.add(p);
+      if (p === 38 || p === 48) i += params[i + 1] === 2 ? 4 : params[i + 1] === 5 ? 2 : 0;
+    }
   }
   return [...seen].sort((a, b) => a - b);
 }
@@ -229,11 +322,6 @@ export function colour256(n) {
   }
   const g = 8 + (n - 232) * 10;
   return `rgb(${g},${g},${g})`;
-}
-
-function dimColour(c) {
-  // Rough approximation: just return a muted grey
-  return "#666666";
 }
 
 function escapeXml(s) {
@@ -260,44 +348,125 @@ function escapeXml(s) {
  * class modelled rather than rendered, and that inconsistency is where the
  * error hid (F204).
  */
-export function ansiToSvg(ansi) {
+/**
+ * Which mode a frame is in, and the ground its page is drawn on.
+ *
+ * **Read off the frame, because the frame is the only witness.** A dark frame
+ * paints no ground — the dark theme declares `background: "terminal"` and
+ * inherits — while a light frame paints its ground into every cell. So: when one
+ * background covers at least half of the frame's cells, that background *is* the
+ * page, and its luminance says which mode's ink an unstyled cell takes; otherwise
+ * the page is the mode's own `bg`. An explicit `mode` overrides the inference,
+ * for a caller that knows and a frame too sparse to say.
+ */
+function groundOf(lines, maxCols, mode) {
+  if (mode !== undefined) return { ink: INKS[mode], ground: INKS[mode].bg };
+  const counts = new Map();
+  for (const line of lines) {
+    for (const span of parseLine(line)) {
+      if (span.background === null) continue;
+      const n = [...span.text].length;
+      counts.set(span.background, (counts.get(span.background) ?? 0) + n);
+    }
+  }
+  let best = null;
+  let most = 0;
+  for (const [bg, n] of counts) if (n > most) [best, most] = [bg, n];
+  if (best === null || most * 2 < lines.length * maxCols) return { ink: INKS.dark, ground: INKS.dark.bg };
+  const [r, g, b] = rgbOf(best) ?? [0, 0, 0];
+  const light = 0.2126 * r + 0.7152 * g + 0.0722 * b > 127.5;
+  return { ink: light ? INKS.light : INKS.dark, ground: best };
+}
+
+/**
+ * Glyphs no font in the rendering container has, drawn from their definition.
+ *
+ * **`⎿` drew as tofu** (design check R1): `fc-list ":charset=23bf"` is empty in
+ * this container, and the hook is on every call's first body row. A font package
+ * is a dependency (CLAUDE.md), so the glyph is modelled the way braille is —
+ * from what the character *is*: DENTISTRY SYMBOL LIGHT VERTICAL AND BOTTOM
+ * RIGHT, a vertical down the cell's centre that turns right at the baseline.
+ * The stroke is DejaVu's own light box-drawing weight, measured off `└` at 8×:
+ * 1.125 units, centred at half a cell — so the hook meets a `│` or `─` drawn by
+ * the font beside it. `└` keeps the font: it is covered, and the two must stay
+ * different glyphs.
+ *
+ * The set is every registry glyph and every recorded frame's code point that
+ * no face covers, measured 2026-10-03: `⎿` alone. `⊶ ⊷` fall back to DejaVu
+ * Math and are covered.
+ */
+const STROKE = 1.125;
+const GEOMETRY = {
+  "⎿": (x, top) => {
+    const cx = x + CELL_W / 2 - STROKE / 2;
+    const base = top + CELL_H - 4;
+    return [
+      [cx, top, STROKE, base - top + STROKE / 2],
+      [cx, base - STROKE / 2, x + CELL_W - cx, STROKE],
+    ];
+  },
+};
+
+/** One SVG rect, crisp — a run's edge lands on a whole pixel at any density. */
+const rect = (x, y, w, h, fill) =>
+  `<rect x="${x.toFixed(3)}" y="${y.toFixed(3)}" width="${w.toFixed(3)}" height="${h.toFixed(3)}" fill="${fill}" shape-rendering="crispEdges"/>`;
+
+/**
+ * Columns of one row grouped into runs of one value, as `[start, end, value]`.
+ *
+ * **One rect per run, edges computed once** (design check R3). Each span's
+ * background was its own anti-aliased rect at a fractional pitch — 8.41 × 2 —
+ * so two touching rects each half-covered the pixel they shared, and the page
+ * showed through at every span boundary. A run is now one rect whatever spans
+ * it crosses, a boundary's x is `PAD + col × CELL_W` for both neighbours, and
+ * `crispEdges` puts both on the same pixel.
+ */
+function runs(values) {
+  const out = [];
+  for (let c = 0; c < values.length; c += 1) {
+    const v = values[c];
+    const last = out[out.length - 1];
+    if (last !== undefined && last[1] === c && last[2] === v) last[1] = c + 1;
+    else out.push([c, c + 1, v]);
+  }
+  return out.filter(([, , v]) => v !== null);
+}
+
+export function ansiToSvg(ansi, opts = {}) {
   const lines = ansi.replace(/\n$/, "").split("\n");
   const maxCols = lines.reduce((mx, line) => {
     const stripped = line.replace(/\x1b\[[0-9;]*m/g, "");
-    return Math.max(mx, stripped.length);
+    return Math.max(mx, [...stripped].length);
   }, 0);
+  const { ink, ground } = groundOf(lines, maxCols, opts.mode);
 
   const width = maxCols * CELL_W + PAD * 2;
   const height = lines.length * CELL_H + PAD * 2;
 
   const parts = [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">`,
-    `<rect width="100%" height="100%" fill="${BG}"/>`,
+    `<rect width="100%" height="100%" fill="${ground}"/>`,
     `<style>text { font-family: 'DejaVu Sans Mono', 'Menlo', 'Consolas', monospace; font-size: ${FONT_SIZE}px; }</style>`,
   ];
 
   for (let row = 0; row < lines.length; row++) {
-    const spans = parseLine(lines[row]);
+    const spans = parseLine(lines[row], ink);
     let col = 0;
     const y = PAD + (row + 1) * CELL_H - 4;
+    const top = PAD + row * CELL_H;
 
     // Background runs first, so a glyph is never painted over by its own cell's
-    // fill. Nothing in the framework emits these today — plots resolve no
-    // background at all — but a swallowed code is how this renderer already
-    // shipped drawing every frame in the default foreground.
-    {
-      let bgCol = 0;
-      for (const span of spans) {
-        const n = [...span.text].length;
-        if (span.background !== null && n > 0) {
-          const x = PAD + bgCol * CELL_W;
-          parts.push(
-            `<rect x="${x.toFixed(1)}" y="${(PAD + row * CELL_H).toFixed(1)}" ` +
-            `width="${(n * CELL_W).toFixed(1)}" height="${CELL_H}" fill="${span.background}"/>`,
-          );
-        }
-        bgCol += n;
+    // fill; underline runs after the glyphs below, in the ink of their cells.
+    const grounds = [];
+    const underlines = [];
+    for (const span of spans) {
+      for (const _ of span.text) {
+        grounds.push(span.background);
+        underlines.push(span.underline === true ? span.colour : null);
       }
+    }
+    for (const [from, to, fill] of runs(grounds)) {
+      parts.push(rect(PAD + from * CELL_W, top, (to - from) * CELL_W, CELL_H, fill));
     }
 
     for (const span of spans) {
@@ -397,8 +566,14 @@ export function ansiToSvg(ansi) {
             }
             return;
           }
+          const drawn = GEOMETRY[ch];
+          if (drawn !== undefined) {
+            for (const [rx, ry, rw, rh] of drawn(x, PAD + row * CELL_H)) parts.push(rect(rx, ry, rw, rh, span.colour));
+            return;
+          }
           const weight = span.bold === true ? ' font-weight="bold"' : "";
-          parts.push(`<text x="${x.toFixed(1)}" y="${y}" fill="${span.colour}"${weight}>${escapeXml(ch)}</text>`);
+          const slant = span.italic === true ? ' font-style="italic"' : "";
+          parts.push(`<text x="${x.toFixed(1)}" y="${y}" fill="${span.colour}"${weight}${slant}>${escapeXml(ch)}</text>`);
         });
         textRun = "";
       };
@@ -412,6 +587,11 @@ export function ansiToSvg(ansi) {
         col++;
       }
       flush();
+    }
+    // A run of underlined cells is one rule a pixel below the baseline,
+    // spaces included — a terminal underlines the cell, not the glyph.
+    for (const [from, to, fill] of runs(underlines)) {
+      parts.push(rect(PAD + from * CELL_W, y + 1.5, (to - from) * CELL_W, 1, fill));
     }
   }
 

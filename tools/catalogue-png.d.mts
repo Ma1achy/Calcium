@@ -8,7 +8,7 @@
 import type { Buffer } from "node:buffer";
 
 /** ANSI, with SGR, to an SVG document at the catalogue's cell metrics. */
-export declare function ansiToSvg(ansi: string): string;
+export declare function ansiToSvg(ansi: string, opts?: Readonly<{ mode?: "dark" | "light" }>): string;
 
 /** An SVG document to PNG bytes. 144 is the still catalogue's 2×; 72 is 1:1. */
 export declare function pngFromSvg(svg: string, density?: number): Promise<Buffer>;
