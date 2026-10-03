@@ -300,6 +300,10 @@ const BYTES: Readonly<Record<string, readonly string[]>> = {
   "panel ms+up": ["\u001b[1;4A", "\u001b[1;10A"],
   "panel ms+down": ["\u001b[1;4B", "\u001b[1;10B"],
   "panel m+o": ["\u001bo"],
+  // The scroll's second base route (C16 I36, F1441, `R-KEY-011`): `ESC k` and
+  // `ESC j`, which no terminal's default keymap is recorded as taking.
+  "panel m+k": ["\u001bk"],
+  "panel m+j": ["\u001bj"],
 
   // C17's editing set (I21). **This table is the check the ruling asked
   // for**, and it earned it: every meta form here is one a terminal has to
@@ -1199,8 +1203,11 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     //
     // **157 from C22 I143 and C22 I144** (`R-KEY-010`, ruling 53 amended): the chip
     // preview's `⌥⇧↑`, `⌥⇧↓` and `⌥o` at `panel` — three in, none out.
-    expect(rows).toHaveLength(157);
-    expect(new Set(rows).size, "no two rows are identical").toBe(157);
+    //
+    // **159 from C16 I36** (F1441, `R-KEY-011`): the scroll's second base
+    // route, `⌥k` and `⌥j` at `panel` — two in, none out.
+    expect(rows).toHaveLength(159);
+    expect(new Set(rows).size, "no two rows are identical").toBe(159);
 
     // Every row whose chord the registry names resolves to the registry's key —
     // the join asserted from the table's side, so a `chordOf` call that silently
@@ -1266,8 +1273,11 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
       //
       // **113 from C22 I143 and C22 I144** (`R-KEY-010`): the chip preview's three
       // are all the registry's own chords.
+      //
+      // **115 from C16 I36** (F1441, `R-KEY-011`): `⌥k` and `⌥j`, the scroll's
+      // second base route, are the registry's too.
       "the rows the registry supplies a chord for",
-    ).toBe(113);
+    ).toBe(115);
   });
 
   it("T1.94 (I41): ⌘↑ and ⌥↑ are two actions under the enhanced profile and one under the base", () => {
@@ -1394,9 +1404,36 @@ describe("C16 §6a — two profiles, and the registry's authority over the table
     expect(rich.entries().some((b) => b.profile === "enhanced-terminal")).toBe(true);
   });
 
-  it.todo(
-    "T1.201 (I36, F1441): every default-terminal key record on a chord an emulator is recorded as taking has a second default-terminal record off the list — not deferred on a component: it lands with the second preview route in the next commit",
-  );
+  /**
+   * **Chords a terminal's own default keymap may take before the application
+   * sees them** (C16 I36, F1441), with the emulator, its documented binding and
+   * the date it was written down. **Unmeasured**: no Windows session can be run
+   * here, so these are what the emulator's documentation says and not what a
+   * keypress delivered. Windows Terminal's `alt+arrow` (`moveFocus`) is the same
+   * class and is not on the list — I36's stated blind spot, not a silent pass.
+   */
+  const EMULATOR_TAKEN: readonly Readonly<{ chord: string; emulator: string; binding: string; recorded: string }>[] = [
+    { chord: "⌥⇧↑", emulator: "Windows Terminal", binding: "alt+shift+up → resizePane up", recorded: "2026-10-03" },
+    { chord: "⌥⇧↓", emulator: "Windows Terminal", binding: "alt+shift+down → resizePane down", recorded: "2026-10-03" },
+  ];
+
+  it("T1.201 (I36, F1441): every action bound on a chord an emulator may take has a second `default-terminal` route that is not", () => {
+    // §6c closed `⌘` and `⌃⇥` by never letting an action depend on them, not by
+    // proving they arrive. This is the same closure for a chord the *terminal*
+    // may keep: the record can stay, and it cannot be the only base route.
+    const taken = new Set(EMULATOR_TAKEN.map((t) => t.chord));
+    const base = (REGISTRY.bindings as readonly Readonly<{
+      actionId: string; chord: string; scope: string; kind: string; status: string; profile: string;
+    }>[]).filter((b) => b.kind === "key" && b.status === "current" && b.profile === "default-terminal");
+    const onTaken = base.filter((b) => taken.has(b.chord));
+    // **The control**: the list has a subject in the registry, so a sweep over
+    // nothing cannot pass.
+    expect(onTaken.length, "a current default-terminal record sits on a taken chord").toBeGreaterThan(0);
+    const stranded = onTaken
+      .filter((b) => !base.some((o) => o.actionId === b.actionId && !taken.has(o.chord)))
+      .map((b) => `${b.actionId} on ${b.chord}`);
+    expect(stranded, "actions whose only base route an emulator may take").toEqual([]);
+  });
 
   it("T1.36 (I36): every action in the table has a `default-terminal` route", () => {
     // An action reachable only where the protocol is reported is an action most

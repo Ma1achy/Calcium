@@ -1,4 +1,4 @@
-● keys · 69 bindings
+● keys · 71 bindings
 Help is an ENTRY in scrollback: copyable, filterable, and scrolled past like any other durable event.
 
  prompt
@@ -8,7 +8,9 @@ Help is an ENTRY in scrollback: copyable, filterable, and scrolled past like any
   key ⌃Y     paste
   key ⌥⌫     drop the last queued message
   key ⌥⇧↑    scroll the chip preview up · previewing
+  key ⌥k     scroll the chip preview up · previewing
   key ⌥⇧↓    scroll the chip preview down · previewing
+  key ⌥j     scroll the chip preview down · previewing
   key ⌥o     open the chip in the editor · previewing
 
  global

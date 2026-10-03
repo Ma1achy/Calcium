@@ -1,7 +1,7 @@
 {
   "meta": {
     "name": "Calcium design language",
-    "revision": "0.21",
+    "revision": "0.22",
     "generatedArtifact": "calcium-design-language.html",
     "ruleIdPolicy": "IDs are explicit, permanent, and never derived from order.",
     "normativeSource": "calcium-registry.json",
@@ -19488,15 +19488,31 @@
       "id": "R-KEY-010",
       "title": "A chip preview's own keys are chords the prompt does not bind, and enter always sends",
       "text": "While a chip preview is up, the prompt keeps every key it binds, and enter sends. The preview owns three chords the prompt does not bind, each deliverable without the Kitty protocol: ⌥⇧↑ and ⌥⇧↓ scroll the preview, and ⌥o opens the chip in the reader's editor. The preview's key row names them from the keymap.",
-      "status": "current",
+      "status": "superseded",
       "sectionKey": "replace-or-float-and-where-a-chip-previews-101",
       "tags": [
         "interaction"
       ],
       "supersedes": [],
-      "supersededBy": null,
+      "supersededBy": "R-KEY-011",
       "legacyIds": [],
       "contentDigest": "cee512e3fe6a687fa382b6fcc874b9e74946ef991adad7a9e0366722a503705a"
+    },
+    {
+      "id": "R-KEY-011",
+      "title": "A chip preview's own keys are chords the prompt does not bind, and enter always sends",
+      "text": "While a chip preview is up, the prompt keeps every key it binds, and enter sends. The preview owns five chords the prompt does not bind, each deliverable without the Kitty protocol: ⌥⇧↑ and ⌥⇧↓ scroll the preview, and so do ⌥k and ⌥j, because a terminal's own keymap may take the first pair and no action depends on a chord it may take; ⌥o opens the chip in the reader's editor. The preview's key row names them from the keymap.",
+      "status": "current",
+      "sectionKey": "replace-or-float-and-where-a-chip-previews-101",
+      "tags": [
+        "interaction"
+      ],
+      "supersedes": [
+        "R-KEY-010"
+      ],
+      "supersededBy": null,
+      "legacyIds": [],
+      "contentDigest": "ee0da4cb216a0e2d883c4ea5f32437b1cf12c9c543bae4ab955c20eea39ab46b"
     }
   ],
   "sections": [
@@ -34695,7 +34711,7 @@
       "label": "scroll the chip preview up",
       "status": "current",
       "ruleIds": [
-        "R-KEY-010"
+        "R-KEY-011"
       ]
     },
     {
@@ -34703,7 +34719,7 @@
       "label": "scroll the chip preview down",
       "status": "current",
       "ruleIds": [
-        "R-KEY-010"
+        "R-KEY-011"
       ]
     },
     {
@@ -34711,7 +34727,7 @@
       "label": "open the chip in the editor",
       "status": "current",
       "ruleIds": [
-        "R-KEY-010"
+        "R-KEY-011"
       ]
     }
   ],
@@ -35925,7 +35941,21 @@
       "profile": "default-terminal",
       "status": "current",
       "ruleIds": [
-        "R-KEY-010"
+        "R-KEY-011"
+      ],
+      "kind": "key",
+      "when": "previewing"
+    },
+    {
+      "id": "binding.preview-scroll-up-k",
+      "actionId": "preview.scroll.up",
+      "chord": "⌥k",
+      "scope": "prompt",
+      "label": "scroll the chip preview up",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-011"
       ],
       "kind": "key",
       "when": "previewing"
@@ -35939,7 +35969,21 @@
       "profile": "default-terminal",
       "status": "current",
       "ruleIds": [
-        "R-KEY-010"
+        "R-KEY-011"
+      ],
+      "kind": "key",
+      "when": "previewing"
+    },
+    {
+      "id": "binding.preview-scroll-down-j",
+      "actionId": "preview.scroll.down",
+      "chord": "⌥j",
+      "scope": "prompt",
+      "label": "scroll the chip preview down",
+      "profile": "default-terminal",
+      "status": "current",
+      "ruleIds": [
+        "R-KEY-011"
       ],
       "kind": "key",
       "when": "previewing"
@@ -35953,7 +35997,7 @@
       "profile": "default-terminal",
       "status": "current",
       "ruleIds": [
-        "R-KEY-010"
+        "R-KEY-011"
       ],
       "kind": "key",
       "when": "previewing"

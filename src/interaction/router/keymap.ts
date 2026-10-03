@@ -341,13 +341,18 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
   // is why C20 adds no fourth row here.
   { target: "panel", key: { name: "r", ctrl: true }, action: "searchOlder" },
   //
-  // **The chip preview's own three** (C22 I143, C22 I144, `R-KEY-010`, ruling 53
+  // **The chip preview's own** (C22 I143, C22 I144, `R-KEY-011`, ruling 53
   // amended). `panel` because the preview is a prompt substate (C15 I29): the
   // prompt answers first (`promptUnderMenu`) and binds none of these, so they
   // reach the panel's rows. Over a menu or a search the row resolves too, and
   // the effect asks the owner — consumed, and nothing moves (§6q.2).
-  { target: "panel", ...fromRegistry("preview.scroll.up"), action: "previewScrollUp" },
-  { target: "panel", ...fromRegistry("preview.scroll.down"), action: "previewScrollDown" },
+  // **The scroll has two base routes** (C16 I36, F1441): `⌥⇧↑`/`⌥⇧↓` first,
+  // which the key row names, and `⌥k`/`⌥j` because Windows Terminal's default
+  // keymap may take the first pair before it arrives.
+  { target: "panel", ...fromRegistry("preview.scroll.up", "default-terminal", "binding.preview-scroll-up"), action: "previewScrollUp" },
+  { target: "panel", ...fromRegistry("preview.scroll.down", "default-terminal", "binding.preview-scroll-down"), action: "previewScrollDown" },
+  { target: "panel", ...fromRegistry("preview.scroll.up", "default-terminal", "binding.preview-scroll-up-k"), action: "previewScrollUp" },
+  { target: "panel", ...fromRegistry("preview.scroll.down", "default-terminal", "binding.preview-scroll-down-j"), action: "previewScrollDown" },
   { target: "panel", ...fromRegistry("preview.open"), action: "previewOpen" },
 
   // --- C17, readline's set and no more (I21, C16 §6) -----------------------
@@ -936,12 +941,18 @@ export const defaultKeymap: readonly BuiltinBinding[] = [
  * Asked by `(actionId, profile)` and thrown on anything but one answer — a
  * build-time fact: a missing record means the registry changed under a row that
  * still names it, and a fallback chord would bind something nobody asked for.
+ * **`id` narrows to one record where an action has two in one profile** — the
+ * chip preview's scroll, whose second base route exists because a terminal's
+ * own keymap may take the first (C16 I36, F1441) — so the answer is still one.
  */
 function fromRegistry(
   actionId: string,
   profile: KeyProfile = "default-terminal",
+  id?: string,
 ): Readonly<{ key: Binding["key"]; registry: string; profile?: "enhanced-terminal" }> {
-  const found = REGISTRY_BINDINGS.filter((b) => b.actionId === actionId && b.profile === profile);
+  const found = REGISTRY_BINDINGS.filter(
+    (b) => b.actionId === actionId && b.profile === profile && (id === undefined || b.id === id),
+  );
   const only = found[0];
   if (only === undefined || found.length !== 1) { // graphemes-ok — an array of registry records, not text
     throw new Error(`${String(found.length)} registry bindings for ${actionId} in ${profile}, not one`); // graphemes-ok — the same array's count

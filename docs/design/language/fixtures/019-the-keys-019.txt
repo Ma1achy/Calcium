@@ -1,6 +1,6 @@
-RESOLVED KEYMAP · 69 bindings · default and enhanced terminals
+RESOLVED KEYMAP · 71 bindings · default and enhanced terminals
 The universal set gives one purpose to each key and does not depend on what has focus; the active owner resolves that purpose.
-Actions are primary. Chords are the resolved profile. A named command route is the intended contract; only 1 of 69 bindings carry one today.
+Actions are primary. Chords are the resolved profile. A named command route is the intended contract; only 1 of 71 bindings carry one today.
 
  global
   key ⏎      confirm · send · activate · open
@@ -65,7 +65,9 @@ Actions are primary. Chords are the resolved profile. A named command route is t
   key ⌃Y     paste
   key ⌥⌫     drop the last queued message
   key ⌥⇧↑    scroll the chip preview up · previewing
+  key ⌥k     scroll the chip preview up · previewing
   key ⌥⇧↓    scroll the chip preview down · previewing
+  key ⌥j     scroll the chip preview down · previewing
   key ⌥o     open the chip in the editor · previewing
 
  transcript

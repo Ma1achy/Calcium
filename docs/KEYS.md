@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT. Source: docs/design/language/calcium-registry.json, rendered by build-calcium.mjs's renderKeysMarkdown; written with the key ladder below by tools/keymap-table.mjs -->
 # Calcium keys
 
-Revision 0.21 · 69 current bindings · a `default-terminal` chord is one a terminal without the Kitty protocol sends; an `enhanced-terminal` chord needs the protocol
+Revision 0.22 · 71 current bindings · a `default-terminal` chord is one a terminal without the Kitty protocol sends; an `enhanced-terminal` chord needs the protocol
 
 The universal set gives one purpose to each key and does not depend on what has focus; the active owner resolves that purpose.
 
@@ -76,7 +76,9 @@ docs/KEYS.md and the help entry come from the same source; a hand-written keymap
 | key | ⌃Y | default-terminal | always | paste | paste |
 | key | ⌥⌫ | default-terminal | always | queue.drop | drop the last queued message |
 | key | ⌥⇧↑ | default-terminal | previewing | preview.scroll.up | scroll the chip preview up |
+| key | ⌥k | default-terminal | previewing | preview.scroll.up | scroll the chip preview up |
 | key | ⌥⇧↓ | default-terminal | previewing | preview.scroll.down | scroll the chip preview down |
+| key | ⌥j | default-terminal | previewing | preview.scroll.down | scroll the chip preview down |
 | key | ⌥o | default-terminal | previewing | preview.open | open the chip in the editor |
 
 ## transcript
@@ -171,7 +173,9 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `home` | both |  |  |  |  |  |  | home |  |  |  |
 | `⇧home` | both |  |  |  |  |  |  | extendLineStart |  |  |  |
 | `⌃J` | both |  |  |  |  |  |  | insertNewline |  |  |  |
+| `⌥j` | both |  |  |  |  | previewScrollDown |  |  |  |  |  |
 | `⌃K` | both |  |  |  |  |  |  | killToEnd |  |  |  |
+| `⌥k` | both |  |  |  |  | previewScrollUp |  |  |  |  |  |
 | `⌃←` | both |  |  |  |  |  |  | wordLeft |  |  |  |
 | `←` † | both |  |  |  | moveSemanticCaretLeft |  | insideLeft | left | watchPrev | elementLeft |  |
 | `⌥←` † | both |  |  |  |  |  |  | wordLeft |  | dividerLeft |  |
@@ -209,4 +213,4 @@ Columns left to right are the ladder's priority (C16 §3, A02 §2): the active t
 | `⌃Z` | both |  |  |  |  |  |  | undo |  |  |  |
 | `⌥z` | both |  |  |  |  |  |  | redo |  |  |  |
 
-157 bindings · 104 keys · 25 resolved by the ladder (†).
+159 bindings · 106 keys · 25 resolved by the ladder (†).
