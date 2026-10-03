@@ -811,6 +811,28 @@ with it** — it indexes pairs, and a cell where three rules meet is in neither 
 Tier 1 in `test/unit/layout-engine.test.ts`, one row per invariant, plus the contract sweep in
 `test/contract/layout.test.ts` where a kind moves onto the engine.
 
+**The per-invariant rows, declared** (F1500). The sentence above was their only declaration, so the
+seventeen rows the tests title `T1.1`–`T1.17` named ids no table held, and A03 SP16 could not tell them
+from a title that had drifted. Row *k* is invariant I*k*'s:
+
+- **T1.1** (I1): every dimension is a whole number of cells, and cells() is the width authority.
+- **T1.2** (I2): a FIT parent sums along its axis and maxes across it, padding and gaps included.
+- **T1.3** (I3): GROW and PERCENT contribute min to a FIT parent, and min defaults to 0.
+- **T1.4** (I4): largest remainder, ties by declaration order, and the leftover is a declared policy.
+- **T1.5** (I5): clamping precedes distribution and reaches a fixed point in at most n rounds, counted.
+- **T1.6** (I6): min is a hard floor, the container clips, and no child is dropped.
+- **T1.7** (I7): n children have n − 1 gaps, a zero child keeps its gap, and padding clamps with them.
+- **T1.8** (I8): alignment acts on slack, centring rounds down, and a no-op alignment is counted.
+- **T1.9** (I9): stretch resolves where its cross axis is solved, over FIT only, silent against GROW.
+- **T1.10** (I10): aspect is pass 2 on width and pass 4 on height, shrinks only, and loses without slack.
+- **T1.11** (I11): the passes run in order, and one re-fit suffices because text wraps at its solved width.
+- **T1.12** (I12): measure stops after pass 4 and equals the composed row count, over the corpus.
+- **T1.13** (I13): the tree and the width are the only inputs.
+- **T1.14** (I14): the degenerate sizes are answers — 0 measures 0 and a zero child is kept.
+- **T1.15** (I15): clipping is per axis with a childOffset, and a clip never changes a measured height.
+- **T1.16** (I16): the engine never throws, so measure stays pure and total.
+- **T1.17** (I17): the module header names the clay port and the version read, and DEPENDENCIES.md carries the refusal.
+
 **The gate that catches a moved frame is the terminal baseline** — 2,440 frames, byte-exact, set
 equality both ways — and the **unregenerable** oracle beneath it (1,916 captures, F1209). Expected
 movers are named before a run and explained after it.
