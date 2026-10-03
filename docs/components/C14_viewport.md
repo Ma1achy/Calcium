@@ -492,6 +492,16 @@ has two blank lines in it, and a reader pasting it can tell where one command's
 output ended — a property that survives only if no block inside an entry can forge
 the same mark.
 
+**An entry's command is in a copy when the selection took it, and only then** (I65,
+F1409). The command reaches a copy as the entry's card head — a block like any
+other, copying as its verb and arguments — and the copy is the selected blocks with
+nothing composed beside them. A selection anchored in the first entry's body begins
+below that entry's head, so its copy starts at the body, while every later entry it
+crosses brings its head with it. That reads as inconsistent and is `R-SEL-003` and
+`R-SEL-015` applied: supplying the first head would copy a block the selection never
+showed, and dropping the later ones would leave out blocks it did — and either way the
+count would stop being the size of the paste.
+
 **One clipboard** (`R-SEL-011`, C17 §5a). `y` fills the same buffer `⌃k` fills and
 `⌃y` yanks, which is the reduction §1 of `CALCIUM_SELECTION_DESIGN.md` argued for
 from the other side. The system clipboard and OSC 52 are the rule's two mechanisms,
@@ -1301,6 +1311,7 @@ than stranding the user.
 - **I62** — *(C22 §6q.4 ruling 4, `R-BLK-164`, `R-BLK-159`, `R-BLK-160`, C22 I109)* **The transcript draws a bar in the margin column whenever it overflows.** On each of the region's rows, the frame's last column (`CONTENT_MARGIN_R`) holds `scrollbarColumn(viewportHeight, totalRows, topRow, set)` over this component's `scroll` — nothing when the transcript fits, because a bar that cannot move is decoration. The thumb is `accent` while focus is in the transcript and `muted` otherwise. No row is re-measured and nothing reflows: the column is blank on every row without it (C22 I109). → T1.83, T6.42
 - **I63** — *(C22 §6q, `R-BLK-363`, C16 §4a)* **A primary press on the bar jumps the view, and focus does not move.** Row *r* of an *h*-row region puts `topRow` at `round(r × maxTop / (h − 1))` — row 0 the top, row *h* − 1 the bottom; the press arms no activation and focuses nothing. While the transcript fits no bar is drawn, and a press on that column is an ordinary press. → T4.46
 - **I64** — *(C22 §6q, I4, I5)* **The jump is a scroll.** It is `scrollBy(target − topRow)`, so follow is derived from where it lands (I5): the last row follows, and any other detaches and anchors (I4). → T4.47
+- **I65** — *(F1409, `R-SEL-003`, `R-SEL-004`, `R-SEL-015`)* **A copy is the selected blocks and nothing composed beside them, an entry's command included.** The command reaches a copy as the entry's card head, which is a block with its own `copy`; it is in the copy when the selection took the head and absent when it did not. So a selection anchored in the first entry's body copies that entry from its body, and every later entry it crosses from its head — and the shell supplies no head the selection did not take and drops none it did. → T4.48
 
 ---
 
@@ -1518,6 +1529,7 @@ Fake heights, no rendering.
 - **T4.43** (I61, C17 I31): three real sessions. `clipboard: "osc52"` declared → the terminal receives `ESC ] 52 ; c ; <base64> BEL` of exactly the copied text, the toast reads `sent to the terminal's clipboard`, and `⌃y` yanks the same text. A `PATH` holding a `pbcopy` that writes its stdin to a file → that file holds the text and the toast reads `copied to the clipboard by pbcopy`. Neither → the footer reads `no clipboard` and `⏎ to file`, `y` writes nothing and toasts `no clipboard here — the kill buffer holds it`, and `⏎` writes `/state/copy.txt` with the text and toasts `saved to /state/copy.txt`. In the OSC 52 and tool sessions the footer never offers a file.
 - **T4.46** (I63, C16 §4a): through a built session, a press on the margin column at every region row *r* → `topRow` `round(r × maxTop / (h − 1))`, so 0 at the first and `maxTop` at the last; the sweep is the row, because the ends are exact under any rounding; focus is where it was and nothing is armed — a release there activates nothing; a press one column in is an ordinary press.
 - **T4.47** (I64, I5): the press on the last row leaves `followTail` on and an append keeps the view at the bottom; the press on the first row turns it off, and an append leaves the view where it was.
+- **T4.48** (I65, F1409): through a built session, two drags over the same three entries in visual mode, each in its own session — one pressed on the first entry's body, one on its card head — then `y` → the first copy begins at the body and carries the later two heads, the second begins `say` and carries all three; nothing else differs between them. Read at the editor's `copyText`, as T4.37c reads it.
 
 ### Tier 5 — e2e
 
@@ -1581,6 +1593,7 @@ Fake heights, no rendering.
 - **T6.40** (I61, K5, K6): the offer drawn while a route exists — `fileOffer` answering for every copy → **T1.82** fails, and **T4.43**'s OSC 52 session reads `⏎ to file` over a copy that went to the terminal.
 - **T6.41** (I61, K1): OSC 52 treated as failed — its copy recorded as the failed copy → **T1.82** fails: the OSC 52 session offers a file for the text it just sent.
 - **T6.42** (I62): the bar's column dropped from the paint → **T1.83** fails on every overflowing arm, and the goldens that overflow lose their right-hand column. `tools/mutate/runs/c14-transcript-bar.mjs`.
+- **T6.43** (I65, F1409): every entry the selection touches copied whole, which supplies the first entry's head — the symmetric reading the finding asked about — → **T4.48** fails on the body-pressed copy, and T4.37c's expected text with it. `tools/mutate/runs/c14-semantic-selection.mjs`.
 
 ---
 

@@ -817,3 +817,7 @@ describe("§7a (I23) — the notice names the layer that actually failed", () =>
     expect(parsed.blocks.map((b) => b.id), "the adapter rendered it").toEqual(["out"]);
   });
 });
+
+describe("C07 I12 — the remainder is the run, owed at the spec commit", () => {
+  it.todo("T3.22 (C07 I12): a stream of text from its first line reaches the document whole — not deferred on a component: the row lands with the code commit that follows this spec commit (lane b5-shell)");
+});

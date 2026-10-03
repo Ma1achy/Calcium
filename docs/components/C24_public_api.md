@@ -36,7 +36,7 @@ calcium-tui            runtime — createTui, builders, types, defaultTheme
 calcium-tui/profiling  the report types and Tier; C28 (I31)
 calcium-tui/mermaid    the Mermaid transform, and the renderer it loads (I36)
 calcium-tui/testing    adapter harness, document assertions, fakes
-calcium-tui/fixtures   recording tooling and the Fixture model
+calcium-tui/fixtures   recording tooling, the Fixture model, and C06's NDJSON reader (C08 I19)
 ```
 
 **`mermaid` is production, and it is separate for a cost rather than an audience.** `mermaidCode` is a synchronous builder over `beautiful-mermaid`, an ESM-only package that brings a layout engine with it; on the runtime barrel it was about a quarter of a cold import — 80–156 ms of 400–480 on a native filesystem, six interleaved pairs — for a builder no example calls (F1188). A synchronous function cannot load an ESM module on demand, so the two shapes that took the emulator (C23 I71) and the grammars (C09 I71) off the graph do not reach it; an entry of its own does, and it is the shape this section already has. A consumer that draws diagrams imports the subpath and pays what it paid before, when it chooses; every other consumer's first frame is that much closer to its import.

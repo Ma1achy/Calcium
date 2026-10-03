@@ -718,3 +718,7 @@ describe("C23 — the call grammar's head states", () => {
     expect(heads(mixed.blocks)[0]).toBe("agent(review) · 8s · 3 of 3");
   });
 });
+
+describe("C23 I54 — a two-word verb's card, owed at the spec commit", () => {
+  it.todo("T4.108 (C23 I54): container stats worker reads container stats(worker) — not deferred on a component: the row lands with the code commit that follows this spec commit (lane b5-shell)");
+});

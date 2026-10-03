@@ -1243,3 +1243,7 @@ describe("C23 §7g — a question's life in a built session", () => {
     expect(ok.calls).not.toContain("invoke");
   });
 });
+
+describe("C23 I94 — the outcome decides, owed at the spec commit", () => {
+  it.todo("T4.110 (C23 I94): a withdrawal resolved on y runs nothing — not deferred on a component: the row lands with the code commit that follows this spec commit (lane b5-shell)");
+});

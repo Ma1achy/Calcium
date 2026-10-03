@@ -445,3 +445,7 @@ describe("C08 §4 — a mutating verb's answer has a recording behind it", () =>
     ).toMatch(/export interface WorldDriver\b/u);
   });
 });
+
+describe("C08 I19 — an authored stream takes C06's reader, owed at the spec commit", () => {
+  it.todo("T2.13 (C08 I19): the fixtures entry's createNdjsonReader is the transport's own — not deferred on a component: the row lands with the code commit that follows this spec commit (lane b5-shell)");
+});

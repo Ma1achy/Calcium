@@ -229,3 +229,7 @@ describe("C22 §6m — a linear session", () => {
     }
   });
 });
+
+describe("C23 I90 — the answered line as drawn, owed at the spec commit", () => {
+  it.todo("T4.109 (C23 I90): a reply holding U+202E and a chip is announced as drawn — not deferred on a component: the row lands with the code commit that follows this spec commit (lane b5-shell)");
+});

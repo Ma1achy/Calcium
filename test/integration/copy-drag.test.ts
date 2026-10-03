@@ -597,3 +597,7 @@ describe("C14 §6f — the drag in a real session", () => {
     }
   });
 });
+
+describe("C14 I65 — a copy carries the heads the selection took, owed at the spec commit", () => {
+  it.todo("T4.48 (C14 I65): a drag from the first entry's body copies no first head, from its head copies all three — not deferred on a component: the row lands with the code commit that follows this spec commit (lane b5-shell)");
+});
