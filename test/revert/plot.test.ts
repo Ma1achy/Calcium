@@ -652,3 +652,9 @@ describe("C12 tier 6 — fail-on-revert", () => {
     expect(visible(area[0] ?? "")).toContain("1");
   });
 });
+
+describe("C12 T6.118", () => {
+  it.todo(
+    "T6.118 (C12 I143): the default set back to box, or rule closed with a corner → T2.131 fails — not deferred on a component: lands with the code commit of this round",
+  );
+});

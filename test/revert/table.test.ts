@@ -267,3 +267,9 @@ describe("C11 tier 6", () => {
     expect(second).not.toBe(first);
   });
 });
+
+describe("C11 T6.38", () => {
+  it.todo(
+    "T6.38 (C11 I34): the indicator inside the label's span, or the labels at regular weight → T2.17 fails — not deferred on a component: lands with the code commit of this round",
+  );
+});

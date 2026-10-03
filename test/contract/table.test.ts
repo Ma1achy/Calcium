@@ -379,3 +379,9 @@ describe("C11 §3 — priority is declared, never inferred", () => {
     expect(textOf(dark), "and the header reads the same").toBe(textOf(lit));
   });
 });
+
+describe("C11 I34 — the header's weight", () => {
+  it.todo(
+    "T2.17 (C11 I34, I24, §078): labels muted and bold, the sort indicator accent and bold, at three rungs — not deferred on a component: lands with the code commit of this round",
+  );
+});

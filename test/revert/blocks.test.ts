@@ -473,3 +473,12 @@ describe("C09 I133–I136 — tier 6 (review batch 4)", () => {
     expect(row({ style: "braille", current: 1, total: 8 }, 1 + 1 + 3)[0], "one eighth of one cell").toBe("⡀");
   });
 });
+
+describe("C09 T6.194, T6.195", () => {
+  it.todo(
+    "T6.194 (C09 I139): paint writing a break inside its style and the rails one span → T2.232 fails on the last body row — not deferred on a component: lands with the code commit of this round",
+  );
+  it.todo(
+    "T6.195 (C09 I140): settled answering elapsed, or banding the unrounded figure → T1.153 fails — not deferred on a component: lands with the code commit of this round",
+  );
+});

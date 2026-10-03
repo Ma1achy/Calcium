@@ -1500,3 +1500,9 @@ describe("C09 I32 — a status asks for a tick only while it moves (ruling 106 c
     expect(loading(0), "loading at two ticks, which the same reader can tell apart").not.toBe(loading(5));
   });
 });
+
+describe("C09 I139 — a panel's rails", () => {
+  it.todo(
+    "T2.232 (C09 I139, §049): every rail cell of a panel carries the frame tone, and paint keeps a span's style on every row — not deferred on a component: lands with the code commit of this round",
+  );
+});

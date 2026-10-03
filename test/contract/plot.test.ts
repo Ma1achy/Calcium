@@ -299,3 +299,9 @@ describe("C12 tier 2 — state", () => {
     );
   });
 });
+
+describe("C12 I143 — open axes by default", () => {
+  it.todo(
+    "T2.131 (C12 I143, I26, §018): a plot naming no frame draws rule, open at the right, and box is opt-in — not deferred on a component: lands with the code commit of this round",
+  );
+});
