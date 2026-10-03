@@ -1314,6 +1314,30 @@ tree is a table row's (`op: "expand"`, C04 I34). **Proposed, (a) recommended**:
 
 ---
 
+> **Ruled 2026-10-03** (by Claude under the person's standing authority; review batch 4). **Batch 4 owns the findings filed during it, from F1406 onward, plus F1348 and F1351 and the release seal's items. The findings older than it carry forward in the ledger and do not gate its merge.** The person asked to finish batch 4; the ledger then held 121 open or partly open findings, and about 95 of them predate the batch: the 3-D raster cost cluster (F1150–F1193), the layout engine's refusals (F1230–F1235), the profiler cards. Nothing in the merge conditions the person set makes the whole ledger a gate. Holding one release for every finding older than it would turn one merge into the next three. **Tie-break:** judgement, stated here so it can be overturned. It approves, runs and sends nothing, so it weakens no safety default.
+
+**107 · RULED — Which open findings batch 4 must close before it merges.** The ledger's open count was reported as about 60 and measured at 121 (TRIAGE, 2026-10-03).
+
+---
+
+> **Ruled 2026-10-03** (by Claude under the person's standing authority; review batch 4, the design check). **The gutter under `⎿` is blank on every body row. C22 I88 is amended.** Every body row the registry draws under a hook is blank in the gutter: 58 rows across fourteen sections (§003 §013 §017 §021 §045 §050 §065 §080–§085 §096). The shell draws a muted `│` on every body row after the first (`entry-layout.ts`, `rest: "bar"`). I88's own citation is *"the design's left rule"*, which is the pre-registry design. The nested-card tree glyphs stay wherever the figures draw them. **Tie-breaks:** structured data beats prose (the registry's figures against I88's citation), and a consistent picture beats a lone rule (58 rows against one). **Owed:** lane b5-dshell.
+
+**108 · RULED — Whether a card's body rows carry a rule in the gutter.** A design check against `calcium-design-language.html` (`out/design-check-report.md`, item 4) found every example frame drawing a bar the registry never draws.
+
+---
+
+> **Ruled 2026-10-03** (by Claude under the person's standing authority; review batch 4, the design check). **A plot is framed by its axes by default. The closed box is opt-in.** §018's R-BLK-138 states it: *"most plots have none, so the AXES are what frames a figure"*, with `frame?` as the switch. Every plot in both examples draws a closed `┌──┐` box. **Tie-break:** when pictures disagree, the rule decides. The design check offered this as ambiguous on two figures, and the rule's own sentence settles it. **Owed:** lane b5-dpres if the box is the framework's default, lane b5-examples where an example sets it.
+
+**109 · RULED — Whether a plot draws a box.** The design check, item 10.
+
+---
+
+> **Ruled 2026-10-03** (by Claude under the person's standing authority; review batch 4, the design check). **The design divergences the check found are batch 4's work: twelve in the framework (items 1–12), three in the examples (items 13–15), the frame renderer's four, and the blind spot that let them through.** The person judged that the examples do not match the design. Measured, the image renderer is mostly faithful, and the gap is the framework and the examples: one-tone call heads, a gutter bar, an unwashed command echo, panel rails losing their tone after one row, the completion menu's layout, a bare prompt rule, boxed plots, and docker-tui's framed panels where §080 and §085 draw calls. M16's comparison sees only which non-ASCII marks appear, so tone, ground, weight and the app sections §080–§086 were never compared. Batch 4 is the reconciliation with the design; merging it with its examples visibly off the design would be signing a picture known to be wrong. **Owed:** lanes b5-dpres, b5-dshell, b5-menu5, b5-examples, and b5-fixcolour for the comparison that would have caught them.
+
+**110 · RULED — Whether the design divergences wait for a later batch.** `out/design-check-report.md`, 2026-10-03.
+
+---
+
 ## Not yet recovered
 
 The gap between the entries and the running count in the per-MR reports was chased and closed: some questions had been counted twice. The list is the count. **No total is stated here in prose**, because the one that used to be here said *sixteen* long after that stopped being true — this file's own subject, arriving inside it.
