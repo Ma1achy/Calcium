@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "calcium-tui": "file:../..",
-    "sharp": "0.35.4"
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@types/node": "26.1.2",
