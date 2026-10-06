@@ -107,7 +107,14 @@ async function record(
     opts.farSideDelayMs === undefined ? {} : { CALCIUM_FARSIDE: slowFarSide(dir, opts.farSideDelayMs) };
   const pty = interactivePty(`${FIXTURE} session subprocess`, {
     cols: 100,
-    rows: 30,
+    // **31, not 30** (M5), and the row it buys back is the owner line's. §103's
+    // footer took a second row, so the transcript is one shorter — and a 20-row
+    // answer then pushes its own settled head off the top, which T5.1d reads out
+    // of a frame. The row had lost its premise, not its claim: the head is what
+    // carries the whole-second figure, and it has to be on screen to carry it.
+    // Measured rather than reasoned — the frames showed `⠹ 2s` and then a body
+    // with no head above it.
+    rows: 31,
     env: { CALCIUM_RECORD: path, CALCIUM_RECORD_TIER: tier, ...farSide },
   });
   const t0 = Date.now();

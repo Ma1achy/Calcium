@@ -29,6 +29,12 @@
  * the `m`. Each of these is what the frame held before the arm existed, and a
  * normaliser that corrected any of them would move a golden.
  *
+ * **One is corrected, because it was a defect and not an oddity** (F1258):
+ * `1` and `2` share one close, `22`, and where a dim run ended inside a bold one
+ * Ink wrote the `22` and treated the bold as still held — so the terminal drew
+ * the rest of the run unbolded. `between` re-opens it. It moved no golden: no
+ * block in the corpus paints bold through dim (T1.46).
+ *
  * The one escape byte this file writes is read from `escapes.ts`'s reset, so
  * the table of sequences stays where SS14 puts it.
  */
@@ -165,8 +171,10 @@ function copyState(into: Code[], from: readonly Code[]): void {
  * lists and no `Set`** (C09 I75): the codes not carried into `to` are reduced
  * as `apply` reduces them — into a list made only when there is one — then
  * undone in reverse, each end written once; the codes `to` adds are written
- * in its order. The transition a plot row makes at every cell, one colour
- * replacing another, writes the new code and allocates nothing but the string.
+ * in its order, **and so is a code `to` holds whose end was just written** —
+ * the one place this departs from Ink (F1258). The transition a plot row makes
+ * at every cell, one colour replacing another, writes the new code and
+ * allocates nothing but the string.
  */
 function between(from: readonly Code[], to: readonly Code[]): string {
   let out = "";
@@ -192,7 +200,11 @@ function between(from: readonly Code[], to: readonly Code[]): string {
   }
   for (let k = 0; k < to.length; k += 1) { // cells-ok — a code count
     const c = to[k] as Code;
-    if (hasCode(from, c.code)) continue;
+    // **Held, unless its end was just written** (C09 I72, F1258): `1` and `2`
+    // share `22`, so closing a dim run inside a bold one closes the bold too,
+    // and a code the terminal no longer holds is re-opened after the close.
+    // Ink's `diffAnsiCodes` skips it, and the row went on unbolded.
+    if (hasCode(from, c.code) && !(closing !== null && hasEnd(closing, c.end))) continue;
     if (closing !== null && hasEnd(closing, c.code)) continue;
     out += c.code;
   }

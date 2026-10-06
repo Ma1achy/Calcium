@@ -53,16 +53,16 @@ const results = runPass({
       // `❯ /ps` over a table, §9c's settled state reached by no path.
       name: "the invoke route settles the adapted document without the card",
       file: EX,
-      from: "      settleWithDocument(pendingId, cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities));",
-      to: "      settleWithDocument(pendingId, doc);",
+      from: "      settleWithDocument(pendingId, withEcho(cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities), settle));",
+      to: "      settleWithDocument(pendingId, withEcho(doc, settle));",
       expect: "T4.47",
     },
     {
       // **T6.85, second arm.** The error arm settles `errorDoc` bare.
       name: "the invoke route's error arm settles the error document without the card",
       file: EX,
-      from: "      settleWithDocument(pendingId, cardOver(failed, call, deps.elapsed() - startedAt, deps.capabilities));",
-      to: "      settleWithDocument(pendingId, failed);",
+      from: "      settleWithDocument(pendingId, withEcho(cardOver(failed, call, deps.elapsed() - startedAt, deps.capabilities), settle));",
+      to: "      settleWithDocument(pendingId, withEcho(failed, settle));",
       expect: "T4.47",
     },
     {
@@ -96,7 +96,7 @@ const results = runPass({
       // The tree's state until 2026-09-05: a pending entry with no blocks.
       name: "step 3 appends compose({ blocks: [] }) — the old pending entry",
       file: EX,
-      from: '        toolCallDoc(displayed, call, { origin: "user", verb, transport: "subprocess", argv: [...result.argv] }, deps.capabilities),',
+      from: '        withEcho(toolCallDoc(displayed, call, { origin: "user", verb, transport: "subprocess", argv: [...result.argv] }, deps.capabilities), settle),',
       to: '        compose({ command: displayed, blocks: [], meta: { origin: "user", verb, transport: "subprocess", argv: [...result.argv] } }),',
       expect: "T4.40",
     },
@@ -114,8 +114,8 @@ const results = runPass({
       // lacks the verdict. T4.40's fourth assertion reads exactly that.
       name: "the verdict is written after the settle",
       file: EX,
-      from: "          finishCard(patch.result.exitCode === 0 ? \"\" : `exit ${String(patch.result.exitCode)}`);\n          // C23 I8 — settlement flushes at `\"completion\"`. §8a A4: settling\n          // clears the stall state, so a notice does not outlive its condition.\n          refresh.settled(id);\n          deps.transcript.settle(id);",
-      to: "          refresh.settled(id);\n          deps.transcript.settle(id);\n          finishCard(patch.result.exitCode === 0 ? \"\" : `exit ${String(patch.result.exitCode)}`);",
+      from: "          finishCard(code === 0 ? \"\" : `exit ${String(code)}`);\n          // C23 I8 — settlement flushes at `\"completion\"`. §8a A4: settling\n          // clears the stall state, so a notice does not outlive its condition.\n          refresh.settled(id);\n          settleKept(code);",
+      to: "          refresh.settled(id);\n          settleKept(code);\n          finishCard(code === 0 ? \"\" : `exit ${String(code)}`);",
       expect: "T4.40",
     },
     {
@@ -150,8 +150,8 @@ const results = runPass({
       // C23 I59 (T4.49, T4.40) — a zero exit said as `exit 0`: `ok` with a number on it.
       name: "exit 0 is an outcome again",
       file: EX,
-      from: "          finishCard(patch.result.exitCode === 0 ? \"\" : `exit ${String(patch.result.exitCode)}`);",
-      to: "          finishCard(`exit ${String(patch.result.exitCode)}`);",
+      from: "          finishCard(code === 0 ? \"\" : `exit ${String(code)}`);",
+      to: "          finishCard(`exit ${String(code)}`);",
       expect: "T4.49",
     },
     {
@@ -200,8 +200,8 @@ const results = runPass({
       also: [
         {
           file: EX,
-          from: "      settleWithDocument(pendingId, cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities));",
-          to: "      settleWithDocument(pendingId, cardOver(doc, call, deps.clock() - startedAt, deps.capabilities));",
+          from: "      settleWithDocument(pendingId, withEcho(cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities), settle));",
+          to: "      settleWithDocument(pendingId, withEcho(cardOver(doc, call, deps.clock() - startedAt, deps.capabilities), settle));",
         },
       ],
       expect: "T4.68",
@@ -209,8 +209,8 @@ const results = runPass({
     {
       name: "denied is recorded as exit 1",
       file: EX,
-      from: "        deps.history.append(line, 126);",
-      to: "        deps.history.append(line, 1);",
+      from: "        else settleKept(126);",
+      to: "        else settleKept(1);",
       expect: "T4.51",
     },
     {
@@ -244,6 +244,16 @@ const results = runPass({
       from: "    const childBody = isSettled(child) ? callBody(child, true) : [];",
       to: "    const childBody = callBody(child, true);",
       expect: "T4.53",
+    },
+    {
+      // C23 I54 (T6.127, F1430) — the card's arguments sliced at one word rather
+      // than the verb's, which is the shape the route shipped in: a namespaced
+      // verb reads its own second word inside the parentheses.
+      name: "the card's arguments are the argv after one word",
+      file: EX,
+      from: "  result.argv.slice(result.tool.name.split(\" \").length);",
+      to: "  result.argv.slice(1);",
+      expect: "T4.108",
     },
   ],
 });

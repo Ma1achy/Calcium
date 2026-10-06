@@ -1,5 +1,5 @@
 // C24 T5.6 (C24 I36) — the runtime barrel imports nothing from the Mermaid
-// renderer; the transform is its own entry, `@fmx/calcium/mermaid` (F1188).
+// renderer; the transform is its own entry, `calcium-tui/mermaid` (F1188).
 //
 // **The graph, not a duration** (C23 I71's argument, T5.22's instrument). A
 // timing row is green on a fast machine with the renderer still on the graph
@@ -139,7 +139,7 @@ describe("C24 I36 — the Mermaid renderer is off the runtime barrel's graph", (
     const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
       exports: Record<string, { types?: string; default?: string }>;
     };
-    expect(pkg.exports["./mermaid"], "@fmx/calcium/mermaid resolves to the entry barrel").toEqual({
+    expect(pkg.exports["./mermaid"], "calcium-tui/mermaid resolves to the entry barrel").toEqual({
       types: "./dist/mermaid.d.ts",
       default: "./dist/bundle/mermaid.js",
     });

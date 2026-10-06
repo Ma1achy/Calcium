@@ -1,0 +1,49 @@
+A TRANSIENT PANEL FLOATS, BETWEEN TWO RULES
+
+the completion menu, find, a chip preview: these are MENUS, and a menu
+draws OVER what is behind it. NOTHING ABOVE MOVES.
+
+  ● The parser handles quotes with a single boolean, so a nested
+    quote flips it back instead of counting a level.
+──────────────────────────────────────────────────────────────────────────────
+   › /colour  tint the chrome for this project
+     /compact  summarise the conversation so far
+──────────────────────────────────────────────────────────────────────────────
+  ❯ /colour▌
+──────────────────────────────────────────────────────────────────────────────
+
+  the prompt already has a rule BELOW it, so the panel sitting BETWEEN
+  TWO RULES is what says it is a panel and not a reply. Without that
+  boundary it reads as transcript content, which is the one thing it
+  is not.
+
+★ and it never REFLOWS the transcript — a keystroke costs a few rows,
+not a whole re-solve.
+
+three shapes, three names, one layer order
+
+  a PANEL    floats above the prompt, between two rules. DISMISSABLE:
+             a click off it CLOSES it, and the click stops there
+  a PEEK     anchored BESIDE an element, and it takes NO KEYS — it
+             is a projection of focus, so focus leaving closes it
+  an OVERLAY modal, and it OWNS input. NOT dismissable: clicking
+             off it does nothing, because an owner is waiting
+
+  overlay › panel › peek › base   — and this is the SCROLL
+  priority too, so one ordering does both jobs.
+
+★ the WHEEL goes to the innermost scrollable under the POINTER, highest
+layer first. The ARROWS go to the one you are INSIDE.
+
+  the pointer says where it is; the keyboard does not. That asymmetry
+  is the whole rule — asking a wheel to click first is asking twice.
+
+and a TEXT preview scrolls where an IMAGE resizes
+
+  that is the axis, NOT how big the thing is. An image has a cell
+  rectangle the producer declares and the engine fills, so it is whole
+  at every width — a cropped preview shows the wrong thing and reads as
+  a bug. Text cannot resize, so it gets a bounded window and the same
+  scrollbar column everything else uses.
+
+  which leaves ⏎ for EDITING rather than for merely seeing.

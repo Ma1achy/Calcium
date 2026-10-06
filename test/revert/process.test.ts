@@ -15,6 +15,10 @@ import { createProcessRunner } from "../../src/data/process/runner.js";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
 import { collect, groupMembers, scripts } from "../support/process.js";
+import { readFileSync } from "node:fs";
+import { join, relative as relativePath } from "node:path";
+import { findClipboardTool, writeClipboard } from "../../src/data/process/clipboard.js";
+import { removeDir, runPath, stub, toolDir } from "../support/clipboard-tools.js";
 
 const opts = { cwd: (): string => process.cwd() };
 
@@ -208,4 +212,59 @@ describe("C21 fail-on-revert", () => {
     const outputs = await Promise.all(children.map((c) => collect(c.stdout)));
     expect(outputs).toEqual(children.map((_unused, n) => `line-${n}\n`));
   });
+});
+
+describe("C21 fail-on-revert, the clipboard tool (I20)", () => {
+  it("T6.20 (I20): searching a relative PATH entry → T1.14's working-directory arm finds the planted tool", () => {
+    const dir = toolDir();
+    try {
+      stub(dir, "pbcopy");
+      const relative = relativePath(process.cwd(), dir);
+      // The same file, reached two ways: a lookup that honoured the relative entry
+      // would execute a tool the reader never chose.
+      expect(findClipboardTool({ PATH: dir })?.name, "control: the stub is a tool").toBe("pbcopy");
+      expect(findClipboardTool({ PATH: relative })).toBeNull();
+    } finally {
+      removeDir(dir);
+    }
+  });
+
+  it("T6.21 (I20): dropping the SSH gate → T1.14's SSH arms offer pbcopy", () => {
+    const dir = toolDir();
+    try {
+      stub(dir, "pbcopy");
+      stub(dir, "clip.exe");
+      expect(findClipboardTool({ PATH: dir })?.name, "control: found locally").toBe("pbcopy");
+      expect(findClipboardTool({ PATH: dir, SSH_CONNECTION: "a b c d" }), "neither local tool over SSH").toBeNull();
+      // And the gate is per reach, not a blanket refusal: a display tool is still offered.
+      stub(dir, "xclip");
+      expect(findClipboardTool({ PATH: dir, SSH_CONNECTION: "a b c d", DISPLAY: "localhost:10.0" })?.name).toBe("xclip");
+    } finally {
+      removeDir(dir);
+    }
+  });
+
+  it("T6.22 (I20): piping stderr and resolving when it closes → T3.20's forking arm never resolves", async () => {
+    const dir = toolDir();
+    let server = 0;
+    try {
+      stub(dir, "wl-copy", '#!/bin/sh\nsleep 30 &\necho $! > "$(dirname "$0")/server.pid"\ncat > /dev/null\n');
+      const tool = findClipboardTool({ PATH: dir, WAYLAND_DISPLAY: "wayland-0" })!;
+      const answer = await Promise.race([
+        writeClipboard(tool, "held", { env: { PATH: runPath(dir) }, cwd: () => dir }),
+        new Promise<"pending">((resolve) => setTimeout(() => resolve("pending"), 5000)),
+      ]);
+      server = Number(readFileSync(join(dir, "server.pid"), "utf8").trim());
+      expect(answer).toEqual({ ok: true, tool: "wl-copy" });
+    } finally {
+      if (server > 0) {
+        try {
+          process.kill(server, "SIGKILL");
+        } catch {
+          // already gone
+        }
+      }
+      removeDir(dir);
+    }
+  }, 15_000);
 });

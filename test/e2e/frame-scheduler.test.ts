@@ -68,7 +68,10 @@ describe("C03 e2e", () => {
         const key = KEYS[i % KEYS.length]!;
         const sent = performance.now();
         pty.type(key);
-        await pty.waitFor(new RegExp(`KEYFRAME ${key}`), 5_000);
+        // **After the key, not anywhere in the stream** (F1525): with sixteen
+        // keys cycled forty times, every sample from the seventeenth on was
+        // answered by the frame the same key drew a lap earlier, and timed nothing.
+        await pty.waitForNew(new RegExp(`KEYFRAME ${key}`), 5_000);
         latencies.push(performance.now() - sent);
         await new Promise((r) => setTimeout(r, 25));
       }

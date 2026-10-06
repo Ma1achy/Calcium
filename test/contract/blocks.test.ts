@@ -13,7 +13,20 @@ import { SCAN_BUDGET_MS } from "../support/budget.js";
 
 import { checkAsciiParity, checkMeasurement, formatReport, uncoveredKinds } from "../../src/testing/measurement-conformance.js";
 import { ADVERSARIAL, CORPUS, ONE_PER_KIND } from "../support/blocks.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } from "../support/render.js";
+import {
+  ASCII_CAPS,
+  DARK_THEME,
+  FULL_CAPS,
+  LIGHT_THEME,
+  MONO_UNICODE_CAPS,
+  measurable,
+  visible,
+} from "../support/render.js";
+import { rowContaining, styleAt, styledScreenFrom } from "../support/styled-screen.js";
+import { CONTENT_LINE_CAP, statusRowsFor } from "../../src/presentation/blocks/kinds/status.js";
+import { background, focusStyle, tone } from "../../src/presentation/blocks/paint.js";
+import { CALL_STATE_TONE, block } from "../../src/data/viewmodel/index.js";
+import { sgr } from "../../src/terminal/escapes.js";
 import { cells, hasEmojiForm, TEXT_PRESENTATION } from "../../src/presentation/text.js";
 import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
@@ -29,8 +42,11 @@ import {
   GLYPH_TOKENS,
   glyphCells,
   glyphFor,
+  FREE_WIDTH_SLOTS,
   glyphs,
-  SUBSTITUTIONS,
+  animationIntervalOf,
+  spinnerIntervalMs,
+  tickIntervalOf,
 } from "../../src/presentation/blocks/index.js";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
@@ -147,11 +163,118 @@ describe("C09 contract — measurement", () => {
     }
   });
 
-  it("T2.5 (I5): every substitution in §4 is 1:1 by cell count", () => {
-    for (const [unicode, ascii] of SUBSTITUTIONS) {
-      expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
-      expect(cells(unicode), `${unicode} is one cell`).toBe(1);
+  it("T2.188 (C09 I5, R-GLY-003, C22 I83): a continuation notice at every width from 6 to 24, at Unicode and ASCII, measures what it renders and starts its text in one column at both rungs", () => {
+    // **The narrow widths are the point**: the hanging indent is five cells of a
+    // six-cell row at the bottom of the range, so a lead one cell wider than
+    // `measure` believes is a wrapped row `measure` did not count, and a lead one
+    // cell narrower at one rung moves every row's text at that rung.
+    const notice = block({
+      kind: "notice",
+      id: "t2-188",
+      tone: "muted",
+      glyph: "continuation",
+      text: "the quick brown fox jumps over the lazy dog, twice over",
+    });
+    const unicode = measurable({ capabilities: FULL_CAPS });
+    const ascii = measurable({ capabilities: ASCII_CAPS });
+    const LEAD = 5;
+    for (let width = 6; width <= 24; width += 1) {
+      const rungs = [
+        ["unicode", unicode, "  ⎿  "],
+        ["ascii", ascii, "  `- "],
+      ] as const;
+      const bodies: string[][] = [];
+      for (const [name, kit, hook] of rungs) {
+        const rows = kit.renderToLines(notice, width).map(visible);
+        expect(rows.length, `${name} at ${String(width)}: measure is what renders`).toBe(kit.measure(notice, width));
+        expect(rows.length, `${name} at ${String(width)}: the fixture wraps`).toBeGreaterThan(1);
+        expect(rows[0]?.slice(0, LEAD), `${name} at ${String(width)}: the hook, padded to its reservation`).toBe(hook);
+        for (const [index, row] of rows.entries()) {
+          expect(cells(row), `${name} at ${String(width)}, row ${String(index)}: inside the width`).toBeLessThanOrEqual(width);
+          if (index > 0) expect(row.slice(0, LEAD), `${name} at ${String(width)}, row ${String(index)}: the hanging indent`).toBe(" ".repeat(LEAD));
+          expect(row.charAt(LEAD), `${name} at ${String(width)}, row ${String(index)}: text starts at the column`).not.toBe(" ");
+        }
+        bodies.push(rows.map((row) => row.slice(LEAD)));
+      }
+      // One column at both rungs means one wrap at both rungs: the text after
+      // the lead is the same rows, not merely the same count.
+      expect(bodies[1], `at ${String(width)}: the ASCII rung wraps the text where Unicode does`).toEqual(bodies[0]);
     }
+  });
+
+  it("T2.5 (I5): every substitution in §4 occupies the same slot at every rung", () => {
+    // **Amended twice, and the second amendment narrowed the first.** One cell
+    // against one cell was a way of guaranteeing that no column moves when the
+    // alphabet changes; it was never the property itself. The design declares
+    // `ellipsis` with `reservedCells: 3` and `ascii: "..."` (R-GLY-003, §096),
+    // so the 1:1 form would refuse it — a rule blocking the design, and the rule
+    // is what changed.
+    //
+    // The first amendment then over-reached: it padded the residue lead into a
+    // three-cell slot at every rung. **`reservedCells` at every rung is a rule
+    // about marks in FIXED COLUMNS** — a gutter, a row's lead, a frame's edge —
+    // where content beside the mark aligns to the column and a mark that
+    // changed width would move the alignment. A residue lead is followed only
+    // by its own count (`⋯ 5 more`, `... 5 more`, §095 / R-BLK-867), so nothing
+    // aligns to it and padding buys two cells of gap the design does not draw.
+    // `FREE_WIDTH_SLOTS` is where the exception is declared, and this row is
+    // what keeps the declaration honest.
+    const uni = glyphs({ unicode: "full", ambiguousWidth: "narrow" });
+    const asc = glyphs({ unicode: "ascii", ambiguousWidth: "narrow" });
+    for (const name of Object.keys(uni) as (keyof typeof uni)[]) {
+      const unicode = uni[name];
+      const ascii = asc[name];
+      if (FREE_WIDTH_SLOTS.has(name)) continue;
+      expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
+      expect(cells(unicode, "narrow"), `${unicode} is one cell narrow`).toBe(1);
+    }
+
+    // **The property the 1:1 rule protected, asserted directly**: a fixed-column
+    // mark is the same number of cells at every rung, so the column beside it
+    // does not move when the terminal changes alphabet. `glyphs()` hands back
+    // the ASCII set wholesale at `wide` (C02 I9), so the three rungs are narrow
+    // Unicode, wide, and ASCII.
+    const rungs = [
+      { unicode: "full", ambiguousWidth: "narrow" },
+      { unicode: "full", ambiguousWidth: "wide" },
+      { unicode: "ascii", ambiguousWidth: "narrow" },
+    ] as const;
+    for (const name of Object.keys(uni) as (keyof typeof uni)[]) {
+      if (FREE_WIDTH_SLOTS.has(name)) continue;
+      const widths = rungs.map((caps) => cells(glyphs(caps)[name], caps.ambiguousWidth));
+      expect(new Set(widths).size, `${name} is one width at every rung — ${widths.join(", ")}`).toBe(1);
+    }
+
+    // **And the exemption is driven, not decorative** (the rule an allow-list
+    // needs to survive): every member of `FREE_WIDTH_SLOTS` must actually vary
+    // across the rungs. A member that stopped varying would be a dead entry
+    // weakening the rule for everything it names, and this is what fails the day
+    // one appears.
+    for (const name of FREE_WIDTH_SLOTS) {
+      const widths = rungs.map((caps) => cells(glyphs(caps)[name], caps.ambiguousWidth));
+      expect(new Set(widths).size, `${name} is exempt because it varies — ${widths.join(", ")}`).toBeGreaterThan(1);
+    }
+
+    // **The block's glyph slot, by reservation** (R-GLY-001, R-GLY-003).
+    // `glyphCells` is the widest of the two renderings, and the lead a notice
+    // draws puts its text in one column at every rung — `continuation` is the
+    // one two-cell slot, `⎿` padded to `` `- ``, and it is what makes the
+    // padding a property rather than a no-op on one-cell marks.
+    const wideCaps = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+    const reserved: string[] = [];
+    for (const token of GLYPH_TOKENS) {
+      const halves = [glyphFor(token, FULL_CAPS), glyphFor(token, ASCII_CAPS)];
+      expect(glyphCells(token), `${token}: the reservation is the widest half`).toBe(Math.max(...halves.map((half) => cells(half))));
+      if (glyphCells(token) > 1) reserved.push(token);
+      // Text no glyph draws: `x` is `error`'s ASCII half, and `indexOf` found
+      // the mark rather than the text the first time this ran.
+      const probe = block({ kind: "notice", id: `t2-5-${token}`, tone: "default", glyph: token, text: "Zq" });
+      const columns = [FULL_CAPS, wideCaps, ASCII_CAPS].map((caps) =>
+        visible(measurable({ capabilities: caps }).renderToLines(probe, 40)[0] ?? "").indexOf("Zq"),
+      );
+      expect(new Set(columns).size, `${token}: the text column at narrow, wide and ASCII — ${columns.join(", ")}`).toBe(1);
+    }
+    expect(reserved, "the multi-cell slots, by equality").toEqual(["continuation"]);
   });
 
   it("T2.5b (I5, C04 §5): every `Glyph` is 1:1 by cell count, in both renderings", () => {
@@ -160,19 +283,30 @@ describe("C09 contract — measurement", () => {
     // emitted a block-supplied character verbatim. Now every glyph a block can
     // name is in this table, so the guarantee covers the whole field rather
     // than most of it.
-    for (const [unicode, ascii] of GLYPH_SUBSTITUTIONS) {
-      expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
+    //
+    // *Restated for review batch 2, M4 item 6* (C09 T2.115): the halves are
+    // equal for every token but `continuation`, whose `` `- `` is the
+    // registry's two cells against `⎿`'s one. What a measurer relies on is the
+    // reservation, which bounds both; T2.5 asserts the renderer pads to it.
+    for (const token of GLYPH_TOKENS) {
+      const [unicode, ascii] = [glyphFor(token, FULL_CAPS), glyphFor(token, ASCII_CAPS)];
       expect(cells(unicode), `${unicode} is one cell`).toBe(1);
+      expect(cells(ascii), `${unicode} → ${ascii} fits the reservation`).toBeLessThanOrEqual(glyphCells(token));
+      if (token !== "continuation") expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
     }
+    expect(GLYPH_SUBSTITUTIONS.length, "every substitution is a token's pair").toBe(GLYPH_TOKENS.length);
   });
 
-  it("T2.5c: `glyphCells` agrees with both renderings, which is what lets measure skip capabilities", () => {
+  it("T2.5c: `glyphCells` bounds both renderings, which is what lets measure skip capabilities", () => {
     // `measure` receives width and no capability record (C04 §5), so it can only
-    // be right if the two renderings are the same width. This asserts the thing
-    // the measurer actually relies on rather than the table it is derived from.
+    // be right if no rendering is wider than the slot it measured. It used to
+    // assert both were *equal* to it; `continuation`'s `⎿` is one cell of a
+    // two-cell reservation (C09 I5) and the lead pads it, which T2.5 reads off
+    // the frame.
     for (const token of GLYPH_TOKENS) {
-      expect(glyphCells(token)).toBe(cells(glyphFor(token, FULL_CAPS)));
-      expect(glyphCells(token)).toBe(cells(glyphFor(token, ASCII_CAPS)));
+      expect(cells(glyphFor(token, FULL_CAPS))).toBeLessThanOrEqual(glyphCells(token));
+      expect(cells(glyphFor(token, ASCII_CAPS))).toBeLessThanOrEqual(glyphCells(token));
+      expect(Math.max(cells(glyphFor(token, FULL_CAPS)), cells(glyphFor(token, ASCII_CAPS)))).toBe(glyphCells(token));
     }
   });
 
@@ -219,7 +353,7 @@ describe("C09 contract — measurement", () => {
     }
   });
 
-  it("T2.6 (I13): the nineteen ship here; the other three are registered elsewhere", () => {
+  it("T2.6 (I13): the twenty-five ship here; the other three are registered elsewhere", () => {
     // The composition-level half of I13 belongs with C11, C12 and C25. What is
     // assertable here is the split itself — and that the three absentees still
     // render, through `raw`, rather than throwing (I10).
@@ -227,9 +361,12 @@ describe("C09 contract — measurement", () => {
 
     expect([...kit.kinds].sort()).toEqual(
       [
+        "choice",
         "code",
         "comparison",
+        "control",
         "events",
+        "form",
         "group",
         "image",
         "keyValue",
@@ -242,10 +379,13 @@ describe("C09 contract — measurement", () => {
         "raw",
         "rule",
         "scroll",
+        "split",
         "status",
         "steps",
+        "tape",
         "terminal",
         "tip",
+        "tree",
       ],
     );
 
@@ -264,7 +404,7 @@ describe("C09 contract — measurement", () => {
     expect(uncoveredKinds(measurable(), CORPUS)).toEqual([]);
   });
 
-  it("T2.6c (I13): all twenty-two kinds, and the three arrive through `register`", () => {
+  it("T2.6c (I13): all twenty-eight kinds, and the three arrive through `register`", () => {
     // **The composition-level half, assertable for the first time.** It waited on
     // C25 because "every block kind" cannot be honest while one is unregistered,
     // and a test that named the fourteen would have read as covering the union.
@@ -282,9 +422,12 @@ describe("C09 contract — measurement", () => {
     });
 
     expect([...kit.kinds].sort()).toEqual([
+      "choice",
       "code",
       "comparison",
+      "control",
       "events",
+      "form",
       "group",
       "image",
       "keyValue",
@@ -299,11 +442,14 @@ describe("C09 contract — measurement", () => {
       "raw",
       "rule",
       "scroll",
+      "split",
       "status",
       "steps",
       "table",
+      "tape",
       "terminal",
       "tip",
+      "tree",
     ]);
 
     // And the three are not privileged: a default registry lacks exactly them, so
@@ -321,10 +467,10 @@ describe("C09 contract — measurement", () => {
   it("T2.126 (I59, §6b): the kinds a bounded container cannot slice, compared by equality", () => {
     // **An exemption list held by equality, not by membership** — a kind that
     // gains a `window` has to move this list, and a new kind that cannot be
-    // bounded has to fail here rather than join a subset quietly. The overrun
-    // those kinds keep inside a `scroll` is recorded by I59 rather than asserted
-    // correct: `plot` is atomic permanently (I27, C12 I1) and the rest simply
-    // have no window yet.
+    // bounded has to fail here rather than join a subset quietly. Inside a
+    // `scroll` these kinds are cropped rather than sliced (C09 I135), so the
+    // list no longer names an overrun: `plot` is atomic permanently (I27, C12
+    // I1) and the rest simply have no window yet.
     const kit = measurable({
       definitions: [
         tableDefinition as unknown as BlockDefinition<never>,
@@ -337,8 +483,11 @@ describe("C09 contract — measurement", () => {
       .sort();
 
     expect(atomic).toEqual([
+      "choice",
       "comparison",
+      "control",
       "events",
+      "form",
       "image",
       "mosaic",
       "notice",
@@ -348,9 +497,12 @@ describe("C09 contract — measurement", () => {
       "progress",
       "rule",
       "scroll",
+      "split",
       "status",
       "steps",
+      "tape",
       "tip",
+      "tree",
     ]);
 
     const plot = { kind: "plot", id: "p", form: "curve", series: [], height: 30 } as unknown as Block;
@@ -457,7 +609,7 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     expect(offenders).toEqual([]);
     // **The controls, so an empty table cannot pass the row**: the two marks
     // the table found on its first run are in it, and the keycap base `*` —
-    // `step`'s and `running`'s ASCII rung — is excluded by the row's own guard.
+    // `step`'s and `work-unit`'s ASCII rung — is excluded by the row's own guard.
     expect(hasEmojiForm(0x23fa), "⏺︎ U+23FA, the mark F823 is about").toBe(true);
     expect(hasEmojiForm(0x2139), "ℹ U+2139, the mark F832 found").toBe(true);
     expect(hasEmojiForm(0x2b24), "⬤ U+2B24, which held the slot between F823 and F854").toBe(false);
@@ -470,30 +622,53 @@ describe("C09 §4 — the call grammar's glyph rows", () => {
     }
     expect(bare, "a bare base is still a violation — the remedy is the selector, not the exemption").toEqual(["\u23fa"]);
     expect(hasEmojiForm(0x2a), "* is a keycap base in the Unicode file and excluded by construction (F832)").toBe(false);
-    expect(glyphFor("step", ASCII_CAPS), "so the ASCII rung is still *").toBe("*");
+    expect(glyphFor("work-unit", ASCII_CAPS), "so the ASCII rung is still *").toBe("*");
   });
 
-  it("T2.115 (C09 I48): every `Glyph` is 1:1 by cell count at BOTH conventions, through `glyphFor`", () => {
+  it("T2.115 (C09 I48, I5): every `Glyph` is its reservation's width at BOTH conventions, through `glyphFor`", () => {
     // T2.5b asserted the rule at `narrow` alone, and ten of seventeen members
     // broke it at `wide` while it was green (F825). The two named sets are
     // compared by equality so a member moving between them fails the row.
-    const AMBIGUOUS = new Set(["warn", "info", "pending", "working", "running", "queued", "cancelled", "expand", "collapse", "live", "bullet"]);
-    const NEUTRAL = new Set(["ok", "error", "quote", "nested", "continuation", "step"]);
+    const AMBIGUOUS = new Set(["warn", "info", "pending", "working", "work-unit", "queued", "cancelled", "expand", "collapse", "focus", "bullet"]);
+    // `question` `⟩` and `current` `›` join NEUTRAL, measured rather than
+    // assumed: both are one cell at either convention, so neither takes a wide
+    // fallback and both are `steady`. They arrived with M11's carrier matrix —
+    // two marks the registry names and this tree could not draw (C09 I88).
+    const NEUTRAL = new Set(["ok", "error", "quote", "nested", "continuation", "question", "current"]);
     expect(new Set([...AMBIGUOUS, ...NEUTRAL])).toEqual(new Set(GLYPH_TOKENS));
+    // **The partition is measured now, not inferred from the resolver** (I48,
+    // §093). It used to read `wide === ascii && narrow !== ascii` — which asked
+    // *did this member fall* and took the answer as its width class. The
+    // vocabulary takes its ASCII rung **whole** at `wide`, so every member falls
+    // and that question no longer separates them: the old form would put all
+    // eighteen in `tiered` and none in `steady`.
+    //
+    // **The fact it was a proxy for is unchanged and is asserted directly**:
+    // `ⓘ` is East Asian Ambiguous and `✓` is not, whatever the resolver does
+    // with either. Measuring the Unicode half at the wide convention says so in
+    // one step, and a member moving between the two named sets still fails the
+    // row by equality. This is the stronger form — it survives the next change
+    // to how the rung is taken, which the old one did not.
     const tiered: string[] = [];
     const steady: string[] = [];
     for (const token of GLYPH_TOKENS) {
       const narrow = glyphFor(token, FULL_CAPS);
       const wide = glyphFor(token, WIDE_CAPS);
       const ascii = glyphFor(token, ASCII_CAPS);
+      // The invariant's own subject, untouched: one cell at every rung, through
+      // `glyphFor`, which is what lets `measure` skip capabilities (I5).
+      // Restated (C09 T2.115, M4 item 6): the width at every rung is the
+      // reservation's for the ASCII half and one cell for the Unicode one.
       expect(cells(narrow, "narrow"), `${token} narrow`).toBe(1);
-      expect(cells(wide, "wide"), `${token} at wide, through glyphFor`).toBe(1);
-      expect(cells(ascii, "wide"), `${token} ascii`).toBe(1);
-      if (wide === ascii && narrow !== ascii) {
+      expect(cells(wide, "wide"), `${token} at wide, through glyphFor`).toBe(glyphCells(token));
+      expect(cells(ascii, "wide"), `${token} ascii`).toBe(glyphCells(token));
+      // And the rung is taken whole — T2.171 is the row for it; here it is the
+      // premise the partition below no longer gets to assume.
+      expect(wide, `${token}: the wide arm is the ASCII rung`).toBe(ascii);
+      if (cells(narrow, "wide") === 2) {
         tiered.push(token);
       } else {
         steady.push(token);
-        expect(cells(narrow, "wide"), `${token} is Neutral`).toBe(1);
       }
     }
     expect(new Set(tiered)).toEqual(AMBIGUOUS);
@@ -662,5 +837,666 @@ describe("C09 contract — the slice seam", () => {
     expect(kit.registry.windowChild(capped, 40, 2, 5), "and so is a capped one").toBeNull();
     expect(kit.window(lines("plain", 6), 40, 2, 5)?.skipRows, "while the same kind, unfloored, slices").toBe(0);
     expect(kit.registry.windowChild(lines("plain", 6), 40, 2, 5), "and the seam takes it").not.toBeNull();
+  });
+});
+
+/**
+ * C09 I83 — the focus ground, owed at the spec commit.
+ *
+ * **Both rows are about what does *not* move.** The first form of I83 reserved
+ * a gutter column here; the frame refused it — a `step` head shifted two cells
+ * and the `\u23bf` body under it did not — and four fixtures put the mark in the
+ * gutter of the block that has addressable rows (C11 §5b). So a notice takes
+ * the ground and nothing else, and the assertion is the geometry.
+ */
+describe("C09 I83 — a notice takes the focus ground and no column", () => {
+  const HEAD = block({ kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: "ps · ok" } as never);
+  const BODY = block({ kind: "notice", id: "b", tone: "muted", glyph: "continuation", text: "one row" } as never);
+  const WIDTH = 40;
+  const kitAt = (focus: RenderContext["focus"], caps = FULL_CAPS) =>
+    measurable({ theme: DARK_THEME, capabilities: caps, ...(focus === null ? {} : { focus }) });
+  const params = (style: ReturnType<typeof tone>): string =>
+    sgr(style).replace(/^\u001b\[/u, "").replace(/m$/u, "");
+  const cellFor = (lines: readonly string[], text: string) => {
+    const row = rowContaining(styledScreenFrom([lines.join("\r\n")], { columns: WIDTH, rows: lines.length }), text);
+    const cell = row === null ? null : styleAt(row, text);
+    if (cell === null) throw new Error(`no cell holds ${text}`);
+    return cell;
+  };
+
+  it("T2.148 (I83, R-SEL-006, C10 I47): a focused `step` notice takes the focus ground and its geometry does not move", () => {
+    const none = kitAt(null);
+    const lit = kitAt({ blockId: "h", rowId: "h" });
+    const plain = none.renderSequence([HEAD, BODY], WIDTH);
+    const focused = lit.renderSequence([HEAD, BODY], WIDTH);
+
+    // **The instrument responds before it is trusted**: the two frames are not
+    // the same bytes, so a row asserting they agree on text is asserting
+    // something (`test/support/README.md`).
+    expect(focused, "the ground is painted, so the bytes differ").not.toEqual(plain);
+    // **Cell for cell, and that is the whole of I83's first form being wrong.**
+    // The reservation shipped here for one commit; the head moved two cells and
+    // the `⎿` body under it did not.
+    expect(focused.map(visible), "the text does not move").toEqual(plain.map(visible));
+    const bodyColumn = (lines: readonly string[]): number => {
+      const line = lines.map(visible).find((l) => l.includes("one row"));
+      if (line === undefined) throw new Error("no ⎿ body in the frame");
+      return line.indexOf("\u23bf");
+    };
+    expect(bodyColumn(focused), "the ⎿ lands in the same column").toBe(bodyColumn(plain));
+    expect(bodyColumn(plain), "and that column is the gutter's, not zero").toBe(2);
+
+    // **The measurement invariant, in both frames** — `measure` never sees a
+    // focus, so a ground that changed the height would be invisible to it.
+    for (const [name, kit, frame] of [
+      ["unfocused", none, plain],
+      ["focused", lit, focused],
+    ] as const) {
+      const measured = kit.measure(HEAD, WIDTH) + kit.measure(BODY, WIDTH);
+      expect(frame.length, `${name}: measure equals the rows rendered`).toBe(measured);
+    }
+
+    // The ground is on the head and nowhere else.
+    expect(cellFor(focused, "ps · ok").bg, "the head takes focusGround").toBe(
+      params(focusStyle(DARK_THEME, FULL_CAPS)),
+    );
+    expect(cellFor(focused, "one row").bg, "the body keeps the page").toBe("");
+    expect(cellFor(plain, "ps · ok").bg, "and unfocused there is no ground").toBe("");
+  });
+
+  it("T2.149 (I83, C10 I47): the focused notice keeps its own tone over the focus ground, on every tone", () => {
+    const ground = params(focusStyle(DARK_THEME, FULL_CAPS));
+    // **Three tones, because one passes a mechanism that paints a constant.**
+    // The form this replaces put `accent` on the selection ground, which could
+    // not tell a focused `info` notice from an unfocused `accent` one.
+    //
+    // **Iterated over states, because a head's tone is its state's** (C04 I141):
+    // this put `info` and `warn` on a `running` head, which construction now
+    // refuses. Three states give three tones, `error` among them.
+    for (const state of ["failed", "succeeded", "running"] as const) {
+      const name = CALL_STATE_TONE[state];
+      const notice = block({ kind: "notice", id: "h", tone: name, glyph: "work-unit", state, text: `on ${name}` } as never);
+      const lines = kitAt({ blockId: "h", rowId: "h" }).renderSequence([notice], WIDTH);
+      // **The slot is the notice's; the hex is the ground's answer** (C10 I48).
+      // `dark` composes a nearer `error` for `focusGround`, so a row asserting
+      // the flat slot here would be asserting a value the painter does not emit
+      // — which is F1240's own shape, in a test rather than in a gate.
+      expect(cellFor(lines, `on ${name}`), `${name}: its own tone over the focus ground`).toEqual({
+        fg: params(tone(name, DARK_THEME, FULL_CAPS, "focusGround")),
+        bg: ground,
+        attrs: [],
+      });
+    }
+    // And at least one of the three is a value the page does not hold, so the
+    // loop is not satisfied by a resolver that ignores its fourth argument.
+    expect(
+      params(tone("error", DARK_THEME, FULL_CAPS, "focusGround")),
+      "the ground moves at least one of them",
+    ).not.toBe(params(tone("error", DARK_THEME, FULL_CAPS)));
+
+    // **At one bit the whole notice inverts, keeping its tone's mono class**
+    // (C09 I121). This arm asserted the focused frame *equal* to the resting one
+    // and said `▸` carried focus — a notice has no `▸`, C09 I83 reserves it no
+    // column, so the frame carried nothing. The resting frame is the control.
+    const mono = kitAt({ blockId: "h", rowId: "h" }, MONO_UNICODE_CAPS).renderSequence([HEAD], WIDTH);
+    const monoPlain = kitAt(null, MONO_UNICODE_CAPS).renderSequence([HEAD], WIDTH);
+    expect(cellFor(mono, "ps · ok").attrs, "inverse at 1-bit").toContain(7);
+    expect(cellFor(monoPlain, "ps · ok").attrs, "and not at rest").not.toContain(7);
+    const without = (attrs: readonly number[]): readonly number[] => attrs.filter((a) => a !== 7);
+    expect(without(cellFor(mono, "ps · ok").attrs), "the tone's mono class is kept").toEqual(cellFor(monoPlain, "ps · ok").attrs);
+  });
+});
+
+/**
+ * C09 I84 and I85 — the status parts and the empty state, owed at the spec
+ * commit (§3a-ter).
+ *
+ * **T2.150 is the row that binds**, and it is here rather than in the generic
+ * suite because `status`'s `measure` is the declared height where every other
+ * kind's is computed: T2.1's agreement for this kind says only that a number was
+ * echoed back, so the property needs a corpus of its own.
+ */
+describe("C09 §3a-ter — the status parts and the empty state", () => {
+  const WIDTHS = [12, 20, 30, 40, 60, 80, 120];
+  const STATES = ["error", "retrying", "loading"] as const;
+  /** Nine rows of message, past `CONTENT_LINE_CAP` on purpose. */
+  const LONG = Array.from({ length: 9 }, (_u, i) => `message line ${String(i)} ${"y".repeat(28)}`).join(" ");
+  /** Six lines of detail, past `DETAIL_LINE_CAP` on purpose. */
+  const BIG = Array.from({ length: 6 }, (_u, i) => `at frame${String(i)} (src/some/file.ts:${String(100 + i)}:12)`).join("\n");
+  const MESSAGES = ["decode failed", "plot failed to render: series 'loss' has 0 points after filtering", LONG];
+  const DETAILS = [undefined, "", "at planColumns (plan.ts:118)", BIG];
+  const statusAt = (over: Record<string, unknown>): Block =>
+    block({ kind: "status", id: "s", state: "error", message: "decode failed", height: 4, ...over } as never) as Block;
+
+  it("T2.150 (C09 I84, C09 I1, §3a-ter): measure equals the rows rendered, over the message × detail × width × state × height corpus", () => {
+    // **Here rather than in T2.1, and the reason is this kind's `measure`.**
+    // Every other kind computes its height from the block; `status` returns the
+    // height the caller declared. So T2.1's agreement for `status` says only
+    // that a number was echoed back — it cannot see an allocation that draws
+    // more rows than it was granted, because the granted number is the answer.
+    // The corpus is what makes the row about the parts.
+    const disagreed: string[] = [];
+    let drawn = 0;
+    for (const caps of [FULL_CAPS, ASCII_CAPS]) {
+      const kit = measurable({ capabilities: caps });
+      for (const message of MESSAGES) {
+        for (const detail of DETAILS) {
+          for (const state of STATES) {
+            // 1 is below the furniture at every rung, which is the case the
+            // allocation has to survive rather than the case it is written for.
+            for (const height of [1, 2, 3, 5, 8, 12]) {
+              for (const width of WIDTHS) {
+                const b = statusAt({
+                  message,
+                  state,
+                  height,
+                  retryInMs: 8000,
+                  elapsedMs: 4000,
+                  ...(detail === undefined ? {} : { detail }),
+                });
+                const measured = kit.measure(b, width);
+                const rendered = kit.renderToLines(b, width).length;
+                drawn += 1;
+                if (measured !== rendered) {
+                  disagreed.push(`${state} h=${String(height)} w=${String(width)} d=${String(detail?.length ?? -1)}: ${String(measured)} vs ${String(rendered)}`);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(disagreed, "measure equals the rows rendered").toEqual([]);
+    // The corpus is a corpus. A filter excluding every case satisfies the line
+    // above exactly (F855's class, and T3.95's own last clause).
+    expect(drawn, "and the corpus was walked").toBe(2 * 3 * 4 * 3 * 6 * 7);
+  });
+
+  it("T2.151 (C09 I84, C04 I49): a cut detail carries a residue row naming its count, and one that fits carries none", () => {
+    const kit = measurable({ capabilities: FULL_CAPS });
+    const lines = (over: Record<string, unknown>): string =>
+      kit.renderToLines(statusAt(over), 60).map(visible).join("\n");
+
+    // Six lines into a box with room for three: two shown, and the third says
+    // how many went. `⋯ +N more` is `scroll`'s text verbatim, so a reader who
+    // has met it in a container is not taught the mark twice.
+    const cut = lines({ height: 8, detail: BIG });
+    expect(cut, "two frames survive").toContain("at frame1");
+    expect(cut, "and the residue names the rest").toContain("⋯ +4 more");
+    expect(cut, "the dropped ones are gone").not.toContain("at frame5");
+    // **The count follows the room, which is what says it is computed.** One row
+    // less and one more frame goes, and the residue says so — a constant would
+    // read as correct on the row above and nowhere else.
+    expect(lines({ height: 6, detail: BIG }), "one row less, one more dropped").toContain("⋯ +5 more");
+
+    // **The asymmetry, which is the half that is easy to lose.** A detail that
+    // fits carries no mark — one claiming a truncation that did not happen sends
+    // a reader looking for text already on screen, which is worse than a silent
+    // cut because it is confidently wrong (the argument `bodyOf` already makes).
+    const fits = lines({ height: 6, detail: "at planColumns (plan.ts:118)\nat render (definition.ts:337)" });
+    expect(fits, "both lines are there").toContain("at render");
+    expect(fits, "and nothing claims otherwise").not.toContain("more");
+
+    // And the mark is capability-resolved, like every other one this file draws.
+    const ascii = measurable({ capabilities: ASCII_CAPS })
+      .renderToLines(statusAt({ height: 6, detail: BIG }), 60)
+      .map(visible)
+      .join("\n");
+    expect(ascii, "the ascii residue").toContain("... +5 more");
+    expect(ascii).not.toContain("⋯");
+  });
+
+  it("T2.152 (C09 I84, F239, §3a-ter): with no detail the render is unchanged and only the request moves, upward", () => {
+    // **The row about the part that already worked.** A suite asserting the new
+    // part works says nothing about the old one, and this change's whole claim
+    // to being additive rests on the no-detail case being untouched.
+    const kit = measurable({ capabilities: FULL_CAPS });
+    for (const message of MESSAGES) {
+      for (const state of STATES) {
+        for (const height of [1, 2, 3, 5, 8, 12]) {
+          for (const width of WIDTHS) {
+            const bare = statusAt({ message, state, height, retryInMs: 8000, elapsedMs: 4000 });
+            const shrug = statusAt({ message, state, height, retryInMs: 8000, elapsedMs: 4000, detail: "" });
+            expect(
+              kit.renderToLines(shrug, width),
+              `${state} h=${String(height)} w=${String(width)}: an empty detail changes no cell`,
+            ).toEqual(kit.renderToLines(bare, width));
+          }
+        }
+      }
+    }
+
+    // **The request, and it moves in one direction.** The cap was 4 on the
+    // message and is 7 on the box, so a message that wrapped past four rows asks
+    // for more than it used to and nothing asks for less.
+    const asked = (message: string, width: number): number =>
+      statusRowsFor(statusAt({ message, height: 1 }) as never, width);
+    expect(asked(LONG, 40), "a nine-row message used to be held to four").toBeGreaterThan(4);
+    expect(asked(LONG, 40), "and is held by the box's cap instead").toBeLessThanOrEqual(CONTENT_LINE_CAP + 3);
+    for (const width of WIDTHS) {
+      expect(asked("decode failed", width), `w=${String(width)}: a short message is unmoved`).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it("T2.182 (C09 I31): a declared height wins over the fit, at every width", () => {
+    // **The fit is for a box that declares nothing** (C09 §3a-quater). A box
+    // with a height is a commitment its producer made — the registry's error
+    // path, `loading`'s one row, `empty`'s three — and re-sizing it behind the
+    // producer's back would break the pair the registry builds by construction.
+    // The message is one the fit would give seven content rows at any width.
+    const kit = measurable({ capabilities: FULL_CAPS });
+    const huge = Array.from({ length: 40 }, (_u, i) => `word${String(i)}`).join(" ");
+    const declared = statusAt({ message: huge, height: 2 });
+    const fitted = block({ kind: "status", id: "s", state: "error", message: huge } as never) as Block;
+    for (let width = 1; width <= 120; width += 1) {
+      expect(kit.measure(declared, width), `w=${String(width)}: the declared two`).toBe(2);
+      expect(kit.renderToLines(declared, width), `w=${String(width)}: drawn at two`).toHaveLength(2);
+      // The control: the same message undeclared is not two anywhere, so the
+      // row above is about the declaration and not about a message that fits.
+      expect(kit.measure(fitted, width), `w=${String(width)}: the fit differs`).toBeGreaterThan(2);
+    }
+  });
+
+  it("T2.153 (C09 I85, §047, §096): an `empty` status has no banner, no mark and no error tone, and is centred on both axes", () => {
+    const kit = measurable({ capabilities: FULL_CAPS });
+    const at = (state: string) => kit.renderToLines(statusAt({ state, message: "No data.", height: 7 }), 40);
+    const empty = at("empty");
+    const error = at("error");
+    const seen = empty.map(visible);
+
+    // **Against `error` at the same height and width**, so each absence is a
+    // difference and not a description — a row asserting only that the frame
+    // lacks a banner passes on a box too narrow to draw one.
+    expect(error.map(visible).join("\n"), "the control draws all three").toMatch(/ERROR/u);
+    expect(seen.join("\n"), "no banner").not.toMatch(/ERROR/u);
+    // **The mark named is the one the control draws** (C09 I138): asserting
+    // the absence of a character the error box no longer draws would pass on
+    // an empty box that led with one.
+    const cross = glyphs(FULL_CAPS).cross;
+    expect(error.map(visible).join("\n"), "the control draws the mark").toContain(`${cross} `);
+    expect(seen.join(""), "no mark").not.toContain(cross);
+    const tone24 = sgr(tone("error", DARK_THEME, FULL_CAPS));
+    expect(error.join(""), "the control is painted in the error tone").toContain(tone24);
+    expect(empty.join(""), "and this one is not").not.toContain(tone24);
+
+    // **Centred on both.** Horizontally, the ink sits at the floor of the slack;
+    // vertically, the rows above and below the content differ by at most one,
+    // which is the group centring this state inherits rather than adds.
+    const row = seen.findIndex((l) => l.includes("No data."));
+    expect(row, "the content is drawn").toBeGreaterThan(0);
+    const line = seen[row] ?? "";
+    // **The border is stripped before the slack is measured, and the first form
+    // of this was vacuous for exactly that reason.** A bordered row begins with
+    // `│`, which is not whitespace, so `trimStart` removed nothing and both
+    // margins came out at the same constant — the assertion held for a
+    // left-ranged row as readily as a centred one, and the mutation that ranges
+    // it left survived the pass. Containment is not correctness.
+    const inner = line.slice(2, line.length - 2);
+    const marginL = inner.length - inner.trimStart().length;
+    const marginR = inner.length - inner.trimEnd().length;
+    expect(marginL, "the ink is not against the left edge").toBeGreaterThan(0);
+    expect(Math.abs(marginL - marginR), "centred horizontally, odd cell to the right").toBeLessThanOrEqual(1);
+    const above = row - 1;
+    const below = seen.length - row - 2;
+    expect(Math.abs(above - below), "and vertically, odd row below").toBeLessThanOrEqual(1);
+  });
+  it("T2.230 (C09 I138, ruling 85, §048, §096): a failed status leads with ✗ and never with the warning's mark, at every rung, against a warn notice's lead", () => {
+    // **The rung is the subject, not the decoration.** At 24 bits the tone and
+    // the tag's ground already say *error*; at 1-bit and in ASCII the mark is
+    // one of the two carriers left, so a mark shared with a warning is a
+    // carrier that says nothing. Each rung is asserted against a `warn`
+    // notice drawn at the same capabilities, which is what makes the two
+    // leads differing a measurement rather than a description.
+    const lead = (row: string): string => row.replace(/^[│|]?\s*/u, "");
+    const warn = block({ kind: "notice", id: "w", tone: "warn", glyph: "warn", text: "disk nearly full" }) as Block;
+    for (const [name, caps] of [["full", FULL_CAPS], ["1-bit", MONO_UNICODE_CAPS], ["ascii", ASCII_CAPS]] as const) {
+      const g = glyphs(caps);
+      const kit = measurable({ capabilities: caps });
+      const notice = lead(kit.renderToLines(warn, 40).map(visible)[0] ?? "");
+      // The warning's mark is the vocabulary's `warn` token: `GlyphSet.warning`
+      // retired with this ruling, because the status was its only reader.
+      const warning = glyphFor("warn", caps);
+      expect(notice.startsWith(`${warning} `), `${name}: the control — a warn notice leads with ${warning}`).toBe(true);
+      expect(g.cross, `${name}: the two marks are distinct at this rung`).not.toBe(warning);
+      for (const state of ["error", "retrying"] as const) {
+        for (const height of [7, 1]) {
+          const drawn = kit
+            .renderToLines(statusAt({ state, message: "connection refused", retryInMs: 8000, attempt: 2, height }), 40)
+            .map(visible);
+          const row = drawn.find((r) => r.includes("connection refused")) ?? "";
+          expect(lead(row), `${name} ${state} h=${String(height)}: the message leads with ${g.cross}`).toMatch(
+            new RegExp(`^${g.cross} connection refused`, "u"),
+          );
+          expect(
+            drawn.some((r) => lead(r).startsWith(`${warning} `)),
+            `${name} ${state} h=${String(height)}: and no row leads with the warning's ${warning}`,
+          ).toBe(false);
+        }
+      }
+      for (const state of ["loading", "empty"] as const) {
+        const drawn = kit.renderToLines(statusAt({ state, message: "waiting", height: 7 }), 40).map(visible);
+        for (const mark of [g.cross, warning]) {
+          expect(
+            drawn.some((r) => lead(r).startsWith(`${mark} `)),
+            `${name} ${state}: no mark — neither ${g.cross} nor ${warning}`,
+          ).toBe(false);
+        }
+      }
+    }
+  });
+  it("T2.159 (C09 I95, §072, `R-COL-004`, `R-BLK-569`): three kinds paint a ground and the rest are text", () => {
+    // **A background is for an EXTENT; a foreground is for a MARK.** The census
+    // is over the whole kind corpus rather than over the three, which is the
+    // half that can fail: a row naming the painters and checking they paint is
+    // satisfied by every kind painting. Compared by equality both ways.
+    //
+    // **`design-surfaces.test.ts` cannot hold this.** It strips SGR, so a
+    // washed row and a bare one fold to the same picture — §072's frame is a
+    // mask for that reason, and this is the gate beside it, because a snapshot
+    // records and does not check.
+    const kit = measurable({
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      definitions: [patchDefinition, tableDefinition, plotDefinition] as never,
+    });
+    const painted = Object.entries(ONE_PER_KIND)
+      .filter(([, sample]) => {
+        const lines = kit.renderToLines(sample, 80);
+        const grid = styledScreenFrom([lines.join("\n")], { columns: 80, rows: lines.length });
+        return grid.flat().some((c) => c.style.bg !== "");
+      })
+      .map(([kind]) => kind);
+    expect([...painted].sort(), "the kinds that paint a ground").toEqual([
+      // a half-block cell carries two full colours — the one place a ground
+      // doubles the resolution rather than decorating it
+      "image",
+      // a changed LINE is an extent, and the ground runs to the block's edge
+      "patch",
+      // ` ERROR ` — the one painted label in the system
+      "status",
+      // the header row — §073's *the one place a full-width ground is right*,
+      // a SURFACE the rows sit under rather than a status (C11 I24). It read
+      // three kinds until this one joined by a spec edit, which is the whole
+      // point of comparing by equality rather than checking the three paint.
+      "table",
+    ]);
+
+    // **The extent, which is the claim a mask makes and a count cannot.** A
+    // patch row that carries a ground carries it in every cell of the row: a
+    // ground stopping at the last character says a *word* changed, and that is
+    // a different claim (C25 T4.9, and this is the same property read as a
+    // shape rather than as a width).
+    const patchLines = kit.renderToLines(ONE_PER_KIND.patch, 80);
+    const patchGrid = styledScreenFrom([patchLines.join("\n")], {
+      columns: 80,
+      rows: patchLines.length,
+    });
+    const ragged = patchGrid
+      .map((row, i) => ({ i, on: row.filter((c) => c.style.bg !== "").length }))
+      .filter(({ on }) => on > 0 && on < 80);
+    expect(ragged, "a grounded row is grounded to the block's edge").toEqual([]);
+    expect(
+      patchGrid.filter((row) => row.every((c) => c.style.bg !== "")).length,
+      "and the illustration has grounded rows to be ragged about",
+    ).toBeGreaterThan(0); // cells-ok — a count
+
+    // **The second rule: a ground is never the only carrier.** At one bit every
+    // ground is gone, so the census is empty — and the marks are still drawn,
+    // which is what makes losing it lossless (C25 I13, T4.7).
+    const mono = measurable({
+      theme: DARK_THEME,
+      capabilities: MONO_UNICODE_CAPS,
+      definitions: [patchDefinition, tableDefinition, plotDefinition] as never,
+    });
+    for (const kind of ["image", "patch", "status"] as const) {
+      const lines = mono.renderToLines(ONE_PER_KIND[kind], 80);
+      const grid = styledScreenFrom([lines.join("\n")], { columns: 80, rows: lines.length });
+      expect(
+        grid.flat().filter((c) => c.style.bg !== "").length,
+        `${kind} paints nothing at one bit`,
+      ).toBe(0); // cells-ok — a count
+    }
+    // **Through `visible`, and the first draft was not.** At one bit the tone
+    // collapse is typographic, so the marker arrives as `+\u001b[22m ` — the
+    // colour is gone and the attribute reset is not, and a raw match on `+ `
+    // failed against a frame that draws the marker perfectly well.
+    expect(
+      mono.renderToLines(ONE_PER_KIND.patch, 80).map(visible).join("\n"),
+      "and the marker carries it",
+    ).toMatch(/[-+] /u);
+  });
+  it("T2.160 (C09 I96, §034, §072, `R-BLK-234`): a painted bar is two structural grounds, and the glyphs are its lower rung", () => {
+    const bar = (painted: boolean, caps = FULL_CAPS) =>
+      measurable({ theme: DARK_THEME, capabilities: caps }).renderToLines(
+        block({ kind: "progress", id: "m", label: "slant", current: 15, total: 24, style: "slant", painted }),
+        80,
+      );
+    const gridOf = (lines: readonly string[]) =>
+      styledScreenFrom([lines.join("\n")], { columns: 80, rows: lines.length })[0] ?? [];
+
+    // **Two grounds, and they are the two the design names.** A single-symbol
+    // check would pass on a bar painted one colour end to end, which draws the
+    // extent and hides where the fill stops — the whole of what a bar says.
+    const on = gridOf(bar(true));
+    const grounds = [...new Set(on.filter((c) => c.style.bg !== "").map((c) => c.style.bg))];
+    const meter = sgr(background("surface.meterFill", DARK_THEME, FULL_CAPS)).replaceAll(/[\u001b[m]/gu, "");
+    expect(grounds.length, "the fill and the track are different grounds").toBe(2); // cells-ok — a count
+    expect(grounds.join("|"), "and the fill's is `meterFill`").toContain(meter);
+
+    // **No glyph under either.** §034 draws the painted bar with no bar
+    // character at all — the ground IS the extent — so a row asserting only
+    // that a background arrived would pass on glyphs wearing a wash.
+    const bars = on.filter((c) => c.style.bg !== "").map((c) => c.ch);
+    expect([...new Set(bars)], "the painted cells are spaces").toEqual([" "]);
+
+    // **The lower rung is the alphabet, not nothing** (§034: *the glyphs are
+    // the 1-bit rung*). At one bit the painted bar and the drawn one are the
+    // same bytes, which is stronger than either alone: it says the fallback is
+    // the bar `style` named rather than a bar that vanished.
+    expect(bar(true, MONO_UNICODE_CAPS), "painted falls back into its alphabet").toEqual(
+      bar(false, MONO_UNICODE_CAPS),
+    );
+    expect(bar(true, MONO_UNICODE_CAPS).join(""), "and that alphabet is `slant`").toContain("▰");
+
+    // **A theme with no `meterFill` falls to the glyphs too, and this arm is
+    // here because the mutation pass said the sentence forbade nothing.**
+    // I96 says the rung is read off the ground resolving rather than off the
+    // depth, and keying it on `colourDepth > 1` instead **survived** a pass:
+    // all ten shipped themes carry `meterFill`, so the two predicates agree on
+    // every input the tree can produce and the distinction was true of nothing.
+    // A03 §2's vacuity class arriving in prose. Constructing the theme the
+    // sentence is about is what makes it checkable — and it is the case a
+    // consumer's own theme can reach, since `ThemeTokens` is public.
+    const { meterFill: _dropped, ...withoutMeter } = DARK_THEME.tokens.surfaces;
+    // **Its own `name`, because the resolver's cache is keyed on one** (C10
+    // I11). The first draft kept `prism` and the stripped theme resolved from
+    // the warm entry the real one had filled — it painted, and read exactly
+    // like the fallback not existing.
+    const noMeter = {
+      ...DARK_THEME,
+      name: "prism-no-meter",
+      tokens: { ...DARK_THEME.tokens, surfaces: withoutMeter },
+    } as typeof DARK_THEME;
+    expect(
+      measurable({ theme: noMeter, capabilities: FULL_CAPS }).renderToLines(
+        block({ kind: "progress", id: "m", label: "slant", current: 15, total: 24, style: "slant", painted: true }),
+        80,
+      ).join(""),
+      "a theme with no `meterFill` draws the alphabet",
+    ).toContain("▰");
+
+    // **The percentage is `muted`** — all five of §034's bars read it so, and
+    // the tree drew `meta` from the day the kind landed with no row naming it.
+    // **Read off the grid, not off the bytes**, and the first draft was the
+    // other way. The `off` cells and the percent now share one style, so the
+    // painter coalesces them and there is no fresh SGR before `63%` at all — a
+    // substring match on `<muted>63%` failed against a row drawing the percent
+    // in muted perfectly well.
+    const drawnRow = gridOf(bar(false));
+    const digit = drawnRow.findIndex((c, i) => c.ch === "6" && drawnRow[i + 1]?.ch === "3");
+    expect(digit, "the percent is drawn").toBeGreaterThan(0); // cells-ok — a column
+    const fg = (style: ReturnType<typeof tone>) => sgr(style).replaceAll(/[\u001b[m]/gu, "");
+    expect(drawnRow[digit]?.style.fg, "the percent is muted").toBe(
+      fg(tone("muted", DARK_THEME, FULL_CAPS)),
+    );
+    expect(
+      drawnRow.map((c) => c.style.fg),
+      "and no cell of the row is meta",
+    ).not.toContain(fg(tone("meta", DARK_THEME, FULL_CAPS)));
+  });
+  it("T2.162 (C09 I97, §035, §036, `R-PRG-001`): quantity, granularity and liveness are three axes, each with one consequence and each outranked", () => {
+    const at = (spec: Record<string, unknown>, caps = FULL_CAPS) =>
+      measurable({ theme: DARK_THEME, capabilities: caps })
+        .renderToLines(
+          block({ kind: "progress", id: "m", label: "work", current: 6, total: 10, ...spec } as never),
+          40,
+        )
+        .map(visible)
+        .join("");
+
+    // **Granularity picks the alphabet, and `style` outranks it.** `block` for
+    // continuous and `posts` for segmented — `R-PRG-002`'s *discrete steps use
+    // posts*, which ruling 32 took over §035's `slant` specimens (C09 I136) —
+    // and the registry's own deferral for the rest: *use only when its texture
+    // is declared by the component*.
+    expect(at({ granularity: "continuous" }), "continuous is the block alphabet").toContain("█");
+    expect(at({ granularity: "segmented" }), "segmented is posts (C09 I136)").toContain("▮");
+    expect(at({ granularity: "segmented", style: "beads" }), "a declared style outranks it").toContain("•");
+
+    // **Quantity picks the readout, and it is the one axis that moves a frame
+    // with no colour and no motion** — which is why it is asserted at one bit
+    // as well. `capacity` carries the pair beside the share; `count` carries
+    // the pair alone, because the unit is what says whether 44% is nearly done.
+    for (const caps of [FULL_CAPS, MONO_UNICODE_CAPS]) {
+      expect(at({ quantity: "progress" }, caps), "a progress reads its share").toContain("60%");
+      expect(at({ quantity: "capacity" }, caps), "a capacity reads both").toContain("60%  6/10");
+      expect(at({ quantity: "count" }, caps), "a count reads its units").toContain("6 of 10");
+      expect(at({ quantity: "count" }, caps), "and no share at all").not.toContain("60%");
+      expect(at({}, caps), "an undeclared quantity reads as it always did").toContain("60%");
+    }
+
+    // **Liveness sets the motion on a ramp that exists and never invents one.**
+    // The two arms are the whole of the rule: with a ramp the animation is the
+    // axis's, and with no ramp the bar is unmoved — a row asserting only the
+    // first would pass on a member that fabricated a `fill` the design never
+    // names.
+    // **Read with the ink kept, and at a tick.** Motion is a colour and
+    // `visible` strips colour, so the first form of these four compared two
+    // frames that differ in the only channel it had thrown away — and the row
+    // went red saying two identical strings were identical.
+    const ink = (spec: Record<string, unknown>) =>
+      measurable({ theme: DARK_THEME, capabilities: FULL_CAPS, tick: 7 })
+        .renderToLines(
+          block({ kind: "progress", id: "m", label: "work", current: 6, total: 10, ...spec } as never),
+          40,
+        )
+        .join("");
+    const ramp = { fill: "gradient" as const, colormap: "viridis" as const };
+    const still = ink({ ramp });
+    expect(ink({ ramp, liveness: "active" }), "active moves a declared ramp").not.toBe(still);
+    expect(ink({ ramp, liveness: "stalled" }), "and stalled moves it differently").not.toBe(
+      ink({ ramp, liveness: "active" }),
+    );
+    expect(ink({ ramp, liveness: "still" }), "and `still` is the ramp unmoved").toBe(still);
+    expect(
+      ink({ ramp: { ...ramp, animate: "wave" as const }, liveness: "active" }),
+      "a declared animate outranks it",
+    ).toBe(ink({ ramp: { ...ramp, animate: "wave" as const } }));
+    expect(ink({ liveness: "active" }), "and with no ramp there is nothing to move").toBe(ink({}));
+
+    // **The presets are two triples and not the only two** (`R-BLK-237`). A row
+    // asserting BUDGET and OPERATION alone is satisfied by an enum with two
+    // members wearing three field names; §035 names the case that is neither —
+    // *a six-hour training run is progress · continuous · active, without
+    // pretending it is a capacity*.
+    const budget = at({ quantity: "capacity", granularity: "continuous", liveness: "still" });
+    const operation = at({ quantity: "progress", granularity: "segmented", liveness: "active" });
+    const training = at({ quantity: "progress", granularity: "continuous", liveness: "active", ramp });
+    expect(budget, "BUDGET is continuous and carries its pair").toContain("█");
+    expect(budget, "BUDGET reads both").toContain("60%  6/10");
+    expect(operation, "OPERATION is segmented, and counted work draws posts (C09 I136)").toContain("▮");
+    expect(operation, "and reads its share alone").not.toContain("6/10");
+    expect(training, "the third triple is expressible and is neither preset").toContain("█");
+    expect(training, "and it is a progress, not a capacity").not.toContain("6/10");
+  });
+});
+
+describe("C09 I111 — the trend arrows", () => {
+  it("T2.174 (C09 I111, R-COL-006, question 37): trendUp, trendDown and trendFlat resolve to ↑ ↓ → and ^ V =", () => {
+    const at = (caps: Parameters<typeof glyphs>[0]) => [glyphs(caps).trendUp, glyphs(caps).trendDown, glyphs(caps).trendFlat];
+    expect(at({ unicode: "full", ambiguousWidth: "narrow" })).toEqual(["\u2191", "\u2193", "\u2192"]);
+    expect(at({ unicode: "ascii", ambiguousWidth: "narrow" })).toEqual(["^", "V", "="]);
+    // All three are Ambiguous, so `wide` takes the ASCII rung with the set (C09 I48).
+    expect(at({ unicode: "full", ambiguousWidth: "wide" })).toEqual(["^", "V", "="]);
+    // **`V` and not `v`** (question 38): `v` is disclosure's, and a row's lead and
+    // a cell share one content row.
+    expect(glyphFor("collapse", { unicode: "ascii", ambiguousWidth: "narrow" })).toBe("v");
+    expect(glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }).trendDown).not.toBe("v");
+  });
+});
+
+describe("C04 I145 — a finished bar has zero rows (review batch 4 M16.2)", () => {
+  it("T1.80 (C04 I145, §3as): progress and count vanish at and past their total; capacity and an undeclared quantity persist; padding stays", () => {
+    const kit = measurable({ theme: DARK_THEME, capabilities: FULL_CAPS });
+    const bar = (spec: Record<string, unknown>) =>
+      block({ kind: "progress", id: "m", label: "work", ...spec } as never);
+    const read = (spec: Record<string, unknown>) => {
+      const b = bar(spec);
+      const lines = kit.renderToLines(b, 40).map(visible);
+      return { measured: kit.registry.measure(b, 40), lines };
+    };
+    for (const quantity of ["progress", "count"]) {
+      expect(read({ quantity, current: 99, total: 100 }).lines.length, `${quantity} at 99/100 draws`).toBe(1);
+      for (const current of [100, 150]) {
+        const got = read({ quantity, current, total: 100 });
+        expect(got.measured, `${quantity} at ${String(current)}/100 measures 0`).toBe(0);
+        expect(got.lines, `${quantity} at ${String(current)}/100 renders nothing`).toEqual([]);
+      }
+    }
+    // `capacity` persists, and its number is not clamped (C09 I28).
+    for (const current of [100, 150]) {
+      const got = read({ quantity: "capacity", current, total: 100 });
+      expect(got.lines.length, `capacity at ${String(current)}/100`).toBe(1);
+      expect(got.lines[0], "reading its own share").toContain(`${String(current)}%`);
+    }
+    // An undeclared quantity never finishes (D25) — examples/docker's CPU bar.
+    expect(read({ current: 150, total: 100 }).lines.length, "undeclared at 150/100 draws").toBe(1);
+    // `total: 0` has no proportion, so it is never finished.
+    expect(read({ quantity: "progress", current: 0, total: 0 }).lines.length, "total 0 draws").toBe(1);
+    expect(read({ quantity: "progress", current: -1, total: 10 }).lines.length, "a negative current draws").toBe(1);
+    // The registry's padding applies to the zero, as it does to an empty container's.
+    const padded = read({ quantity: "progress", current: 100, total: 100, padding: { t: 1 } });
+    expect(padded.measured, "a finished bar with padding measures its padding").toBe(1);
+    expect(padded.lines.map((l) => l.trim()), "and renders one blank row").toEqual([""]);
+  });
+});
+
+describe("C09 I32 — a status asks for a tick only while it moves (ruling 106 c, F1526)", () => {
+  it("T2.231 (C09 I32, ruling 106 c; F1526): tickIntervalOf asks for a status's tick exactly when its activity line draws", () => {
+    // **A named set whose interval is not the default's**, so an answer of the
+    // default interval would be the kind's and not the block's.
+    const at = (state: string, over: Record<string, unknown> = {}): Block =>
+      block({ kind: "status", id: "s", state, message: "decode failed", spinner: "line", ...over } as never) as Block;
+    const own = spinnerIntervalMs("line");
+    expect(own, "the set is distinguishable from the default").not.toBe(spinnerIntervalMs(undefined));
+
+    expect(tickIntervalOf(at("loading")), "loading moves").toBe(own);
+    expect(tickIntervalOf(at("retrying", { retryInMs: 8000 })), "retrying with a countdown moves").toBe(own);
+    expect(tickIntervalOf(at("error")), "error has nothing that moves").toBeNull();
+    expect(tickIntervalOf(at("empty")), "nor empty").toBeNull();
+    expect(tickIntervalOf(at("retrying")), "nor retrying with no countdown").toBeNull();
+    const panel = block({ kind: "panel", id: "p", title: "build", children: [at("error")] } as never) as Block;
+    expect(animationIntervalOf([panel]), "a panel holding only the error box").toBeNull();
+    expect(
+      animationIntervalOf([block({ kind: "panel", id: "p", title: "build", children: [at("loading")] } as never) as Block]),
+      "and the control: the same panel over loading asks",
+    ).toBe(own);
+
+    // **The control for the null**: the error box drawn at two ticks is the
+    // same bytes, so asking for no tick is about a box in which nothing moves.
+    const drawn = (tick: number): string => measurable({ capabilities: FULL_CAPS, tick }).renderToLines(at("error"), 60).join("\n");
+    expect(drawn(0), "error at two ticks").toBe(drawn(5));
+    const loading = (tick: number): string => measurable({ capabilities: FULL_CAPS, tick }).renderToLines(at("loading"), 60).join("\n");
+    expect(loading(0), "loading at two ticks, which the same reader can tell apart").not.toBe(loading(5));
   });
 });

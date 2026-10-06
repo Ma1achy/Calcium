@@ -3,28 +3,101 @@
  *
  * C16 §4, §5, §7 — see spec.
  *
- * **The ladder is not a list here.** Rungs 3 to 7 are handlers registered on
- * `overlay`, `copyMode`, `pushedView` and `liveBlock`, so their order *is*
- * `FOCUS_ORDER`'s and the two cannot disagree. Only rungs 1 and 2 sit outside
- * dispatch, because a verb in flight and a shell child are not focus targets and
- * have no target to register on. C16 §5's table documents what falls out of this;
- * it is not a second specification.
+ * **The ladder is not a list here.** The rungs below the two refusals are
+ * handlers registered on `panel`, `interaction`, `liveBlock` and `prompt`, so
+ * their order *is* `FOCUS_ORDER`'s and the two cannot disagree. The refusals — a
+ * question and either copy mode — are the intercept table's `reject`, read before
+ * everything (I62). Rungs 1 and 2 sit outside dispatch, because a verb in flight
+ * and a shell child are not focus targets and have no target to register on.
+ * C16 §5's table documents what falls out of this; it is not a second
+ * specification.
  */
 
 import { NO_SPAN } from "../../data/viewmodel/index.js";
 import type { Probe } from "../../data/viewmodel/index.js";
-import { activeTarget, type FocusInputs, type FocusStore } from "./focus.js";
+import { activeTarget, rungOfLayer, type FocusInputs, type FocusStore, type KeyedTop } from "./focus.js";
 import type { Keymap } from "./keymap.js";
-import type { FocusTarget, InputEvent } from "./types.js";
+import {
+  RUNG_OF,
+  type FocusTarget,
+  type InputEvent,
+  type Key,
+  type OwnerRung,
+  type Verdict,
+} from "./types.js";
+import { INTERCEPTS, interceptOf, interceptVerdict, isExactCtrlC } from "./intercepts.js";
+import { repeatFor, repeatSteps } from "./repeat.js";
 
 const EXIT_ARM_MS = 500;
 
+/**
+ * Ruling 52 as the person amended it on 2026-09-28 (C16 I69): without key-release
+ * reporting a question's guard refuses every activation for this long after it
+ * arrives.
+ *
+ * **The grace is what the first form of the ruling was missing.** A single window
+ * of 250 ms from the arrival closed before a held key's first repeat — X11 waits
+ * 660 ms — so the commonest case, `⏎` submitting a verb that asks at once,
+ * answered at the repeat (§3c S4).
+ */
+const GUARD_GRACE_MS = 750;
+
+/**
+ * And after the grace, the guard holds while activations keep arriving within
+ * this long of the last one refused (C16 I69). A held key repeats at 25–40 Hz, so
+ * its repeats are refused for exactly as long as it is held; a reader's
+ * deliberate press after a pause is not.
+ */
+const GUARD_GAP_MS = 250;
+
+/**
+ * A question's activation guard, live (C16 I44, I69, I70).
+ *
+ * **`held` and `timed` are R-BLK-788's two boundaries**, and the terminal decides
+ * which: with key releases reported the guard waits for the key that was down to
+ * lift, and reads no clock; without them it is ruling 52's two numbers. `refused`
+ * is the first key it refused, which is what the owner line names — the second
+ * refusal changes nothing (I70).
+ */
+type Guard = {
+  readonly arm: "held" | "timed";
+  readonly arrivedAt: number;
+  lastAt: number;
+  refused: Key | null;
+};
+
+/** When a timed guard lapses: the grace from the arrival, or the gap from the last refusal. */
+const deadlineOf = (g: Guard): number => Math.max(g.arrivedAt + GUARD_GRACE_MS, g.lastAt + GUARD_GAP_MS);
+
+
+/**
+ * A placed layer as the pointer sees it (C16 I74).
+ *
+ * **A peek is one of them now**, for the wheel alone (C15 I31): it has no rung,
+ * so its `kind` is outside `KeyedTop`, and the router never runs a handler for
+ * it — the wheel goes to its scroller by id.
+ */
 export type Placed = Readonly<{
-  layer: Readonly<{ id: string; kind: "overlay" | "view"; dismissable: boolean }>;
+  layer: (KeyedTop | Readonly<{ kind: "peek"; owner?: undefined }>) &
+    Readonly<{ id: string; blocking: boolean; dismissal: "escape" | "focus" | "answer" }>;
   top: number;
   left: number;
   height: number;
   width: number;
+}>;
+
+/**
+ * A refusal the router made, handed to L4 to explain (C16 I62).
+ *
+ * `cause` is which of the two refusals it was: an intercept's `reject` at the
+ * owner's rung, or an event that reached a blocking top and no rung took. A
+ * handler's own `reject` is not one — that handler has decided and explained
+ * for itself — and neither is the question guard, whose explanation is the
+ * armed mark on the owner line (I44).
+ */
+export type Refusal = Readonly<{
+  rung: OwnerRung | null;
+  cause: "intercept" | "blocked";
 }>;
 
 /**
@@ -51,7 +124,7 @@ export type RouterDeps = Readonly<{
    * `handler`/`local` ruling, one layer up.
    */
   probe?: Probe;
-  overlayTop: () => Readonly<{ kind: "overlay" | "view"; id: string; dismissable: boolean }> | null;
+  overlayTop: () => (KeyedTop & Readonly<{ id: string; blocking: boolean; dismissal: "escape" | "focus" | "answer" }>) | null;
   /**
    * The top layer's answer handler, or null — I25.
    *
@@ -60,15 +133,42 @@ export type RouterDeps = Readonly<{
    * searched downwards would be answered by the menu.
    *
    * C16 does not know what a key means to a question. It offers the event and
-   * honours the boolean, which is the same contract `register` already has — so
-   * `Esc`, `⌃c`, an accelerator and an arrow are one path here and four rules
-   * over in L4, where the question lives.
+   * honours the answer, which is the same contract `register` already has — so
+   * `Esc`, an accelerator and an arrow are one path here and three rules over in
+   * L4, where the question lives. **`⌃c` is not offered** (I62): the intercept
+   * table rejects it at `question` before any rung runs. A `reject` from the
+   * callback is a refusal the question has already explained (C23 I82).
    */
-  overlayAnswerCallback: () => ((e: InputEvent) => boolean) | null;
-  placed: () => readonly Placed[];
+  overlayAnswerCallback: () => ((e: InputEvent) => boolean | Verdict) | null;
+  /**
+   * The layers under the pointer's reach for this gesture, in draw order —
+   * C15's `takesPointer` applied by L4, so a peek is here for the wheel and not
+   * for a press (C16 I74, C15 I31). One predicate, stated once, in the
+   * component that owns the layer.
+   */
+  placed: (gesture: "wheel" | "press") => readonly Placed[];
+  /**
+   * Move a layer's own scroller by `notches` wheel steps — negative is up — and
+   * answer whether the layer has anything to scroll (C16 I74).
+   *
+   * **By id, and that is the point** (§3d P2). The layer's rung handler reads
+   * `top`, so a wheel routed through it over a lower layer would move the upper
+   * one. `false` is *nothing to scroll here*: a keyed layer still consumes the
+   * wheel, and a peek declines it to the base.
+   */
+  scrollLayer: (id: string, notches: number) => boolean;
   popLayer: () => void;
-  copyMode: () => boolean;
-  exitCopyMode: () => void;
+  nativeSelection: () => boolean;
+  /**
+   * Semantic copy mode is up (C14 §6a, C16 §5d, I51).
+   *
+   * **The router reads the state and calls no exit** (I62, ruling 59). It held
+   * both copy modes' exits for the `⌃c` rung, and §103 has COPY MODE *reject*
+   * the interrupt — so the rung went, and with it the only reader of either.
+   * `escapeSemanticSelection` was a member here that nothing in the router read:
+   * `esc` reaches it through the keymap's effect table, as every bound key does.
+   */
+  semanticSelection: () => boolean;
   liveEntry: () => Readonly<{ id: string }> | null;
   entryAtRow: (row: number) => Readonly<{ id: string; rowOffset: number }> | null;
   /**
@@ -87,6 +187,21 @@ export type RouterDeps = Readonly<{
    * prompt (C23 §8a A1).
    */
   inFlight: () => "app" | "local" | "shell" | null;
+  /**
+   * An application's child surface holds the keyboard (I49, R-BLK-711).
+   *
+   * The `child` rung's **second** source. Separate from `inFlight` because the
+   * two are different mechanisms answering one question — a shell delegation is
+   * C23's and an attachment is C22's — and one dep covering both would make a
+   * component report another's state.
+   */
+  childAttached: () => boolean;
+  /**
+   * End the captured child's attachment (C16 I75). The `host-detach`
+   * intercept's exception, called at the `child` rung and nowhere else; a
+   * shell delegation has nothing here to close.
+   */
+  detachChild: () => void;
   /**
    * C23's, for the same reason. `runner.killAll()` kills the child and leaves the
    * entry streaming forever; C23 I10 settles it `partial` with output retained,
@@ -122,9 +237,80 @@ export type RouterDeps = Readonly<{
    */
   liveStreams: () => number;
   cancelNewestStream: () => boolean;
+  /**
+   * Does this terminal report key releases (C02 `keyboardProtocol`, C16 I44)?
+   *
+   * **The one thing that decides which of R-BLK-788's two boundaries applies.**
+   * *Wait for the held key to lift* is only an instruction a terminal that says
+   * when it lifted can be given; on one that does not, the guard has to end on
+   * the refusal or it would swallow the reader's deliberate second press with
+   * nothing able to tell it from the held first one.
+   *
+   * A pull like every other, and the same field §6a reads to choose a profile —
+   * so the two answers cannot drift apart into *this terminal has the protocol*
+   * and *this terminal sends releases*.
+   */
+  keyReleasesReported: () => boolean;
+  /**
+   * Would the top question **resolve** on this key, or `null` when none is open
+   * (C16 I44, R-BLK-788)?
+   *
+   * **The guard's predicate, and it is a pull because C16 must not know the
+   * answer** (I25). *The first ambiguous activation is refused* needs a way to
+   * tell a key that would answer the question from one that would move its
+   * selection or do nothing, and the only honest way to ask is to ask the
+   * question — the alternative is calling the answer handler, which answers it.
+   * A separate pull rather than a widened `overlayAnswerCallback`, because one
+   * settles and one does not, and a single function that sometimes settles is
+   * the shape no caller can use safely.
+   */
+  overlayWouldResolve: () => ((e: InputEvent) => boolean) | null;
+  /**
+   * A count that moves whenever an owner is raised or removed — C15's
+   * `generation` plus the surface host's attachments (C16 I73, C15 I33).
+   *
+   * **The rung alone missed the owners between two reads.** The epoch is brought
+   * current lazily — at a dispatch's two ends, in the pointer calls and in the
+   * getters — so a question raised and answered between a press and its release
+   * left the rung `scope` at both reads, and the release committed across two
+   * owner changes (§3c S9). A question replaced by a question within one
+   * dispatch was the same miss at the other rung (S10b). A pull, and a sum
+   * rather than two, because the router asks one question of it: *did anything
+   * change*.
+   */
+  ownerGeneration: () => number;
+  /**
+   * The router refused an event — explain it (C16 I62, R-HON-004, R-INT-009).
+   *
+   * Called exactly once per refusal, and only for the two the router makes
+   * itself: an intercept's `reject` and a blocking top no rung took. **L4 routes
+   * it by rung**, because the explanation is the owner's: a question draws
+   * `answer this first` on its own row (C23 I82), semantic copy mode a one-shot
+   * chip on the owner line (C22 I133), and native selection nothing — the
+   * scheduler is suspended, and that is the stated limit (ruling 60).
+   */
+  refused: (r: Refusal) => void;
 }>;
 
-export type Handler = (e: InputEvent) => boolean;
+/**
+ * What a handler answers (§103, R-OWN-001, C16 §3a W6, I64).
+ *
+ * **`boolean` could say two of the three things and conflated the other one.**
+ * `true` is `handle`; `false` meant *pass downward* **and** *consume without
+ * acting*, which are different rungs of the design's decision — and that is why
+ * a blocking question could drop a key in silence and read as correct (W2).
+ * `global-intercept` is an intercept's word and not a handler's (I64).
+ *
+ * Both forms are accepted because the three-verdict form is only needed where a
+ * handler has something to say beyond *yes* or *not mine*, and 30-odd handlers
+ * in `construct.ts` have not. `true`/`false` normalise to `handle`/`pass`, which
+ * is what they have always meant; a handler that means `reject` now says so.
+ */
+export type Handler = (e: InputEvent) => boolean | Verdict;
+
+/** `true` is `handle` and `false` is `pass` — what the boolean form always meant. */
+const verdictOf = (answer: boolean | Verdict): Verdict =>
+  answer === true ? "handle" : answer === false ? "pass" : answer;
 
 export interface InputRouter {
   register(
@@ -135,20 +321,140 @@ export interface InputRouter {
   dispatch(e: InputEvent): boolean;
   resetFocus(): void;
   readonly target: FocusTarget;
+  /**
+   * Who owns the keyboard, as §103's ladder names it — `null` when no rung does
+   * and the global keymap is all that is left (R-OWN-001, R-KEY-004).
+   *
+   * Exposed because the footer's owner line has to read it: *AN OWNER YOU CANNOT
+   * SEE IS AN OWNER YOU WILL FIGHT.* It is derived, not stored, for the reason
+   * `target` is — a second copy is a second thing to keep in step.
+   */
+  readonly rung: OwnerRung | null;
+  /**
+   * Is the current owner newly raised and still refusing activations (C16 I44,
+   * I69)? Read by the footer's owner line, which is where the refusal explains
+   * itself (C22 §6, R-INT-008).
+   *
+   * **The epoch is not beside it any more** (I73). It was public for one reader,
+   * a test, and the two things it is for — a pointer arm's commit and the guard —
+   * are observable through `commitPointer` and this.
+   */
+  readonly ownerArmed: boolean;
+  /**
+   * What the guard has refused, and the way out — `null` until its first refusal
+   * (C16 I70).
+   *
+   * **The first refused key, and only the first**: the owner line names it, so
+   * the refused key changes the frame once and later refusals change nothing.
+   * `untilRelease` is which boundary this terminal has — the key's release where
+   * releases are reported, a pause where they are not.
+   */
+  readonly ownerRefused: Readonly<{ key: Key; untilRelease: boolean }> | null;
+  /**
+   * When a timed guard lapses, or `undefined` when nothing here is waiting on a
+   * clock (C16 I70).
+   *
+   * **The wake's half of the guard.** A guard that ends on time ends with no
+   * input, and no input is no frame — so the mark would outlive the guard for as
+   * long as the reader waited (§3c S6). L4 schedules on this as it does on the
+   * decoder's deadline, and draws the frame the lapse changed.
+   */
+  nextDeadline(): number | undefined;
+  /**
+   * Arm a pointer activation on a stable identity (C16 I45, R-OWN-003).
+   *
+   * The identity is the caller's to compose and is `(entry, blockId, elementId)`
+   * in the gesture table — never a cell, because a live block re-renders under a
+   * held button and a release comparing positions activates whatever slid under
+   * the pointer.
+   */
+  armPointer(id: string): void;
+  /**
+   * Commit the arm if `id` is still the armed identity in the epoch it was armed
+   * in (C16 I45). Clears the arm either way: a release ends it whatever became
+   * of it.
+   */
+  commitPointer(id: string): boolean;
   /** Which stages the last dispatch consulted, in order. Diagnostics and T2.x. */
   readonly lastStages: readonly string[];
 }
 
-const isCtrlC = (e: InputEvent): boolean =>
-  e.kind === "key" && e.key.ctrl && e.key.name === "c";
+/** The ladder's `⌃c`, which is the intercept table's (C16 I67). */
+const isCtrlC = (e: InputEvent): boolean => e.kind === "key" && isExactCtrlC(e.key);
 
 export function createRouter(
   opts: Readonly<{ focus: FocusStore; keymap: Keymap; now: () => number; deps: RouterDeps }>,
 ): InputRouter {
-  const { focus, now, deps } = opts;
+  const { focus, keymap, now, deps } = opts;
   const handlers = new Map<FocusTarget, Handler[]>();
   let armedAt: number | null = null;
   let stages: string[] = [];
+
+  /**
+   * M7's two fields, and they are two because one cannot hold both facts
+   * (C16 I43, I44, §4a W8).
+   *
+   * `ownerEpoch` moves on **every** owner change — a raise, a fall, and a move
+   * to or from no rung alike — because R-OWN-002's first clause is *events carry
+   * the owner epoch in which they began and are never replayed against a new
+   * owner*, and a question closing is an owner change like any other.
+   * `guard` is set only when a **question** arrives, because R-BLK-786's
+   * clause is *a newly presented question requires a fresh, deliberate
+   * activation*. Folding them into one field refuses the first keystroke after
+   * every question the reader has just answered — which is exactly when they are
+   * typing deliberately, and is a defect no row asserting a *state* can see.
+   *
+   * **A clock on one arm only** (§4a W9, I69). R-BLK-788 makes the boundary an
+   * event where the terminal reports one — *wait for the held key to lift* —
+   * and that arm reads no clock. Where it does not, a held key produces no event
+   * at all, and ruling 52 as amended gives that arm two numbers instead: the
+   * grace and the gap. Ending on the first refusal, which is what this did, let
+   * the held key's next repeat answer.
+   *
+   * **`lastRung` starts at `null`, and a lazy seed was wrong** (I43). An
+   * `undefined` seed taken on the first `syncOwner` swallows the first
+   * transition it ever sees — which is the arrival of the session's first
+   * question, the one the guard most has to catch. Seeding eagerly at
+   * construction is the other wrong answer: the deps are pulls and `inFlight`
+   * reads a `pipeline` that is still in its temporal dead zone, so asking costs
+   * a `ReferenceError` rather than a walk. `null` needs neither, because a
+   * router is built with nothing raised — there is no stack yet to raise from.
+   */
+  let ownerEpoch = 0;
+  let lastRung: OwnerRung | null = null;
+  /**
+   * The owner generation at the last sync (I73). Zero is honest at construction
+   * for `lastRung`'s reason: nothing is raised yet, and neither C15 nor the
+   * surface host has counted anything.
+   */
+  let lastGeneration = 0;
+  let guard: Guard | null = null;
+  /**
+   * The press's arm (I45, I71). The identity is the caller's; what the release
+   * commits is the activation the caller captured at the press, and that lives
+   * with the caller too — the router only answers *same identity, same epoch*.
+   */
+  let pointerArm: Readonly<{ id: string; epoch: number }> | null = null;
+  /**
+   * Which keys are physically down, where the terminal says so (C16 I44).
+   *
+   * **Empty and meaningless without release reporting**, which is the whole
+   * reason R-BLK-788 splits its rule in two. *Wait for the held key to lift*
+   * presupposes a held key, and a terminal that reports releases is one that can
+   * say whether there is one — so where there is not, a question guards nothing
+   * and the reader's first press answers it. Where the terminal is silent about
+   * releases this stays empty and the conservative arm applies.
+   */
+  /**
+   * Which keys are down, and since when (C16 I44, I53).
+   *
+   * **A map rather than a set, and the stamps are what I53 needs.** The set
+   * answered *is anything held*, which is all the question guard asks. A
+   * repeat policy asks two more — how long this key has been down, and when
+   * it was last acted on — and neither can be recovered from membership.
+   * `size` and `delete` read the same either way, so the guard is untouched.
+   */
+  const held = new Map<string, { pressedAt: number; lastActedAt: number }>();
 
   function register(
     target: FocusTarget,
@@ -171,7 +477,16 @@ export function createRouter(
   function inputs(): FocusInputs {
     return {
       overlayTop: deps.overlayTop(),
-      copyMode: deps.copyMode(),
+      nativeSelection: deps.nativeSelection(),
+      semanticSelection: deps.semanticSelection(),
+      // **Two sources, one fact** (I49, R-BLK-711). A shell delegation and an
+      // attached child surface are the same claim — the terminal's keys are not
+      // the host's — and the rung has to answer for both or the second has a
+      // target with nothing that reaches it. `||` rather than a precedence:
+      // neither can be true while the other is (a delegation suspends raw mode),
+      // and a rule about which wins would be a rule about an unconstructible
+      // state.
+      attachedChild: deps.inFlight() === "shell" || deps.childAttached(),
       liveEntry: deps.liveEntry(),
       stored: focus.current,
     };
@@ -199,7 +514,20 @@ export function createRouter(
     // stops a runaway `--watch` is also the key that arms the session's exit,
     // which is the wrong pair to make adjacent — two presses to stop two
     // streams would arm and then raise the confirm.
-    if (isExitKey && atEmptyPrompt && deps.inFlight() === null && deps.liveStreams() === 0) {
+    //
+    // **Nor does an attached child** (I56, R-OWN-002). A surface leaves focus at
+    // the prompt with the line empty, so without this the second `⌃c` inside
+    // the window raised the host's confirm and never reached the child — the
+    // key a full-screen program most needs twice. `childAttached` is the fact
+    // the `child` rung reads, so the arm and the ladder cannot disagree about
+    // who holds the keys; a shell delegation is already `inFlight`.
+    if (
+      isExitKey &&
+      atEmptyPrompt &&
+      deps.inFlight() === null &&
+      deps.liveStreams() === 0 &&
+      !deps.childAttached()
+    ) {
       if (armedAt !== null) {
         armedAt = null;
         return "raise";
@@ -216,34 +544,28 @@ export function createRouter(
     return null;
   }
 
-  /** Rungs 3–7, installed as handlers so the ladder has no order of its own. */
+  /** The ladder's rungs, installed as handlers so it has no order of its own. */
   function installLadder(): void {
     register("overlay", (e) => {
       // **I25 — a layer that must be answered gets its keys first, and the order
-      // is the invariant.** The clause below answers `⌃c` at a non-dismissable
-      // top with *consumed, and nothing happens*, which was the whole truth when
-      // no layer could be answered. Against a question it is a hang: the key
-      // vanishes and the handler awaiting it waits forever. `Esc` and `⌃c` are
-      // handed over rather than decided here, because what they mean belongs to
-      // the question (C23 I36) and half a rule in each place is how they drift.
+      // is the invariant.** `Esc` is handed over rather than decided here,
+      // because what it means belongs to the question (C23 I36) and half a rule
+      // in each place is how they drift. The callback's own verdict is honoured:
+      // `reject` is a refusal the question has already explained (C23 I82).
+      //
+      // **No `⌃c` clause, and no rungs for either copy mode** (I62, ruling 59).
+      // This handler used to pop an escapable overlay on `⌃c` and consume it at
+      // any other, and native and semantic selection each had a rung calling
+      // their exit. The intercept table rejects `⌃c` at `question` and `copy`
+      // before any of them could run, so all three were reachable only while a
+      // reject still ran the owning rung — which is the defect.
       const answer = deps.overlayAnswerCallback();
-      if (answer !== null && answer(e)) return true;
-
-      if (!isCtrlC(e)) return false;
-      const top = deps.overlayTop();
-      if (top === null) return false;
-      // `top`, never `pop()`'s return: null covers both "nothing to close" and
-      // "you may not close this", and those are a fall-through and a no-op.
-      if (!top.dismissable) return true; // consumed, and nothing happens (I8)
-      deps.popLayer();
-      return true;
+      return answer === null ? "pass" : verdictOf(answer(e));
     });
-    register("copyMode", (e) => {
-      if (!isCtrlC(e)) return false;
-      deps.exitCopyMode();
-      return true;
-    });
-    register("pushedView", (e) => {
+    // **A panel's rung is `substate`, and so is a view's** (§2c, R-BLK-109).
+    // Two targets, one rung, and the registration is per target: a panel is
+    // escapable by construction, so `⌃c` closes it exactly as `esc` does.
+    register("panel", (e) => {
       if (!isCtrlC(e)) return false;
       deps.popLayer();
       return true;
@@ -268,12 +590,19 @@ export function createRouter(
       focus.toPrompt();
       return true;
     });
+    // **`liveBlock`'s rung, one position over** (I76, §6d): the watch row is a
+    // position of `scope`, and `⌃c` there is the reader stepping out.
+    register("watchRow", (e) => {
+      if (!isCtrlC(e)) return false;
+      focus.toPrompt();
+      return true;
+    });
     register("prompt", (e) => {
       if (!isCtrlC(e) && !(e.kind === "key" && e.key.ctrl && e.key.name === "d")) return false;
 
       // **The subscription rung, above the prompt's own and below every layer's**
       // (§5). Its position needs no ordering of its own: `activeTarget` has
-      // already chosen `prompt`, so an overlay, copy mode, a pushed view or the
+      // already chosen `prompt`, so an overlay, native selection, a pushed view or the
       // live block took the key before this ran — and it sits ahead of clearing
       // the input because a running stream outranks a half-typed line.
       //
@@ -306,7 +635,17 @@ export function createRouter(
     const region = deps.region();
     const regionRow = e.row - region.top;
 
-    const covering = deps.placed().find(
+    // **Every direction is a wheel** (I30, §4a row j). This named two of the
+    // four, so the day the decoder produced `wheelLeft` a horizontal wheel fell
+    // through to the entry rung and was routed as a click on the block under
+    // the pointer.
+    const wheel = e.button.startsWith("wheel");
+
+    // **The topmost that takes this gesture** (I74, §3d P1). C15's `layout` is
+    // draw order, bottom first, and `find` took the bottom one — invisible
+    // while the only overlap was two panels answering one handler, and the
+    // wrong layer the day either of them took a gesture of its own.
+    const covering = [...deps.placed(wheel ? "wheel" : "press")].reverse().find(
       (p) =>
         regionRow >= p.top &&
         regionRow < p.top + p.height &&
@@ -314,14 +653,67 @@ export function createRouter(
         e.col < p.left + p.width,
     );
 
-    // **Every direction is a wheel** (I30, §4a row j). This named two of the
-    // four, so the day the decoder produced `wheelLeft` a horizontal wheel fell
-    // through to the entry rung and was routed as a click on the block under
-    // the pointer.
-    const wheel = e.button.startsWith("wheel");
-    if (covering !== undefined) {
+    if (covering !== undefined && wheel) {
       stages.push(`layer:${covering.layer.id}`);
-      return run(covering.layer.kind === "view" ? "pushedView" : "overlay", e);
+      // **The layer's scroller, by id** (I74, §3d P2–P6). A vertical wheel asks
+      // it; a horizontal one has nothing to ask (§4a row j). A keyed layer
+      // consumes the wheel whether or not it moved — it is between the pointer
+      // and the base — and a peek with nothing to scroll declines it, as a
+      // `scroll` that cannot move does below.
+      const notches = e.button === "wheelUp" ? -1 : e.button === "wheelDown" ? 1 : 0;
+      if (notches !== 0 && deps.scrollLayer(covering.layer.id, notches)) return true;
+      if (covering.layer.kind !== "peek") return true;
+      stages.push("layer:declined");
+    } else if (covering !== undefined && covering.layer.kind !== "peek") {
+      stages.push(`layer:${covering.layer.id}`);
+      // **Two kinds, two targets** (I48, C15 I23, R-BLK-779). *The layer order
+      // is the scroll order*, so a mouse event over a panel is the panel's
+      // exactly as a key is — and while a panel routed to `overlay` here, the
+      // handlers registered at `panel` were unreachable by the pointer while
+      // reachable by the keyboard, which is one seam answering two ways. It was
+      // three until `kind: "view"` retired (R-EXA-082, F1254).
+      //
+      // **And the target is the layer's rung, not its kind** (I63): the same
+      // `rungOfLayer` `activeTarget` reads, so a key and a click over one layer
+      // cannot reach two different rungs.
+      return run(rungOfLayer(covering.layer) === "substate" ? "panel" : "overlay", e);
+    }
+
+    // **The click that dismisses does not also act** (I47, R-BLK-854,
+    // R-BLK-855). The point is not on the layer, and the topmost layer is one
+    // the reader can close — so the press closes it and stops there. *The thing
+    // you meant to hit was covered a moment ago*, so a press that closed the
+    // panel and activated what was underneath would act on something the reader
+    // could not see when they decided to press. One gesture, one effect: the
+    // same shape as `esc` popping one rung, on the pointer instead.
+    //
+    // The **press** and not the release, because closing is not an activation
+    // and nothing about it is taken back by moving the pointer; the arm a
+    // release would commit is cancelled by this press as by any other (I46).
+    // A wheel is carved out for I40's reason and a hover for §4a row t's: a
+    // hand resting on the mouse under mode 1003 would close every panel it
+    // reported over.
+    //
+    // **The primary click, and only it** (I47, §3d P8, ruling D7). Any button
+    // closed the layer; a right or a middle press, a modified press and a drag
+    // beside it are now consumed and do nothing — the thing beneath was covered
+    // a moment ago, so nothing beneath may act, and closing is the click's.
+    const escapable = deps.overlayTop();
+    if (
+      escapable !== null &&
+      escapable.dismissal === "escape" &&
+      e.press &&
+      !wheel &&
+      e.button !== "none"
+    ) {
+      const primary = e.button === "button0" && !e.motion && !e.shift && !e.ctrl && !e.meta;
+      if (!primary) {
+        stages.push("dismiss:inert");
+        return true;
+      }
+      stages.push("dismiss");
+      deps.popLayer();
+      return true;
     }
     // **A layer that must be answered takes the mouse as it takes the keys**
     // (I8). The point is not on the layer, so nothing beneath it may act — a
@@ -330,7 +722,15 @@ export function createRouter(
     // this table had no gate while the keyboard's had two. Consumed and
     // nothing happens, which is the key path's shape.
     const top = deps.overlayTop();
-    if (top !== null && !top.dismissable) {
+    // **The wheel is carved out, because it is a reserved route** (I40, I8, §103,
+    // §4a row k). The gate is right about every other gesture and was wrong about
+    // this one for the same reason the keyboard path was: a wheel does not move
+    // focus, does not change state and does not answer anything — it moves the
+    // viewport so the reader can see. Holding it under an unanswered confirm
+    // produced the defect I8 exists to prevent, one layer up: the layer blocked
+    // comprehension of its own question. A click beside a confirm is still
+    // consumed and still does nothing, which is what row k was measured on.
+    if (top !== null && top.blocking && !wheel) {
       stages.push("modal");
       return true;
     }
@@ -347,7 +747,26 @@ export function createRouter(
       stages.push(hit === null ? "viewport:wheel" : `viewport:${hit.id}`);
       if (hit !== null && run("liveBlock", e)) return true;
       if (hit !== null) stages.push("viewport:wheel");
-      return run("copyMode", e) || run("global", e);
+      return run("nativeSelection", e) || run("global", e);
+    }
+
+    // **A pointer gesture in semantic copy mode is the mode's, wherever the
+    // pointer is** (C14 I44, §6f, `R-SEL-012`, `R-SEL-013`).
+    //
+    // Two things sit in this one line. Without the rung at all a press routes
+    // to `liveBlock` and moves focus — the other mode's gesture running inside
+    // this one, and the reader's drag selecting nothing while something else
+    // lights up. And **outside `inRegion`**, because a drag that autoscrolls is
+    // a drag whose pointer has *left* the container: `R-SEL-013`'s bands are
+    // measured in cells past the rect, so the reports that matter most are the
+    // ones an in-region test drops. *A gesture belongs to where it started* is
+    // the same sentence for the router as for the container.
+    //
+    // A wheel never reaches here — the arm above returns — so the viewport
+    // still scrolls under the hold (I32).
+    if (deps.semanticSelection()) {
+      stages.push("viewport:copy");
+      return run("semanticSelection", e);
     }
 
     if (inRegion) {
@@ -359,42 +778,287 @@ export function createRouter(
   }
 
   /**
-   * Does the layer `id` fill the region it was placed in?
+   * **`coversRegion` retired in M8** (C15 I26, R-QST-001, I8).
    *
-   * **The property, not a proxy for it** (I8). `kind === "view"` is the narrow
-   * test and it passes every case written about views while missing any other
-   * full-region layer — and a view whose box was clamped smaller would be
-   * treated as covering when it does not. C15 §4 commits a view to `top: 0`,
-   * `left: 0` and the region's full extent, so the box is where the answer is.
+   * It measured a layer's box because `dismissable` could not say *owns input*,
+   * and a full-region view had to be recognised by its geometry. That was right
+   * about the hazard and wrong about where the answer lives: *a question
+   * declares blocking and owner explicitly*, so the field says it. A proxy for
+   * a field that does not exist yet fails in both directions once the field
+   * does — a large layer blocking nothing would still be modal, and a one-row
+   * typed reply that blocks would not be.
    */
-  function coversRegion(id: string): boolean {
-    const region = deps.overlayRegion();
-    const box = deps.placed().find((p) => p.layer.id === id);
-    if (box === undefined) return false;
-    return box.top === 0 && box.left === 0 && box.height >= region.height && box.width >= region.width;
-  }
-
-  function run(target: FocusTarget, e: InputEvent): boolean {
+  /**
+   * Every handler on a target, until one does not `pass` (R-OWN-001).
+   *
+   * **`reject` stops the walk exactly as `handle` does**, and that is the whole
+   * difference the verdict buys: both mean *this rung decided*, and only the
+   * effect differs. `pass` is the one answer that continues, which is what
+   * `false` meant at the two sites that used it correctly and not at the one
+   * that used it to drop a key.
+   */
+  function runRung(target: FocusTarget, e: InputEvent): Verdict {
     const list = handlers.get(target) ?? [];
     // **Nothing to run is not a span** (C28 I39). `dispatch` calls this up to
     // three times per event and most targets hold no handler, so opening one
     // here unconditionally would make `spans.handler.count` a count of *rungs
     // walked* under a name that says *handlers run*.
-    if (list.length === 0) return false; // graphemes-ok — a count of handlers
+    if (list.length === 0) return "pass"; // graphemes-ok — a count of handlers
     using _s = deps.probe?.span("handler") ?? NO_SPAN;
     for (const h of list) {
       // Contained: a throwing handler leaves the event unconsumed and the
-      // session alive (T3.15).
+      // session alive (T3.15). A throw is `pass` and never `reject`: a handler
+      // that fell over has not decided anything.
       try {
-        if (h(e)) return true;
+        const verdict = verdictOf(h(e));
+        if (verdict !== "pass") return verdict;
       } catch {
         /* treated as not consumed */
       }
     }
-    return false;
+    return "pass";
+  }
+
+  /**
+   * The router's own refusal: consume, run nothing, and hand the explanation to
+   * L4 exactly once (I62). The caller has already decided no rung runs.
+   */
+  function refuse(rung: OwnerRung | null, cause: Refusal["cause"]): true {
+    stages.push("reject");
+    deps.refused({ rung, cause });
+    return true;
+  }
+
+  /** The boolean the ladder's own call sites still read: did this rung consume it. */
+  function run(target: FocusTarget, e: InputEvent): boolean {
+    return runRung(target, e) !== "pass";
+  }
+
+  function rungNow(): OwnerRung | null {
+    const target = activeTarget(inputs());
+    return target === "global" ? null : RUNG_OF[target];
+  }
+
+  /**
+   * Bring the epoch and the owner arm up to date (C16 I43, §4a W7).
+   *
+   * **Written at the bottom of a dispatch and read at the top**, because the
+   * raise is usually caused by the key being dispatched: a handler pushes a
+   * layer, and the rung is different on the way out than it was on the way in.
+   * A machine comparing the rung only before dispatch never arms for the case
+   * that matters, and every row asserting a state still passes.
+   *
+   * Idempotent, so `commitPointer` may call it first to make sure the epoch it
+   * compares against is the current one — an owner raised by output or a timer
+   * has had no dispatch of its own in which to move it.
+   */
+  function syncOwner(): void {
+    const rung = rungNow();
+    const generation = deps.ownerGeneration();
+    if (rung === lastRung && generation === lastGeneration) return;
+    // **A generation change at the `question` rung is a question arriving**
+    // (I73, §3c S10b): Q1 answered and Q2 pushed inside one dispatch leave the
+    // rung `question` at both ends, and a held `⏎`'s next repeat answered Q2.
+    const questionArrived = rung === "question" && (lastRung !== "question" || generation !== lastGeneration);
+    lastRung = rung;
+    lastGeneration = generation;
+    // R-BLK-786: *every owner transition increments an ownership generation*.
+    ownerEpoch += 1;
+    // R-BLK-786 again, and it is narrower than the transition: *a newly
+    // presented QUESTION requires a fresh, deliberate activation*. No other rung
+    // acts on one keystroke the way an answer does, so no other rung guards —
+    // and a guard outliving its question would refuse a row's `⏎` at `scope`.
+    if (questionArrived) guard = arrive();
+    else if (rung !== "question") guard = null;
+  }
+
+  /**
+   * The guard a question arriving now is given (I44, I69).
+   *
+   * **Where the terminal reports releases, only a held key is guarded**: the
+   * guard is for a key that was already down when the question arrived, and with
+   * nothing down there is nothing to wait for and nothing to refuse. Where it
+   * does not, nothing can say whether a key is down, so every arrival is timed.
+   */
+  function arrive(): Guard | null {
+    const t = now();
+    if (deps.keyReleasesReported()) {
+      return held.size > 0 ? { arm: "held", arrivedAt: t, lastAt: t, refused: null } : null;
+    }
+    return { arm: "timed", arrivedAt: t, lastAt: t, refused: null };
+  }
+
+  /**
+   * End a timed guard whose deadline has passed (I69). Every reader of the guard
+   * calls this first, so a lapse needs no event of its own — which is what lets
+   * the wake draw it (I70).
+   */
+  function lapse(): void {
+    if (guard !== null && guard.arm === "timed" && now() >= deadlineOf(guard)) guard = null;
+  }
+
+  /**
+   * Is this event an activation the raised owner would act on (C16 I44)?
+   *
+   * **Narrower than *a key the owner handles*, and the narrowing is the rule.**
+   * Refusing every key after a raise refuses the arrow that would let the reader
+   * read what arrived; refusing none lets a held key answer a question that
+   * appeared under it. For a raised question every key its answer callback would
+   * consume is an answer — the callback is the question's whole vocabulary and
+   * C16 does not know what a key means to it (I25) — and elsewhere it is the
+   * chord bound to `rowActivate`, asked of the keymap rather than spelled here.
+   */
+  function isActivation(e: InputEvent): boolean {
+    if (e.kind !== "key") return false;
+    // **Ambiguous is *would resolve*, not *would be consumed*** (R-BLK-788).
+    // An unbound key at an open question is consumed and does nothing, and an
+    // arrow moves the selection — neither is an activation, and refusing them
+    // would stop a reader looking at what arrived. Only the question knows which
+    // of its keys answer it (I25), so the predicate is its own.
+    const resolves = deps.overlayWouldResolve();
+    if (resolves !== null) return resolves(e);
+    return keymap.resolve(activeTarget(inputs()), e.key)?.action === "rowActivate";
+  }
+
+  /**
+   * The question's activation guard, read at the top of a dispatch — `true`
+   * means *refuse this one* (C16 I44, R-BLK-788).
+   *
+   * **The pointer is never guarded** (R-BLK-788's last clause): a fresh press
+   * belongs to the new epoch and keeps ordinary one-click semantics, and it could
+   * not be the in-flight event the guard exists to catch — a button already down
+   * when the question arrived produces a release and never a press.
+   *
+   * **Two boundaries, and which one applies is the terminal's answer.** Where key
+   * releases are reported, the guard waits for the held key to lift, so every
+   * activation before the key-up is refused. Where they are not, it is timed
+   * (I69): refused through the grace, and after it for as long as activations
+   * keep arriving within the gap of the last refused one — each refusal restarts
+   * the gap, so a held key's repeats are refused for as long as it is held. A
+   * neutral key — one the question would not take as an answer — ends it either
+   * way, and that includes an intercept's key (§3c S11): any key stops the OS
+   * repeating the one before it, which is what the guard was waiting for.
+   */
+  function takeGuard(e: InputEvent): boolean {
+    lapse();
+    if (guard === null || e.kind !== "key") return false;
+    if (e.event === "release") {
+      // The held key lifted. `held` was updated before this ran, so an empty set
+      // is *nothing is down any more* and the guard has what it was waiting for.
+      if (guard.arm === "held" && held.size === 0) guard = null;
+      return false;
+    }
+    if (!isActivation(e)) {
+      guard = null;
+      return false;
+    }
+    // **The first refused key is the one the owner line names** (I70), so later
+    // refusals leave the frame as the first one drew it.
+    guard.refused ??= e.key;
+    guard.lastAt = now();
+    return true;
+  }
+
+  /**
+   * Three of I46's five cancellations, observed before dispatch.
+   *
+   * A drag and a second press both arrive as `press: true` — a motion report has
+   * `press: true, motion: true` (I30) — so one line answers for both, and the
+   * press that *arms* clears first and is re-armed by the effect during dispatch.
+   * A hover is not a gesture and clears nothing, for §4a row t's reason.
+   */
+  function cancelArmOnPress(e: InputEvent): void {
+    if (e.kind !== "mouse" || e.button === "none") return;
+    if (e.press) pointerArm = null;
   }
 
   function dispatch(e: InputEvent): boolean {
+    // **A focus report is never routed** (I61): before the owner is read and
+    // before the stages reset, so the last dispatch's stages and the exit arm
+    // are exactly as they were. L4 reads the report before dispatch; this is
+    // the line that keeps a stray one inert.
+    //
+    // **But a focus-out is read** (I72, §3c S8). Every key the terminal saw go
+    // down may now be released in another window, where no release reaches us,
+    // so `held` would guard every later question until a neutral key. The same
+    // for a button: its release is not coming. A timed guard is left to its
+    // clock — its numbers are about repeats, and a focus-out stops none.
+    if (e.kind === "focus") {
+      if (!e.focused) {
+        held.clear();
+        pointerArm = null;
+        if (guard?.arm === "held") guard = null;
+      }
+      return false;
+    }
+    // **Read at the top as well as written at the bottom** (§4a W7). The bottom
+    // call catches a raise the dispatch itself caused — a handler pushing a
+    // layer. This one catches a raise nothing dispatched: `ctx.ask` is called
+    // from a verb, so the question exists before the next keystroke arrives, and
+    // that keystroke is precisely the one the guard exists to refuse. A machine
+    // with only the bottom call lets it through and guards the one after it.
+    // **`syncOwner` first, and the order is the rule** (I44). A question raised
+    // out of band is observed here, and the condition is what was held *when it
+    // arrived* — which is what was down before this event, not including it. A
+    // key genuinely held across the arrival is already in the set, because a
+    // held key repeats and its first press was an earlier dispatch; a key
+    // pressed deliberately after it is not, and answers. Counting this event
+    // first collapses the two and guards every question on every terminal,
+    // which is the conservative arm arriving where the design asked for the
+    // precise one.
+    syncOwner();
+    let steps = 1;
+    if (e.kind === "key") {
+      if (e.event === "release") held.delete(e.key.name);
+      else {
+        const t = now();
+        const was = held.get(e.key.name);
+        if (e.event === "repeat" && was !== undefined) {
+          // **The degradation rung is structural** (I53, `R-DEG-002`).
+          // Without the kitty protocol no event carries `repeat` at all, so
+          // this arm is unreachable and the operating system’s own repeat
+          // stands unchanged — no capability check, because the absence of
+          // the field *is* the absence of the capability.
+          // **Where dispatch finds the binding: the target's, then `global`'s**
+          // (I53, §4). Asking the target alone missed every global binding, and
+          // `⌥↑`/`⌥↓` are bound only there — so the page policy never applied
+          // and each OS repeat turned a whole screen.
+          const action = (keymap.resolve(activeTarget(inputs()), e.key) ?? keymap.resolve("global", e.key))?.action;
+          steps = repeatSteps(repeatFor(action ?? ""), t - was.pressedAt, t - was.lastActedAt);
+          // Absorbed rather than passed on: the policy decided about this
+          // event, so letting it fall through would hand a repeat this
+          // component has just refused to whoever is beneath it.
+          if (steps === 0) return true;
+          held.set(e.key.name, { pressedAt: was.pressedAt, lastActedAt: t });
+        } else {
+          // **A repeat with no press behind it starts its own delay.** The
+          // protocol can be negotiated mid-hold, and inheriting a hold this
+          // router never observed would grant acceleration for time it
+          // cannot account for.
+          held.set(e.key.name, { pressedAt: t, lastActedAt: t });
+        }
+      }
+    }
+    cancelArmOnPress(e);
+    try {
+      // **The first result is the verdict** (I53). A repeat worth four steps
+      // is four moves of one list, not four chances to be consumed by four
+      // different owners: a later step finding no handler does not retract
+      // the first one that acted.
+      const first = dispatchInner(e);
+      for (let i = 1; i < steps; i += 1) dispatchInner(e);
+      return first;
+    } finally {
+      syncOwner();
+      // **A release ends the arm whatever became of it** (I46). The commit is
+      // attempted during dispatch by the gesture table; a release over chrome,
+      // over a layer or outside the region never reaches it, and an arm that
+      // outlived one would be committed by the *next* release somewhere else.
+      if (e.kind === "mouse" && !e.press && e.button !== "none") pointerArm = null;
+    }
+  }
+
+  function dispatchInner(e: InputEvent): boolean {
     stages = [];
 
     stages.push("arming");
@@ -404,40 +1068,126 @@ export function createRouter(
       return true;
     }
 
+    // **A newly presented question refuses an activation already in flight, and
+    // names why** (I44, R-BLK-786, R-BLK-788, R-INT-008). Below the exit arm,
+    // because the exit arm must still see a refused key as input — a `⌃c` that
+    // was refused is a `⌃c` that happened, and leaving it armed would raise the
+    // confirm on a keystroke the reader never got an answer to.
+    //
+    // `reject` and not a dropped key: R-INT-008 says a rejected command
+    // explains, and the explanation is the footer's owner line naming the
+    // refused key from this keystroke on (I70) — so the frame changes, which is
+    // the whole difference between refused and swallowed.
+    if (takeGuard(e)) {
+      stages.push("question-guard");
+      stages.push("reject");
+      return true;
+    }
+
+    // **The three reserved routes are read before the ladder and no rung can
+    // claim them** (§103, R-OWN-001, C16 §3a W4). `⌃c`, `⌥↑`/`⌥↓` and the wheel
+    // are *declared overrides, not contradictions in the ladder*, and the table
+    // is consulted first precisely so a rung cannot take one ahead of it — which
+    // is what "unclaimable" means and what a branch further down could not give.
+    //
+    // A `null` verdict is *this intercept does not apply at this rung*, which is
+    // not `pass`: passing is a decision an owner took, and this is the absence of
+    // one. The ladder then runs normally, which is how `interrupt` still reaches
+    // §5's own rungs below.
+    // **The child's escape is asked of the keymap** (I75): its `child` rows are
+    // the chords the border and `/help` name, so the three cannot disagree.
+    const intercept = interceptOf(e, (key) => keymap.resolve("child", key)?.action === "hostDetach");
+    if (intercept !== null) {
+      // **The rung every other reader reads** (I63). An `interceptRung` asked
+      // whether an answer callback was registered and answered `scope` where
+      // none was, so the table and the footer named two rungs for one layer.
+      const rung = rungNow();
+      const declared = interceptVerdict(intercept, rung);
+      stages.push(`intercept:${intercept}:${rung ?? "idle"}:${declared}`);
+      // **A reject consumes the event and runs no rung** (I62, ruling 59). This
+      // used to give the owning rung its turn first, on the reading that a
+      // rejection is a thing an owner *does* — and running the rung made the
+      // reject perform what it refused: a question's answer callback classified
+      // `⌃c` as `resolve` and settled with the default, and copy mode's rung
+      // called its exit. §103: *QUESTION and COPY MODE reject* the interrupt.
+      // What the reject owes is an explanation, and that is `refused`'s.
+      if (declared === "reject") return refuse(rung, "intercept");
+
+      // **`global-intercept` takes the intercept's own exception, ahead of the
+      // ladder** (I40, I64, §103). The table said `handle` at every rung and the
+      // code did nothing with it: the event fell to the ladder, a question's
+      // answer handler took `⌥↑`, and **a reader could not scroll to read the
+      // thing they were being asked to approve**. A route no rung may claim that
+      // is nevertheless resolved by the ladder is not reserved; it is
+      // documented.
+      //
+      // §103 names the destination for both — *the active viewport handles* for
+      // page-scroll, *its pointer-hit owner* for the wheel — and each intercept
+      // declares which as its `exception`. The branch is on the verdict alone:
+      // it asked `intercept !== "interrupt"` while `handle` meant two things,
+      // and `handle` now means only *continue to this rung* (I64).
+      if (declared === "global-intercept") {
+        // **The escape, ahead of every handler at the rung it escapes** (I75,
+        // §3e H1, H2). A release is consumed and detaches nothing: the press
+        // detached, and the child is not handed half of a chord the host took
+        // (H6).
+        if (INTERCEPTS[intercept].exception === "detach") {
+          stages.push("intercept:detach");
+          if (!(e.kind === "key" && e.event === "release")) deps.detachChild();
+          return true;
+        }
+        if (INTERCEPTS[intercept].exception === "pointer") {
+          stages.push("intercept:wheel");
+          return e.kind === "mouse" ? routeMouse(e) : false;
+        }
+        // **The transcript, whatever is focused** (I40, R-BLK-112,
+        // binding.031/.032). `⌥↑` carries `scope: "transcript"` in the registry,
+        // and R-BLK-112 says what that buys: *scroll WITHOUT moving focus — the
+        // prompt keeps it and you keep typing*. So this does not ask which
+        // viewport is active; asking would make the chord mean one thing at the
+        // prompt and another inside a `scroll` box, which is the ambiguity the
+        // reservation removes.
+        //
+        // **`PgUp`/`PgDn` used to arrive here and no longer do.** They are in no
+        // binding and no rule in the registry — they are the repo's keys, they
+        // behave like the arrows, and the ladder gives them to the box you are
+        // inside. One route cannot be both, and trying made I40 say *the active
+        // viewport* while meaning two different viewports.
+        //
+        // The transcript's scroller is `global`: all four paging routes register
+        // there, and a focused box's paging is on `liveBlock`/`interaction`,
+        // which is exactly the rung this steps over.
+        stages.push("intercept:scroll:transcript");
+        return run("global", e);
+      }
+      // `handle`: continue — the rung answers the route with its own verb.
+    }
+
     if (e.kind === "mouse") return routeMouse(e);
 
-    // Native release events exist for application surfaces. Calcium's own
-    // command bindings remain edge-triggered and must never fire on release.
+    // **A release reaches `child` and nothing else** (I65, R-OWN-002). Native
+    // release events exist for application surfaces; every other rung is
+    // edge-triggered. This ran the active target's handlers for any target, and
+    // a question's answer callback ignores `event` — so with releases reported,
+    // `y` answered one question and `y`'s release answered the next one the
+    // verb raised (§3b S12).
     if (e.kind === "key" && e.event === "release") {
       const target = activeTarget(inputs());
       stages.push(`target:${target}`);
-      if (run(target, e)) return true;
+      if (target === "child" && run(target, e)) return true;
       stages.push("release-dropped");
       return false;
     }
 
     if (isCtrlC(e)) {
-      // **A verb waiting for an answer is not a verb to cancel** (I25).
+      // **A verb waiting for an answer is not a verb to cancel** (I7, I25, I62).
+      // A local verb awaiting `ctx.ask` is in flight for the whole time its
+      // question is on screen, and this branch used to hand `⌃c` to the
+      // question ahead of rung 1 — cancellation discards the entry, and the
+      // submitted line vanished. The intercept table now rejects `⌃c` at
+      // `question` before this is reached, so neither happens: the question
+      // stays open, the verb stays waiting, and the question says why.
       //
-      // Rungs 1 and 2 read `inFlight`, and a local verb awaiting `ctx.ask` is in
-      // flight for the whole time its question is on screen — so `⌃c` was taken
-      // by rung 1 and the question never saw it. The outcome looked right, which
-      // is why only a frame-read found it: the container was untouched and the
-      // layer was gone, and a test asserting both passes. What the frame showed
-      // is that **the submitted line vanished** — cancellation discards the
-      // entry, so there was no record the command had been run at all, where
-      // declining settles one saying nothing changed.
-      //
-      // Ruling A's own argument decides it. `Esc` and `⌃c` collapse *because*
-      // declining and cancelling produce the same outcome — and when they do,
-      // the one that leaves a record is the one to keep. So a question outranks
-      // the cancel rungs, which is the only place the ladder's newest-first
-      // order is not enough on its own: both rungs have a claim, and the older
-      // one is higher.
-      if (deps.overlayAnswerCallback() !== null) {
-        stages.push("question");
-        return run("overlay", e);
-      }
       // Rungs 1 and 2, discriminated by route rather than by two sources.
       const route = deps.inFlight();
       if (route === "app" || route === "local") {
@@ -454,15 +1204,79 @@ export function createRouter(
 
     const target = activeTarget(inputs());
     stages.push(`target:${target}`);
-    if (run(target, e)) return true;
+
+    // **A bare `esc` belongs to the child, and only `⌥esc` detaches** (§103,
+    // R-OWN-002: *takes all but host.detach*).
+    //
+    // This is the row that decides whether a full-screen program inside a child
+    // is usable at all. `esc` is how vi leaves insert mode, how less closes a
+    // help pane, how every curses application cancels — so an `esc` the host
+    // consumed to pop a rung is an `esc` that program never receives, and the
+    // reader has no way to send one. The child takes **all** keys; the two that
+    // leave are `⌃]` and `⌥esc`, and both are deliberately chords a full-screen
+    // program does not want.
+    //
+    // Written here rather than as a handler on `child` because the rule is about
+    // what the *host* declines to do: a handler that consumed `esc` and forwarded
+    // it would be the same bytes and a second place for the exception to be
+    // forgotten.
+    if (target === "child" && e.kind === "key" && e.key.name === "escape" && !e.key.meta) {
+      stages.push("child:esc-to-child");
+      // **Consumed whether or not a handler took it.** The child owns every key
+      // that is not a detach chord, so an `esc` no handler claimed must still not
+      // fall to `global` — a host binding acting on it is exactly the failure this
+      // row exists to stop. Delivery to the PTY is the child surface's business
+      // and lands with it in M9; what the router owes is that nothing else acts.
+      runRung(target, e);
+      return true;
+    }
+
+    const verdict = runRung(target, e);
+    if (verdict !== "pass") {
+      // **`reject` consumes exactly as `handle` does** (R-OWN-001). The two
+      // differ in what they did, not in whether the event is spent.
+      if (verdict === "reject") stages.push("reject");
+      return true;
+    }
+
+    // **The child consumes what nothing at its rung took** (I49, ruling 62).
+    // *Takes all but host.detach*: a shell delegation registers no handler, so
+    // every key passed here and fell to `global` — `F1` at a delegated `vim`
+    // submitted `/help keys` behind it. **This is the only carrier, for both
+    // sources**: an attached surface's handler answers for its own bindings
+    // and passes the rest here — the wrapper that also consumed them was
+    // removed in review batch 3, because nothing could tell it from this.
+    // Forwarding the bytes to the delegation's stdin is a C21/C23
+    // mechanism that does not exist, and is not built here.
+    if (target === "child") {
+      stages.push("child:consumed");
+      return true;
+    }
 
     // Step 3 is skipped when the top layer is non-dismissable: a layer that must
     // be answered is modal, and a global shortcut firing beneath one acts on a
     // surface the user cannot see (I8).
     const top = deps.overlayTop();
-    if (top !== null && (!top.dismissable || coversRegion(top.id))) {
+    if (top !== null && top.blocking) {
+      // **This is a REJECT and it used to be a silent drop** (§103, R-HON-004,
+      // R-INT-009, C16 §3a W2). §103: *a blocking question handles its answer
+      // actions and REJECTS unrelated typing; it never passes keys into the held
+      // prompt.* The row returned `false`, which told the caller *nobody wanted
+      // this* — indistinguishable from an unbound key on a quiet prompt, and the
+      // reason the silence was writable at all is W6: `false` meant *pass* and
+      // *consume without acting* at once.
+      //
+      // **Help is not an exception here, and §103 is what settles it.** R-KEY-004
+      // asks that the help route stay reachable at every responsive rung, which
+      // reads as a conflict until §103's footer table: every rung retains *owner
+      // plus its highest-ranked reachable safe action*, and **ordinary** rungs
+      // *also* show primary action, safe exit and help. A question is not an
+      // ordinary rung. Its footer line is its own vocabulary — `question · ←→
+      // move · ⏎ answer · esc → no` (C22 I133) — and the refusal's explanation
+      // R-INT-009 requires is the owner being visible **and** `refused`, which L4
+      // turns into `answer this first` on the question's row, once (C23 I82).
       stages.push("modal-blocked");
-      return false;
+      return refuse(rungNow(), "blocked");
     }
 
     stages.push("global");
@@ -477,7 +1291,47 @@ export function createRouter(
   return {
     register,
     dispatch,
-    resetFocus: () => focus.reset(),
+    get rung() {
+      return rungNow();
+    },
+    get ownerArmed() {
+      syncOwner();
+      lapse();
+      return guard !== null;
+    },
+    get ownerRefused() {
+      syncOwner();
+      lapse();
+      return guard === null || guard.refused === null
+        ? null
+        : Object.freeze({ key: guard.refused, untilRelease: guard.arm === "held" });
+    },
+    nextDeadline() {
+      syncOwner();
+      lapse();
+      return guard !== null && guard.arm === "timed" ? deadlineOf(guard) : undefined;
+    },
+    armPointer(id: string) {
+      syncOwner();
+      pointerArm = Object.freeze({ id, epoch: ownerEpoch });
+    },
+    commitPointer(id: string) {
+      // **The epoch is brought current first, and that is what catches trace 16**
+      // (I45, I46, R-OWN-002). An owner raised by output or by a timer between
+      // the press and the release has had no dispatch of its own in which to
+      // move the counter, so comparing against a stale one would commit an
+      // activation armed under an owner that is gone.
+      syncOwner();
+      const armed = pointerArm;
+      pointerArm = null;
+      return armed !== null && armed.id === id && armed.epoch === ownerEpoch;
+    },
+    resetFocus: () => {
+      // I46's fifth cancellation. A reset is L4 saying the reader is somewhere
+      // else now, which is the one cancel no event carries.
+      pointerArm = null;
+      focus.reset();
+    },
     get target() {
       return activeTarget(inputs());
     },

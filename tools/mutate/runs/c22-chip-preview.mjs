@@ -1,0 +1,166 @@
+// C22 I113 and C17 I27 — where a chip previews (§101).
+//
+// **A projection has no key, so nothing about it is visible in a keymap.** It
+// is right or wrong only in the frames it produces, and each of these attacks a
+// clause the panel would still be drawn without: which chip it names, whether
+// it survives the caret leaving, whether it defers to a layer that owns the
+// region, and whether it takes the keys that move the caret it is derived from.
+//
+// A mutation that fails nothing indicts the tests or the prose, not the code.
+//
+// **Anchors checked for uniqueness before the pass** (F219).
+import { execSync } from "node:child_process";
+
+import { fsIo, report, runPass } from "../mutate.mjs";
+
+const ROOT = process.cwd();
+const CONSTRUCT = "src/shell/construct.ts";
+const EDITOR = "src/interaction/editor/editor.ts";
+const CHIP_EDITOR = "src/shell/chip-editor.ts";
+const INTERCEPTS = "src/interaction/router/intercepts.ts";
+const FILES =
+  "test/unit/chip-preview.test.ts test/unit/chip-form.test.ts test/integration/chip-preview.test.ts " +
+  "test/unit/router-dispatch.test.ts";
+
+const { read, write } = fsIo(ROOT);
+const run = () => {
+  try {
+    return execSync(`npx vitest run ${FILES} 2>&1`, { cwd: ROOT, encoding: "utf8", timeout: 300_000 });
+  } catch (e) {
+    const out = `${e.stdout ?? ""}${e.stderr ?? ""}`;
+    return e.killed === true ? `${out}\nTIMED OUT after 300000ms` : out;
+  }
+};
+
+const results = runPass({
+  read,
+  write,
+  run,
+  control: {
+    // **A change the run's own corpus can see** (F1254): with the projection
+    // never finding a chip, no panel is ever pushed and every positive arm
+    // fails. If this survives, nothing below reaches a frame.
+    file: CONSTRUCT,
+    from: "    const chip = focus.current.at === \"prompt\" ? stores.editor.chipAt() : null;",
+    to: "    const chip = null;",
+    why:
+      "no preview is ever pushed, so the panel arms and the caret-walk arms are all "
+      + "the empty frame — if this survives, the rows are not reading the frames they think they are",
+  },
+  mutations: [
+    {
+      // **THE DEFECT: the preview outlives the caret.** A projection that is
+      // pushed and never dismissed is a layer that was opened, and the whole
+      // of §101's *focus decides which* is that it is not. Nothing about the
+      // panel's own content would show it.
+      name: "THE DEFECT: the preview is not dismissed when the caret leaves the chip",
+      file: CONSTRUCT,
+      from: "      previewScrolls = false;\n      if (have) stores.overlays.dismiss(CHIP_PREVIEW_ID);\n      return;",
+      to: "      previewScrolls = false;\n      return;",
+      expect: "T1.69",
+    },
+    {
+      // **The guard that defers to whatever owns the region.** Removed, the
+      // preview pushes itself under a search — C15 places every layer, so it is
+      // still drawn, which is why the row reads the frame rather than the top.
+      name: "the preview pushes itself beneath a layer that owns the region",
+      file: CONSTRUCT,
+      from: "    const blocked = stores.overlays.stack.some((l) => l.id !== CHIP_PREVIEW_ID);",
+      to: "    const blocked = false;",
+      expect: "T1.70",
+    },
+    {
+      // **Focus read as the router's target.** The measured defect this clause
+      // exists for: the preview's own layer raises the `panel` rung, so a
+      // projection asking the router dismisses itself on the next key.
+      name: "focus is read from the router's target, which the preview's own layer moves",
+      file: CONSTRUCT,
+      from: "    const chip = focus.current.at === \"prompt\" ? stores.editor.chipAt() : null;",
+      to: "    const chip = router.target === \"prompt\" ? stores.editor.chipAt() : null;",
+      expect: "T1.69",
+    },
+    {
+      // **The prompt's precedence under the preview.** Without it the panel
+      // takes the keys that move the caret it is derived from, so typing
+      // reaches no handler and the caret can never leave the chip.
+      name: "the preview answers keys rather than letting the prompt answer beneath it",
+      file: CONSTRUCT,
+      // Re-anchored in review batch 2: the preview is found by its declared
+      // substate name now, not its id (C15 I29, ruling 61).
+      // Re-anchored in review batch 4: the preview declares `promptLive`
+      // (C22 I145, C15 I34), and `promptUnderMenu` reads the field.
+      from: "        promptLive: true,",
+      to: "        promptLive: false,",
+      expect: "T1.69",
+    },
+    {
+      // **The chip nearest the caret, backwards first.** Forwards only, and the
+      // chip just pasted never previews — the caret is left past it, which is
+      // the one position a reader arrives at without moving.
+      name: "only the chip after the caret is read, so a pasted chip never previews",
+      file: EDITOR,
+      from: "    return this.#chips.get(before)?.chip ?? this.#chips.get(after)?.chip ?? null;",
+      to: "    return this.#chips.get(after)?.chip ?? null;",
+      expect: "T1.48",
+    },
+    {
+      // **And backwards only**, which loses the head of the buffer — the one
+      // position `home` lands on, where there is nothing before the caret.
+      name: "only the chip before the caret is read, so the head of the buffer answers nothing",
+      file: EDITOR,
+      from: "    return this.#chips.get(before)?.chip ?? this.#chips.get(after)?.chip ?? null;",
+      to: "    return this.#chips.get(before)?.chip ?? null;",
+      expect: "T1.48",
+    },
+    {
+      // **The panel's title is the chip's own label.** Composed from a literal
+      // instead, two chips spell the same and the prompt's inline label and the
+      // panel's header part company — C17 I25's *never supplied as a string*.
+      name: "the panel's header is a literal rather than the chip's composed label",
+      file: CONSTRUCT,
+      // Re-anchored by lane b4-panels: the title is §101's header row now
+      // (C22 I113 amended, §6s ruling 2).
+      from: "    const label = chipLabel(chip, chipLook);",
+      to: "    const label = \" Chip \";",
+      expect: "T1.69",
+    },
+    {
+      // T6.144 (C22 I143) — the preview's content the bare `code` block again:
+      // no box, no bar, nothing for the chords to move.
+      name: "the preview's content is the bare code block, not a box",
+      file: CONSTRUCT,
+      from: "    makeBlock({\n      kind: \"scroll\",\n      id: PREVIEW_BOX_ID,\n      height,\n      children: [makeBlock({ kind: \"code\", id: \"chip-preview-content\", language: \"text\", text: chip.content })],\n    });\n",
+      to: "    makeBlock({ kind: \"code\", id: \"chip-preview-content\", language: \"text\", text: chip.content });\n",
+      expect: "T1.175",
+    },
+    {
+      // T6.145 (C22 I144) — the read-back dropped: the editor ran and nothing returns.
+      name: "the edited file is never read back",
+      file: CHIP_EDITOR,
+      from: "    const read = await deps.fs.readFile(path);\n",
+      to: "    const read = chip.content;\n",
+      expect: "T1.176",
+    },
+    {
+      // C22 I144, ruling 9 — the editor's added newline kept, so an unchanged
+      // file is a changed chip.
+      name: "an editor's added final newline is kept",
+      file: CHIP_EDITOR,
+      from: "!chip.content.endsWith(\"\\n\") && read.endsWith(\"\\n\")",
+      to: "false",
+      expect: "T1.176",
+    },
+    {
+      // C16 T6.65 (I40) — the intercept reads *meta and an arrow* again, and
+      // takes the preview's `⌥⇧` chords before the ladder.
+      name: "the page-scroll intercept takes ⌥⇧↑/⌥⇧↓",
+      file: INTERCEPTS,
+      from: "  return key.meta && !key.shift && !key.ctrl && (key.name === \"up\" || key.name === \"down\");\n",
+      to: "  return key.meta && (key.name === \"up\" || key.name === \"down\");\n",
+      expect: "T1.200",
+    },
+  ],
+});
+
+console.log(report(results));
+process.exit(results.some((r) => !r.killed) ? 1 : 0);

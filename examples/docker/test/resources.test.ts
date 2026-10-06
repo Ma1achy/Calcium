@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 import { createListAdapter, createResourceInspectAdapter } from "../src/resources.ts";
-import type { AdapterContext, Block, RawResult } from "@fmx/calcium";
+import type { AdapterContext, Block, RawResult } from "calcium-tui";
 
 const raw = (stdoutRaw: string, exitCode = 0, stderr = ""): RawResult =>
   ({

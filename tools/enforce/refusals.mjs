@@ -27,7 +27,7 @@
 // and irrelevant to consuming a member (CLAUDE.md, *a correct sentence justifying
 // the wrong decision*). `shiftInward` staying absent says the expiry has not
 // arrived; it says nothing about whether `force` should still be refused when it
-// does. And the 176 finding sections in `examples/docker/FINDINGS.md` that carry
+// does. And the 176 finding sections in `docs/archive/records/FINDINGS.md` that carry
 // a refusal have no verdict field, so they are outside this by construction —
 // the register holds what someone moved into it, and nothing sweeps prose for
 // refusals it has not been told about.

@@ -125,20 +125,20 @@ const results = runPass({
       expect: "A8",
     },
 
-    // --- the title, which cannot carry anything that changes (F16) -----------
+    // --- the entry is rows, not a frame (DASHBOARD_WALK §E) -------------------
     {
-      name: "the counts move back into the title, where they freeze",
+      name: "the dashboard is wrapped in a panel again, which is the chrome §080 deletes",
       file: "src/dashboard.ts",
-      from: 'export const LIVE_TITLE = "RUNNING";',
-      to: 'export const LIVE_TITLE = "RUNNING (5)";',
-      expect: "C1 (F16)",
+      from: "    ...runningRows(live, unicode),",
+      to: "    b.panel(\"docker-tui\", [...runningRows(live, unicode)]),",
+      expect: "E0",
     },
     {
-      name: "the summary leaves the body, so nothing recomputes it per tick",
+      name: "the summary drops the engine, which the deleted title carried",
       file: "src/dashboard.ts",
-      from: "    b.notice(\"muted\", summaryLine(live, unicode)),",
-      to: "    b.notice(\"muted\", \"containers\"),",
-      expect: "C1 (F16)",
+      from: "    `engine ${engine}`,",
+      to: "    `host`,",
+      expect: "E5",
     },
 
     // --- the boundaries the frame found --------------------------------------
@@ -164,6 +164,43 @@ const results = runPass({
       from: '      emptyMessage: `nothing running ${dot(unicode)} every container is stopped`,',
       to: '      emptyMessage: "",',
       expect: "A9",
+    },
+
+    // --- S3's five rows (S3_WALK §6) ------------------------------------------
+    {
+      name: "the CPU value drops the window's range, so a spark is read as a level",
+      file: "src/container.ts",
+      from: "    ...(range === null ? [] : [`${range[0].toFixed(1)}${dash}${range[1].toFixed(1)}%`]),",
+      to: "",
+      expect: "B6",
+    },
+    {
+      name: "the error arm replaces the rows instead of drawing them from the ring",
+      file: "src/container.ts",
+      from: "      statsBlock(ring, { stats: null, details: null }, unicode),",
+      to: "",
+      expect: "B5",
+    },
+    {
+      name: "the ring is sized from something other than the spark column",
+      file: "src/container.ts",
+      from: "  const ring = createRing(SPARK_CELLS);",
+      to: "  const ring = createRing(SPARK_CELLS * 4);",
+      expect: "B2",
+    },
+    {
+      name: "the details are reported gone while the first tick has not landed",
+      file: "src/container.ts",
+      from: "      value: loading\n",
+      to: "      value: false\n",
+      expect: "D6",
+    },
+    {
+      name: "the id half of the title is the argument the view was opened by",
+      file: "src/container.ts",
+      from: "  const id = str(row, \"ID\") || str(row, \"Container\");",
+      to: "  const id = str(row, \"Container\") || str(row, \"ID\");",
+      expect: "D5",
     },
 
     // --- the shared NDJSON parse ---------------------------------------------

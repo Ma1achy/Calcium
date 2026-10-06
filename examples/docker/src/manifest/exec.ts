@@ -9,7 +9,7 @@
  * Named `exec.ts` because step 13's handoff verbs land here too.
  */
 
-import type { ToolDef } from "@fmx/calcium";
+import type { ToolDef } from "calcium-tui";
 
 const OUTPUT = {
   name: "output",

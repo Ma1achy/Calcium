@@ -33,22 +33,33 @@ const escape = (): InputEvent => ({
 function routerDeps(overlays: OverlayManager): RouterDeps {
   return {
     overlayRegion: () => ({ width: 80, height: 24 }),
+    keyReleasesReported: () => false,
+    // **The `child` rung's second source** (C16 I49). Required rather than
+    // optional, so a harness that means to attach one has to say so.
+    childAttached: () => false,
+    // C16 I73 — the stack's own count; no surface host here.
+    // C16 I74 — no layer here has anything to scroll.
+    scrollLayer: () => false,
+    // C16 I75 — the escape's detach; nothing here attaches a child.
+    detachChild: () => undefined,
+    ownerGeneration: () => overlays.generation,
+    overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,
     overlayTop: () => {
       const top = overlays.top;
-      return top === null ? null : { kind: top.kind, id: top.id, dismissable: top.dismissable };
+      return top === null ? null : { kind: top.kind, id: top.id, blocking: top.blocking, dismissal: top.dismissal };
     },
     placed: () =>
       overlays.layout({ width: 80, height: 24 }).filter(takesInput).map((p) => ({
-        layer: { id: p.layer.id, kind: p.layer.kind, dismissable: p.layer.dismissable },
+        layer: { id: p.layer.id, kind: p.layer.kind, blocking: p.layer.blocking, dismissal: p.layer.dismissal },
         top: p.top,
         left: p.left,
         height: p.height,
         width: p.width,
       })),
     popLayer: () => void overlays.pop(),
-    copyMode: () => false,
-    exitCopyMode: () => undefined,
+    nativeSelection: () => false,
+    semanticSelection: () => false,
     liveEntry: () => null,
     entryAtRow: () => null,
     inFlight: () => null,
@@ -64,6 +75,7 @@ function routerDeps(overlays: OverlayManager): RouterDeps {
     promptHasText: () => false,
     clearPrompt: () => undefined,
     raiseExitConfirm: () => undefined,
+    refused: () => undefined,
   };
 }
 
@@ -91,10 +103,16 @@ describe("C15 e2e — layers under real input", () => {
       pty.type("/ps --status=");
       pty.type("\t");
 
-      await pty.waitFor(/running/, 15_000);
-      await pty.waitFor(/queued/, 15_000);
+      // **On the frame, after `⇥`** (F1525): every one of these was in the
+      // stream from the rest menu and the typed line before `⇥` drew anything.
       // The prompt below it, still holding the line — the layer floated.
-      await pty.waitFor(/❯ \/ps --status=/, 15_000);
+      await pty.waitForFrame(
+        (f) =>
+          f.some((r) => r.includes("⏎ accept")) &&
+          ["running", "queued"].every((v) => f.some((r) => r.includes(v))) &&
+          promptRow(f).includes("❯ /ps --status="),
+        15_000,
+      );
     } finally {
       pty.kill();
     }
@@ -114,7 +132,10 @@ describe("C15 e2e — layers under real input", () => {
     });
 
     overlays.push(menuLayer([{ value: "--status" }, { value: "--since" }], 0, 0, { row: 20, rows: 1 }));
-    expect(router.target).toBe("overlay");
+    // **`panel`, because the menu is one** (C15 §2c, I27). The completion menu
+    // is a prompt substate rather than a question, so the target it answers at
+    // is the substate rung's.
+    expect(router.target).toBe("panel");
 
     const { store } = await openWith();
     for (const c of ["/ps --status=running", "/logs digit-42"]) store.append(c, 0);
@@ -138,9 +159,13 @@ describe("C15 e2e — layers under real input", () => {
     // from the keymap, and let the layer on top decide what it means. That is
     // the seam C20 §5 names when it says the bindings are C16's.
     const keymap = createKeymap(defaultKeymap);
-    router.register("overlay", (e) => {
+    // **`panel`, both times** (C15 I27, M8). The menu and the search are
+    // panels, so this is the target they answer at and the target the binding
+    // is declared on — `escape → dismiss` is bound at `overlay` as well, and a
+    // handler reading the wrong one of the two resolves nothing.
+    router.register("panel", (e) => {
       if (e.kind !== "key") return false;
-      const binding = keymap.resolve("overlay", e.key);
+      const binding = keymap.resolve("panel", e.key);
       if (binding?.action !== "dismiss") return false;
       if (overlays.top?.id === SEARCH_ID) store.searchEnd("cancel");
       overlays.pop();
@@ -149,50 +174,45 @@ describe("C15 e2e — layers under real input", () => {
 
     expect(router.dispatch(escape()), "consumed").toBe(true);
     expect(overlays.stack.map((l) => l.id)).toEqual([MENU_ID]);
-    expect(router.target, "the menu is still there, and still has the keys").toBe("overlay");
+    expect(router.target, "the menu is still there, and still has the keys").toBe("panel");
     expect(store.searchState).toBeNull();
   });
-  // **T5.3 and T5.5 were deferred on a premise that was false when it was
-  // written down.** Both said *nothing in the tree pushes a `kind: "view"`
-  // layer* and cited C22 §13 as an open ruling. C22 §13a took the ruling,
-  // `document-view.ts` pushes exactly that layer, `construct.ts` registers the
-  // `pushedView` handler, and the fixture manifest declares `ps --watch` and
-  // `tail --screen` as view flags — all before this row was re-read. The todo
-  // survived because nothing re-reads a deferral that is not failing.
+  // **T5.3 and T5.5 were written about a push and outlive it** (C22 §13a,
+  // R-EXA-082, F1253). They asserted that a view verb covered the transcript and
+  // took the keys, and that `esc` popped the layer leaving nothing behind — the
+  // ruling C22 §13a took, and the ruling the design overturns: a verb's result
+  // has no prompt and no context of its own, so it is an entry.
   //
-  // The confirm half of the original title — *a confirm inside the dashboard,
-  // esc does nothing, n resolves it* — is not constructible from this fixture:
-  // the only confirm the shell raises is the exit confirm, and C16 §5's ladder
-  // puts *a pushed view → pop it* above *prompt empty → arm the exit confirm*,
-  // so Ctrl-C over a view pops the view and never reaches the confirm. The
-  // routing half of that claim is T4.2 in test/integration/router.test.ts; what
-  // this row asserts is the half that needed a session.
-  it("T5.3 (C22 §13a, C15 I1, A01 D4): a view verb pushes a `kind: \"view\"` layer over the transcript, and the layer owns the keys", async () => {
+  // **Re-aimed rather than struck, and they are stronger for it.** The old pair
+  // asserted an absence — the transcript is *not* on screen, nothing was
+  // appended — and an absence is what a broken session also produces. The pair
+  // below asserts what is there: both entries at once, and a prompt that still
+  // has the keys.
+  it("T5.3 (C22 §13a, R-EXA-082): a streaming verb lands in the transcript beside the entry before it, and the prompt keeps the keys", async () => {
     const pty = interactivePty("node test/support/fixture.mjs session", { cols: 80, rows: 20 });
     try {
       await pty.waitFor(PROMPT, 15_000);
-      // Something in the transcript first, so "drawn over it" has a referent.
+      // Something in the transcript first, so "beside it" has a referent.
       pty.type("/ps --mine\r");
       await pty.waitFor(/a3f9b21/, 15_000);
       expect(pty.frame.join("\n")).toContain("/ps --mine");
 
       pty.type("/ps --watch\r");
       await pty.waitForFrame((f) => f.join("\n").includes("watching"), 15_000);
-      // **The view covers the region** (`placement: fill`): the entry that was
-      // on screen is not, and no pending entry was appended for the view verb —
-      // C22 §13a's *there is no source entry*.
-      const over = pty.frame.join("\n");
-      expect(over, "the transcript is underneath the view").not.toContain("/ps --mine");
-      expect(over, "no entry was appended for the view verb").not.toContain("❯ /ps --watch");
 
-      // **Input ownership is what makes it a view rather than an overlay**
-      // (A01 D4, C22 §13a): a printable does not reach the prompt while the
-      // view is up. The prompt row is read after a frame the keystroke could
-      // have changed has had time to arrive; T5.5 is the positive control that
-      // the same keystroke reaches the prompt once the view has popped.
-      pty.type("x");
-      await new Promise((r) => setTimeout(r, 400));
-      expect(promptRow(pty.frame).trim(), "the view took the key").toBe("❯");
+      // **Both, at once** — the claim the old row made in reverse. The record is
+      // the product, so the work that used to take the screen is an entry under
+      // the work before it.
+      const both = pty.frame.join("\n");
+      expect(both, "the entry before it is still on screen").toContain("/ps --mine");
+      expect(both, "and the new one is its own entry, with its command echoed").toContain("--watch");
+
+      // **The prompt keeps the keys**, which is what *no frame of its own* means
+      // at the keyboard: a printable reaches the prompt while the stream runs.
+      // The old row asserted the opposite and used T5.5 as its control; there is
+      // one claim now and it needs none.
+      pty.type("still-here");
+      await pty.waitForFrame((f) => promptRow(f).includes("still-here"), 15_000);
     } finally {
       pty.kill();
     }
@@ -215,13 +235,28 @@ describe("C15 e2e — layers under real input", () => {
       await pty.waitFor(/\u276f/, 15_000);
       pty.type("/ps --status=");
       pty.type("\t");
-      await pty.waitFor(/queued/, 15_000);
+      // **The selection `⏎` will accept, as a frame** (F1525). `queued` was
+      // already on the rest frame `/ps --status=` drew, so a wait on it resolved
+      // before `⇥` had selected anything, `⏎` went out about a millisecond
+      // later, and the session read `\t\r` together 1 time in 7 — which since
+      // ruling 106 runs the line at rest.
+      await pty.waitForFrame((f) => f.some((r) => r.includes("⏎ accept")), 15_000);
 
       // Narrower and much shorter, down to the size gate\u2019s minimum. The menu
       // is anchored to a prompt whose row has moved and sized against a region
       // that has shrunk by eight rows.
       pty.resize(60, 16);
-      await pty.waitFor(/\u276f \/ps --status=/, 15_000);
+      // **The 60-column frame, not the prompt** (F1525): the prompt line was in
+      // the stream from before the resize, so this resolved at once. The
+      // harness clips the 24-row frame to 16 (`Painter.resize`), which takes
+      // the prompt and the owner line off its bottom, so only the session's
+      // redraw at the new size puts both back — asserted, so the wait below
+      // cannot be answered by the frame from before.
+      expect(promptRow(pty.frame), "the clip took the old prompt").toBe("");
+      await pty.waitForFrame(
+        (f) => promptRow(f).includes("/ps --status=") && f.some((r) => r.includes("⏎ accept")),
+        15_000,
+      );
 
       // **The session is still live afterwards**, which is the half a test of
       // the redrawn frame alone would miss: a refused frame draws the fallback
@@ -247,12 +282,7 @@ describe("C15 e2e — layers under real input", () => {
   // draft had C23 write `logs a3f9b21 — 1,284 lines … (esc 14:24:08)` and it
   // could not be built — the trace is an entry, an entry freezes its
   // predecessor, and the frozen block is the one A01 D7 returns focus to.
-  // C23 §4's pop row is the ruling, so the row asserts what remains true.
-  //
-  // The deferral above it read "waits on C24 — a PTY needs a binary to drive",
-  // then "nothing pushes a `kind: \"view\"` layer"; the first was expired by
-  // TD2 and the second was false when written — see T5.3.
-  it("T5.5 (C23 §4, C22 §13a, B03 §2): esc from a pushed view — the view pops, nothing is appended, and the prompt has the keys again", async () => {
+  it("T5.5 (C23 §4, C22 §13a, B03 §2): esc over a streaming entry takes nothing away, because there is nothing to pop", async () => {
     const pty = interactivePty("node test/support/fixture.mjs session", { cols: 80, rows: 20 });
     try {
       await pty.waitFor(PROMPT, 15_000);
@@ -262,15 +292,21 @@ describe("C15 e2e — layers under real input", () => {
       await pty.waitForFrame((f) => f.join("\n").includes("watching"), 15_000);
 
       pty.type("\u001b");
-      // The transcript is back, exactly as it was: the entry underneath, and no
-      // trace of the view verb — not an entry, not a notice.
-      await pty.waitForFrame((f) => f.join("\n").includes("/ps --mine"), 15_000);
-      const after = pty.frame.join("\n");
-      expect(after, "the view is gone").not.toContain("watching");
-      expect(after, "nothing was appended on the way out").not.toContain("--watch");
+      await new Promise((r) => setTimeout(r, 400));
 
-      // **And the keys are the prompt's again** — the control for T5.3's
-      // "the view took the key": the same printable, now on the prompt row.
+      // **B03 §2, with the premise gone.** The old row asserted that `esc`
+      // removed a layer and left the transcript exactly as it had been; there is
+      // no layer, so what it asserts now is that `esc` is inert over the
+      // transcript — both entries still there afterwards. That is the half of
+      // B03 §2 that survives a world with no push, and it is the half that says
+      // a reader cannot lose the record by pressing the key that used to.
+      const after = pty.frame.join("\n");
+      expect(after, "the entry before it").toContain("/ps --mine");
+      expect(after, "and the streaming one").toContain("watching");
+
+      // And the prompt still has the keys — the control that the session is
+      // live rather than wedged, which an assertion about what is on screen
+      // cannot supply on its own.
       pty.type("still-here");
       await pty.waitForFrame((f) => promptRow(f).includes("still-here"), 15_000);
     } finally {

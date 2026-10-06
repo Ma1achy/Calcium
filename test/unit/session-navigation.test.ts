@@ -161,7 +161,7 @@ describe("C26 §4g — the frame side of the ceiling", () => {
       expect(focus, "a focus was drawn").not.toBeNull();
       expect(focus, "a focus was drawn").not.toBe("never rendered");
       if (focus === null || focus === "never rendered") return;
-      expect(focus.blockId, "a `step` head").toMatch(/^step-/u);
+      expect(focus.blockId, "a call head").toMatch(/^call-/u);
       expect(focus.rowId, "a block-level element").toBe(focus.blockId);
     };
     await s.type(DOWN);
@@ -246,7 +246,7 @@ describe("C26 §4g — the stored location", () => {
     // A notice — no command ran, so C16 I2's reset does not fire — becomes the
     // live entry and the table is settled under focus.
     const notice = graph.transcript.append(
-      doc("", [{ kind: "notice", id: "n", tone: "warn", text: "history will not persist" }]) as never,
+      doc("", [{ kind: "notice", id: "n", tone: "warn", glyph: "warn", text: "history will not persist" }]) as never,
     );
     expect(graph.transcript.liveId).toBe(notice);
 
@@ -321,20 +321,25 @@ describe("C26 §4g — the stored location", () => {
     });
   });
 
-  it("T3.45 (C26 I2, §4g row d): interaction is reachable in the live entry only", async () => {
+  it("T3.45 (C26 I2, §8b.9, §102): interaction is reachable in a settled entry too", async () => {
+    // **Inverted by the design** (`R-INT-005`). The row read *interaction is
+    // reachable in the live entry only*, on §4g row d; §102's heading is *VIEW
+    // STATE IS NOT LIVENESS* — *Settled an hour ago, from a call that finished
+    // — it STILL ORBITS.* Asserted through the session rather than through
+    // `activeTarget` alone, because the router's target is what the keys read.
     const { graph } = await buildGraph();
     const settled = graph.transcript.append(doc("/rows", [table("1")]) as never);
     graph.transcript.append(doc("/rows", [table("2")]) as never);
 
     graph.focus.enterLiveBlock(settled, addr("a1", "t1"));
     graph.focus.setMode("interact");
-    expect(graph.router.target, "a settled entry has nothing to interact with — D4 withdrew its keys").toBe(
-      "liveBlock",
+    expect(graph.router.target, "a settled block's camera survives the freeze; its bindings do not").toBe(
+      "interaction",
     );
 
     graph.router.dispatch(press({ name: "tab" }));
     graph.focus.setMode("interact");
-    expect(graph.router.target, "the live entry is where the mode lives").toBe("interaction");
+    expect(graph.router.target, "and the live entry, unchanged").toBe("interaction");
   });
 });
 

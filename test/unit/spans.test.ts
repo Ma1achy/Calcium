@@ -12,15 +12,16 @@ import type { Block, Ramp, TextSpan, ViewDocument } from "../../src/data/viewmod
 import { stripControl } from "../../src/data/text.js";
 import { atomsOf, runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../src/presentation/runs.js";
 import { clusterEnds, truncateParts, wrapCells, wrapCellsParts } from "../../src/presentation/text.js";
-import { runStyle, withSpan } from "../../src/presentation/blocks/paint.js";
-import { resolve, resolveTone, type Style } from "../../src/presentation/theme/index.js";
+import { paintRuns, runStyle, withSpan } from "../../src/presentation/blocks/paint.js";
+import { resolve, resolveBackground, resolveTone, type Style } from "../../src/presentation/theme/index.js";
 import { COLORMAPS, continuousColour, nearestAnsi256, sample } from "../../src/presentation/theme/colormap.js";
 import { mixHex, rampStyle, stepOf } from "../../src/presentation/theme/ramp.js";
 import { animateT, extentT, rampCadenceMs } from "../../src/presentation/blocks/ramp.js";
 import { spinnerIntervalMs } from "../../src/presentation/blocks/glyphs.js";
 import { readFileSync } from "node:fs";
 import { doc } from "../support/blocks.js";
-import { DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, measurable, MONO_UNICODE_CAPS, visible } from "../support/render.js";
+import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { caps, DEPTHS, store, TONES } from "../support/theme.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 
@@ -113,12 +114,22 @@ describe("C04 §3am — spans, the gate", () => {
   const span = (ramp: unknown): unknown => ({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp }] });
   const bar = (ramp: unknown): unknown => ({ kind: "progress", id: "p", label: "build", current: 3, total: 10, ramp });
 
-  it("T1.29 (C04 I106): the arity table at the gate — one backing for gradient and step, none for palette, bands on step alone in 2..8, each refusal naming its rule", () => {
+  it("T1.29 (C04 I106): the arity table at the gate — one backing for every fill but palette, none for palette, bands on step alone in 2..8, each refusal naming its rule", () => {
     const table: readonly Readonly<{ name: string; ramp: unknown; ok: boolean; names?: RegExp }>[] = [
       { name: "gradient, slot pair", ramp: { fill: "gradient", from: "default", to: "accent" }, ok: true },
       { name: "step, slot pair, bands 2", ramp: { fill: "step", from: "default", to: "accent", bands: 2 }, ok: true },
       { name: "step, slot pair, bands 8", ramp: { fill: "step", from: "default", to: "accent", bands: 8 }, ok: true },
       { name: "palette, bare", ramp: { fill: "palette" }, ok: true },
+      // **`centred` takes the same backings as `gradient` and refuses `bands`
+      // for the same reason** (C04 I106, §037): it is a sampling, so the gate's
+      // arity rule — written over *every fill but `palette`* — reaches it with
+      // no arm of its own, and these rows are what say that is true rather than
+      // merely intended.
+      { name: "centred, slot pair", ramp: { fill: "centred", from: "default", to: "accent" }, ok: true },
+      { name: "centred, animated", ramp: { fill: "centred", from: "default", to: "accent", animate: "wave" }, ok: true },
+      { name: "centred, both backings", ramp: { fill: "centred", from: "default", to: "accent", colormap: "viridis" }, ok: false, names: /one backing.*not both.*C04 I106/u },
+      { name: "centred, no backing", ramp: { fill: "centred" }, ok: false, names: /one backing.*C04 I106/u },
+      { name: "bands on a centred", ramp: { fill: "centred", from: "default", to: "accent", bands: 3 }, ok: false, names: /"bands" rides on "step" alone/u },
       { name: "gradient, animated", ramp: { fill: "gradient", from: "default", to: "accent", animate: "shimmer" }, ok: true },
       { name: "gradient, both backings", ramp: { fill: "gradient", from: "default", to: "accent", colormap: "viridis" }, ok: false, names: /one backing.*not both.*C04 I106/u },
       { name: "gradient, no backing", ramp: { fill: "gradient" }, ok: false, names: /one backing.*C04 I106/u },
@@ -131,7 +142,7 @@ describe("C04 §3am — spans, the gate", () => {
       { name: "bands 1", ramp: { fill: "step", from: "default", to: "accent", bands: 1 }, ok: false, names: /2\.\.8.*one band is a gradient/u },
       { name: "bands 9", ramp: { fill: "step", from: "default", to: "accent", bands: 9 }, ok: false, names: /2\.\.8/u },
       { name: "bands 2.5", ramp: { fill: "step", from: "default", to: "accent", bands: 2.5 }, ok: false, names: /2\.\.8/u },
-      { name: "an unknown fill", ramp: { fill: "rainbow" }, ok: false, names: /"fill" must be one of gradient, step, palette/u },
+      { name: "an unknown fill", ramp: { fill: "rainbow" }, ok: false, names: /"fill" must be one of gradient, centred, step, palette/u },
       { name: "an unknown key", ramp: { fill: "palette", easing: "ease-in" }, ok: false, names: /unknown member "easing".*C04 I106/u },
       { name: "not a record", ramp: "viridis", ok: false, names: /must be a record with a "fill"/u },
     ];
@@ -530,3 +541,35 @@ function channelsOf(hex: string): readonly [number, number, number] {
   const n = Number.parseInt(hex.slice(1), 16);
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
 }
+
+describe("C09 I139 — a grounded run (F1522)", () => {
+  it("T1.153 (C09 I139, C04 I151): a run with ground pick paints pickInk on pick at 24-bit and no background at 1 bit, its bold kept", () => {
+    const text = "a #1 pasted · 6L";
+    const spans: readonly TextSpan[] = [{ from: 2, to: 11, ground: "pick", bold: true }];
+    const runs = runsOf(text, spans);
+    expect(runs.map((r) => r.text), "plain, grounded, plain").toEqual(["a ", "#1 pasted", " · 6L"]);
+
+    const full = paintRuns(runs, {}, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    const pick = resolveBackground("surface.pick", DARK_THEME, FULL_CAPS).background;
+    const ink = resolve("surface.pickInk", DARK_THEME, FULL_CAPS).colour;
+    expect(pick, "the fixture resolves a pick ground at 24-bit").toBeDefined();
+    expect(full.map((sp) => sp.text)).toEqual(["a ", "#1 pasted", " · 6L"]);
+    expect(full[1]?.style?.background, "the name stands on pick").toEqual(pick);
+    expect(full[1]?.style?.colour, "in pickInk").toEqual(ink);
+    expect(full[1]?.style?.bold, "and bold").toBe(true);
+    for (const i of [0, 2]) expect(full[i]?.style?.background, `span ${String(i)} takes no ground`).toBeUndefined();
+
+    // **1 bit: no ground resolves**, so the run paints as its neighbours do,
+    // its weight kept (C09 I139's second clause).
+    const mono = paintRuns(runs, {}, { theme: DARK_THEME, capabilities: MONO_UNICODE_CAPS });
+    for (const sp of mono) expect(sp.style?.background, `${sp.text} at 1 bit`).toBeUndefined();
+    expect(mono.find((sp) => sp.text.includes("#1"))?.style?.bold, "the name is still bold").toBe(true);
+
+    // The text is the same at both rungs, rendered through the block library.
+    const raw = block({ kind: "raw", id: "h", text, spans });
+    const at = (capabilities: TerminalCapabilities): readonly string[] =>
+      measurable({ capabilities }).renderToLines(raw, 40).map((l) => visible(l).trimEnd());
+    expect(at(MONO_UNICODE_CAPS)).toEqual(at(FULL_CAPS));
+    expect(at(FULL_CAPS)).toEqual([text]);
+  });
+});

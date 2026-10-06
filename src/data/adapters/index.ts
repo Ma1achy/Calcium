@@ -20,5 +20,5 @@ export type {
 export { AdapterSchemaError } from "./types.js";
 
 export { createFallbackAdapter } from "./fallback.js";
-export { exitCodeOf, usageBlocks } from "./mapping.js";
+export { cancelledNotice, exitCodeOf, usageBlocks } from "./mapping.js";
 export { RegistrySealedError, createAdapterRegistry } from "./registry.js";

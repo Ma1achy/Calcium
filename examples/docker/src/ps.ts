@@ -7,8 +7,8 @@
  * arriving through a transport that tried to parse it as one document.
  */
 
-import { b } from "@fmx/calcium";
-import type { Adapter, ColumnDef, Glyph, TableRow, Tone } from "@fmx/calcium";
+import { b } from "calcium-tui";
+import type { Adapter, ColumnDef, Glyph, TableRow, Tone } from "calcium-tui";
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
 
@@ -30,7 +30,7 @@ export { parseNdjson };
  * another state's colour.
  */
 const STATES: Readonly<Record<string, { glyph: Glyph; tone: Tone }>> = {
-  running: { glyph: "running", tone: "ok" },
+  running: { glyph: "work-unit", tone: "ok" },
   restarting: { glyph: "warn", tone: "warn" },
   paused: { glyph: "pending", tone: "warn" },
   exited: { glyph: "error", tone: "error" },

@@ -3571,6 +3571,12 @@ function elements(block: Plot, width: number, measureChild: MeasureFn): readonly
       level: "block" as const,
       rows: Object.freeze({ from: 0, to: measureChild(block, width) }),
       cols: Object.freeze({ from: 0, to: width }),
+      // **The plot has an inside** (C26 I26, I27, §102). The guard above is
+      // already §102's own table read as a predicate — *a 3D plot · a camera*,
+      // *a 2D plot · a cursor* — so the element exists exactly when there is
+      // view state to be inside of, and the declaration is the same condition
+      // said out loud rather than a second one to disagree with it.
+      viewState: true,
       // **Absent rather than `undefined`**, so the member reads as the ruling it
       // is — a `plot3d` is a place to stand — and `"copy" in e` answers it.
       ...(copy === undefined ? {} : { copy }),
@@ -3636,6 +3642,25 @@ const SERIES_KEYS = 9;
 
 export const plotDefinition: BlockDefinition<Plot> = {
   kind: "plot",
+  // C09 I137 — the frame or the axes take it, never the data (C12 I142, `R-FOC-004`).
+  focusShape: "frame",
+
+  // §7a — *a plot as its data view* (C09 I86, `R-SEL-004`). The braille cells,
+  // the axes and the colours are the whole of what this component makes, and
+  // none of them is data; what a reader copies a chart for is the numbers.
+  //
+  // One row per series, label first where there is one, `null` written as the
+  // empty cell it is — a gap in a series is a fact and `0` is a different one.
+  // Hidden series are dropped: hidden is the reader's own decision about what
+  // this plot is showing, which is the one rendering decision that is also a
+  // statement about the data.
+  copy: (block) =>
+    block.series
+      .filter((s) => s.hidden !== true)
+      .map((s) =>
+        [s.label ?? "", ...s.values.map((v) => (v === null ? "" : String(v)))].join("\t"),
+      )
+      .join("\n"),
   measure,
   render,
   elements,

@@ -71,15 +71,21 @@ const MUTATIONS = [
     // plot — so the crosshair stays where the first click put it.
     name: "a click on the focused plot is ⏎ rather than the crosshair",
     file: CONSTRUCT,
-    from: "      if (aim !== null) return aim;\n      // Click again is `⏎`",
-    to: "      // Click again is `⏎`",
+    // **Re-anchored after M7 split the press from the release.** The anchor
+    // reached into the comment below it, which the same commit rewrote — an
+    // anchor that ends at a line boundary rots for reasons unrelated to its
+    // subject. It now names the branch itself plus the least context that makes
+    // it unique.
+    from: "      if (aim !== null) return aim;\n      // **Click again is still a state test",
+    to: "      // **Click again is still a state test",
     expect: "T4.71",
   },
   {
     // Motion extends the (empty) selection instead of aiming.
     name: "a drag over the focused plot is ⇧↓ rather than the crosshair",
     file: CONSTRUCT,
-    from: "      if (onFocused && aim !== null) return aim;\n",
+    // Re-anchored 2026-09-28 (review batch 3, M7): motion aims the crosshair and never the legend (C16 I71); the mutation is unchanged.
+    from: "      if (onFocused && crosshair !== null) return crosshair;\n",
     to: "",
     expect: "T4.71",
   },
@@ -116,10 +122,15 @@ const MUTATIONS = [
     expect: "T1.26",
   },
   {
+    // **Re-anchored** (C10 I47, R-SEL-006): the head chip takes `focusGround`,
+    // or the wash where it is also selected. The mutation is unchanged — the head
+    // loses its ground and is `accent` alone — and it is anchored on the ground
+    // chooser, which is what it removes.
     name: "the head chip loses the ground",
     file: SIMPLE,
-    from: '              ? { ...tone("accent", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }',
-    to: '              ? tone("accent", ctx.theme, ctx.capabilities)',
+    // Re-anchored 2026-09-27 (C09 I121): the focus shapes read focusShapeStyle.
+    from: '                  ...(selected.has(id) ? selectionStyle : focusShapeStyle)(ctx.theme, ctx.capabilities),\n',
+    to: "",
     expect: "T1.24",
   },
 ];

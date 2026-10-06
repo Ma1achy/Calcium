@@ -16,6 +16,7 @@ expectations, which is the same reason C02 takes its `env` by injection.
 | `startup-graph-child.mjs` | The child T5.22 spawns under it: imports `dist/`, lists the graph, runs one shell command through the route over the bench's fakes, lists it again; two JSON lines appended to the file named by its argument |
 | `code-graph-child.mjs` | The child T5.6 spawns under `import-trace.mjs`: imports `dist/presentation/blocks/kinds/code.js`, lists the graph, registers a seventeenth grammar and lists it again — the row that reads what the code block loads (C09 I71). | C09 T5.6 |
 
+| `quantised-shortfalls.ts` | The two lists C10 T2.74 and T2.75 hold `quantisedShortfalls()` to by equality — the floor measured at 8 and 4 bits, ink and ground as the resolver paints them. The instrument itself moved to `src/presentation/theme/resolve.ts` when its 8-bit list emptied (C10 I69), because it is now the load gate C10 I70 runs; the lists stay here, since a list written beside the function it checks agrees with it by construction |
 | `world.ts` | `fakeWorld()`, `worldResult()`, `steppableClock()` — a constant `WorldDriver` double for C08's resolver, which is not "the world" for I14's purposes |
 
 **Two files left this directory for `src/testing/`** — `measurement-conformance.ts`
@@ -438,7 +439,7 @@ because one row went through the producer.
 
 ## An example's rows run against `dist/`, so no mutation reaches them
 
-`examples/docker/test/*` and `examples/minimal/test/*` import `@fmx/calcium`,
+`examples/docker/test/*` and `examples/minimal/test/*` import `calcium-tui`,
 which resolves to the built package. A mutation applied to `src/` therefore
 changes nothing those rows can see: the mutation pass reports a **survivor**, and
 the survivor is an artefact of the module graph rather than a gap in the

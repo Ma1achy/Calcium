@@ -96,7 +96,8 @@ const results = runPass({
       // C09 I29 — the state both catches shipped in.
       name: "the render catch swallows without reporting",
       file: REG,
-      from: '      this.#report(\n        block,\n        "render",\n        error,\n        statusRowsFor(errorStatus(text, 1), inner, childContext.capabilities),\n      );',
+      // Re-anchored 2026-09-27 (C09 I34): the count takes no capability record.
+      from: '      this.#report(\n        block,\n        "render",\n        error,\n        statusRowsFor(errorStatus(text, 1), inner),\n      );',
       to: "",
       expect: "T3.35",
     },

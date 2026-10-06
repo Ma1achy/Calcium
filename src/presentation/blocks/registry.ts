@@ -20,14 +20,19 @@ import {
   parseAreas,
   placeable,
   sequenceHeight,
+  splitPanes,
 } from "../../data/viewmodel/index.js";
 import { NO_PROBE } from "../../data/viewmodel/index.js";
 import type { Block, Probe, Status } from "../../data/viewmodel/index.js";
+import type { ResolvedTheme } from "../theme/index.js";
 import { DEFAULT_DEFINITIONS } from "./defaults.js";
 import { clampSpans, paint, rows, tone } from "./paint.js";
 import { truncate } from "../text.js";
 import { fitRow } from "../rows.js";
 import { statusDefinition, statusRowsFor } from "./kinds/status.js";
+import { barOf } from "./kinds/containers.js";
+import { neutralBlock } from "./neutral.js";
+import { neutraliseControl } from "../../data/text.js";
 import type {
   MeasureMemo,
   RenderScratch,
@@ -35,7 +40,10 @@ import type {
   BlockDefinition,
   BlockFault,
   BlockRegistry,
+  FocusShape,
+  FocusState,
   NavElement,
+  PlacedElement,
   RenderContext,
   RenderContextInput,
   Windowed,
@@ -154,7 +162,7 @@ const MISSING: BlockDefinition = {
     rows([
       paint([
         {
-          text: `[${block.kind} has no definition, and no raw fallback is registered]`,
+          text: `[${neutraliseControl(block.kind)} has no definition, and no raw fallback is registered]`,
           style: tone("error", ctx.theme, ctx.capabilities),
         },
       ]),
@@ -379,15 +387,11 @@ class Registry implements BlockRegistry {
       // diagnostic and never a request: the shell only records one inside the
       // scope a *render* opens, so a measure fault with no request is exactly
       // the case that cannot produce one. Asking for rows would be answering a
-      // question nobody put.
+      // question nobody put. **The count itself needs no capabilities** (C09
+      // I34) — `caps` is read here as the sign of a render's scope, not as an
+      // input to the arithmetic.
       const rows =
-        caps === undefined
-          ? 0
-          : statusRowsFor(
-              errorStatus(Registry.#errorText(block, "measure", error), 1),
-              width,
-              caps,
-            );
+        caps === undefined ? 0 : statusRowsFor(errorStatus(Registry.#errorText(block, "measure", error), 1), width);
       this.#report(block, "measure", error, rows);
       return { ok: false, rows: Math.max(1, floor) };
     }
@@ -446,7 +450,7 @@ class Registry implements BlockRegistry {
       // block, so a focus ring sat `t` rows above and `l` columns left of the
       // thing it was ringing.
       const pad = paddingOf(block);
-      const elements = declared(form.block, contentWidth(block, width), this.#measureChild);
+      const elements = declared(form.block, contentWidth(block, width), this.#measureChild, this.copyOf);
       if (pad.l === 0 && pad.t === 0) return { elements, owned: true };
       return {
         elements: elements.map((e) => ({
@@ -491,6 +495,14 @@ class Registry implements BlockRegistry {
     return this.#definitions.get(kind);
   }
 
+  /**
+   * The shape a block's kind declares for focus, or `null` (I137, §7k) — what
+   * `RenderContext.focusShapeOf` hands a container, so it asks the kind rather
+   * than switching over kinds. An unregistered kind draws as `raw`, which
+   * declares none.
+   */
+  focusShapeOf = (block: Block): FocusShape | null => this.#definitions.get(block.kind)?.focusShape ?? null;
+
   seal(): void {
     // Sealing twice is a no-op, not an error (T3.3). Composition roots compose.
     this.#sealed = true;
@@ -507,17 +519,21 @@ class Registry implements BlockRegistry {
    * and nothing registered — falls back to nothing, and says so as a block
    * rather than as a throw.
    */
+  /**
+   * **And the block is neutralised here, once** (C09 I127). This is the one
+   * function every member reaches a definition through, so measure, render,
+   * the windows, elements and copy all read the same neutralised value — the
+   * class closed at its funnel rather than at nineteen call sites. A clean
+   * block comes back as itself, and a block met again is a lookup.
+   */
   #resolve(block: Block): Readonly<{ definition: BlockDefinition; block: Block }> {
     const held = this.#definitions.get(block.kind);
-    if (held !== undefined) return { definition: held, block };
+    if (held !== undefined) return { definition: held, block: neutralBlock(block) };
 
     const fallback = this.#definitions.get("raw");
-    if (fallback === undefined) return { definition: MISSING, block };
+    if (fallback === undefined) return { definition: MISSING, block: neutralBlock(block) };
 
-    return {
-      definition: fallback,
-      block: { kind: "raw", id: block.id, text: JSON.stringify(block) },
-    };
+    return { definition: fallback, block: neutralBlock(rawOf(block)) };
   }
 
   /**
@@ -699,6 +715,92 @@ class Registry implements BlockRegistry {
     this.#scoped(() => this.#elements(block, normaliseWidth(width)).elements);
 
   /**
+   * The widths a container's children are drawn at (I126) — `[]` for a leaf.
+   *
+   * **The renderers' own functions, each read once**: `barOf` for a scroll's
+   * bar, `splitPanes` for a right pane's, `groupPlacements` for a cell aligned
+   * off `left` (C04 I101), and C04's `childWidths` for everything those do not
+   * narrow. `width` is the container's own, padding included, which is what
+   * every other member here takes; the padding comes off first, as it does
+   * before a definition sees its width (I80).
+   *
+   * **Why the library answers and the shell does not** (§7i). All three
+   * narrowings are this layer's and none was published, so the shell asked
+   * every nested question at the region's width, the only one it held — and a
+   * box in a card's body clamped against a ceiling of 1 where the frame's was 4.
+   */
+  childWidthsOf = (block: Block, width: number): readonly number[] =>
+    this.#scoped((): readonly number[] => {
+      if (!hasChildren(block)) return [];
+      const w = contentWidth(block, normaliseWidth(width));
+      const shares = childWidths(block, w);
+      const share = (i: number): number => shares[i] ?? shares[0] ?? w;
+      switch (block.kind) {
+        case "scroll": {
+          const at = barOf(block, w, this.#measureChild).contentWidth;
+          return block.children.map(() => at);
+        }
+        case "split": {
+          const panes = splitPanes(block, w, this.#measureChild);
+          return block.children.map((_c, i) => panes.find((p) => p.side === i)?.width ?? share(i));
+        }
+        case "group": {
+          const placements = groupPlacements(block, w, this.#measureChild, this.width);
+          return block.children.map((_c, i) => placements[i]?.width ?? share(i));
+        }
+        default:
+          return block.children.map((_c, i) => share(i));
+      }
+    });
+
+  /**
+   * What a block copies as, or `null` when its kind declines (§7a, I86,
+   * `R-SEL-004`).
+   *
+   * **`null` and not `""`, which is the whole of the ruling.** A blank line is
+   * `R-SEL-004`'s *entry* separator, so a kind contributing an empty string
+   * forges an entry boundary inside an entry — a rendering decision leaking
+   * into a source copy, which is the class `NavElement.copy` exists against.
+   * The caller drops a `null` and joins the rest.
+   *
+   * **No width, unlike `elementsOf`.** A copy is the source and the source does
+   * not have a width; the columns a width dropped are exactly what this is for.
+   * An unregistered kind falls to `raw`'s definition as everything else does,
+   * which is right here: `raw` carries its text verbatim.
+   */
+  copyOf = (block: Block): string | null =>
+    this.#scoped(() => {
+      const { definition, block: resolved } = this.#resolve(block);
+      return definition.copy?.(resolved, (child: Block) => this.copyOf(child)) ?? null;
+    });
+
+  /**
+   * A sequence's copy text — the blocks that answered, newline-joined (§7a).
+   *
+   * **One newline between blocks and never two**, because two is the entry
+   * separator and this is inside one entry (C14 §6a). The kinds that decline
+   * are dropped rather than joined as empty, which is the same sentence from
+   * the caller's side.
+   */
+  /**
+   * The kind's fold, asked of the block itself (I124, C23 I84).
+   *
+   * **Through the definitions and never through `#resolve`**: an unregistered
+   * kind resolves to `raw`'s fallback with a `raw` block standing in, and a
+   * fold of the stand-in would hand the dispatcher a `raw` to write over the
+   * block it named. A kind nobody registered has no fold.
+   */
+  fold = (block: Block): Block | null => {
+    return this.#definitions.get(block.kind)?.fold?.(block) ?? null;
+  };
+
+  copySequence = (blocks: readonly Block[]): string =>
+    blocks
+      .map((b) => this.copyOf(b))
+      .filter((t): t is string => t !== null && t !== "")
+      .join("\n");
+
+  /**
    * Every element in a **sequence**, block-local rows lifted into
    * sequence-local ones (C26 §5).
    *
@@ -713,11 +815,8 @@ class Registry implements BlockRegistry {
    * `gapBefore` is counted here and never inside a block, for `windowSequence`'s
    * reason: the gap belongs to the run.
    */
-  elementsIn = (
-    blocks: readonly Block[],
-    width: number,
-  ): readonly Readonly<{ blockId: string; element: NavElement }>[] => {
-    const out: Readonly<{ blockId: string; element: NavElement }>[] = [];
+  elementsIn = (blocks: readonly Block[], width: number): readonly PlacedElement[] => {
+    const out: PlacedElement[] = [];
 
     /**
      * One block at `(top, left)`, `atWidth` wide — its own elements lifted in
@@ -821,8 +920,42 @@ class Registry implements BlockRegistry {
         }
         case "scroll":
           // Content rows from the box's top (C26 I3 — never the offset), which
-          // is where `childRanges` puts them.
-          sequence(block.children, top, left, widths[0] ?? 1);
+          // is where `childRanges` puts them — at the width the bar leaves
+          // (I126), which is the width `render` draws them at.
+          sequence(block.children, top, left, barOf(block, normaliseWidth(atWidth), this.#measureChild).contentWidth);
+          return;
+        case "split":
+          // **Each pane at the column and width the renderer draws it at**
+          // (C04 I133) — `splitPanes` is the renderer's own answer, so the
+          // right pane's bar narrows both or neither. Content rows from the
+          // split's top, as a scroll's are (C26 I3).
+          for (const pane of splitPanes(block, atWidth, this.#measureChild)) {
+            const before = out.length; // cells-ok — an index into the walk
+            place(pane.child, top, left + pane.col, pane.width);
+            // **A pane with nothing to stand on still has a place** (§3aq S6):
+            // one block-level element addressed to the split, as a mosaic's
+            // pane is, so `→` always has somewhere to land.
+            if (out.length === before) { // cells-ok — a count of elements
+              const copy = this.copyOf(pane.child);
+              out.push({
+                blockId: block.id,
+                element: Object.freeze({
+                  id: pane.child.id,
+                  level: "block" as const,
+                  rows: Object.freeze({ from: top, to: top + Math.max(1, pane.content) }),
+                  cols: Object.freeze({ from: left + pane.col, to: left + pane.col + pane.width }),
+                  ...(copy === null || copy === "" ? {} : { copy }),
+                }),
+              });
+            }
+            // **The innermost pane wins** (C26 I28): a nested split tagged its
+            // own elements first, on the way down.
+            const ref = Object.freeze({ split: block.id, side: pane.side, top, left });
+            for (let i = before; i < out.length; i += 1) { // cells-ok — an index into the walk
+              const placed = out[i];
+              if (placed !== undefined && placed.pane === undefined) out[i] = Object.freeze({ ...placed, pane: ref });
+            }
+          }
           return;
       }
     };
@@ -1055,9 +1188,15 @@ class Registry implements BlockRegistry {
       width: inner,
       measureChild: this.#measureChild,
       widthChild: this.width,
-      renderChild: (child: Block, childWidth: number): Rendered =>
-        this.render(child, { ...ctx, width: childWidth }),
+      renderChild: (child: Block, childWidth: number, theme?: ResolvedTheme, focus?: FocusState | null): Rendered =>
+        this.render(child, {
+          ...ctx,
+          width: childWidth,
+          ...(theme === undefined ? {} : { theme }),
+          ...(focus === undefined ? {} : { focus }),
+        }),
       windowChild: this.windowChild,
+      focusShapeOf: this.focusShapeOf,
     };
 
     // **The height is committed before anything is drawn** (I11). It used to be
@@ -1112,7 +1251,7 @@ class Registry implements BlockRegistry {
         block,
         "render",
         error,
-        statusRowsFor(errorStatus(text, 1), inner, childContext.capabilities),
+        statusRowsFor(errorStatus(text, 1), inner),
       );
       return this.#floored(block, this.#padded(block, this.#errorBlock(text, committed.rows, childContext), inner));
     }
@@ -1168,7 +1307,25 @@ export function createBlockRegistry(
  * (C09 I34).
  */
 function errorStatus(text: string, height: number): Status {
-  return { kind: "status", id: "status", state: "error", message: text, height } as Status;
+  // **Neutralised, because a thrown message is a field too** (C09 I127): the
+  // error box is drawn by a definition the registry calls directly, and a
+  // renderer's `Error` can carry whatever the block it choked on carried.
+  return { kind: "status", id: "status", state: "error", message: neutraliseControl(text), height } as Status;
+}
+
+/**
+ * An unregistered block's `raw` stand-in (I10), one per block object — so the
+ * fallback's neutralised form is memoised as every other block's is, rather
+ * than rebuilt and re-walked on every ask. The JSON escapes C0 as a backslash-u sequence
+ * and leaves C1 and bidi as they are, which is why the neutraliser still runs.
+ */
+const RAW_OF = new WeakMap<Block, Block>();
+function rawOf(block: Block): Block {
+  const held = RAW_OF.get(block);
+  if (held !== undefined) return held;
+  const raw: Block = { kind: "raw", id: block.id, text: JSON.stringify(block) };
+  RAW_OF.set(block, raw);
+  return raw;
 }
 
 function floorOf(block: Block): number {

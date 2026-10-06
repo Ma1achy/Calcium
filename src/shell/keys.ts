@@ -25,7 +25,7 @@ import {
   menuBlocks,
   menuLayer,
   menuRowsShown,
-  menuWindow,
+  menuWindowOf,
   remainderOf,
   MENU_ID,
   SPINNER_MS,
@@ -38,18 +38,16 @@ import type {
   CompletionEngine,
 } from "../interaction/completion/index.js";
 import type { LineEditor } from "../interaction/editor/index.js";
-import type { HistoryStore } from "../interaction/history/index.js";
+import type { HistoryStore, Navigator } from "../interaction/history/index.js";
 import type { ElementAddress, KeyAction } from "../interaction/router/types.js";
 import { extentOf, resolveFocus } from "../interaction/router/focus.js";
 import type { Action } from "../data/viewmodel/index.js";
-import type { NavElement } from "../presentation/blocks/index.js";
+import type { NavElement, PaneRef } from "../presentation/blocks/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import type { Manifest } from "../data/manifest/index.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { FocusStore } from "../interaction/router/focus.js";
-import type { DocumentView, DocumentViewMotion } from "./document-view.js";
-import type { PatchView, PatchViewMotion } from "./patch-view.js";
-import type { ProfileView, ProfileViewMotion } from "./profile-view.js";
+import { ECHO_BLOCK } from "./echo.js";
 
 /** The prompt's own extent, for anchoring (C19 §6, C20 §5). */
 export type PromptAnchor = Readonly<{ row: number; rows: number }>;
@@ -59,6 +57,17 @@ export type KeyDeps = Readonly<{
   completion: CompletionEngine;
   overlays: OverlayManager;
   history: HistoryStore;
+  /**
+   * The history of a typed reply while one owns the line, else `null` (C23 I77,
+   * §052, `R-QST-003`).
+   *
+   * **The owner's, never the prompt's.** §052 gives a borrowing question *its
+   * OWN buffer, selection, history and undo*; `↑` in a commit-message reply
+   * walking the prompt's commands is the leak. And the prompt's walk has a
+   * floor that enters the live block, which from under an unanswered question
+   * is a focus move I8 forbids — so the reply's walk ends at its floor.
+   */
+  reply: () => Pick<Navigator, "previous" | "next"> | null;
   /**
    * C14, for the four scroll actions (C16 I23).
    *
@@ -74,6 +83,69 @@ export type KeyDeps = Readonly<{
     scrollToBottom(): void;
   }>;
   manifest: Manifest | null;
+  /**
+   * Submit a line, for `?` and `F1` (R-KEY-005, C16 §6a).
+   *
+   * **The same path `/help keys` takes, not a second renderer.** §6's whole
+   * argument is that help renders from the table dispatch uses; a key that built
+   * its own listing would satisfy the letter of *durable transcript entry* and
+   * reintroduce exactly the drift the module note forbids.
+   */
+  submit: (line: string) => void;
+  /**
+   * Runs a `local` verb's handler and appends its entry **without submitting**
+   * (C16 I57, C23 I79) — no clear, no history, no queue. `?` and `F1`.
+   */
+  emit: (line: string) => void;
+  /**
+   * Runs the palette's action by its registry id (C16 I68, §6c Q2) — the
+   * composition root's, because which row an id names depends on the
+   * keymap's profile and the application's handlers, and neither is here.
+   */
+  runAction: (id: string) => void;
+  /** Move focus into the transcript, for `⇧⇥` (`focus.previous`, §6a). */
+  focusTranscript: () => void;
+  /**
+   * The watch row's keys (C16 I76, I77, C22 I140) — the composition root's,
+   * because the set, the focus store and the transcript are all there.
+   */
+  watchKeys: Readonly<{
+    focusPrevious: () => void;
+    step: (by: 1 | -1) => void;
+    open: (n?: number) => void;
+  }>;
+  /**
+   * The chip preview's keys (C22 I143, I144) — the composition root's, because
+   * the layer, the store and the editor are all there. Each asks whether the
+   * preview is the panel on top, and does nothing when it is not.
+   */
+  previewKeys: Readonly<{
+    scroll: (rows: 1 | -1) => void;
+    open: () => void;
+  }>;
+  /**
+   * Send the prompt's line, for its `⏎` (C22 I133, ruling 63).
+   *
+   * **Not `submit`**, which takes a line: this sends the line the editor holds,
+   * and the composition root is where a chip becomes its content (roadmap 30).
+   */
+  submitPrompt: () => void;
+  /** Keep what a held form field holds, for its `⏎` (C22 I118, I133). A no-op with no field held. */
+  keepField: () => void;
+  /**
+   * Leave a captured child and return ownership to the host (C16 I49,
+   * R-BLK-908).
+   *
+   * **Not `reserved`**, and this is the one row where the difference is the
+   * whole point: *a captured child reserves one `host.detach` action because a
+   * `/command` cannot reach the host while capture is active… may never leave
+   * capture without a visible, reachable host escape.* A reservation here is a
+   * session with no way out of a child that has stopped answering.
+   *
+   * A no-op with nothing attached, because the chord is only ever resolved at
+   * the `child` target and that target is only reachable while one is.
+   */
+  detachChild: () => void;
   /** Where the prompt sits, from the composed frame rather than a fresh read. */
   anchor: () => PromptAnchor;
   /** How big a layer may be (C15 `Region`), for the menu's "… n more". */
@@ -81,48 +153,58 @@ export type KeyDeps = Readonly<{
   /** C16's stored focus — the one piece of it in the system (C16 §3). */
   focus: FocusStore;
   /**
-   * Enter copy mode (C16 §5b, C03 §4a).
+   * Enter native selection (C16 §5b, C03 §4a).
    *
-   * **The entry half only, and the exit is deliberately not here.** Leaving is
-   * `⌃c` on the ladder's copy-mode rung, which already calls `exitCopyMode` —
-   * so a matching effect in this table would be a second exit with an order of
-   * its own. The pair still ships together; they just do not ship *here*
-   * together.
+   * **And the exit, `esc`'s** (C16 §5c). There was a second exit, `⌃c` on the
+   * ladder's native-selection rung; §103 has COPY MODE reject the interrupt
+   * (C16 I62, ruling 59), so `esc` is the one way out.
    */
-  enterCopyMode: () => void;
-  exitCopyMode: () => void;
+  enterNativeSelection: () => void;
+  exitNativeSelection: () => void;
   /**
-   * The fullscreen patch view (C25 §3b, C22 I41).
+   * Semantic copy mode (C14 §6a, C16 §5d, I51).
    *
-   * Named here rather than reached through `overlays`, because the motions are
-   * the view's own arithmetic over one offset and C16 executes no action itself
-   * (I19). The seven `view*` entries below are what makes `pushedView` a target
-   * with a vocabulary rather than a name in a union.
+   * **`esc` is the one way out, and it clears a selection first** (I51). The
+   * ladder's `⌃c` rung called a second verb, `exitSemanticSelection`, which
+   * always left; §103 has COPY MODE reject the interrupt (C16 I62, ruling 59),
+   * so the rung and the verb are gone.
    */
-  patchView: PatchView;
+  enterSemanticSelection: () => void;
+  escapeSemanticSelection: () => void;
+  selectEntryUnderCaret: () => void;
+  selectAllLoadedEntries: () => void;
   /**
-   * C22 §13a's view. One target, two owners — C15 I1 allows one view at a time,
-   * so at most one of these is open and the keymap needs no third target.
+   * `y` — the selected entries to the clipboard (`R-SEL-004`, `R-SEL-011`).
+   *
+   * **Not `editor.copyText` from here**, though that is where the text lands.
+   * The join needs the transcript's document order and C09's `copySequence`,
+   * neither of which this table has, and the refusal `R-SEL-011` requires when
+   * a copy cannot leave the process is the mode's statement rather than a key's.
    */
-  documentView: DocumentView;
+  copySelectedEntries: () => void;
+  /** `⏎` — the same copy, then the mode's exit (C14 I59, I47). */
+  copyAndLeaveSemanticSelection: () => void;
+  /** `⌃V` — the rectangle on or off (C14 I60, ruling 36). */
+  toggleSemanticRect: () => void;
   /**
-   * C28 §3c's view — the third owner of the one `pushedView` target.
-   *
-   * Its unit is the pane: `n`/`p` switch panes where a patch moves by hunk and
-   * a document by block, and the four page keys and `g`/`G` move its window.
-   * No binding is added for it, so `/help keys` is unchanged (C23 I26).
-   *
-   * **Optional for the harness that builds these deps by hand and required in
-   * effect**: the root always supplies it (`construct.ts`), and a deps literal
-   * without it exercises the two older owners exactly as before this one
-   * existed. `session-keys.test.ts` is that harness: its graph-backed literal
-   * passes it, and its three stub literals (`editor: {}`) do not — so this stays
-   * optional until those three grow a stub view, which is what making it
-   * required costs and not one line.
+   * A toast in the footer's tail (C22 I116, §012) — for a fact that changed
+   * nothing, which a copy is: *you pressed a key and something happened. What
+   * says so?*
    */
-  profileView?: ProfileView;
-  /** C22 I46 — the pop releases the view's parts, rather than a later fetch doing it. */
-  releaseView: () => void;
+  toast: (text: string) => void;
+  /**
+   * How many questions wait behind the open one (C23 I91). A panel a question
+   * displaced comes back only when no question remains, open **or waiting**:
+   * between one question's disposal and the next one's push the stack holds no
+   * blocking layer, and a restore there is a menu drawn for no frame and taken
+   * down again. Absent is none.
+   */
+  questionsWaiting?: () => number;
+  /**
+   * The caret's eight, as one dep with three axes (C14 I37, I60, §6c): rows,
+   * columns — which only the rectangle takes — and whether the anchor holds.
+   */
+  moveSemanticCaret: (rows: number, columns: number, extend: boolean) => void;
   /**
    * Every navigable element in the live entry, addressed and in reading order,
    * or empty (C16 I22, C26 §5).
@@ -162,6 +244,14 @@ export type KeyDeps = Readonly<{
    */
   focusedElements: () => readonly PlacedNavElement[];
   focusedEntryId: () => EntryId | null;
+  /**
+   * How far a split pane of the focused entry is scrolled, clamped as the
+   * renderer clamps it (C22 I117) — what `←`/`→` need to find the element
+   * nearest on screen when the two panes scroll apart (C26 I28).
+   */
+  paneOffset: (split: string, side: number) => number;
+  /** Move a split's divider by `delta` cells in the focused entry (C22 I117). */
+  moveDivider: (split: string, delta: number) => void;
   /**
    * The nearest entry with an element in `direction`, or `null` at the end
    * (C26 I21). `-1` is older and `1` newer; L4 walks the transcript because
@@ -236,7 +326,11 @@ export type KeyDeps = Readonly<{
    * C23's dispatcher (C23 I16). Supplied, never constructed here — an action is
    * a submission by another route, and L4's routing component owns routes.
    */
-  onAction: (action: Action, from: EntryId | null) => void;
+  /**
+   * `at` is the element that fired it, where one did — the button a form's
+   * submit completes from (C04 I137, C22 I118).
+   */
+  onAction: (action: Action, from: EntryId | null, at?: ElementAddress) => void;
   /**
    * Commit a frame for something that settled after its batch (C22 I31).
    *
@@ -270,7 +364,39 @@ export type PlacedNavElement = Readonly<{
   // are watched at all (FINDINGS F159).
   blockId: string;
   element: NavElement;
+  /** The split pane the element sits in, innermost (C26 I28). */
+  pane?: PaneRef;
 }>;
+
+/**
+ * Whether `to` is in a split pane that a vertical step from `from` passes over
+ * (C26 I28, C04 §3aq E1, E2).
+ *
+ * **Inside a split, the other pane; from outside it, the right pane.** The
+ * first is what keeps `↓` from running off the left pane's last row into the
+ * right pane's first — focus crosses the divider only on `←`/`→`. The second
+ * is that a split is entered on its left pane from either side, so which pane
+ * a reader lands in does not depend on the direction they came from.
+ */
+const passedOver = (from: PlacedNavElement | undefined, to: PlacedNavElement): boolean => {
+  if (to.pane === undefined) return false;
+  if (from?.pane !== undefined && from.pane.split === to.pane.split) return to.pane.side !== from.pane.side;
+  return to.pane.side !== 0;
+};
+
+/**
+ * Whether two placed elements are one row (C26 I30, §8c.2): the same pane, or
+ * both in none, and rows that overlap.
+ *
+ * **Overlap, not equality**, so a one-row element beside a taller one shares
+ * its row. **And the same pane**, so a split is not a wide row: its two panes
+ * overlap by construction, and crossing between them stays I28's.
+ */
+const oneRow = (a: PlacedNavElement, b: PlacedNavElement): boolean =>
+  a.pane?.split === b.pane?.split &&
+  a.pane?.side === b.pane?.side &&
+  a.element.rows.from < b.element.rows.to &&
+  b.element.rows.from < a.element.rows.to;
 
 /** The address of a placed element. One expression, so no call site spells it. */
 const addressOf = (p: PlacedNavElement): ElementAddress =>
@@ -312,6 +438,28 @@ export interface KeyEffects {
    * `searchEnd` takes its action for the same reason (C20 §7).
    */
   searchTyped(text: string | null): void;
+  /**
+   * What `⏎` on the element at `address` in `entryId` would do, resolved now
+   * and run later — or `null` where it would do nothing (C16 I71, §3c S1).
+   *
+   * **The pointer's press captures this, and its release runs it.** The arm
+   * held `table.rowActivate`, which reads `focus.current` when it runs — so a
+   * press on row A, `↓` to row B with the button down, and a release over A
+   * fired B's action. The identity the router compares is A's, so the effect
+   * has to be A's too. Asked of the focused entry, because a press only arms
+   * on the focused element.
+   */
+  activationAt(entryId: EntryId, address: ElementAddress): KeyEffect | null;
+  /**
+   * The wheel over the menu: move its window by `rows` candidates, and answer
+   * whether it has a window to move (C16 I74, §3d Q2).
+   *
+   * **What is shown, never what is chosen** (C19 I20). A menu holding no
+   * selection is a display, and `⏎` still submits under it — so a wheel that
+   * selected as it scrolled would turn the reader's next `⏎` into an accept.
+   * The window follows the selection again the moment a key moves it.
+   */
+  scrollMenu(rows: number): boolean;
   /**
    * The region changed — re-place whatever is anchored to the prompt.
    *
@@ -368,7 +516,71 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    * nowhere.
    */
   let fits = 0;
+  /**
+   * Where the wheel put the window, and the selection it was put against
+   * (C16 I74). `null` is *the selection places the window*, which is every
+   * menu nobody has wheeled; a selection that has moved since reads as `null`.
+   */
+  let wheeled: Readonly<{ start: number; at: number | null }> | null = null;
   let seq = 0;
+
+  /** The focused element's placed record, or `null` (C26 I10). */
+  const focusedPlaced = (): Readonly<{ at: number; elements: readonly PlacedNavElement[] }> | null => {
+    const current = deps.focus.current;
+    if (current.at !== "liveBlock") return null;
+    const elements = deps.focusedElements();
+    const at = resolveFocus(current.element, elements);
+    return at === null ? null : { at, elements };
+  };
+
+  /** `←`/`→` across a split's divider (C26 I28, C04 §3aq E3). */
+  const crossPane = (side: number): void => {
+    const found = focusedPlaced();
+    const entry = deps.focusedEntryId();
+    if (found === null || entry === null) return;
+    const here = found.elements[found.at];
+    const pane = here?.pane;
+    if (here === undefined || pane === undefined || pane.side === side) return;
+    const others = found.elements.filter((q) => q.pane?.split === pane.split && q.pane.side === side);
+    if (others.length === 0) return; // cells-ok — a count of elements
+    // **Screen rows, each pane's own offset off** — the two scroll apart.
+    const row = here.element.rows.from - deps.paneOffset(pane.split, pane.side);
+    const shift = deps.paneOffset(pane.split, side);
+    const target = others.find((q) => q.element.rows.to - shift > row) ?? others.at(-1); // cells-ok — the last element
+    if (target !== undefined) deps.focus.focusRow(entry, addressOf(target));
+  };
+
+  /**
+   * `←`/`→` along the focused row (C26 I30, §8c; `R-BLK-853`).
+   *
+   * The next element in element order that shares the focused one's row, in
+   * the direction pressed; at the row's end, the split's divider where I28
+   * allows it, and nothing otherwise. **Focus moves, never `current`** (ruling
+   * 80): the shell cannot write the producer's field, so a tape's window
+   * follows focus (C26 I31) and `⏎` is how a member is chosen.
+   */
+  const alongRow = (direction: -1 | 1): void => {
+    const found = focusedPlaced();
+    const entry = deps.focusedEntryId();
+    if (found === null || entry === null) return;
+    const here = found.elements[found.at];
+    if (here === undefined) return;
+    for (let j = found.at + direction; j >= 0 && j < found.elements.length; j += direction) {
+      const q = found.elements[j];
+      if (q !== undefined && oneRow(here, q)) {
+        deps.focus.focusRow(entry, addressOf(q));
+        return;
+      }
+    }
+    crossPane(direction === 1 ? 1 : 0);
+  };
+
+  /** `⌥←`/`⌥→` — the innermost split holding focus (C04 §3aq E4). */
+  const nudgeDivider = (delta: number): void => {
+    const found = focusedPlaced();
+    const pane = found?.elements[found.at]?.pane;
+    if (pane !== undefined) deps.moveDivider(pane.split, delta);
+  };
   /**
    * Where `Esc` dismissed a typed menu, as the token's start offset (C19 I19).
    *
@@ -402,15 +614,34 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // so a `fits` from the wrong one silently dropped candidates that fitted
     // perfectly well. `remainder` is the only thing that says *something was
     // actually cut*, and where nothing was, there is nothing to window.
-    if (remainder <= 0) return menuBlocks(candidates, selection.at, 0);
-    const w = menuWindow(candidates.length, selection.at, fits);
+    // **The current is the selection, or the first candidate while a typed
+    // menu holds none** (C19 I29, ruling 89): marked at rest, and not chosen.
+    const current = selection.at ?? 0;
+    if (remainder <= 0) return menuBlocks(candidates, current, 0);
+    // **The keys own the window again once they move the selection** (§3d Q2).
+    if (wheeled !== null && wheeled.at !== selection.at) wheeled = null;
+    const w = windowFrom(wheeled?.start ?? null);
     const slice = candidates.slice(w.start, w.start + w.shown);
-    return menuBlocks(slice, selection.at === null ? null : selection.at - w.start, remainder);
+    const at = current - w.start;
+    // A current the wheel scrolled out of view is drawn as none on screen, and
+    // is still the current: `⏎` accepts a selection, as it would have, and the
+    // mark's cells stay reserved so no label moves (C11 I33).
+    //
+    // **The indicator is the placement's count**: a row is a candidate (C19
+    // I30), so the window shows `fits` whatever its start.
+    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, remainder);
+  }
+
+  /** The window over the candidates (C19 I23), for the draw and the wheel alike. */
+  function windowFrom(from: number | null): Readonly<{ start: number; shown: number }> {
+    return menuWindowOf(candidates.length, selection.at, fits, from);
   }
 
   function redrawMenu(): void {
     if (candidates.length === 0) return;
-    deps.overlays.update(MENU_ID, { content: windowedBlocks() });
+    // `promptLive` goes with every redraw a selection move causes (C22 I145):
+    // a field set only at push reads correct and is stale on the first `Tab` that selects.
+    deps.overlays.update(MENU_ID, { content: windowedBlocks(), promptLive: selection.at === null });
   }
 
   /**
@@ -441,8 +672,15 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // the state, not the code could not reach it — and the two dead clamps
     // beside it were the first disposition. They read identically in a report.
     fits = 0;
+    wheeled = null;
     const layer = menuLayer(candidates, selection.at, remainder, deps.anchor());
-    if (deps.overlays.update(MENU_ID, { content: layer.content, placement: layer.placement })) {
+    if (
+      deps.overlays.update(MENU_ID, {
+        content: layer.content,
+        placement: layer.placement,
+        promptLive: layer.promptLive ?? false,
+      })
+    ) {
       return;
     }
     remainder = 0;
@@ -453,13 +691,46 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     return candidates.length > 0;
   }
 
+  /**
+   * The line a request was asked against has gone, so its answer is void
+   * (C19 I15, ruling 106 b).
+   *
+   * **C19's token, not this table's sequence.** `seq` guards a request
+   * against a later `Tab` and nothing else moves it, so a submit, a recall, an
+   * edit through the recompute set and a dismissal each left a request live
+   * whose result then opened a selected menu over a line it was never asked
+   * about — `› running` over the empty prompt after `⇥⏎` (F1524). `cancel()`
+   * makes the result arrive `superseded`, which the continuation reads.
+   */
+  function abandonRequest(): void {
+    deps.completion.cancel();
+  }
+
   function closeMenu(): void {
+    wheeled = null;
     candidates = [];
     selection.reset(0, null);
     requested = false;
     builtFor = "";
     remainder = 0;
     deps.overlays.dismiss(MENU_ID);
+  }
+
+  /**
+   * A history walk's line, put in the prompt (C19 I31, F1497).
+   *
+   * **The line the menu and the hold were built against is gone**, so both go
+   * with it. `RECOMPUTES` leaves the walks out because a menu over a recalled
+   * command is noise, and that reason held for opening a menu and not for the
+   * one already open: `↑` at rest put `/help` under `/c`'s candidates. Closed
+   * rather than rebuilt, because a rebuild here is the menu that reason
+   * excludes; the next edit rebuilds it (C19 I22).
+   */
+  function recall(line: string): void {
+    abandonRequest();
+    deps.editor.setText(line);
+    if (hasMenu()) closeMenu();
+    suppressedAt = null;
   }
 
   /**
@@ -484,6 +755,27 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   function applyEdit(ctx: CompletionContext, candidate: Candidate, whole: boolean): void {
     const edit = accept(ctx, candidate, whole);
     const before = deps.editor.text;
+    // **A candidate may accept into a chip** (C19 I28, §011). The span the
+    // engine computed is what the chip stands in for, so this is the same one
+    // edit the text arm is — not a delete and an insert, which is two undo
+    // units and puts `⌃_` back to a buffer with the token already gone.
+    //
+    // **The ordinal and the label are C17's** (C17 I25). What comes across the
+    // seam are the parts; a source that spelled its own label would put §011's
+    // form in every application separately, which is what I25 exists to stop.
+    const chip = candidate.chip;
+    if (chip !== undefined) {
+      // **The delimiter still closes the token, and goes in the same edit**
+      // (C19 I16, I28). A chip is a unique match like any other, so the next
+      // keystroke belongs in the next slot rather than inside the chip's name —
+      // and a second `insert` for the space would be a second undo unit, so
+      // `⌃_` would take the space back and leave the chip.
+      deps.editor.insertChip(chip, {
+        replace: { start: edit.start, end: edit.end },
+        ...(whole ? { delimiter: candidate.delimiter ?? " " } : {}),
+      });
+      return;
+    }
     deps.editor.setText(
       before.slice(0, edit.start) + edit.text + before.slice(edit.end),
       edit.start + edit.text.length,
@@ -494,7 +786,19 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     const at = selection.at;
     const candidate = at === null ? undefined : candidates[at];
     if (candidate === undefined) return;
-    applyEdit(ctxNow(), candidate, whole);
+    const ctx = ctxNow();
+    // **An action row runs; it is never inserted** (C16 I68, §6c Q2). The
+    // line was only ever the query, so it goes before the action runs — an
+    // action that reads the prompt reads an empty one, as it would from its
+    // chord at an empty prompt.
+    if (ctx.slot.kind === "action") {
+      closeMenu();
+      suppressedAt = null;
+      deps.editor.clear();
+      deps.runAction(candidate.value);
+      return;
+    }
+    applyEdit(ctx, candidate, whole);
     closeMenu();
   }
 
@@ -549,7 +853,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       return;
     }
 
-    if (suppressedAt !== null && suppressedAt !== ctx.replace.start) suppressedAt = null;
+    // **An emptied line ends the hold as well** (C19 I31, F1498). The hold is
+    // taken against the token's start, and a line's first token starts at 0
+    // whatever the line, so backspacing to nothing and typing again read as the
+    // same token and the menu never came back.
+    if (suppressedAt !== null && (suppressedAt !== ctx.replace.start || deps.editor.text === "")) {
+      suppressedAt = null;
+    }
 
     const next = deps.completion.suggest(ctx);
     // **Two, and one is ghost text's case** (C19 I19). A one-row menu under a
@@ -564,9 +874,105 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     countRemainder();
   }
 
+  /**
+   * **A reserved chord's executor, which `bound` never runs** (C16 §6c, C22 I134).
+   *
+   * The reservation passes through now: with no handler registered through
+   * `TuiConfig.keyActions` the row resolves as though absent, or to the
+   * `fallback` it names, and with one it resolves to the handler — so the
+   * composition root answers these rows before this table is consulted. The
+   * entries stay because §6's closed set makes an action with no executor
+   * uncompilable. What follows is the note as the no-op was written:
+   *
+   * **A reserved chord with an explicit no-op** (C16 I38, §6a).
+   *
+   * Fourteen of these: the nine agent slots, `agent.next`/`agent.previous`,
+   * `posture.cycle`, `values.toggle` and `queue.drop`. **`selection.semantic`
+   * was the fifteenth and is built** (M10b, C14 §6a), which is what a
+   * reservation is for — it held the chord against an application taking it
+   * for the interval between the design naming it and the mode existing.
+   * **`host.detach` is not among them** — it arrived with a chord in the same
+   * shape and it is the one action whose reservation would be a defect, because
+   * it is the only exit from a rung nothing else can leave (C16 I49).
+   * The chord is the design's and the feature is not built, and leaving it
+   * unbound is the worse of the two — an unbound chord is one an application
+   * takes, so the feature arrives needing a key that is gone. §6's closed set
+   * makes an action with no executor uncompilable, so the reservation has to be
+   * written down here rather than by omission.
+   *
+   * It is a named function so a stack or a mutation run can tell a reservation
+   * from an effect that happens to do nothing today.
+   */
+  const reserved = (): void => undefined;
+
   const raw: Readonly<Record<KeyAction, KeyEffect>> = Object.freeze({
+    // --- §6a, M6 ------------------------------------------------------------
+    helpKeymap: () => void deps.emit("/help keys"),
+    focusTranscript: () => void deps.focusTranscript(),
+    // --- the watch row (C16 I76, I77, §6d) ---------------------------------
+    focusPrevious: () => void deps.watchKeys.focusPrevious(),
+    watchPrev: () => void deps.watchKeys.step(-1),
+    watchNext: () => void deps.watchKeys.step(1),
+    watchOpen: () => void deps.watchKeys.open(),
+    watchJump1: () => void deps.watchKeys.open(1),
+    watchJump2: () => void deps.watchKeys.open(2),
+    watchJump3: () => void deps.watchKeys.open(3),
+    watchJump4: () => void deps.watchKeys.open(4),
+    watchJump5: () => void deps.watchKeys.open(5),
+    watchJump6: () => void deps.watchKeys.open(6),
+    watchJump7: () => void deps.watchKeys.open(7),
+    watchJump8: () => void deps.watchKeys.open(8),
+    watchJump9: () => void deps.watchKeys.open(9),
+    // --- the chip preview (C22 I143, I144) ---------------------------------
+    previewScrollUp: () => void deps.previewKeys.scroll(-1),
+    previewScrollDown: () => void deps.previewKeys.scroll(1),
+    previewOpen: () => void deps.previewKeys.open(),
+    agentNext: reserved,
+    agentPrevious: reserved,
+    agent1: reserved,
+    agent2: reserved,
+    agent3: reserved,
+    agent4: reserved,
+    agent5: reserved,
+    agent6: reserved,
+    agent7: reserved,
+    agent8: reserved,
+    agent9: reserved,
+    hostDetach: () => void deps.detachChild(),
+    postureCycle: reserved,
+    valuesToggle: reserved,
+    queueDrop: reserved,
+    // **No longer reserved** (M10b). The chord was held with an explicit no-op
+    // from M6 so an application could not take it; C14 §6a is the mode it was
+    // holding it for.
+    enterSemanticSelection: () => void deps.enterSemanticSelection(),
+    escapeSemanticSelection: () => void deps.escapeSemanticSelection(),
+    // **`esc` is the only way out** (I51, C16 I62). `⌃c` is refused in the mode,
+    // so there is no second exit to keep out of this table.
+    selectEntryUnderCaret: () => void deps.selectEntryUnderCaret(),
+    selectAllLoadedEntries: () => void deps.selectAllLoadedEntries(),
+    copySelectedEntries: () => void deps.copySelectedEntries(),
+    copyAndLeaveSemanticSelection: () => void deps.copyAndLeaveSemanticSelection(),
+    toggleSemanticRect: () => void deps.toggleSemanticRect(),
+    // **Eight actions over one dep**, because the axes are the whole
+    // difference: a plain arrow moves and a shifted one extends (C14 I37), the
+    // direction is the sign, and a column is the rectangle's (I60). Eight deps
+    // would be eight places for the pair to come apart.
+    moveSemanticCaretUp: () => void deps.moveSemanticCaret(-1, 0, false),
+    moveSemanticCaretDown: () => void deps.moveSemanticCaret(1, 0, false),
+    moveSemanticCaretLeft: () => void deps.moveSemanticCaret(0, -1, false),
+    moveSemanticCaretRight: () => void deps.moveSemanticCaret(0, 1, false),
+    extendSemanticSelectionUp: () => void deps.moveSemanticCaret(-1, 0, true),
+    extendSemanticSelectionDown: () => void deps.moveSemanticCaret(1, 0, true),
+    extendSemanticSelectionLeft: () => void deps.moveSemanticCaret(0, -1, true),
+    extendSemanticSelectionRight: () => void deps.moveSemanticCaret(0, 1, true),
+
     // --- C17 ---------------------------------------------------------------
     insertNewline: () => void deps.editor.insert("\n"),
+
+    // --- the two `⏎`s the owner line names (C22 I133, ruling 63) -------------
+    submit: () => void deps.submitPrompt(),
+    keepField: () => void deps.keepField(),
 
     // --- C19 ---------------------------------------------------------------
     //
@@ -601,7 +1007,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         // A later request supersedes this one. The engine sequences its own
         // work; this guards the *menu*, which is state the engine has never
         // seen.
-        if (mine !== seq) return;
+        //
+        // **And `superseded`, because this sequence is not the token** (C19
+        // I13, I15, ruling 106 b). A printable key cancels in the composition
+        // root and moves nothing here, so its superseded result — empty by I13
+        // — reached the *none* arm below and closed the menu the key had just
+        // opened: `/`, `⇥h` in one read, and `/help` and `/history` gone.
+        if (mine !== seq || result.superseded) return;
 
         // **C19 §5's algorithm, which had no caller until now** (C19 I16).
         // `commonPrefix` was computed on every request and read by nothing
@@ -649,6 +1061,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // **One action, not two** (C16 §6). Two bindings for one `(target, key)` is
     // a construction error, so the fallback is here rather than in the table.
     acceptGhostOrForward: () => {
+      // **A reply's `→` is a motion and nothing more** (C16 I54). The ghost is
+      // C19's completion of a *command*, and completion is the prompt's, not the
+      // borrowed editor's — accepting one would put a verb into a sentence.
+      if (deps.reply() !== null) {
+        deps.editor.move("charRight");
+        return;
+      }
       const ctx = contextAt(deps.editor.text, deps.editor.cursor, deps.manifest);
       const ghost = deps.completion.ghost(ctx);
       if (ghost === null || ghost === "") {
@@ -684,6 +1103,10 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         // must stay closed for more than one keystroke, or the dismissal is
         // undone by the next character.
         const at = ctxNow().replace.start;
+        // **And the request behind it** (C19 §8's `Esc` column, ruling 106 b):
+        // a slow source answering after the dismissal reopened the menu it
+        // dismissed, selected.
+        abandonRequest();
         closeMenu();
         suppressedAt = at;
         return;
@@ -698,8 +1121,9 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
 
     // --- C20 ---------------------------------------------------------------
     historyPrev: () => {
-      const entry = deps.history.previous(deps.editor.text);
-      if (entry !== null) deps.editor.setText(entry);
+      // The owner's walk (C23 I77): a reply's, or the prompt's.
+      const entry = (deps.reply() ?? deps.history).previous(deps.editor.text);
+      if (entry !== null) recall(entry);
     },
     // **One binding, two effects, in order** (C16 I22). C20's walk has a defined
     // bottom — `↓` past the newest entry restores the stashed draft — so
@@ -707,9 +1131,18 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // case competing with history. `next()` answering `null` is precisely
     // "navigation is inactive or already finished".
     historyNext: () => {
+      // **A reply's walk ends at its floor** (C23 I77, C16 I8). The live-block
+      // entry below is the prompt's `↓`, and from a reply it would move focus
+      // out from under a question that must still be answered.
+      const own = deps.reply();
+      if (own !== null) {
+        const entry = own.next();
+        if (entry !== null) recall(entry);
+        return;
+      }
       const entry = deps.history.next();
       if (entry !== null) {
-        deps.editor.setText(entry);
+        recall(entry);
         return;
       }
       const elements = deps.liveElements();
@@ -740,6 +1173,22 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       deps.focus.focusRow(to.entryId, addressOf(to.first));
     },
 
+    // --- along a row, and a split's panes (C26 I30, I28, C22 I117) ---------
+    //
+    // **`←`/`→` move along the focused row first** (C26 I30), and at its end
+    // **they are the only way focus leaves a pane**: they go to the other
+    // pane's element nearest the focused row **on screen**, with each pane's
+    // own offset taken off, because the two scroll apart and a content row in
+    // one is not the same line of the frame as the same number in the other.
+    // The first element whose visible rows reach the focused one's, or the
+    // pane's last where none does. Outside a split the row's end is a stop.
+    elementLeft: () => alongRow(-1),
+    elementRight: () => alongRow(1),
+    // **The divider moves a cell and focus stays** (C04 §3aq E4): element ids
+    // do not change with width, and the next resolution finds the same one.
+    dividerLeft: () => nudgeDivider(-1),
+    dividerRight: () => nudgeDivider(1),
+
     // --- the way back, and between rows (C16 I22) ------------------------
     //
     // Entry with no exit is a session whose prompt cannot be reached, so both
@@ -767,7 +1216,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // "leave to the prompt".
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
-      const next = elements[i + 1];
+      // **The next element this step can reach**, which is the next in reading
+      // order unless a split pane is in the way (C26 I28) — **and not on the
+      // focused row** (C26 I30, D10): `↓` leaves a row of elements rather than
+      // walking it, and the first element past the row is the first of the
+      // row it enters.
+      const here = elements[i];
+      const next = elements.slice(i + 1).find((q) => !passedOver(here, q) && (here === undefined || !oneRow(here, q)));
       // **The resolved entry, not the stored one** (C26 I22): after an eviction
       // the two differ, and writing the stored one back would leave the store
       // pointing at nothing while the frame highlights the live entry.
@@ -807,22 +1262,41 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       const elements = deps.focusedElements();
       const i = resolveFocus(current.element, elements);
       if (i === null) return;
-      // `activate` is the element's own, declared by the kind (C26 §5), rather
-      // than a row shape this layer would otherwise have to know.
-      const action = elements[i]?.element.activate;
-      // **The focused entry, which is the origin C23 I18 reads** (C26 §4g row
-      // e). A settled row's action arrives here for the first time, and it is
-      // refused there — with `liveId` as the origin it would have fired against
-      // the live entry's document instead and been refused by nothing.
-      const from = deps.focusedEntryId();
-      if (action === undefined || from === null) return;
-      deps.onAction(action, from);
+      activationOf(deps.focusedEntryId(), elements[i])?.();
     },
     rowUp: () => {
       const elements = deps.focusedElements();
       const current = deps.focus.current;
       if (current.at !== "liveBlock") return;
-      const i = resolveFocus(current.element, elements);
+      const found = resolveFocus(current.element, elements);
+      // **The nearest element this step can reach** (C26 I28): a split pane in
+      // the way is passed over, so `↑` from under a split lands on its left
+      // pane and `↑` inside a pane never climbs into the other. Where nothing
+      // before is reachable the step is at its first element, and the edge
+      // rule below reads it so.
+      let reach = -1;
+      if (found !== null) {
+        const here = elements[found];
+        for (let j = found - 1; j >= 0; j -= 1) {
+          const q = elements[j];
+          // **Off the focused row** (C26 I30, D10), as `↓` is.
+          if (q !== undefined && !passedOver(here, q) && (here === undefined || !oneRow(here, q))) {
+            reach = j;
+            break;
+          }
+        }
+        // **The first element of the row it enters**, which is where `↓` lands
+        // on it too (§8c.3 row 5): back along the run that shares the row. The
+        // run is contiguous, so a block beside this one whose rows overlap is
+        // not reached from here.
+        for (let k = reach - 1; reach > 0 && k >= 0; k -= 1) {
+          const q = elements[k];
+          const at = elements[reach];
+          if (q === undefined || at === undefined || passedOver(here, q) || !oneRow(at, q)) break;
+          reach = k;
+        }
+      }
+      const i = found === null ? null : reach === -1 ? 0 : found;
       // At the first element `↑` leaves. **A stale address no longer arrives
       // here as one** (C26 I10): it used to reach this as `indexOf`'s −1 and
       // exit to the prompt, while `rowDown` read the same −1 as "go to the top"
@@ -847,12 +1321,15 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         // entry's first element is an end, and an end is not a place a
         // selection outlives an unshifted key — `rowDown`'s tail rule from the
         // other direction. Leaving, above, is a collapse already.
+        // **Where it stands, not `elements[0]`** (C26 I28): at a right pane's
+        // first element nothing before is reachable, and the entry's first
+        // element is across the divider.
         const entry = deps.focusedEntryId();
-        const first = elements[0];
+        const first = elements[found ?? 0];
         if (entry !== null && first !== undefined) deps.focus.focusRow(entry, addressOf(first));
         return;
       }
-      const previous = elements[i - 1];
+      const previous = elements[reach];
       const entry = deps.focusedEntryId();
       if (entry === null) return;
       deps.focus.focusRow(entry, previous === undefined ? null : addressOf(previous));
@@ -898,19 +1375,34 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // pager does and what makes a reader able to join two screens. The store
     // floors at zero and the renderer bounds the top, so nothing here clamps
     // (C04 §3c cell 4).
-    orbitLeft: () => void deps.orbitBlock(-1),
-    orbitRight: () => void deps.orbitBlock(1),
-    tiltDown: () => void deps.tiltBlock(-1),
-    tiltUp: () => void deps.tiltBlock(1),
+    // **The inside's four arrows, resolved by declaration** (C16 I28, C26 I27,
+    // §102). §102's control row is `←→ orbit   ↑↓ tilt`, and its kind table is
+    // what makes one action per key total: *a 3D plot · a camera*, *a 2D plot ·
+    // a cursor* — a kind has one or the other, never both. So the horizontal
+    // arrow turns a camera and steps a cursor, and neither effect has to ask
+    // which kind it is on: `orbitBlock` already resolves the focused plot and
+    // no-ops without a camera, and `cursorBlock` no-ops without `cursorable`.
+    // **Both are called, and the exclusivity is what makes that one effect
+    // rather than two.** A version that tested the block here would be a second
+    // copy of a predicate C12 owns, which is `moveCursor`'s own warning.
+    insideLeft: () => {
+      deps.orbitBlock(-1);
+      deps.cursorBlock(-1);
+    },
+    insideRight: () => {
+      deps.orbitBlock(1);
+      deps.cursorBlock(1);
+    },
+    // No vertical for a cursor: a crosshair runs along one axis, and §102's
+    // table gives the 2D plot *a cursor* where the 3D plot has *a camera*.
+    insideUp: () => void deps.tiltBlock(1),
+    insideDown: () => void deps.tiltBlock(-1),
+    /** `esc out` (§102) — leave the inside, stay on the element (C26 I14). */
+    exitInside: () => void deps.focus.setMode("navigate"),
     dollyIn: () => void deps.dollyBlock(1),
     dollyOut: () => void deps.dollyBlock(-1),
     cameraReset: () => void deps.resetCamera(),
     orbitToggle: () => void deps.toggleOrbit(),
-    // **The horizontal pair, and the first writer of `cursorPositions`** (C22
-    // I76, C12 §3s). The vertical pair steps elements; this moves the focused
-    // plot's crosshair and is a no-op on a kind with no horizontal interior.
-    cursorLeft: () => void deps.cursorBlock(-1),
-    cursorRight: () => void deps.cursorBlock(1),
     // **The digits, and the first writer of `seriesVisibility`** (C22 I78, C12
     // I116). Nine effects because an effect takes no key; bound by no default
     // row — the plot's own `keymap` declares the ones it has.
@@ -933,53 +1425,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     scrollBottom: () => void deps.viewport.scrollToBottom(),
 
     // --- the pushed view (C16 I24) -----------------------------------------
-    //
-    // Every one is the same call with a different motion, which is the point:
-    // the view holds one offset and computes each destination from it, so there
-    // is no per-motion state here to fall out of step (C22 I41).
-    // **One target, two owners** (C22 §13a). C15 I1 permits one view at a time,
-    // so `onView` asks which is open rather than the keymap growing a second
-    // `pushedView` target — a target per producer would put the same seven keys
-    // in two tables, and the day they disagreed nothing would say so.
-    //
-    // `n`/`p` are the hunk motions on a patch and one block on a document,
-    // which is S3's footer read literally: *n/p scroll*. The two are the same
-    // gesture over each view's own unit, which is what makes one binding right
-    // rather than a compromise.
-    viewNextHunk: () => void onView("nextHunk", "down", 1),
-    viewPrevHunk: () => void onView("prevHunk", "up", -1),
-    viewTop: () => void onView("top", "top", "top"),
-    viewBottom: () => void onView("bottom", "bottom", "bottom"),
-    viewPageUp: () => void onView("pageUp", "pageUp", "pageUp"),
-    viewPageDown: () => void onView("pageDown", "pageDown", "pageDown"),
-    // **The section gesture, and it is one call to whichever owner is up**
-    // (C16 I33). `n`/`p` above move the view's own *unit*; these move its
-    // *section* — a file on a patch, a heading on a document, a group on the
-    // profiler's deck. The member is required on all three interfaces, so this
-    // needs no `undefined` arm and an owner that has one section answers
-    // `false` in its own words rather than by omission.
-    viewNextSection: () => void onSection(1),
-    viewPrevSection: () => void onSection(-1),
-    // `Esc` is the view's own dismissal and deliberately not `dismiss`, which
-    // pops whatever layer is on top: this one knows it is closing *its* view and
-    // drops its offset with it (A01 D7).
-    viewPop: () => {
-      // **The profiler view first** (C28 §3c). Its `pop` restores the tier it
-      // raised; sending its `Esc` to another owner would leave that tier up.
-      if (deps.profileView !== undefined && deps.profileView.section !== null) {
-        void deps.profileView.pop();
-        return;
-      }
-      // **Released here, which is the trigger C23 I33's set did not have** (I46).
-      // The order matters: release first, so a fetch that resolves during the
-      // pop finds no registration rather than a half-dismissed view.
-      if (deps.documentView.openFor !== null) {
-        deps.releaseView();
-        void deps.documentView.pop();
-        return;
-      }
-      void deps.patchView.pop();
-    },
+    // **The `view*` effects are gone with the last owner of `pushedView`**
+    // (C22 §13a, C25 §3b, C28 §3c, R-EXA-082, F1254). Eight of them — `n`/`p`,
+    // `g`/`G`, the two pages and the two section steps — plus `viewPop`, over a
+    // target three surfaces shared. Each surface is a transcript entry now, and an
+    // entry is scrolled the way every entry is: C14's viewport, C26's focus, and
+    // `⏎` to expand in place. The target retires with them, which is why this is a
+    // deletion and not a re-pointing.
 
     reverseSearch: () => {
       deps.history.searchOpen(deps.editor.text);
@@ -1090,6 +1542,11 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         .join("\n");
       if (text === "") return;
       deps.editor.copyText(text);
+      // **What says so** (C22 I116, §012): a copy changes nothing, so it
+      // confirms in the footer, briefly. Counted in lines because the elements
+      // are rows and the text is joined on newlines.
+      const lines = text.split("\n").length; // cells-ok — a count of lines
+      deps.toast(`copied ${String(lines)} ${lines === 1 ? "line" : "lines"}`);
     },
 
     /**
@@ -1107,7 +1564,9 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
      * why it is not `extendRow` twice.
      */
     selectAllElements: () => {
-      const elements = deps.focusedElements();
+      // **The document's elements, not the echo's** (C22 I154, C26 I33): the
+      // head's copy already holds the chips' content, so `⌃a y` would copy it twice.
+      const elements = deps.focusedElements().filter((e) => e.blockId !== ECHO_BLOCK);
       if (deps.focus.current.at !== "liveBlock") return;
       const first = elements[0];
       const last = elements.at(-1);
@@ -1117,71 +1576,30 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       deps.focus.extendRow(entry, addressOf(last));
     },
 
-    // --- copy mode (C16 §5b) -----------------------------------------------
+    // --- native selection (C16 §5b) -----------------------------------------------
     //
     // **Entry only. The exit is the `⌃c` rung**, which is the ladder's and not
-    // this table's — a second way out here would give copy mode an order of its
+    // this table's — a second way out here would give native selection an order of its
     // own, which is exactly what makes it a target rather than a mode.
     //
-    // **The prompt's region goes first** (C17 I23; F765). Copy mode hands the
+    // **The prompt's region goes first** (C17 I23; F765). Native selection hands the
     // screen to the terminal's own selection, and a prompt still washing a
     // region under it is two selections at once. `collapse()` rather than a
     // motion, because the caret must stay where the reader left it — and here
-    // rather than in `#setCopyMode`, because this effect is the only way in
-    // (`⌥v` at the prompt and in the block) and T2.14 asks that every C17
+    // rather than in `#setNativeSelection`, because this effect is the only way in
+    // (`⌥⇧C`, a `global` row since C16 §6c) and T2.14 asks that every C17
     // operation be reachable from a key.
-    enterCopyMode: () => {
+    enterNativeSelection: () => {
       deps.editor.collapse();
-      deps.enterCopyMode();
+      deps.enterNativeSelection();
     },
-    exitCopyMode: () => void deps.exitCopyMode(),
+    exitNativeSelection: () => void deps.exitNativeSelection(),
+    // **Consumed, and nothing acts** (C16 I66, §6c table B): the key is the
+    // terminal's while it holds the selection. A named no-op, as `reserved`
+    // is, so a reader can tell a decline from an effect that happens to do
+    // nothing today.
+    passToTerminal: () => undefined,
   });
-
-  /**
-   * Send a motion to whichever view is open (C22 §13a).
-   *
-   * Two motions per binding because the vocabularies differ where the units
-   * differ: a patch moves by hunk, a document by block. Anything the two share
-   * — `top`, `bottom`, the pages — passes the same name twice, and that
-   * repetition is deliberate: it keeps the mapping visible at the call site
-   * rather than hidden in a table that would have to be read to know whether a
-   * key does the same thing in both.
-   */
-  const onView = (
-    patch: PatchViewMotion,
-    document: DocumentViewMotion,
-    // The profiler view's reading of the same key: a card step for `n`/`p`,
-    // a window motion for the rest (C28 §3c).
-    profile: ProfileViewMotion | 1 | -1,
-  ): boolean => {
-    const profileView = deps.profileView;
-    if (profileView !== undefined && profileView.section !== null) {
-      return typeof profile === "number"
-        ? profileView.nextCard(profile)
-        : profileView.move(profile);
-    }
-    return deps.documentView.openFor !== null
-      ? deps.documentView.move(document)
-      : deps.patchView.move(patch);
-  };
-
-  /**
-   * `tab`/`⇧tab` to whichever view is open (C16 I33).
-   *
-   * **The same ladder as `onView` and deliberately not a second one**: two
-   * copies of *which owner is up* is how they come to disagree, and the one
-   * above has already been wrong once (F944). One gesture, one resolution.
-   */
-  const onSection = (direction: 1 | -1): boolean => {
-    const profileView = deps.profileView;
-    const owner =
-      profileView !== undefined && profileView.section !== null
-        ? profileView
-        : deps.documentView.openFor !== null
-          ? deps.documentView
-          : deps.patchView;
-    return direction === 1 ? owner.sectionNext() : owner.sectionPrev();
-  };
 
   /**
    * The actions after which the as-you-type menu is recomputed (C19 §6a).
@@ -1212,6 +1630,12 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         action,
         RECOMPUTES.has(action as KeyAction)
           ? () => {
+              // **Every edit supersedes, not only a printable key** (C19 I13,
+              // ruling 106 b). The composition root cancels before a
+              // printable and a paste; these reached the buffer by the
+              // table, and `⇥⌫` in one read left `--status=`'s values
+              // selected over `/ps --status`.
+              abandonRequest();
               effect();
               afterEdit();
             }
@@ -1219,6 +1643,103 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       ]),
     ) as Record<KeyAction, KeyEffect>,
   );
+
+  /**
+   * What activating `fired` in `entry` does (C16 I71) — `rowActivate`'s body,
+   * resolved without running so the pointer can capture it at the press.
+   */
+  function activationOf(entry: EntryId | null, fired: PlacedNavElement | undefined): KeyEffect | null {
+    if (fired === undefined) return null;
+    const address = addressOf(fired);
+    // **The way IN** (C26 I26, §102: *focused — the way IN — ⏎ enter*). An
+    // element that declares view state is entered rather than activated, and
+    // the two are disjoint by §018 — *direct-action toggles and choices act
+    // without an inside state* — so this is a ruling read off the element and
+    // not a precedence between two meanings of one key.
+    //
+    // **Focused first where focus has gone elsewhere** (C16 I71): a captured
+    // entry runs after focus may have moved, and `interact` on another element
+    // would hand that element the keys.
+    if (fired.element.viewState === true) {
+      const enter = (): void => deps.focus.setMode("interact");
+      return () => {
+        const now = deps.focus.current;
+        const here =
+          now.at === "liveBlock" &&
+          deps.focusedEntryId() === entry &&
+          now.element?.blockId === address.blockId &&
+          now.element.elementId === address.elementId;
+        if (!here && entry !== null) deps.focus.focusRow(entry, address);
+        enter();
+      };
+    }
+    // `activate` is the element's own, declared by the kind (C26 §5), rather
+    // than a row shape this layer would otherwise have to know.
+    const action = fired.element.activate;
+    // **The focused entry, which is the origin C23 I18 reads** (C26 §4g row
+    // e). A settled row's action arrives here for the first time, and it is
+    // refused there — with `liveId` as the origin it would have fired against
+    // the live entry's document instead and been refused by nothing.
+    if (action === undefined || entry === null) return null;
+    return () => deps.onAction(action, entry, address);
+  }
+
+  /**
+   * What a question closed and the reader has not (C15 I32, R-BLK-873).
+   *
+   * **Held, not closed.** C15 I28 dismisses every panel when a question
+   * arrives, and the reason is `displaced` — *its state is held with the
+   * prompt's*. The menu's candidates, its selection and whether `Tab` opened it
+   * are held here, and the live fields are cleared so `hasMenu()` does not
+   * answer for a layer that is not on the stack. C20 holds the search's own
+   * state, so for it the bit is enough.
+   *
+   * **Restored when no blocking layer remains, and only onto the draft it was
+   * built for.** The borrow puts a typed reply's line back before the question
+   * disposes its layer (`confirm.ts` `settle`), so the draft here is the held
+   * one on every answer. A draft that changed under the question is another
+   * line, and a menu built for the old one is dropped rather than shown against
+   * it.
+   */
+  type Held = {
+    draft: string;
+    menu: Readonly<{ candidates: readonly Candidate[]; at: number | null; requested: boolean; builtFor: string }> | null;
+    searching: boolean;
+  };
+  let held: Held | null = null;
+
+  deps.overlays.subscribe((change) => {
+    if (change.kind === "dismiss" && change.reason === "displaced") {
+      held ??= { draft: deps.editor.text, menu: null, searching: false };
+      if (change.id === MENU_ID && candidates.length > 0) {
+        held.menu = { candidates, at: selection.at, requested, builtFor };
+        candidates = [];
+        selection.reset(0, null);
+        requested = false;
+        builtFor = "";
+        remainder = 0;
+      }
+      if (change.id === SEARCH_ID) held.searching = true;
+      return;
+    }
+    if (held === null || (change.kind !== "dismiss" && change.kind !== "pop")) return;
+    if (deps.overlays.stack.some((l) => l.blocking)) return;
+    if ((deps.questionsWaiting?.() ?? 0) > 0) return;
+    const was = held;
+    held = null;
+    if (deps.editor.text !== was.draft) {
+      if (was.searching) deps.history.searchEnd("cancel");
+      return;
+    }
+    if (was.menu !== null) {
+      showMenu(was.menu.candidates, was.menu.at, was.menu.builtFor);
+      requested = was.menu.requested;
+      countRemainder();
+    }
+    if (was.searching && deps.history.searchState !== null) {
+      deps.overlays.push(deps.history.searchLayer(deps.anchor()));
+    }
+  });
 
   return {
     table,
@@ -1233,6 +1754,21 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       else deps.history.searchType(text);
       refreshSearchLayer();
     },
+    scrollMenu: (rows) => {
+      // **Only a window that cuts something moves** — `windowedBlocks`' own
+      // guard, for its reason: `remainder` is what says something was cut.
+      if (candidates.length === 0 || remainder <= 0) return false;
+      const here = windowFrom(wheeled === null || wheeled.at !== selection.at ? null : wheeled.start);
+      const start = windowFrom(Math.max(0, here.start + rows)).start;
+      wheeled = { start, at: selection.at };
+      redrawMenu();
+      return true;
+    },
+    activationAt: (entryId, address) => {
+      const elements = deps.focusedElements();
+      const i = resolveFocus(address, elements);
+      return i === null ? null : activationOf(entryId, elements[i]);
+    },
     refreshAnchors: () => {
       const at = deps.anchor();
       // `update` answers *whether the layer is on the stack* and is a no-op
@@ -1245,8 +1781,13 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     },
 
     reset: () => {
+      // **The request goes with the line** (C19 I15, ruling 106 b, F1524):
+      // `⇥⏎` in one read submits the line shown, and `⇥`'s result used to open
+      // `› running` over the empty prompt after it.
+      abandonRequest();
       closeMenu();
       suppressedAt = null;
+      held = null;
     },
     get selected() {
       return selection.at;

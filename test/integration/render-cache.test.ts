@@ -10,7 +10,7 @@
 // a whole sequence, so one call is one increment however many blocks an entry
 // holds.
 import { describe, expect, it, vi } from "vitest";
-import { regionWidth } from "../../src/shell/config.js";
+import { transcriptWidth } from "../../src/shell/config.js";
 import { BODY_INDENT } from "../../src/shell/entry-layout.js";
 
 import { buildGraph, buildSession } from "../support/session.js";
@@ -77,6 +77,8 @@ function tallDividing(): { definition: BlockDefinition; renders: () => number } 
 
 const PAGE_UP = "\u001b[5~";
 const DOWN = "\u001b[B";
+/** `←` — the inside's orbit key (§102, C16 I28). */
+const LEFT = "\u001b[D";
 
 /**
  * A painting session over several kinds, with the profiler's counters on and
@@ -385,9 +387,10 @@ describe("C22 §6c — the render cache", () => {
     const { type } = await session(watcher, PLOT_DOC);
     await type("\u001b[B"); // the card's head is the first element (C09 I47)
     await type("\u001b[B");
+    await type("\r"); // ⏎ into the plot (C26 I26, §102: *the way IN*)
     seen.length = 0;
 
-    await type("[");
+    await type(LEFT); // §102: `←→ orbit`
     const last = seen.at(-1);
     expect(last, "the renderer received the record").toBeDefined();
     // **Keyed by block id and not by entry**, which is the whole reason it is a
@@ -427,13 +430,14 @@ describe("C22 §6c — the render cache", () => {
     const { type } = await session(definition, PLOT_DOC);
     await type("\u001b[B"); // the card's head is the first element (C09 I47)
     await type("\u001b[B");
+    await type("\r"); // ⏎ into the plot (C26 I26, §102: *the way IN*)
 
     const before = count();
-    await type("[");
+    await type(LEFT); // §102: `←→ orbit`
     const once = count();
     expect(once, "a keystroke turned the camera and the frame followed").toBeGreaterThan(before);
 
-    await type("[");
+    await type(LEFT); // §102: `←→ orbit`
     expect(count(), "and again").toBeGreaterThan(once);
   });
 
@@ -459,7 +463,7 @@ describe("C22 §6c — the render cache", () => {
     const { definition, measured } = measuring();
     const children = Array.from({ length: 40 }, (_, i) => ({ kind: "count", id: `c-${String(i)}`, ...(i === 0 ? { padding: { t: 1 } } : {}) }));
     const { screen, type } = await session(definition, [
-      { kind: "notice", id: "h", tone: "info", glyph: "step", text: "rows · ok" },
+      { kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: "rows · ok" },
       ...children,
     ]);
     expect(screen().rows.join("\n"), "the card is on screen").toContain("counted");
@@ -580,7 +584,12 @@ describe("C22 §6c — the render cache", () => {
     const fresh = kit.renderToLines(block(group as never), 80).map((l) => visible(l).trimEnd());
     // The entry is a card (C22 I83), so each row carries the gutter in front
     // of the block's own cells; the comparison is over the cells the block drew.
-    const onScreen = s.screen().text.filter((r) => r.includes("counted ")).map((r) => r.slice(r.indexOf("counted ")).trimEnd());
+    // **Less the margin column**, which holds the transcript's bar while it
+    // overflows (C14 I62) — the frame's, not the block's.
+    const onScreen = s
+      .screen()
+      .text.filter((r) => r.includes("counted "))
+      .map((r) => [...r].slice(0, -1).join("").slice(r.indexOf("counted ")).trimEnd());
     expect(onScreen.length, "rows on screen").toBeGreaterThan(0);
     expect(fresh.join("\n"), "a slice of the fresh render, in order").toContain(onScreen.join("\n"));
 
@@ -1030,8 +1039,10 @@ describe("C22 I108 — the paced schedule, wired (F1207)", () => {
       // under the hook (I83, §6l.2 row 11) — so the number to read is the
       // region's less the indent, and it is `columns − 1 − 4` rather than
       // `columns − 4`. That one column is the whole of what this row is about.
+      // The region is the transcript's box, a further column in for the rail's
+      // reserved column 0 (C14 I57), so the number is `transcriptWidth`.
       expect(widest, `the widest ask at ${String(columns)} columns`).toBe(
-        regionWidth(columns) - BODY_INDENT,
+        transcriptWidth(columns) - BODY_INDENT,
       );
       expect(widest, "and never off the terminal's width").not.toBe(columns - BODY_INDENT);
     }

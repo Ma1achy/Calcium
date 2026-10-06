@@ -52,7 +52,7 @@ const results = runPass({
     {
       name: "the find by rows alone — cols ignored",
       file: "src/shell/construct.ts",
-      from: "      if (col < p.element.cols.from || col >= p.element.cols.to) continue;\n",
+      from: "      if (col < cols.from || col >= cols.to) continue;\n",
       to: "",
       expect: "T4.63",
     },
@@ -66,8 +66,9 @@ const results = runPass({
     {
       name: "the click-again branch dropped — a row can be reached and never acted on",
       file: "src/shell/construct.ts",
-      from: "      return at.mode === \"interact\" ? null : keys.table.rowActivate;\n",
-      to: "      return at.mode === \"interact\" ? null : () => focus.focusRow(hit.id, address);\n",
+      // Re-anchored 2026-09-28 (review batch 3, M7): the press now captures the activation (C16 I71); the mutation is unchanged.
+      from: "      return armActivation(armId(hit.id, address.blockId, address.elementId), activation ?? ((): void => undefined));\n",
+      to: "      return () => focus.focusRow(hit.id, address);\n",
       expect: "T4.64",
     },
     {
@@ -94,6 +95,78 @@ const results = runPass({
       from: "    return stores.viewport.entryAtRow(regionRow - blankRowsAbove(viewportHeight, totalRows));\n",
       to: "    return stores.viewport.entryAtRow(regionRow + 0 * blankRowsAbove(viewportHeight, totalRows));\n",
       expect: "T4.62c",
+    },
+    // **M7's three rulings, each mutated against the row that claims it**
+    // (C16 I45, T6.34, T6.35). The arm is where a correct-looking revert is
+    // cheapest: every one below leaves a click that focuses and activates and
+    // looks right in any session where nothing moves.
+    {
+      name: "the release commits on position — the identity is the cell again",
+      file: "src/shell/construct.ts",
+      from: "      return router.commitPointer(armId(over.id, stillUnder.blockId, stillUnder.element.id))\n",
+      to: "      return router.commitPointer(armId(over.id, String(e.row), String(e.col)))\n",
+      expect: "T4.64",
+    },
+    {
+      name: "the press arms whatever it lands on — focus-first deleted",
+      file: "src/shell/construct.ts",
+      from: "    const land = at.at === \"prompt\" ? () => focus.enterLiveBlock(hit.id, address) : () => focus.focusRow(hit.id, address);\n",
+      to: "    const land = armActivation(armId(hit.id, address.blockId, address.elementId), at.at === \"prompt\" ? () => focus.enterLiveBlock(hit.id, address) : () => focus.focusRow(hit.id, address));\n",
+      expect: "T4.62",
+    },
+    // **M8's three, each against the row that claims it** (C16 I47, I48). All
+    // three leave a pointer that lands where it looks like it should: the
+    // dismissal is invisible unless something under the closing layer would
+    // have acted, and a wheel's depth is invisible unless two boxes are nested.
+    {
+      // I47 — the press closes and also acts. *The thing you meant to hit was
+      // covered a moment ago*, so this is the state the rule forbids and it
+      // reads as making a click do more rather than less.
+      name: "the dismissing click falls through and acts on what was underneath",
+      file: "src/interaction/router/router.ts",
+      from: '      stages.push("dismiss");\n      deps.popLayer();\n      return true;',
+      to: '      stages.push("dismiss");\n      deps.popLayer();',
+      expect: "T1.103",
+    },
+    {
+      // I48 — a panel routed to `overlay` by the pointer while the keyboard
+      // reaches it at `panel`: one seam answering two ways, which is what the
+      // layer order being the scroll order rules out.
+      //
+      // **Re-anchored in M9d** (R-EXA-082, F1254): the arm was a three-way
+      // conditional while `kind: "view"` existed and is a ternary now, so the
+      // anchor is one line rather than three. What it says is unchanged.
+      name: "a covering panel routes to the overlay target, as it did before the kind existed",
+      file: "src/interaction/router/router.ts",
+      // Re-anchored in review batch 2: the target is the layer's rung now
+      // (C16 I63), and the mutation is unchanged in what it says.
+      from: '      return run(rungOfLayer(covering.layer) === "substate" ? "panel" : "overlay", e);',
+      to: '      return run("overlay", e);',
+      expect: "T1.104",
+    },
+    {
+      // I48's second clause — the descent removed, so every wheel is the
+      // outermost box's. The reader's hand is inside the inner box and the
+      // outer one moves.
+      name: "the wheel takes the outermost scrollable rather than the innermost",
+      file: "src/shell/construct.ts",
+      from: "      const box = innermostScrollUnder(hit.id, under);",
+      to: "      const box = under.block;",
+      expect: "T1.105",
+    },
+    {
+// **Killed by T1.101b and not by T4.65, which is a fact about T4.65.**
+      // The session's drag row extends a *selection*, and a selection never
+      // arms — so there is no arm in that row for a drag to fail to cancel, and
+      // it would pass with the cancellation deleted. The unit row is where the
+      // press lands on the focused element, which is the only gesture that arms.
+      // Recorded rather than re-anchored: the expectation names the row that
+      // actually sees it.
+      name: "a drag no longer cancels the arm — a gesture taken back still commits",
+      file: "src/interaction/router/router.ts",
+      from: "    if (e.press) pointerArm = null;\n",
+      to: "    if (e.press && !e.motion) pointerArm = null;\n",
+      expect: "T1.101b",
     },
   ],
 });

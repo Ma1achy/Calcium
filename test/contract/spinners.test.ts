@@ -5,16 +5,32 @@
 // neither `cells()` nor a frame-read on the machine that picked it will show it:
 // the disagreement depends on locale. So it is asserted here, over every set, on
 // both arms.
+
 import { describe, expect, it } from "vitest";
 
-import { glyphs, spinnerFrames, spinnerIntervalMs } from "../../src/presentation/blocks/index.js";
+import { FREE_WIDTH_SLOTS, glyphs, spinnerFrameAt, spinnerFrames, spinnerIntervalMs, TICK_MS, tickIntervalOf } from "../../src/presentation/blocks/index.js";
 // **The table itself is not on the barrel**, and MG24 is why: its members have
 // no reader in `src/` — the two functions are the seam. Imported from the module
 // so the rows can walk every set rather than a list they keep themselves, which
 // would be a coverage set drawn from the test's own table.
-import { SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
+import { GLYPH_TOKENS, glyphFor, SPINNER_SETS } from "../../src/presentation/blocks/glyphs.js";
+import { spinnerSetNames } from "../../src/presentation/blocks/glyphs.js";
+// **The design's own resolver, not a reimplementation** (C09 I98). `asciiPattern`
+// is a *pattern* and `asciiTrajectory` says how it fits the set's frame count; a
+// second copy of that arithmetic here would be a second record of the design,
+// which is the failure the registry projection exists to stop.
+import { loadRegistry, spinnerAsciiFrames } from "../../docs/design/language/build-calcium.mjs";
+import type { Registry } from "../../docs/design/language/build-calcium.mjs";
 import { cells, hasEmojiForm } from "../../src/presentation/text.js";
-import { ASCII_CAPS, FULL_CAPS } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, measurable, registry, visible } from "../support/render.js";
+// C09 I99's three rows: the preference, the two resolvers it drives, and the
+// union the ambient set partitions.
+import type { Block } from "../../src/data/viewmodel/index.js";
+import { RAMP_ANIMATIONS } from "../../src/data/viewmodel/types.js";
+import type { Motion } from "../../src/presentation/blocks/index.js";
+import { AMBIENT_ANIMATIONS, effectiveAnimation } from "../../src/presentation/blocks/ramp.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
+import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 
 const WIDE_CAPS = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
 const NAMES = Object.keys(SPINNER_SETS);
@@ -74,6 +90,37 @@ describe("roadmap 51 — the spinner sets", () => {
     for (const c of "·❈★☆") expect(hasEmojiForm(c.codePointAt(0) ?? 0), `${c} was on the list and has no emoji form`).toBe(false);
   });
 
+/**
+ * The cycles the registry states, read from it rather than copied (T2.72).
+ *
+ * **Read and not written**: a number copied here would be a second record of
+ * the design's, and the two would drift silently — which is the failure the
+ * whole registry projection exists to stop.
+ */
+/** The registry, read once through its own loader — the source this file projects. */
+const REGISTRY: Registry = loadRegistry();
+
+type SpinnerRecord = Readonly<{
+  id: string;
+  status?: string;
+  frames: readonly string[];
+  intervalMs: number;
+  cycleMs?: number;
+  reusable?: boolean;
+  asciiPattern?: readonly string[];
+  asciiTrajectory?: Readonly<{ type: string; spinnerIds?: readonly string[] }>;
+}>;
+
+const REGISTERED: readonly SpinnerRecord[] = (REGISTRY["spinners"] as readonly SpinnerRecord[]).filter(
+  (sp) => sp.status === "current",
+);
+
+const STATED_CYCLES: Readonly<Record<string, number>> = Object.freeze(
+  Object.fromEntries(
+    REGISTERED.filter((sp) => typeof sp.cycleMs === "number").map((sp) => [sp.id, sp.cycleMs as number]),
+  ),
+);
+
   it("T2.72: the interval belongs to the set, and the product lands in the band", () => {
     // **A caller picking a 28-frame set and getting a 10-frame default makes it
     // frantic**, which is the whole reason the interval is not the caller's.
@@ -97,6 +144,19 @@ describe("roadmap 51 — the spinner sets", () => {
 
       if (name === "fullramp") {
         expect(cycle, "a second category — present, not working").toBeGreaterThan(2000);
+        continue;
+      }
+      // **A set whose registry record states its own cycle is held to that
+      // number, not to the band — which is stronger and not weaker.** The band
+      // exists because nothing else pins the figure; where the design states
+      // one, a bracket that merely contains it would let the set drift by
+      // hundreds of milliseconds and stay green. `agent` walks for 9.84 s and
+      // is neither a turn nor a pulse: it is a bloom that does not repeat
+      // inside a call, and §095 draws it as the mark of a thing still running
+      // rather than of a thing turning.
+      const stated = STATED_CYCLES[name];
+      if (stated !== undefined) {
+        expect(cycle, `${name} is pinned to the registry's own cycle`).toBe(stated);
         continue;
       }
       if (TOGGLES.has(name)) {
@@ -125,19 +185,352 @@ describe("roadmap 51 — the spinner sets", () => {
     }
   });
 
-  it("T2.73: the ASCII pair keeps the shape of motion", () => {
-    // Degradation preserves meaning rather than appearance — but a bloom
-    // falling to a rotation loses more than it needs to, so the pairing is by
-    // shape. Asserted on the two that would be easiest to get wrong.
-    expect(spinnerFrames(ASCII_CAPS, "bloom"), "a pulse falls to a pulse").toEqual([
-      ".", "o", "O", "@", "*",
-    ]);
-    expect(spinnerFrames(ASCII_CAPS, "braille"), "a rotation falls to a rotation").toEqual([
-      "-", "\\", "|", "/",
-    ]);
+  // **C09 I99's three rows, landed with the code the `it.todo`s named.** Two
+  // subjects, because the axes ride on two different channels: a `status` in
+  // `loading` draws a **spinner** (discrete, a glyph, and what survives 1-bit)
+  // and a ramped span **interpolates a colour** (continuous, and what stops
+  // below 8-bit). One subject could not show independence — a row that moved
+  // the preference on the glyph alone would be green on a tree where the
+  // colour rung had been broken, and the other way about.
+  const LIVE = (over: Record<string, unknown> = {}): Block =>
+    ({
+      kind: "status",
+      id: "st",
+      state: "loading",
+      message: "reindexing",
+      height: 3,
+      elapsedMs: 4000,
+      spinner: "braille",
+      ...over,
+    }) as unknown as Block;
+
+  /** The colour channel's subject: a shimmering span, which needs 8-bit to move. */
+  const RAMPED: Block = {
+    kind: "notice",
+    id: "n",
+    tone: "info",
+    text: "abcdefghij",
+    spans: [{ from: 0, to: 10, ramp: { fill: "gradient", from: "muted", to: "accent", animate: "shimmer" } }],
+  } as unknown as Block;
+
+  /** The block's rows at one tick, on one capability record and one preference. */
+  const frameAtTick = (block: Block, caps: TerminalCapabilities, tick: number, motion?: Motion): readonly string[] =>
+    renderToLines(registry(), block, 40, {
+      theme: DARK_THEME,
+      capabilities: caps,
+      tick,
+      ...(motion === undefined ? {} : { motion }),
+    });
+
+  /** Does anything in this block move across a cycle's worth of ticks? */
+  const moves = (block: Block, caps: TerminalCapabilities, motion?: Motion): boolean => {
+    const first = frameAtTick(block, caps, 0, motion).join("\n");
+    for (let k = 1; k < 12; k += 1) { // cells-ok — a tick count
+      if (frameAtTick(block, caps, k, motion).join("\n") !== first) return true;
+    }
+    return false;
+  };
+
+  it("T2.166 (C09 I99, R-MOT-001, R-BLK-702): motion and colour depth are two axes, and the corners are the four combinations", () => {
+    // **`R-BLK-702` states the independence as two concrete cases** rather than
+    // as a principle — *a 1-bit display may animate and a 24-bit display may be
+    // still* — and before I99 the tree could express neither: depth was the only
+    // axis motion had, so the two named corners were unreachable by construction.
+    // This row is the 2 × 2 and not a pair of assertions about `motion` alone,
+    // because independence is a claim about the **grid** and a row that moved one
+    // knob with the other fixed would be green on a tree where depth still
+    // gated everything.
+    const grid = [
+      { caps: FULL_CAPS, motion: "full" as Motion, expect: true, why: "24-bit, motion full — everything moves" },
+      { caps: MONO_UNICODE_CAPS, motion: "full" as Motion, expect: true, why: "R-BLK-702: a 1-bit display may animate" },
+      { caps: FULL_CAPS, motion: "off" as Motion, expect: false, why: "R-BLK-702: a 24-bit display may be still" },
+      { caps: MONO_UNICODE_CAPS, motion: "off" as Motion, expect: false, why: "1-bit and off — both axes stopped" },
+    ];
+    for (const cell of grid) {
+      expect(moves(LIVE(), cell.caps, cell.motion), cell.why).toBe(cell.expect);
+    }
+    // **And the depth axis still does its own job on the channel it owns**, which
+    // is the half the glyph grid above cannot see: the colour rung is untouched
+    // by I99, and `R-MOT-012`'s *below 8-bit motion stops* still holds for a
+    // ramp at full motion. Without this the grid would be green on a tree where
+    // `effectiveTick`'s depth gate had been deleted.
+    expect(moves(RAMPED, FULL_CAPS, "full"), "24-bit: a ramp interpolates").toBe(true);
+    // **At 4-bit and not at 1-bit, and the difference is the whole of a
+    // survivor.** This assertion's first form asked it at `MONO_UNICODE_CAPS`
+    // and a mutation deleting the depth gate outright **survived**: at 1-bit
+    // `rampStyle` answers with `from`'s *class* for every `t`, so the ramp is
+    // constant whether the gate fires or not — the degenerate rung, green on a
+    // tree where `R-MOT-012` had been removed. The 4-bit rung is a step of two,
+    // `from` below ½ and `to` from ½, which is the shallowest rung whose output
+    // still moves with `t` and therefore the one that can see the gate at all.
+    const ANSI16: TerminalCapabilities = { ...FULL_CAPS, colourDepth: 4 };
+    expect(moves(RAMPED, ANSI16, "full"), "R-MOT-012: below 8-bit a ramp stops, whatever the preference").toBe(false);
+    expect(moves(RAMPED, MONO_UNICODE_CAPS, "full"), "and at 1-bit, where it is constant in t anyway").toBe(false);
+    // **And the corner the first grid cannot reach.** *A 24-bit display may be
+    // still* is a claim about **both** channels, and the grid above carries it
+    // on the glyph alone — `LIVE` has no ramp, so a tree where `off` stopped
+    // spinners and left every ramp running was green over all four cells. The
+    // mutation pass is what said so: a gate deleted from the colour path failed
+    // nothing, and the row was as much the finding as the code was.
+    expect(moves(RAMPED, FULL_CAPS, "off"), "R-BLK-702: a 24-bit display may be still, on the colour channel too").toBe(false);
+    // **And the default is `full`**, which is the arm every existing caller
+    // takes: absent must be the same picture as asking for it, or the field's
+    // arrival would have been a behaviour change to every frame in the tree.
+    expect(frameAtTick(LIVE(), FULL_CAPS, 5)).toEqual(frameAtTick(LIVE(), FULL_CAPS, 5, "full"));
+  });
+
+  it("T2.167 (C09 I99, R-MOT-002): with motion off the state survives on the three carriers that never moved", () => {
+    // **`R-MOT-002`'s argument is that `off` costs nothing to read**: the mark,
+    // the label and the elapsed text carry the state, and none of them was ever
+    // the animation. So the row asserts the frames are identical across ticks
+    // **and** that all three are still on the page — a frozen frame that had
+    // dropped the elapsed counter would pass the first half alone, and the first
+    // half alone is what a stillness assertion naturally reaches for.
+    // Height 5, so the box affords the message row as well as the activity
+    // line: at 3 the border spends two of the three and R-MOT-002's second
+    // carrier is simply not on the page, which would make the assertion below
+    // a statement about the height ladder rather than about motion.
+    const still = frameAtTick(LIVE({ height: 5 }), FULL_CAPS, 0, "off");
+    for (let k = 1; k < 12; k += 1) { // cells-ok — a tick count
+      expect(frameAtTick(LIVE({ height: 5 }), FULL_CAPS, k, "off"), `tick ${String(k)} moved under motion off`).toEqual(still);
+    }
+    const page = still.join("\n");
+    expect(page, "the label").toContain("reindexing");
+    expect(page, "the elapsed text — the honest answer for liveness").toContain("4s");
+    // **The mark, and it is a spinner frame and not merely ink.** `off` holds
+    // frame 0 rather than emptying the cell, which is the difference between a
+    // still figure and a dropped one — and the dropped one would satisfy every
+    // assertion above.
+    expect(page, "the mark — frame 0, held").toContain(spinnerFrames(FULL_CAPS, "braille")[0] ?? "");
+  });
+
+  it("T2.168 (C09 I99, R-MOT-003, R-MOT-012): the ambient set is the registry's, and reduced stops exactly those three", () => {
+    // **By equality in both directions, as I94 and I98 are** (the bar alphabets
+    // and the spinner sets): a membership written twice drifts, and a subset
+    // check would let a fourth arrive in `rampPolicy` with the tree never
+    // noticing. The registry is read through its own loader for the reason
+    // T2.163 gives.
+    const policy = (REGISTRY as unknown as { rampPolicy: { attentionGroups: Record<string, readonly string[]> } })
+      .rampPolicy.attentionGroups;
+    // **A premise, not an assumption.** If the loader ever hands back a
+    // registry without this group the two `toEqual`s below compare `[]` with
+    // `[]` and pass, which is the vacuity a missing field reads as.
+    const AMBIENT: readonly string[] = policy["ambient"] ?? [];
+    expect(AMBIENT.length, "rampPolicy.attentionGroups.ambient — the row is vacuous without it").toBe(3);
+    expect([...AMBIENT_ANIMATIONS].sort()).toEqual([...AMBIENT].sort());
+
+    // **And the behaviour over the whole union, not over the three.** A row
+    // asking only about `glint drift tide` is answered by an implementation that
+    // stops everything, which is `off`'s job and not `reduced`'s — so the
+    // partition is the assertion: exactly the ambient three fall to `none` and
+    // every other effect is handed back untouched.
+    const stopped = RAMP_ANIMATIONS.filter((a) => effectiveAnimation(a, "reduced") === "none" && a !== "none");
+    expect([...stopped].sort()).toEqual([...AMBIENT].sort());
+    for (const a of RAMP_ANIMATIONS) {
+      if (AMBIENT_ANIMATIONS.has(a)) continue;
+      expect(effectiveAnimation(a, "reduced"), `${a} is not ambient and reduced must leave it alone`).toBe(a);
+      expect(effectiveAnimation(a, "off"), `${a} under motion off`).toBe("none");
+    }
+  });
+
+  it("T2.163 (C09 I98, R-MOT-010): SPINNER_SETS against the registry, by equality and field by field", () => {
+    // **The row commitment 78 said already existed.** That commitment cites the
+    // spinner catalogue as the remedy the bars lacked — *registry against tree,
+    // by equality in both directions* — and the row it meant is T2.72, which
+    // compares `cycleMs`. The cadence, never the alphabet. So the alphabet was
+    // the uncompared column on both catalogues and the one the bars were wrong
+    // in; a precedent cited for a column it does not cover reads exactly like
+    // coverage.
+    //
+    // **Resolved through the design's own function, not read off the field.**
+    // `asciiPattern` is a *pattern* and `asciiTrajectory` says how it fits: a
+    // `fit-cycle` stretches it to the set's frame count, so `braille`'s four
+    // characters become ten frames and the ASCII cycle is the Unicode one. A
+    // first draft compared against the raw field and reported nineteen
+    // disagreements of the wrong kind — an instrument that guesses what a field
+    // means measures its own guess.
+    for (const sp of REGISTERED) {
+      const set = SPINNER_SETS[sp.id];
+      expect(set, `${sp.id} is registered and must be built`).toBeDefined();
+      if (set === undefined) continue;
+      expect([...set.frames], `${sp.id} frames`).toEqual(sp.frames);
+      expect(set.intervalMs, `${sp.id} interval`).toBe(sp.intervalMs);
+      expect([...set.ascii], `${sp.id} ascii — the registry's pattern, fitted`).toEqual(
+        spinnerAsciiFrames(REGISTRY, sp),
+      );
+    }
+
+    // **The other direction, and the residue is empty.** Six sets shipped
+    // unregistered and M4 ruled they are registered from the repo's values;
+    // they are, so this is now an equality with nothing excused. A set added to
+    // either side alone fails here.
+    const built = new Set(spinnerSetNames());
+    const registered = new Set(REGISTERED.map((sp) => sp.id));
+    expect(
+      [...built].filter((n) => !registered.has(n)).sort(),
+      "built and not registered",
+    ).toEqual([]);
+    expect([...built].sort(), "the two catalogues are one set").toEqual([...registered].sort());
+  });
+
+  it("T2.164 (C09 I98, R-MOT-008): the bloom family is the agent's, over its membership", () => {
+    // **Over the frames and not over the name**, because a tool adopting a bloom
+    // would do it by copying frames. §038: *the bloom family is RESERVED —
+    // fullramp, grow, bloom, starfield and pulse mean THE MODEL IS WORKING. A
+    // tool never blooms. which is still checkable: a bloom set on a TOOL is a
+    // defect a grep finds.* The design names the check; this is it.
+    const FAMILY = ["agent", "fullramp", "grow", "bloom", "starfield", "pulse"];
+    const bloomGlyphs = new Set(FAMILY.flatMap((n) => [...(SPINNER_SETS[n]?.frames ?? [])]));
+    // `⋅ ∘ ◦` open the walk and are not blooms — they are where it starts small.
+    for (const plain of ["\u22c5", "\u2218", "\u25e6"]) bloomGlyphs.delete(plain);
+
+    for (const name of spinnerSetNames()) {
+      if (FAMILY.includes(name)) continue;
+      const frames = SPINNER_SETS[name]?.frames ?? [];
+      const borrowed = [...frames].filter((f) => bloomGlyphs.has(f));
+      expect(borrowed, `${name} draws no bloom frame`).toEqual([]);
+    }
+
+    // And the registry says the same, in its own field: `agent` is the one
+    // record that is not reusable.
+    expect(
+      REGISTERED.filter((sp) => sp.reusable === false).map((sp) => sp.id),
+      "the agent's walk is the one set nothing else may take",
+    ).toEqual(["agent"]);
+  });
+
+  it("T2.165 (C09 I98, R-MOT-009): a ping-pong traverses 0 → N → 1, so neither endpoint doubles", () => {
+    // **A ping-pong is detected, not listed.** A set whose second half is its
+    // first half reversed is one; asserting the property over a hand list would
+    // let a set stop being a ping-pong and keep the row green. The seam is the
+    // whole claim: `.oO@Oo` returns without drawing `@` or `.` twice in a row,
+    // and the collapse's `.oO@*` was not a ping-pong at all.
+    let found = 0;
+    for (const name of spinnerSetNames()) {
+      for (const frames of [SPINNER_SETS[name]?.frames ?? [], SPINNER_SETS[name]?.ascii ?? []]) {
+        const n = frames.length;
+        if (n < 4) continue;
+        const peak = frames.indexOf([...frames].reduce((a, b) => (frames.indexOf(b) > frames.indexOf(a) ? b : a), frames[0] ?? ""));
+        void peak;
+        // The seam: the last frame and the first are never equal, and no frame
+        // is repeated across the wrap. A ping-pong that emitted its endpoint
+        // twice would pause there for two ticks, which reads as a stutter.
+        const wrapsCleanly = frames[n - 1] !== frames[0];
+        if (!wrapsCleanly) {
+          expect.fail(`${name} repeats ${String(frames[0])} across the cycle seam`);
+        }
+        // A ping-pong: the tail mirrors the head.
+        const half = Math.floor(n / 2);
+        const mirrors = half > 1 && frames.slice(1, half + 1).every((f, i) => f === frames[n - 1 - i]);
+        if (mirrors) found += 1;
+      }
+    }
+    expect(found, "the corpus has ping-pong sets for this row to be about").toBeGreaterThan(0);
+  });
+
+  it("T2.73 (C09 I98, I112, R-MOT-010, R-MOT-011, question 40): every set's ASCII rung steps at the one ASCII cadence, and the Unicode rung at the set's own", () => {
+    // **This row has asserted three things, and the first was the defect.** As
+    // first written it asserted two literals it wrote itself against no
+    // registry — `bloom` falls to `.oO@*` and `braille` to `-\|/` — green for
+    // as long as the collapse I98 removed shipped. Its first rewrite asserted
+    // that the ASCII rung runs for as long as the Unicode one, `fit-cycle`'s
+    // promise. **Question 40 gave that up on purpose**: the nine sets sharing
+    // `|/-\` sat at nine intervals, so one alphabet turned at nine rates, and the
+    // ruling is one cadence for the whole ASCII rung. The pattern's shape is
+    // kept (T2.163); its duration is the rung's.
+    const policy = REGISTRY["spinnerPolicy"] as Readonly<{ asciiIntervalMs?: number }>;
+    const ascii = policy.asciiIntervalMs;
+    expect(ascii, "the registry records the ASCII rung's cadence").toBe(120);
+    let slower = 0;
+    for (const sp of REGISTERED) {
+      const set = SPINNER_SETS[sp.id];
+      if (set === undefined) continue;
+      expect(spinnerIntervalMs(sp.id), `${sp.id}: no capabilities is the set's own`).toBe(sp.intervalMs);
+      expect(spinnerIntervalMs(sp.id, FULL_CAPS), `${sp.id} at full capabilities`).toBe(sp.intervalMs);
+      expect(spinnerIntervalMs(sp.id, ASCII_CAPS), `${sp.id} at ASCII`).toBe(ascii);
+      // At `wide` a narrow-only set draws its ASCII frames, so it takes their cadence.
+      expect(spinnerIntervalMs(sp.id, WIDE_CAPS), `${sp.id} at wide`).toBe(set.narrowOnly === true ? ascii : sp.intervalMs);
+      if (sp.intervalMs > (ascii ?? 0)) slower += 1;
+
+      // **The frame, not only the number**: at ASCII the drawn frame changes on
+      // the 120 ms boundaries and at no other tick — read over two cycles.
+      const frames = spinnerFrames(ASCII_CAPS, sp.id);
+      for (let tick = 0; tick < 2 * frames.length * 3; tick += 1) {
+        const at = spinnerFrameAt(ASCII_CAPS, tick, sp.id);
+        expect(at, `${sp.id} at tick ${String(tick)}`).toBe(frames[Math.floor((tick * TICK_MS) / (ascii ?? 1)) % frames.length]);
+      }
+    }
+    // The corpus holds sets slower than the cadence, so the rung is seen to speed
+    // some up as well as slow others down.
+    expect(slower, "sets slower than the ASCII cadence").toBeGreaterThan(0);
+
+    // **The wake asks for the rung's cadence** given the capabilities: a toggle
+    // status is 400 ms at the Unicode rung and 120 at ASCII, so its ASCII frames
+    // are not sampled at a third of their rate.
+    const toggle = { kind: "status", id: "t", state: "loading", message: "m", spinner: "toggle" } as unknown as Block;
+    expect(tickIntervalOf(toggle, undefined, FULL_CAPS), "toggle at full capabilities").toBe(400);
+    expect(tickIntervalOf(toggle, undefined, ASCII_CAPS), "toggle at ASCII").toBe(ascii);
+    expect(tickIntervalOf(toggle), "toggle with no capabilities").toBe(400);
+
+    // A counter is already ASCII, and the row still says so — the rung is the
+    // same array at both, and only the cadence moves.
     expect(spinnerFrames(ASCII_CAPS, "decimal"), "a counter is already ASCII").toEqual(
       SPINNER_SETS["decimal"]?.frames,
     );
+  });
+
+  it("T2.169 (C09 I107, R-MOT-005, C02 I9): a set takes its ASCII rung whole, and the mixed sets are what can see it", () => {
+    // **§032's first rule has two clauses and the tree read one**: *if any
+    // primary frame is not exactly one cell, the WHOLE set takes its semantic
+    // ASCII fallback — never frame by frame.* The code composes nothing, so
+    // this row records a property that holds; what it adds is the ability to
+    // notice if it stops.
+    //
+    // **Why it needed adding, given three rows above look like coverage.**
+    // `T2.70` asserts each returned frame is one cell — satisfied exactly by a
+    // per-frame substitution, because the substitutes are one cell too. `T2.74`
+    // and `T3.45` assert whole-array equality and both name `boxBounce`, all
+    // four of whose frames are Ambiguous, so the two mechanisms return the same
+    // array there. **A property asserted only on members that cannot express it
+    // is not asserted.**
+    for (const name of NAMES) {
+      const set = SPINNER_SETS[name];
+      if (set === undefined) continue;
+      for (const caps of [FULL_CAPS, WIDE_CAPS, ASCII_CAPS]) {
+        const got = spinnerFrames(caps, name);
+        const whole = got.length === set.frames.length && got.every((f, i) => f === set.frames[i]);
+        const fallen = got.length === set.ascii.length && got.every((f, i) => f === set.ascii[i]);
+        expect(
+          whole || fallen,
+          `${name} at ${caps.unicode}/${caps.ambiguousWidth}: ${got.join("")} is neither alphabet whole`,
+        ).toBe(true);
+      }
+    }
+
+    // **The fixture responds to the thing under test**, which is the whole
+    // reason the row above is written over every set rather than over one.
+    // These three hold frames of BOTH widths, so a per-frame fallback returns a
+    // mixture here and an identical array everywhere else — they are the only
+    // members that can fail the assertion.
+    const mixed = NAMES.filter((name) => {
+      const set = SPINNER_SETS[name];
+      if (set === undefined || set.narrowOnly !== true) return false;
+      const wide = set.frames.filter((f) => cells(f, "wide") !== 1).length;
+      return wide > 0 && wide < set.frames.length;
+    });
+    expect(mixed.sort(), "the sets where whole-set and per-frame differ").toEqual(
+      ["agent", "bloom", "fullramp"],
+    );
+
+    // And the counts, because *some frames are wide* is the premise and a set
+    // that drifted to all-or-none would make this row vacuous without failing
+    // it (A03 §2). `agent` is the strongest case: 76 of its 82 frames would
+    // stay in the Unicode bloom under a per-frame build.
+    for (const [name, wide, total] of [["agent", 6, 82], ["fullramp", 5, 42], ["bloom", 1, 14]] as const) {
+      const frames = SPINNER_SETS[name]?.frames ?? [];
+      expect(frames.length, `${name}'s frame count`).toBe(total);
+      expect(frames.filter((f) => cells(f, "wide") !== 1).length, `${name}'s two-cell frames`).toBe(wide);
+    }
   });
 
   it("T2.74 (C02 I9): a narrow-only set degrades on a wide terminal, and the default does not", () => {
@@ -147,11 +540,47 @@ describe("roadmap 51 — the spinner sets", () => {
       "▖", "▘", "▝", "▗",
     ]);
     expect(spinnerFrames(WIDE_CAPS, "boxBounce"), "wide takes the pair").toEqual([
-      "-", "\\", "|", "/",
+      "|", "/", "-", "\\",
     ]);
     expect(spinnerFrames(WIDE_CAPS, "braille"), "and braille is narrow on both").toEqual(
       SPINNER_SETS["braille"]?.frames,
     );
+  });
+
+  it("T2.171 (C09 I48, \u00a7093, C02 I9): the mark vocabulary takes its ASCII rung whole at wide", () => {
+    // **Over the whole vocabulary, not over the members that move.** An
+    // assertion restricted to the Ambiguous tokens is satisfied *exactly* by the
+    // per-member build — those are the members it already fell for — so it is
+    // the seven that stayed which carry the property: `\u27e9 \u203a \u2713 \u2717 \u23b8 \u2043 \u23bf`.
+    //
+    // **The width rule is not this rule, and that is what let the old form
+    // stand.** Every slot was one cell at either arm either way (T2.115, I5),
+    // so `glyphCells` needs no capability and every arithmetic row agreed. What
+    // was wrong was the alphabet: `*` for running beneath a `\u23bf` continuation
+    // with `\u2713` and `\u2717` as outcomes is C02 I9's *mostly ASCII dressed as
+    // Unicode* inside one vocabulary.
+    const wide = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+    for (const token of GLYPH_TOKENS) {
+      expect(
+        glyphFor(token, wide),
+        `${String(token)}: the wide arm is the ASCII rung, whole`,
+      ).toBe(glyphFor(token, ASCII_CAPS));
+    }
+
+    // **The control is the narrow arm**, which keeps every Unicode half — without
+    // it, *wide equals ascii* is satisfied by a table that collapsed entirely.
+    const stayedUnicode = GLYPH_TOKENS.filter(
+      (t) => glyphFor(t, FULL_CAPS) !== glyphFor(t, ASCII_CAPS),
+    );
+    expect(stayedUnicode.length, "the narrow arm still draws Unicode").toBeGreaterThan(10);
+
+    // And the fixture's own premise, because *the set is mixed* is what \u00a7093
+    // rules on: before this landed, eleven of eighteen fell at wide and seven
+    // did not. A vocabulary that drifted to all-Ambiguous would make the row
+    // above vacuous without failing it (A03 \u00a72).
+    const twoCellsWide = GLYPH_TOKENS.filter((t) => cells(glyphFor(t, FULL_CAPS), "wide") === 2);
+    expect(twoCellsWide.length, "Ambiguous members").toBe(11);
+    expect(GLYPH_TOKENS.length - twoCellsWide.length, "Narrow members — the mixed half").toBe(7);
   });
 
   it("T2.75 (C02 I9): the glyph set falls to ASCII on a wide terminal", () => {
@@ -164,9 +593,82 @@ describe("roadmap 51 — the spinner sets", () => {
     expect(glyphs(WIDE_CAPS)).toEqual(glyphs(ASCII_CAPS));
 
     // And every glyph the wide arm hands back is one cell measured as wide,
-    // which is the property the fall exists for.
-    for (const value of Object.values(glyphs(WIDE_CAPS))) {
-      expect(cells(value, "wide"), `${value} on a wide terminal`).toBeLessThanOrEqual(1);
+    // which is the property the fall exists for. The exception is declared, not
+    // assumed: `residue` is a free-width slot (`FREE_WIDTH_SLOTS`, T2.5),
+    // because nothing aligns to a lead followed only by its own count.
+    const wide = glyphs(WIDE_CAPS);
+    for (const [name, value] of Object.entries(wide)) {
+      if (FREE_WIDTH_SLOTS.has(name as never)) continue;
+      expect(cells(value, "wide"), `${value} on a wide terminal`).toBe(1);
+    }
+    expect(cells(wide.residue, "wide"), "and the residue mark is the bare `...` at the wide arm").toBe(3);
+  });
+});
+
+describe("C09 I112 — a spinner steps at its own set's interval", () => {
+  it("T1.78 (C09 I112, §039): at one tick, agent and the default set take their own frames", () => {
+    const caps = { unicode: "full" as const, ambiguousWidth: "narrow" as const };
+    const at = (tick: number, name?: string) => spinnerFrameAt(caps, tick, name);
+    const def = spinnerFrames(caps);
+    const agent = spinnerFrames(caps, "agent");
+    expect(spinnerIntervalMs(), "the default set is the unit").toBe(TICK_MS);
+    expect(spinnerIntervalMs("agent")).toBe(120);
+
+    // At tick 3 — 240 ms — the default set is on frame 3 and `agent` on frame 2.
+    expect(at(3)).toBe(def[3]);
+    expect(at(3, "agent")).toBe(agent[2]);
+
+    // **Over thirty ticks `agent` changes twenty times**, its own 120 ms, and the
+    // default set thirty. The old index changed both on every tick.
+    const changes = (name?: string) =>
+      Array.from({ length: 30 }, (_, t) => at(t + 1, name) !== at(t, name)).filter(Boolean).length;
+    expect(changes(), "the default set, every tick").toBe(30);
+    expect(changes("agent"), "agent, at its own interval").toBe(20);
+  });
+
+  it("T1.79 (C09 I112): every kind drawing a non-default set draws spinnerFrameAt's frame", () => {
+    const caps = FULL_CAPS;
+    const TICKS = Array.from({ length: 12 }, (_, t) => t);
+    const drawn = (block: unknown, tick: number): string =>
+      visible(measurable({ capabilities: caps, tick }).renderToLines(block as never, 40).join("\n"));
+
+    // **Each site's frame, read out of the frame it draws** rather than asked of
+    // the helper, which is what T1.78 already does. Twelve ticks is a whole
+    // `agent` step pattern (2 of every 3) and more than an `arc` cycle.
+    const sites: readonly (readonly [string, unknown, string, (text: string) => string])[] = [
+      [
+        "a streaming notice's mark",
+        { kind: "notice", id: "n", tone: "default", text: "streaming", streaming: true },
+        "agent",
+        (text) => text.trimEnd().slice(-1),
+      ],
+      [
+        "a loading status declaring arc",
+        { kind: "status", id: "s", state: "loading", message: "fetching", height: 7, spinner: "arc" },
+        "arc",
+        (text) => /(\S) loading/u.exec(text)?.[1] ?? "",
+      ],
+      [
+        "a tape's running member",
+        { kind: "tape", id: "t", members: [{ id: "a", label: "build", state: "running" }], current: "a" },
+        "agent",
+        (text) => /build (\S)/u.exec(text)?.[1] ?? "",
+      ],
+    ];
+    for (const [site, block, set, read] of sites) {
+      const seen = TICKS.map((t) => read(drawn(block, t)));
+      expect(seen.every((f) => f !== ""), `${site} draws a frame at every tick`).toBe(true);
+      expect(seen, site).toEqual(TICKS.map((t) => spinnerFrameAt(caps, t, set)));
+      // **And the set's own rate is visible in it**: over twelve ticks the old
+      // index changed the frame twelve times; these sets are slower than the unit.
+      const changes = seen.slice(1).filter((f, i) => f !== seen[i]).length;
+      expect(changes, `${site} steps slower than the tick`).toBeLessThan(TICKS.length - 1);
+    }
+  });
+
+  it("T2.175 (C09 I112): no set is faster than the tick, so none skips a frame", () => {
+    for (const name of spinnerSetNames()) {
+      expect(spinnerIntervalMs(name), name).toBeGreaterThanOrEqual(TICK_MS);
     }
   });
 });

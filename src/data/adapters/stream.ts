@@ -1,5 +1,5 @@
 /**
- * §6 — `RawPatch` to `ViewPatch`, and the one line that nearly went missing.
+ * §6 — `RawPatch` to `ViewPatch`, and the lines that nearly went missing.
  *
  * **`malformed` is read twice.** Before `degraded`, a stray unparseable line
  * among good ones is noise and is dropped. After it, the `malformed` patches
@@ -12,8 +12,16 @@
  * a line and *then* tests the ratio, so the patch that pushed the stream over
  * the threshold is emitted as `malformed` immediately before `degraded`. Read by
  * arrival order alone it falls on the "dropped" side — while being the first
- * line of the remainder. One patch of lookbehind is what keeps it, and without
- * it I12 is false by exactly one line, silently, in every degraded stream.
+ * line of the remainder.
+ *
+ * **And it is rarely the first line of the remainder** (I12, F1432). C06's ratio
+ * has a ten-line floor, so a stream that is text from its first byte trips at
+ * its tenth line with nine `malformed` lines already gone by. The unit held is
+ * therefore the run — every `malformed` line since the last `data` patch — and a
+ * `data` patch is what says the lines before it were noise among good ones. One
+ * patch of lookbehind, which this was, lost the first nine lines of every
+ * `docker logs`. The run is bounded by C06's ratio: one that has not tripped
+ * degradation is at most nine lines, or a ninth of the lines before it.
  *
  * The fix is here rather than in C06 because reordering a landed component's
  * observable stream is the more expensive of two ways to keep the same line.
@@ -46,8 +54,8 @@ export function createPatchAdapter(): PatchAdapter {
   let degraded = false;
   /** The remainder so far, so each `malformed` line extends one block. */
   let remainder: string[] = [];
-  /** The lookbehind: the last `malformed` line, held in case `degraded` is next. */
-  let pending: string | null = null;
+  /** The run: every `malformed` line since the last `data` patch, held in case `degraded` arrives. */
+  let pending: string[] = [];
 
   return {
     adapt(patch, ctx, adapter) {
@@ -58,7 +66,7 @@ export function createPatchAdapter(): PatchAdapter {
       if (ctx.seq === 0) {
         degraded = false;
         remainder = [];
-        pending = null;
+        pending = [];
       }
 
       // An adapter with `adaptPatch` owns the `data` row and nothing else. The
@@ -66,7 +74,8 @@ export function createPatchAdapter(): PatchAdapter {
       // has no more to say about a stream that stopped being NDJSON than the
       // framework does.
       if (patch.kind === "data") {
-        pending = null;
+        // A good value after the run: the run was noise among good ones.
+        pending = [];
         if (adapter?.adaptPatch !== undefined) return adapter.adaptPatch(patch, ctx);
 
         // I11 — streaming works before anyone writes a stream adapter. One
@@ -95,9 +104,9 @@ export function createPatchAdapter(): PatchAdapter {
 
       if (patch.kind === "malformed") {
         if (!degraded) {
-          // Dropped — but held, because the very next patch may be `degraded`
-          // and this may be the first line of the remainder.
-          pending = patch.line;
+          // Dropped — but held, because `degraded` may arrive before another
+          // `data`, and then this run is the head of the remainder.
+          pending.push(patch.line);
           return null;
         }
         remainder.push(patch.line);
@@ -114,12 +123,12 @@ export function createPatchAdapter(): PatchAdapter {
 
       if (patch.kind === "degraded") {
         degraded = true;
-        // The lookbehind, spent. If the preceding patch was not `malformed` the
-        // block opens empty, which is the reachable case only when degradation
-        // trips on something other than the line just classified — it does not
-        // today, and the mapping does not depend on that staying true.
-        remainder = pending === null ? [] : [pending];
-        pending = null;
+        // The run, spent. If no `malformed` line arrived since the last `data`
+        // the block opens empty, which is the reachable case only when
+        // degradation trips on something other than the line just classified —
+        // it does not today, and the mapping does not depend on that staying true.
+        remainder = pending;
+        pending = [];
         return {
           op: "append",
           block: block({
@@ -133,7 +142,7 @@ export function createPatchAdapter(): PatchAdapter {
       // `end` — the status patch. The terminal blocks a document needs are the
       // one-shot path's, and C23 appends the settled document; what a stream
       // needs from here is the status it settles at (T3.18).
-      pending = null;
+      pending = [];
       return { op: "status", status: mapResult(patch.result, ctx).status };
     },
   };

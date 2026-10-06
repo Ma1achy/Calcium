@@ -53,8 +53,11 @@ function linesOf(b: Block): readonly string[] {
  * a row can learn from it.
  *
  * `narrow` answers a content width of five, so a centred child is rendered
- * narrower than its cell (C04 I101) — the one way a container asks the same
- * block at two widths inside one call (T3.81). `windowed` gives it a `window`
+ * narrower than its cell (C04 I101) — **one** of the two ways a container asks
+ * the same block at two widths inside one call (T3.81). The other is a scroll
+ * that overflows: it spends its last column on a bar and lays its content out
+ * one cell narrower (C09 I93, §7f), which is why the rows below key on the
+ * width and not on the id alone. `windowed` gives it a `window`
  * so the cap has a form to take (T3.83).
  */
 function tally(opts: Readonly<{ narrow?: boolean; windowed?: boolean }> = {}): Tally {
@@ -156,6 +159,7 @@ describe("C09 §6 — a (block, width) is answered once per registry call (I61)"
       widthChild: (_child, w) => w,
       renderChild: () => ["x"],
       windowChild: () => null,
+      focusShapeOf: () => null,
     };
     groupDefinition.measure(group as Group, 80, counting);
     groupDefinition.render(group as Group, ctx);
@@ -168,7 +172,6 @@ describe("C09 §6 — a (block, width) is answered once per registry call (I61)"
       make: () => Block;
       children: readonly string[];
       drawn?: readonly string[];
-      overdraws?: true;
     }>[] = [
       {
         kind: "panel",
@@ -197,14 +200,21 @@ describe("C09 §6 — a (block, width) is answered once per registry call (I61)"
         // the drawn total, and every one is the same question of the same child.
         kind: "scroll",
         make: () => block({ kind: "scroll", id: "s", height: 2, children: [one("a"), two("b"), one("c")] }),
+        // **Each child is asked at two widths here, and that is I61 satisfied
+        // rather than broken**:
+        // *one block at two widths is two*, in the invariant's own words. A box
+        // that overflows spends its last column on a bar (C09 I93, §7f), so it
+        // measures its content at the full width to learn that it overflows and
+        // again one cell narrower to lay it out. The pairs below are what the
+        // invariant is about; a list of bare ids cannot tell a second width from
+        // a second ask, which is the distinction this row exists to make.
         children: ["a", "b", "c"],
         // Two rows hold `a` and the top of `b`; `c` is below the box and is
         // measured for the content height without being drawn. `raw` here
-        // declares no `window`, so `b` is kept whole and the box over-draws by
-        // one row — I59's recorded overrun (T3.76, F855), a property of this
-        // fixture and not of the count, so I1 is not asserted for it.
+        // declares no `window`, so `b` is rendered whole and cropped to its top
+        // row (C09 I135) — it over-drew by one row before, and I1 is asserted
+        // for this box now like every other.
         drawn: ["a", "b"],
-        overdraws: true,
       },
       {
         // `mosaic` measures no child in `measure` (C04 I71) — its arm is the
@@ -222,11 +232,21 @@ describe("C09 §6 — a (block, width) is answered once per registry call (I61)"
       const lines = renderToLines(registry, container, 80, OPTIONS);
       // The counts first: `registry.measure` below is a second call, and a
       // second call measures again — that is T1.35's row, not this one's.
-      expect([...counted.measured].sort(), `${c.kind}: each child measured once for the render`).toEqual([...c.children]);
+      // **Keyed on the width as well as the block**, because C09 I61 is: *keyed on
+      // the block object, never its id — and one block at two widths is two.*
+      //
+      // The pairs are not written out, because each container insets by its own
+      // amount and a literal would pin a panel's border rather than the rule.
+      // What the invariant says is that **no pair repeats**, and that every
+      // child was asked.
+      const asked = counted.measured.map((id, i) => `${id}@${String(counted.widths[i] ?? -1)}`);
+      expect(new Set(asked).size, `${c.kind}: no (child, width) is asked twice`).toBe(asked.length);
+      expect(
+        [...new Set(counted.measured)].sort(),
+        `${c.kind}: and every child was measured`,
+      ).toEqual([...c.children].sort());
       expect([...counted.rendered].sort(), `${c.kind}: and each child in the box drawn once`).toEqual([...(c.drawn ?? c.children)]);
-      if (c.overdraws !== true) {
-        expect(lines.length, `${c.kind}: measure equals rendered rows (C09 I1)`).toBe(registry.measure(container, 80));
-      }
+      expect(lines.length, `${c.kind}: measure equals rendered rows (C09 I1)`).toBe(registry.measure(container, 80));
     }
   });
 

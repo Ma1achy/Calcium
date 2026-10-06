@@ -1,0 +1,107 @@
+/colour takes a COLOUR NAME — not a tone. The tones mean something;
+this is you choosing what your terminal looks like.
+
+   blue   orange   cyan   pink   lime   violet   yellow   green   red   purple
+
+ten hues, VIVID — they are the point, not a tint of the theme. The ink
+on each is chosen by CONTRAST against that hue, so yellow takes black
+and blue takes white without anyone deciding per theme.
+
+solid — the default
+
+──────────────────────────────────────────────────────────────────── calcium ─
+❯ /colour blue
+──────────────────────────────────────────────────────────────────────────────
+
+─────────────────────────────────────────────────────────────────────── prod ─
+❯ /colour red                             the one you must not break
+──────────────────────────────────────────────────────────────────────────────
+
+──────────────────────────────────────────────────────────────────── scratch ─
+❯ /colour lime
+──────────────────────────────────────────────────────────────────────────────
+
+a gradient — built in, or two hues
+
+─────────────────────────────────────────────────────────────────── calcium ─
+❯ /colour viridis                         any colormap the plot system has
+──────────────────────────────────────────────────────────────────────────────
+
+─────────────────────────────────────────────────────────────────── calcium ─
+❯ /colour blue..pink                      two hues, interpolated
+──────────────────────────────────────────────────────────────────────────────
+
+animated — the same ramps, on a rule
+
+─────────────────────────────────────────────────────────────────── calcium ─
+❯ /colour cyan --animate wave
+──────────────────────────────────────────────────────────────────────────────
+
+─────────────────────────────────────────────────────────────────── calcium ─
+❯ /colour purple --animate drift
+──────────────────────────────────────────────────────────────────────────────
+
+  ▲ available, and a bad default — a rule that moves is motion with
+  nothing behind it. This is an explicit PERSONALIZATION/DECORATION exception:
+  default off, never semantic, and suppressed in REDUCED and OFF.
+
+a hex — and this is where the rule changes
+
+──────────────────────────────────────────────────────────────────── calcium ─
+❯ /colour #e07aa8                         taken literally
+──────────────────────────────────────────────────────────────────────────────
+
+  everywhere else in this system a hex is refused, because C10 owns
+  colour and a literal cannot follow a theme change.
+
+  HERE THAT IS THE POINT. You are picking a colour to tell this
+  terminal apart, and one that shifted when you changed theme would
+  be broken from where you are standing.
+
+  so: a NAME resolves per theme and stays legible. A HEX is taken
+  as given and you own the result — with one check.
+
+and the check is a CHOICE-ONLY question, so it normally replaces the prompt.
+It is never a line of prose with two unowned words after it.
+
+● read_file(parse.ts) · 0.2s · 184 lines
+
+
+──────────────────────────────────────────────────────────────────────────────
+ ⟩ Set this colour?
+
+ #2a2a2a is 1.4:1 against this theme's ground.
+ It will be invisible on Ink and on High contrast.
+
+  › no    yes, set it anyway    pick from the ten
+──────────────────────────────────────────────────────────────────────────────
+←→ move     ⏎ answer   — esc resolves to NO
+
+  the safe answer is initially focused, esc resolves to it, and the third
+  choice is the way out — the same three rules every choice-only safety question takes.
+
+what it is actually for
+
+  one terminal is not one project. Four windows on four checkouts
+  look identical, and the cost of typing into the wrong one is a
+  bad afternoon.
+
+  a painted label is the cheapest answer: zero rows, one glance,
+  and it sits where your eye already is when you type.
+
+two rules that survive
+
+  it persists per directory, in .calcium/config.toml — the point is
+  that THIS checkout looks like this
+
+  chrome only. A painted label is furniture; a painted transcript is
+  a theme, and that is a different command
+
+  /colour                 open the picker
+  /colour blue            a hue
+  /colour blue..pink      a gradient between two
+  /colour viridis         a colormap
+  /colour #e07aa8         a literal, checked for contrast
+  /colour cyan --animate  wave · drift · breathe · shimmer
+  /colour off             back to the default
+  /label prod             the label is its own verb

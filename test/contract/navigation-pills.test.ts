@@ -103,7 +103,8 @@ describe("C26 §5, §5c — focus lands, `y` copies, `⏎` fires", () => {
     },
   };
 
-  it("T3.46: ↓ enters on the first chip and steps chip to chip", async () => {
+  // A row of elements is walked sideways, and `↓` leaves it (C26 §8c).
+  it("T3.46: ↓ enters on the first chip, and → steps chip to chip", async () => {
     const { graph } = await buildGraph();
     const id = graph.transcript.append(doc as never);
     graph.router.dispatch(press("down"));
@@ -114,6 +115,11 @@ describe("C26 §5, §5c — focus lands, `y` copies, `⏎` fires", () => {
       anchor: null,
       mode: "navigate",
     });
+    graph.router.dispatch(press("right"));
+    expect(graph.focus.current.at === "liveBlock" && graph.focus.current.element?.elementId).toBe("chip-1");
+    // **And `↓` leaves the row** (D10) rather than walking it: the chips are
+    // the document's only block, so there is no row below and focus stays —
+    // where the old `↓` stepped on to the third chip.
     graph.router.dispatch(press("down"));
     expect(graph.focus.current.at === "liveBlock" && graph.focus.current.element?.elementId).toBe("chip-1");
   });
@@ -122,7 +128,7 @@ describe("C26 §5, §5c — focus lands, `y` copies, `⏎` fires", () => {
     const { graph } = await buildGraph();
     graph.transcript.append(doc as never);
     graph.router.dispatch(press("down"));
-    graph.router.dispatch(press("down"));
+    graph.router.dispatch(press("right"));
     graph.router.dispatch(press("y"));
     // The kill buffer is C17's; `⌃y` at the prompt is how it is read back.
     graph.router.dispatch(press("escape"));
@@ -134,8 +140,8 @@ describe("C26 §5, §5c — focus lands, `y` copies, `⏎` fires", () => {
     const { graph } = await buildGraph();
     graph.transcript.append(doc as never);
     graph.router.dispatch(press("down"));
-    graph.router.dispatch(press("down"));
-    graph.router.dispatch(press("down"));
+    graph.router.dispatch(press("right"));
+    graph.router.dispatch(press("right"));
     // The third chip's action is a `fill`, which lands in the prompt (A01 D8).
     graph.router.dispatch(press("enter"));
     expect(graph.editor.text).toBe("ps --status stopped");

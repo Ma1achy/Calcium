@@ -43,7 +43,7 @@
 // summary line now says which state it saw.
 
 import { execFileSync } from "node:child_process";
-import { readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = process.cwd();
@@ -199,6 +199,50 @@ const COVERED = [
   ["examples/docker/tools/corrections.mjs", ["node", "examples/docker/tools/corrections_test.mjs"]],
   ["examples/docker/tools/measure-raw.mjs", null], // same fixture — the shared registry
   ["examples/docker/tools/measure-s3.mjs", null], // same fixture
+  // **Thirty-eight at once, and the equality comparison paid out to nobody.**
+  // CI's fast job said `85 found, 47 with a fixture` on #62 and #63, both
+  // landed, and the target had not been run on the lanes that added them.
+  // Every one of the thirty-eight was read and its callers grepped: twenty
+  // are exempted below, and of the eighteen here, eleven had a fixture all
+  // along that nobody had listed and seven were given one.
+  //
+  // The eleven. **The browser row needs `make chromium`**, which is why it is
+  // a prerequisite of this target — the catalogue's reason, one artefact on.
+  ["tools/design/chromium.mjs", ["npx", "vitest", "run", "--dir", "test/browser"]],
+  ["tools/design/figures.ts", ["npx", "vitest", "run", "test/golden/design-fixtures.test.ts"]],
+  // A03-DSN1–4 spawn `release.mjs` and `released-against.mjs` over fabricated
+  // baselines and refs, and DSN2 runs `fixtures.ts --check --out` over a
+  // drifted corpus — one filter, three tools, each row naming its file.
+  ["tools/design/release.mjs", ["npx", "vitest", "run", "test/unit/enforce-rules.test.ts", "-t", "A03-DSN"]],
+  ["tools/design/released-against.mjs", null], // same fixture — A03-DSN3, against a copy on another ref
+  ["tools/design/fixtures.ts", null], // same fixture — A03-DSN2, the corpus against its derivation
+  ["tools/generate-keymap.mjs", ["npx", "vitest", "run", "test/unit/router-keymap.test.ts"]], // T1.95 runs `--check`
+  ["tools/rule-status.mjs", ["npx", "vitest", "run", "test/unit/rule-ledger.test.ts"]],
+  ["tools/theme/from-registry.mjs", ["npx", "vitest", "run", "test/unit/theme-generator-check.test.ts"]],
+  // T2.39 is this file's default mode — `canonical()` against the pin through
+  // the same `entryDiff` — and the write path is kept out of the test on
+  // purpose (its header says why), so the row covers what can be covered.
+  ["tools/curated/pin.ts", ["npx", "vitest", "run", "test/contract/curated.test.ts"]],
+  // T5.8 reads `dist/bundle/`, which this writes as the second half of `npm run build`.
+  ["tools/bundle.mjs", ["npx", "vitest", "run", "--dir", "test/e2e", "public-api"]],
+  // `world.test.ts` imports `recordSession` and asserts two recordings of one
+  // script are the same bytes. Run under the example's own root, as its `npm
+  // test` runs it — the root config fakes timers and this file installs its
+  // own clock. Measured at 78cd90e1, it passes under both (7 of 7), so this is
+  // matching the example's runner and not the avoidance of a failure.
+  ["examples/docker/tools/record.ts", ["npx", "vitest", "run", "--root", "examples/docker", "test/world.test.ts"]],
+  // The seven. **`wcag.mjs` is a library and its arithmetic is load-bearing**:
+  // every composed ink in the registry went through `clearFloor`.
+  ["tools/theme/wcag.mjs", ["npx", "vitest", "run", "test/unit/theme-wcag.test.ts"]],
+  // T3.73 holds the table and never runs the writer; QT1 runs it via `--out`.
+  ["tools/theme/quantised.mjs", ["npx", "vitest", "run", "--dir", "test/e2e", "quantised-table"]],
+  // **The benches `bench-liveness` does not reach** — none imports `liveness.mjs`.
+  // The rows assert what a reading depends on and never a number.
+  ["tools/bench/stress.mjs", ["npx", "vitest", "run", "--dir", "test/e2e", "bench-probes"]],
+  ["tools/bench/mosaic.mjs", null], // same fixture — BP3 and BP4, the digest beside the timing
+  ["tools/bench/alloc3d.mjs", null], // same fixture — BP5, a sample taken under `presentation/`
+  ["tools/design-prose-with-surfaces.py", ["npx", "vitest", "run", "test/unit/design-census.test.ts"]],
+  ["tools/design-unregistered-marks.py", null], // same fixture — DC3 to DC5
   // **This runner's own reader.** It reported `0 rows` for a child that had run
   // six and failed one (F929, F949), and nothing could ask it a question because
   // the file ran at import. The reader is exported and the runner is behind a
@@ -219,6 +263,8 @@ const NOT_INSTRUMENTS = {
   // guessed. It measures nothing; it is measured against.
   "tools/capture-foreign.cursor-control.mjs": "a control script for capture-foreign's cursor translation — it writes known escapes and reads nothing",
   "examples/docker/tools/_fixture.py": "the fixtures' own four-line harness",
+  "tools/check-fast.sh": "the local loop: it runs the checks, and checks nothing itself",
+  "tools/flow-probe.py": "a headless PTY driver for flow tests: it reports a screen, and asserts nothing",
   "examples/docker/tools/registry.mjs": "the shared registry, covered by probes_test.mjs",
   "examples/docker/tools/__pycache__": "not a file",
   // **An instrument, and untestable as written — the reason is the debt rather
@@ -235,7 +281,45 @@ const NOT_INSTRUMENTS = {
   // repository cannot do that — a probe rewritten blind is a probe whose next
   // reading nobody can trust. Whoever next runs the read owns the change.
   "tools/terminal-probe/probe.py": "runs at import and opens /dev/tty at module scope, so its parsers cannot be imported; the expiry is a `__main__` guard, and it must be verified in a real terminal",
+  // **The one-shot registry edits, one entry each rather than a glob** — a glob
+  // over `register-*` would exempt the next file of that name before anyone
+  // read it, and one of the next may be a checker. Each was *run* at
+  // 78cd90e1 against a copy of the tree, and each refused or said it had
+  // nothing to do, which is the evidence *already applied* rests on: the text
+  // after the dash is what it printed. What checks their output is the
+  // registry's own gate — `make design-check`: `check-calcium.mjs` (digests,
+  // links, the projection), `lint-immutable.mjs` (the released baseline) and
+  // `rule-status.mjs` (the ledger). **Kept rather than deleted** because the
+  // registry is normative and its edits have to stay auditable after they ran —
+  // `register-sel.mjs`'s header, which the rest cite.
+  "tools/design/register-ascii-interval.mjs": ONE_SHOT("already recorded · spinnerPolicy.asciiIntervalMs is 120, nothing written"),
+  "tools/design/register-braille-steps.mjs": ONE_SHOT("already recorded · braille.steps is the approved eight, nothing written"),
+  "tools/design/register-key-008.mjs": ONE_SHOT("already registered · R-KEY-008 present, nothing written"),
+  "tools/design/register-preview-keys.mjs": ONE_SHOT("already registered · R-KEY-010 present, nothing written"),
+  "tools/design/register-revert.mjs": ONE_SHOT("`revert` already exists — this script has run"),
+  "tools/design/register-sel.mjs": ONE_SHOT("already registered · 15 of 15 R-SEL rules present, nothing written"),
+  "tools/design/register-selection-rail.mjs": ONE_SHOT("`selection-rail` already exists — this script has run"),
+  "tools/design/register-trend-flat.mjs": ONE_SHOT("already registered · trend-flat present, nothing written"),
+  "tools/design/register-watch-jump.mjs": ONE_SHOT("already registered · R-KEY-009 present, nothing written"),
+  "tools/design/supersede-bindings.mjs": ONE_SHOT("binding.transcript-bottom-base already exists"),
+  "tools/design/supersede-branch-blocks.mjs": ONE_SHOT("already superseded · all 28 blocks have successors and no one-blank branch is projected, nothing written"),
+  "tools/design/supersede-rulings.mjs": ONE_SHOT("R-STR-003 is already superseded — this script has run"),
+  "tools/design/supersede-thm-003.mjs": ONE_SHOT("R-THM-003 is already superseded — this script has run"),
+  "tools/theme/floor-scope.mjs": ONE_SHOT("R-THM-004 already exists — this script has run"),
+  "tools/theme/hc-bands.mjs": ONE_SHOT("hcLight .bg-selection: already carries an ink — this script has run"),
+  "tools/theme/hc-promise.mjs": ONE_SHOT("R-THM-002 already exists — this script has run"),
+  // Refuses by throwing rather than by a message — the value it expects to
+  // replace is gone, and the one there is the one it wrote.
+  "tools/theme/mono-accent.mjs": ONE_SHOT("unexpected value: color:#f0f0f0"),
+  "tools/theme/sta-availability.mjs": ONE_SHOT("R-STA-004 already exists — this script has run"),
+  "tools/bench/env.mjs":
+    "not an instrument: one line, `NODE_ENV ??= \"production\"`, imported first by `stress.mjs` and `plots.mjs` so React's production build is the one measured (F1167). It measures nothing; bench-probes runs it with NODE_ENV cleared, and no row asserts its effect",
 };
+
+/** The reason every one-shot shares, with what it printed when it was run again. */
+function ONE_SHOT(said) {
+  return `a one-shot registry edit, already applied — re-run at 78cd90e1 it said *${said}* and wrote nothing; its output is the registry, which \`make design-check\` checks`;
+}
 
 // **`.ts` was missing, and the omission has a history worth keeping.**
 // `tools/catalogue-forms.ts` was moved out of a `.mjs` *precisely* to get it
@@ -367,12 +451,21 @@ function main() {
   const covered = new Set(COVERED.map(([f]) => f));
   const missing = files.filter((f) => !covered.has(f));
   const stale = [...covered].filter((f) => !files.includes(f));
+  // **And the exemptions, the same way.** An entry for a file that is gone
+  // outlives its reason in silence — and with eighteen one-shots listed one by
+  // one, deleting one is the likeliest edit this table will see.
+  // `__pycache__` is the one entry absent on a clean clone: the python
+  // fixtures write it, and it is gitignored.
+  const gone = Object.keys(NOT_INSTRUMENTS).filter(
+    (f) => f !== "examples/docker/tools/__pycache__" && !existsSync(join(ROOT, f)),
+  );
 
   console.log(`instruments — ${String(files.length)} found, ${String(covered.size)} with a fixture\n`);
 
-  if (missing.length > 0 || stale.length > 0) {
+  if (missing.length > 0 || stale.length > 0 || gone.length > 0) {
     for (const f of missing) console.error(`  NO FIXTURE   ${f}`);
     for (const f of stale) console.error(`  NOT PRESENT  ${f} — listed as covered and not on disk`);
+    for (const f of gone) console.error(`  NOT PRESENT  ${f} — exempted and not on disk`);
     console.error(
       "\nThe inventory is compared by equality, so this is the whole of it: an " +
         "instrument added without a fixture fails here on the day it lands.",

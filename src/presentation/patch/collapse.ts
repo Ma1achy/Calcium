@@ -37,3 +37,19 @@ export function collapseText(count: number, caps: Pick<TerminalCapabilities, "un
   const lines = count === 1 ? "line" : "lines";
   return `${ellipsis} ${count} unchanged ${lines}`;
 }
+
+/**
+ * The cap's marker (C25 I14): `⋯ 3 more hunks`, the same ellipsis and the same
+ * one-row budget as an elision, because it is the same statement one unit up —
+ * *there is more here, and this is how much*.
+ *
+ * **No key in it**, where §3a's figure drew `· ⏎ expand`. The key is the marker
+ * element's `activate` (I24); a renderer cannot see the keymap, and a key
+ * spelled inside a block is a second keymap that drifts under rebinding (C16
+ * I19's argument).
+ */
+export function moreText(count: number, caps: Pick<TerminalCapabilities, "unicode">): string {
+  const ellipsis = caps.unicode === "ascii" ? ELLIPSIS[1] : ELLIPSIS[0];
+  const hunks = count === 1 ? "hunk" : "hunks";
+  return `${ellipsis} ${count} more ${hunks}`;
+}

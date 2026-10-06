@@ -1,5 +1,5 @@
 // C09 tier 1 — the registry's state machine, and each kind's documented height.
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createLowlight } from "lowlight";
 import type { LanguageFn } from "highlight.js";
@@ -28,6 +28,8 @@ import type { Block, Group, MeasureFn, Probe } from "../../src/data/viewmodel/in
 import { groupDefinition } from "../../src/presentation/blocks/kinds/containers.js";
 import {
   createBlockRegistry,
+  GLYPH_TOKENS,
+  spinnerFrames,
   DEFAULT_DEFINITIONS,
   DEFAULT_LANGUAGES,
   registerGrammar,
@@ -43,6 +45,8 @@ import { RenderScratchStore } from "../../src/shell/render-scratch.js";
 import { rows as inkRows } from "../../src/presentation/blocks/paint.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/types.js";
 import { cells } from "../../src/presentation/text.js";
+import { scrollbarColumn } from "../../src/presentation/blocks/scrollbar.js";
+import { scrollbarSet, SCROLLBAR_UNICODE } from "../../src/presentation/blocks/glyphs.js";
 
 /** One sample per default grammar, ASCII throughout (T3.32, T1.45). */
 const SAMPLES: Readonly<Record<string, string>> = {
@@ -219,6 +223,9 @@ describe("C09 §6 — the registry's transition table", () => {
     "twenty-three": 23,
     "twenty-four": 24,
     "twenty-five": 25,
+    "twenty-six": 26,
+    "twenty-seven": 27,
+    "twenty-eight": 28,
     one: 1,
     two: 2,
     three: 3,
@@ -259,11 +266,17 @@ describe("C09 §6 — the registry's transition table", () => {
       code: 2, // lines
       comparison: 2, // rows + header
       pills: 1, // one logical row
+      tape: 1, // one row at every width — the window is what changes
+      tree: 6, // visible nodes — `parser` is collapsed, so `decode.ts` is not one (C04 I129)
+      choice: 1, // a checkbox or a radio group, on one row (C09 I105)
+      control: 1, // label, track and value, on one row (C09 I106)
       tip: 1, // ceil(cells / w)
       panel: 4, // children + 2
       group: 1, // row: max of children
       scroll: 3, // height, plus a residue row where the content overflows
       mosaic: 4, // `height`, exactly — declared and never derived (C04 I71)
+      split: 4, // `height`, exactly — the bars say where, and there is no residue row (C04 I132)
+      form: 7, // §105's form: three fields, an error and a hint, a blank row and the buttons (C04 I136)
       image: 3, // `height`, clamped by the width — 8x8 at 3 rows needs 6 columns (C04 I73)
       status: 7, // the declared height — six is the figure, seven shows its line
       raw: 2, // lines
@@ -349,6 +362,10 @@ describe("C09 §6 — the registry's transition table", () => {
     // formula collapsing to one, is a finding rather than a smaller loop.
     const literal = registered.filter((k) => /^\d+$/.test(table.get(k) ?? ""));
     expect(literal.slice().sort(), "the §3 rows whose measure is a bare integer").toEqual([
+      // §018's two shapes are one row each at every width, so both are inside
+      // the arm this row can actually check rather than beside it (C09 I105, I106).
+      "choice",
+      "control",
       "progress",
       "rule",
     ]);
@@ -750,16 +767,18 @@ describe("C09 §6 — kinds", () => {
     ).toContain("sparkline-3000");
   });
 
-  it("T1.11 (I18): an injected escape sequence is stripped, not passed through", () => {
+  it("T1.11 (I18, I128): an injected escape sequence is shown as an escape, not passed through", () => {
     const kit = measurable();
     const attack = `${String.fromCharCode(27)}[31mred`;
     const notice = block({ kind: "notice", id: "n-attack", tone: "info", text: attack });
 
     const line = kit.renderToLines(notice, 80)[0] ?? "";
     // The rendered row carries C10's styling and not the block's: the injected
-    // sequence is gone, and the literal text that followed it remains.
-    expect(visible(line)).toContain("[31mred");
-    expect(cells(visible(line))).toBe(cells("[31mred"));
+    // ESC is gone, and it is **shown** as `^[` rather than leaving `[31m` to read
+    // as text a tool meant to print (ruling 71).
+    expect(line.includes(`${String.fromCharCode(27)}[31m`)).toBe(false);
+    expect(visible(line)).toContain("^[[31mred");
+    expect(cells(visible(line))).toBe(cells("^[[31mred"));
   });
 
   it("T1.12 (§2): steps show a spinner while active and a settled glyph after", () => {
@@ -911,17 +930,98 @@ describe("C09 §6 — kinds", () => {
         children: [block({ kind: "rule", id: live ? "r" : "s", label: "x" })],
       });
 
+    // **The mark is a spinner frame since M4, and it was `▌`.** `Glyph.live` is
+    // retired: the design carries no static live mark — liveness is the spinner
+    // (§030) — and `▌` is the design's selection rail and caret (§017), so a
+    // repository token stood on a design character for a fact drawn another way.
+    // The fact survives the mark, which is what this row is now for.
     const kit = measurable();
-    expect(visible(kit.renderToLines(of(true), 40)[0] ?? "")).toContain("▌ containers");
-    expect(visible(kit.renderToLines(of(false), 40)[0] ?? "")).not.toContain("▌");
+    const frames = spinnerFrames(FULL_CAPS);
+    const titleAt = (t: number, caps = FULL_CAPS): string =>
+      visible(measurable({ capabilities: caps, tick: t }).renderToLines(of(true), 40)[0] ?? "");
 
-    // The whole argument for a slot rather than a character in the title.
+    expect(titleAt(0)).toContain(`${frames[0]!} containers`);
+    expect(visible(kit.renderToLines(of(false), 40)[0] ?? ""), "a static panel takes no mark").not.toContain(
+      ` containers`.trimStart() === "" ? "x" : `${frames[0]!} `,
+    );
+
+    // **It advances**, which is the half a static rail could not carry: the
+    // fact is *this region refreshes*, and a mark that never moves says a
+    // region exists rather than that it is working.
+    const seen = new Set(frames.map((_, t) => titleAt(t)));
+    expect(seen.size, "the title moves with the tick").toBeGreaterThan(1);
+
+    // The whole argument for a slot rather than a character in the title: it
+    // degrades, where a `▌` an app wrote into its own title could not.
     const ascii = measurable({ capabilities: ASCII_CAPS });
-    expect(visible(ascii.renderToLines(of(true), 40)[0] ?? "")).toContain("| containers");
+    const asciiFrames = spinnerFrames(ASCII_CAPS);
+    expect(visible(ascii.renderToLines(of(true), 40)[0] ?? "")).toContain(`${asciiFrames[0]!} containers`);
 
-    // It rides in a border drawn either way, so the panel is children + 2 still.
+    // **Geometry does not animate** (I8): it rides in a border drawn either
+    // way, so the panel is children + 2 still, and every frame is one cell, so
+    // the row is the same width at every tick.
     expect(kit.measure(of(true), 40)).toBe(kit.measure(of(false), 40));
-    expect(visible(kit.renderToLines(of(true), 40)[0] ?? "")).toHaveLength(40);
+    for (const t of frames.keys()) expect(titleAt(t), `tick ${String(t)}`).toHaveLength(40);
+  });
+
+  /** Every `.ts` under `src/`, for the producer sweep below. */
+  const srcFiles = (dir: string, out: string[] = []): string[] => {
+    for (const entry of readdirSync(dir)) {
+      const path = `${dir}/${entry}`;
+      if (statSync(path).isDirectory()) srcFiles(path, out);
+      else if (/\.ts$/u.test(entry) && !/\.d\.ts$/u.test(entry)) out.push(path);
+    }
+    return out;
+  };
+
+  it("T1.4g2 (C04 I39, R-GLY-003): retiring `live` loses no fact — `▌` had one consumer and it was this one", () => {
+    // **The condition on retiring the token was that both its facts keep a
+    // named, asserted replacement.** Measured, the repository's `▌` carried
+    // **one**: *this region refreshes* (`Panel.live`, `livePanel` in
+    // `shell/refresh.ts`, drawn at exactly one site), which T1.4g above now
+    // asserts as a spinner.
+    //
+    // The other reading of `▌` — *my keys go here* — is the **design's**
+    // (§017, R-BLK-129: the selection rail, and the caret in the mode line),
+    // and nothing in `src/` paints it. A fact with no carrier cannot be lost by
+    // retiring a mark, and this row is what makes that a measurement rather
+    // than a claim: it fails the day a second producer appears, which is when
+    // the replacement — the footer's owner line (R-KEY-004, M5) plus `▸` when
+    // focused — has to exist.
+    const src = srcFiles("src");
+    const producers: string[] = [];
+    for (const file of src) {
+      const text = readFileSync(file, "utf8");
+      for (const [i, line] of text.split("\n").entries()) {
+        if (!line.includes("\u258c")) continue;
+        // A mention in prose is not a producer; a string literal is.
+        if (/^\s*(\*|\/\/|\/\*)/u.test(line)) continue;
+        // **The line number is deliberately not in the key** (the anchor
+        // lesson): it moves whenever anything above it is edited, so a row
+        // keyed on it goes red for reasons that have nothing to do with `▌`.
+        // The file and the line's own text locate it just as well and only
+        // move when the producer does.
+        void i;
+        producers.push(`${file} ${line.trim().replace(/\s+/gu, " ")}`);
+      }
+    }
+    // **Four, and not one of them is an ownership mark.** Named rather than
+    // counted, because a count says *no new producer* and a list says *what the
+    // old ones were for* — and the second is what the next reader needs when
+    // R-KEY-004's owner line lands.
+    expect(producers, "every `▌` a frame can reach, and what each is for").toEqual([
+      // The plot's box fill — a figure, where position carries the meaning.
+      'src/presentation/blocks/glyphs.ts bar: "▌",',
+      // Two spinner sets: `▌` as one *frame* of an animation, which is a
+      // liveness carrier and not a mark that stands still and means something.
+      'src/presentation/blocks/glyphs.ts frames: Object.freeze(["▏", "▎", "▍", "▌", "▋", "▊", "▉", "▊", "▋", "▌", "▍", "▎"]),',
+      'src/presentation/blocks/glyphs.ts frames: Object.freeze(["▌", "▀", "▐", "▄"]),',
+      // A trailing comment on a range bound in `cells()`'s own table.
+      "src/presentation/text.ts 0x25a0, 0x25ff, // geometric shapes — ▌ ● ○ ▸ ▾",
+    ]);
+
+    // And the token is gone from the vocabulary, both halves.
+    expect(GLYPH_TOKENS as readonly string[]).not.toContain("live");
   });
 
   it("T1.4h (C04 I40): a comparison names its columns, and says nothing when it has nothing to say", () => {
@@ -1173,5 +1273,104 @@ describe("C09 I76 — the window seam takes the caller's scratch, and the form i
     r.windowSequence([big], 80, 0, 5);
     r.windowSequence([big], 80, 0, 5);
     expect(on(big, measured), "two calls with no scratch, two whole-block measures each").toBe(beforePlain + 4);
+  });
+});
+
+describe("C09 §7f — the scrollbar", () => {
+  // §021's own figure: a twelve-row gutter, a viewport of 12 and a maximum
+  // offset of 28 — so the content is 40 — with the four offsets it works.
+  const FIGURE = [
+    [0, "\u2503\u2503\u2503\u257f\u2502\u2502\u2502\u2502\u2502\u2502\u2502\u2502"],
+    [5, "\u2502\u257d\u2503\u2503\u2503\u2502\u2502\u2502\u2502\u2502\u2502\u2502"],
+    [14, "\u2502\u2502\u2502\u2502\u2503\u2503\u2503\u257f\u2502\u2502\u2502\u2502"],
+    [28, "\u2502\u2502\u2502\u2502\u2502\u2502\u2502\u2502\u257d\u2503\u2503\u2503"],
+  ] as const;
+
+  const UNI = scrollbarSet({ unicode: "full", ambiguousWidth: "narrow" } as never);
+  const draw = (rows: number, content: number, offset: number, set = UNI): string | null => {
+    const col = scrollbarColumn(rows, content, offset, set);
+    return col === null ? null : col.join("");
+  };
+
+  it("T1.59 (C09 I92, §7f, §021): §021's four rows are drawn back, glyph for glyph", () => {
+    // **The design's figure is the fixture.** A rounding that is arithmetically
+    // self-consistent and different passes every property below and draws
+    // another picture; only the figure itself can tell them apart.
+    for (const [offset, expected] of FIGURE) {
+      expect(draw(12, 40, offset), `offset ${String(offset)}`).toBe(expected);
+    }
+  });
+
+  it("T1.60 (C09 I92, §7f, §021): nothing where a bar could not move, and the properties everywhere else", () => {
+    // **The boundary from both sides.** *A bar that cannot move is decoration*
+    // is satisfied exactly by a renderer that draws none at all, so the row one
+    // taller has to draw one.
+    for (const rows of [1, 4, 12, 30]) {
+      expect(draw(rows, rows, 0), `content of exactly ${String(rows)} fits`).toBe(null);
+      expect(draw(rows, rows - 1, 0), "and less than the viewport fits too").toBe(null);
+      expect(draw(rows, rows + 1, 0), "one row more is a bar").not.toBe(null);
+    }
+
+    for (const rows of [1, 2, 3, 12, 31]) {
+      for (const content of [rows + 1, rows + 7, rows * 3, rows * 100 + 1]) {
+        const maxOffset = content - rows;
+        for (const offset of [0, 1, Math.floor(maxOffset / 3), maxOffset - 1, maxOffset]) {
+          if (offset < 0) continue;
+          const col = scrollbarColumn(rows, content, offset, UNI);
+          const at = `${String(rows)}/${String(content)}@${String(offset)}`;
+          expect(col, at).not.toBe(null);
+          const glyphs = col ?? [];
+          expect(glyphs.length, `the column is the gutter's height at ${at}`).toBe(rows);
+          // **The thumb is never empty.** A very long document over a short
+          // gutter rounds the proportion to nothing, and the floor on the ratio
+          // is what keeps the mark on the screen.
+          expect(
+            glyphs.some((g) => g !== UNI.track),
+            `the thumb is somewhere at ${at}`,
+          ).toBe(true);
+          // And it is one run, not scattered — the half-row forms only ever
+          // appear at its two ends.
+          const marked = glyphs.flatMap((g, i) => (g === UNI.track ? [] : [i]));
+          const first = marked[0] ?? 0;
+          const last = marked[marked.length - 1] ?? 0;
+          expect(marked.length, `one contiguous run at ${at}`).toBe(last - first + 1);
+        }
+        // **It reaches the end exactly at the maximum offset**, which is the
+        // clause the floor is chosen for: 28 of 28 lands at 17 of 17 rather
+        // than being clamped there, and a clamp would hide a rounding that
+        // stalls one position short everywhere else.
+        const top = scrollbarColumn(rows, content, 0, UNI) ?? [];
+        const bottom = scrollbarColumn(rows, content, maxOffset, UNI) ?? [];
+        expect(top[0], `the thumb starts at the top at ${String(rows)}/${String(content)}`).not.toBe(UNI.track);
+        expect(
+          bottom[bottom.length - 1],
+          `and ends at the bottom at ${String(rows)}/${String(content)}`,
+        ).not.toBe(UNI.track);
+      }
+    }
+  });
+
+  it("T1.61 (C09 I93, §7f, C02 I9): the set degrades whole, and the check is on the set", () => {
+    const wide = scrollbarSet({ unicode: "full", ambiguousWidth: "wide" } as never);
+    const ascii = scrollbarSet({ unicode: "ascii", ambiguousWidth: "narrow" } as never);
+    expect(wide, "a set of mixed widths cannot ship, so it takes ascii").toEqual(ascii);
+    expect(wide.half, "and the ascii rung has no half-row form").toBe(false);
+    // Twelve positions rather than twenty-four: the thumb is three rows and
+    // starts at one, where the Unicode rung draws seven half-rows from three.
+    expect(draw(12, 40, 5, wide), "so it draws at whole-row resolution").toBe("|###||||||||");
+
+    // **The premise, measured rather than assumed, and it is not the design's.**
+    // §021 argues the set degrades whole because `│` and `┃` are Ambiguous
+    // where `╽` and `╿` are Narrow — true of the property, and false here:
+    // `DRAWN_AS_GEOMETRY` widens the box-drawing block entire, a deliberate
+    // one-directional deviation (F665). So the four are two cells *together* at
+    // `wide`, and a two-cell glyph in a one-column bar is not a one-column bar.
+    //
+    // Asserted so that a change to that table fails here and is read rather
+    // than absorbed — the ruling is the same either way, and the reason is not.
+    const at = (w: "narrow" | "wide"): readonly number[] =>
+      SCROLLBAR_UNICODE.map((g: string) => cells(g, w));
+    expect(at("narrow"), "one cell each at narrow").toEqual([1, 1, 1, 1]);
+    expect(at("wide"), "and two each at wide, which is this tree and not the property").toEqual([2, 2, 2, 2]);
   });
 });

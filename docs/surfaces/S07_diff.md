@@ -33,7 +33,7 @@ At 100 columns:
 ▌   kind                 candidate         ≠  experiment
 ▌   status               succeeded         =  succeeded
 ▌   job                  TrainingJob       =  TrainingJob
-▌   owner                malachy           =  malachy
+▌   owner                someone           =  someone
 ▌   resources            2×GPU · 16Gi      ≠  1×GPU · 8Gi
 ▌   duration             14m 20s           ≠  22m 04s
 ▌

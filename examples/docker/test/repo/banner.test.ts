@@ -3,7 +3,7 @@
 // This file reaches into `../../../../test/support/render.ts` for `measurable`,
 // because comparing the container's rows against the hand-composed banner needs
 // a block rendered to lines, and **the published package has no way to do
-// that**: `@fmx/calcium` exports `createTui` and the builders, and rendering a
+// that**: `calcium-tui` exports `createTui` and the builders, and rendering a
 // block outside a session is a capability only the framework's own test support
 // has.
 //
@@ -29,11 +29,11 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { cells } from "@fmx/calcium";
-import type { Raw } from "@fmx/calcium";
+import { cells } from "calcium-tui";
+import type { Raw } from "calcium-tui";
 import { FLOOR, WHALE_ROWS, WORDMARK_ROWS, banner, bannerLines, bannerRow, variants } from "../../src/banner.ts";
 import { measurable } from "../../../../test/support/render.ts";
-import { b, type Block } from "@fmx/calcium";
+import { b, type Block } from "calcium-tui";
 
 const DOC = readFileSync(new URL("../../DOCKER_TUI_BANNER.md", import.meta.url), "utf8");
 const fenced = [...DOC.matchAll(/```[a-z]*\n([\s\S]*?)```/gu)].map((m) =>

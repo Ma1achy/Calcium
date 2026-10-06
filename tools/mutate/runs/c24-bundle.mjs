@@ -61,11 +61,19 @@ const results = runPass({
       // dependency is never a module of its own, so the tree the child traces
       // holds the bundle's own copy instead — T5.8 reads the entries' names
       // against the `tsc` tree's and sees the divergence.
+      //
+      // **The expectation was `R4.7`, a row deleted with Ink** (F1209) leaving
+      // only the tombstone comment at `examples/docker/test/bin.test.ts:109`. The
+      // mutation was caught the whole time, by the row the paragraph above names
+      // and by nothing else — measured: `FAIL test/e2e/public-api.test.ts > C24
+      // I38 … > T5.8`, 1 failed of 13. So the row said `CAUGHT ELSEWHERE` while
+      // being caught exactly where its own comment said it would be, which is
+      // what an expectation naming a row that no longer exists reads like.
       name: "PACKAGES-BUNDLED: node_modules are bundled rather than external",
       file: B,
       from: '  packages: "external",',
       to: '  packages: "bundle",',
-      expect: "R4.7",
+      expect: "T5.8",
     },
     {
       // **No maps.** A chunk frame has nothing beside it and T5.5 draws the

@@ -42,7 +42,7 @@ const results = runPass({
     file: MOSAIC,
     from: "export const MOSAIC_HOLE = \".\";",
     to: "export const MOSAIC_HOLE = \"\\u0000\";",
-    why: "with no hole character every `.` becomes a named region, so MG8's holes gain children the arity check then refuses",
+    why: "with no hole character every `.` becomes a named region, so MS8's holes gain children the arity check then refuses",
   },
   mutations: [
     {
@@ -53,7 +53,7 @@ const results = runPass({
       file: MOSAIC,
       from: "    if (box.n !== area) {",
       to: "    if (false) {",
-      expect: "MG2",
+      expect: "MS2",
     },
     {
       // **The clamp the build found and the walk did not** — and 1.7 moved it
@@ -66,7 +66,7 @@ const results = runPass({
       file: CONTAINERS,
       from: "  const w = Math.min(rect.width, width - rect.left); // cells-ok — a cell count",
       to: "  const w = rect.width; // cells-ok — a cell count",
-      expect: "MG7",
+      expect: "MS7",
     },
     {
       // **The pair was `flexShrink: 0` and `overflow: "hidden"`** on the cell's
@@ -80,7 +80,7 @@ const results = runPass({
       file: CONTAINERS,
       from: "        x: rect.left, top: rect.top, width: room.width, height: room.height,",
       to: "        x: rect.left, top: rect.top, width: 1000, height: room.height,",
-      // **It survived against MG5, and the reason is the construction.** Every
+      // **It survived against MS5, and the reason is the construction.** Every
       // child is rendered at `rect.width`, so its rows are already no wider and
       // there is nothing for the cut to take — unless the child answers past
       // the width it was given, which no kind C09 ships does and a consumer's
@@ -94,17 +94,28 @@ const results = runPass({
       file: CONTAINERS,
       from: "        x: rect.left, top: rect.top, width: room.width, height: room.height,\n",
       to: "        x: rect.left, top: rect.top, width: room.width,\n",
-      expect: "MG6",
+      expect: "MS6",
     },
     {
       // **Fixed shares after the weights**, which is C04 I44's rule and the reason a
       // cell count is not a suggestion. The totals still sum to the width, so
       // nothing about the arithmetic looks wrong.
+      //
+      // **Re-anchored onto the mosaic's own line, and that is the finding**
+      // (F1244). It used to sit on `divideShares`' budget — which is the
+      // *group's* implementation of this rule and is already `c04-weights`'
+      // T3.20 — so this run mutated another run's subject and reported nothing
+      // about its own. It survived, because none of the four files this command
+      // names carries a group's fixed-share row. The rule has two
+      // implementations, `divideShares` for a group and `gridLines` for both of
+      // the mosaic's axes, and `measure.ts:141`'s claim that one serves both is
+      // wrong. The import-reach gate cannot see this: `mosaic.ts` is imported by
+      // `mosaic.test.ts`, and the reach that was missing is to a *function*.
       name: "the weights divide before the fixed shares are taken",
       file: MOSAIC,
-      from: "  const budget = total - gaps - fixed;",
-      to: "  const budget = total - gaps;",
-      expect: "MG4",
+      from: "  const budget = total - fixed.reduce((a, b) => a + b, 0); // cells-ok — a cell count",
+      to: "  const budget = total; // cells-ok — a cell count",
+      expect: "MS4",
     },
     {
       // **Reading order reversed.** The mapping onto `children` is positional,
@@ -114,7 +125,7 @@ const results = runPass({
       file: MOSAIC,
       from: "  const regions = order.map((name) => {",
       to: "  const regions = [...order].reverse().map((name) => {",
-      expect: "MG4",
+      expect: "MS4",
     },
   ],
 });

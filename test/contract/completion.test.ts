@@ -248,9 +248,15 @@ describe("C19 §2, §6 — the contract surface", () => {
     });
     const covered = new Set(sources.flatMap((s) => [...s.slots]));
     // `none` is the absence of a slot and has nothing to offer by definition.
-    for (const kind of SLOT_KINDS.filter((k) => k !== "none")) {
-      expect(covered).toContain(kind);
-    }
+    // `action` is the palette's, and its source is the composition root's (C16
+    // I68): the actions the prompt reaches are a fact about the keymap and the
+    // application's handlers, which this layer holds neither of. C16 T1.178
+    // reads that source through a built graph.
+    const NOT_FRAMEWORK = ["action", "none"];
+    expect(
+      SLOT_KINDS.filter((k) => !covered.has(k)),
+      "the kinds the framework does not cover, by equality",
+    ).toEqual(NOT_FRAMEWORK);
   });
 
   it("T4.6b (with C16): C19's rows construct without a KeymapError", () => {

@@ -22,6 +22,12 @@ export { plotDefinition, cursorable, legendHitAt, sampleIndexAt } from "./defini
 export { sparkline } from "./sparkline.js";
 export { valueBar } from "./bar.js";
 /**
+ * **`pairFor` is published for C11's missing number** (C11 I29): a table draws
+ * the absent mark a bar draws for a missing value, so one fact keeps one
+ * character at every rung — asked of the one table that holds it.
+ */
+export { pairFor } from "./ramp.js";
+/**
  * **`fillHeight` is published because the caller is an app, not a component.**
  * The other three exports here are seams inside the framework; this one closes
  * roadmap 38, whose whole subject is a *producer* choosing a height from the

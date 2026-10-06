@@ -10,17 +10,19 @@
  * them and lays out no text of its own (C09 §3).
  */
 import type { AmbiguousWidth } from "../text.js";
-import { SGR_RESET, sgr } from "../../terminal/escapes.js";
-import { resolve, resolveBackground, resolveTone, type Style } from "../theme/index.js";
+import { SGR_RESET, sgr, toTerminalDefault } from "../../terminal/escapes.js";
+import { bandAt, resolve, resolveBackground, resolveTone, type Style } from "../theme/index.js";
 import type { ColourRef, ColourValue, ResolvedTheme } from "../theme/index.js";
 import { COLORMAPS, continuousColour } from "../theme/colormap.js";
 import type { ColormapName, Tone } from "../../data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
+import type { FocusState, Motion, RenderContext } from "./types.js";
+import type { Block } from "../../data/viewmodel/index.js";
 import { cells, truncate } from "../text.js";
 import type { Run, SpanAttrs } from "../runs.js";
 import { graphemes } from "../text.js";
 import { rampStyle } from "../theme/ramp.js";
-import { animateT, effectiveTick, extentT } from "./ramp.js";
+import { animateT, effectiveAnimation, effectiveTick, extentT } from "./ramp.js";
 
 /** A run of text and the style it carries. Width is the text's, never the run's. */
 export type Span = Readonly<{ text: string; style?: Style }>;
@@ -51,6 +53,22 @@ export type RunContext = Readonly<{
   colormap?: ColormapName;
   /** C03's spinner counter, for a ramp that moves (C09 I53); absent is the static frame. */
   tick?: number;
+  /** The reader's motion preference (C09 I99); absent is `"full"`, and structural like the rest. */
+  motion?: Motion;
+  /**
+   * **The ground these runs are painted on** (C10 I48) — a surface name, absent
+   * being the page. A run's tone resolves *against* it, so a `tone.error` cell
+   * inside a selection takes the ink the theme composed for that ground and the
+   * high-contrast bands take their single ink.
+   *
+   * **Carried on the context rather than asked per call**, because it is a fact
+   * about the region and not about the run: a painter that washes an extent
+   * says so once, and every run inside it inherits the answer. The thing this
+   * cannot catch is a painter that washes and forgets to say — which is why the
+   * row that watches it is the composition frame, reporting each run's ink
+   * beside the ground it stands on (F1240).
+   */
+  on?: string | undefined;
 }>;
 
 /**
@@ -67,9 +85,20 @@ export type RunContext = Readonly<{
  * 4-bit frame is byte-identical with and without the value (C10 I31). The gate
  * refused a `value` on a block with no map, so the `colormap === undefined`
  * arm is a total function's and not a branch anything reaches.
+ *
+ * **A `ground` replaces the style with a pair** (C09 I139, C04 I151): `pickInk`
+ * on `pick`, resolved together as C11's current row resolves them (C10 I51), the
+ * span's attributes on top. Where `pick` does not resolve — 1 bit, a theme
+ * declaring none — the run paints as its neighbours would, its attributes kept.
+ * The gate refused a `tone`, `value` or `ramp` beside it.
  */
 export function runStyle(run: Run, style: Style, ctx: RunContext): Style {
-  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities);
+  if (run.ground !== undefined) {
+    const ground = resolveBackground("surface.pick", ctx.theme, ctx.capabilities);
+    if (ground.background === undefined) return withSpan(style, run.attrs);
+    return withSpan(withBackground(resolve("surface.pickInk", ctx.theme, ctx.capabilities), ground), run.attrs);
+  }
+  const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities, ctx.on);
   const merged = withSpan(base, run.attrs);
   if (run.value === undefined || ctx.colormap === undefined) return merged;
   const map = COLORMAPS[ctx.colormap];
@@ -112,7 +141,7 @@ export function paintRuns(runs: readonly Run[], style: Style, ctx: RunContext): 
     const tick = effectiveTick(ctx.tick, ctx.capabilities);
     clusters.forEach((cluster, i) => {
       const index = at + i;
-      const t = animateT(ramp.animate, extentT(index, of), tick, of, index);
+      const t = animateT(effectiveAnimation(ramp.animate, ctx.motion), extentT(index, of), tick, of, index, ramp.since);
       // A palette cycles identities, and on text the identity is the span
       // (C04 §3am.2): the ordinal, not the cluster — per cluster is confetti.
       const sampled = rampStyle(ramp, t, ramp.fill === "palette" ? ordinal : index, ctx.theme, ctx.capabilities);
@@ -146,13 +175,19 @@ function sameValue(a: ColourValue | undefined, b: ColourValue | undefined): bool
   return a.kind === "rgb" ? a.hex === (b as { hex: string }).hex : a.index === (b as { index: number }).index;
 }
 
-/** A tone, resolved. The only way a renderer obtains a style (I4). */
+/**
+ * A tone, resolved. The only way a renderer obtains a style (I4).
+ *
+ * `on` names the ground the run lands on (C10 I48); absent is the page, which
+ * is every call site that paints on nothing in particular.
+ */
 export function tone(
   name: Tone,
   theme: ResolvedTheme,
   caps: TerminalCapabilities,
+  on?: string,
 ): Style {
-  return resolveTone(name, theme, caps);
+  return resolveTone(name, theme, caps, on);
 }
 
 /**
@@ -163,8 +198,9 @@ export function slot(
   ref: ColourRef,
   theme: ResolvedTheme,
   caps: TerminalCapabilities,
+  on?: string,
 ): Style {
-  return resolve(ref, theme, caps);
+  return resolve(ref, theme, caps, on);
 }
 
 /**
@@ -206,13 +242,94 @@ export function withBackground(style: Style | undefined, surface: Style): Style 
  * and one slot carries one meaning. **The 1-bit rung is `inverse`, not a
  * mark**: `resolveBackground` answers `NO_STYLE` without colour, and a wash
  * alone would fall straight from a background to nothing; an attribute
- * survives the depth where a colour does not, and a gutter mark would cost a
- * cell C11 I14 forbids. `shell/paint.ts`'s `selectionStyle` is this same
+ * survives the depth where a colour does not. The gutter mark is not this
+ * function's: it is the `▌` rail, drawn by the frame in the column it reserves
+ * (C14 I57, I58), so no cell of a row is spent on it and C11 I14 holds. `shell/paint.ts`'s `selectionStyle` is this same
  * ladder for the prompt, written first; it should import this one.
  *
  * Painted **over `tone.default`** and nothing else — the one ink C10 §4b has
  * measured against this ground (`SELECTION_SLOTS`).
  */
+/**
+ * The focus ground (C10 I47, C09 I83, R-SEL-006).
+ *
+ * **A ground of its own, and that is the whole change.** Focus and selection
+ * were told apart by *ink over one ground* — `accent` for the head, `default`
+ * for the extent, both over `surface.selection` — where R-SEL-006 tells them
+ * apart by two grounds and a mark. `focusGround` had shipped as a token with a
+ * contrast gate and no reader for exactly as long as that was true.
+ *
+ * **No 1-bit rung here, and that is deliberate.** `selectionStyle` falls to
+ * `inverse` because the ground is selection's only ground-level carrier (its
+ * second is the `▌` rail, C14 I58); focus has `▸`
+ * (C09 I83), which survives to 1-bit and survives a reader who overrode their
+ * background. A second inverse rung would make a focused row and a selected one
+ * the same frame, which is the defect this function exists to end. So where
+ * there is no colour this answers `NO_STYLE` and the mark carries focus alone.
+ */
+export function focusStyle(theme: ResolvedTheme, caps: TerminalCapabilities): Style {
+  return resolveBackground("surface.focusGround", theme, caps);
+}
+
+/**
+ * Focus on a shape that has **no mark** (C09 I121, R-FOC-001, R-STA-003).
+ *
+ * `focusStyle` has no 1-bit rung because `▸` carries focus there — and `▸` is
+ * the table's. A notice, a pill, a choice option and a control have no mark
+ * column, so at 1-bit the ground answered `NO_STYLE` and their focused frames
+ * were byte-identical to their resting ones. **The same ladder `selectionStyle`
+ * already is**: the ground where it carries, and where it does not, the whole
+ * shape inverts — an attribute, so no cell moves and `measure` still sees no
+ * focus. One function, so a fifth shape cannot choose a different fallback.
+ */
+export function focusShapeStyle(theme: ResolvedTheme, caps: TerminalCapabilities): Style {
+  const ground = focusStyle(theme, caps);
+  return ground.background === undefined ? { inverse: true } : ground;
+}
+
+/**
+ * How a container lights a pane its focus names (C09 I137, I100, §7k).
+ *
+ * The pane's element is `(container, child.id)`, and what it paints depends on
+ * what the child **is** — asked of the kind through `ctx.focusShapeOf`, never a
+ * switch over kinds here:
+ *
+ *   - a `frame` child — a plot, a scroll, a mosaic — has furniture of its own,
+ *     so the focus is **forwarded** to the child's own block element,
+ *     `{ …focus, blockId: child.id, rowId: child.id }` (I85), and the child's
+ *     predicate lights its frame or axes. **No ground**: `R-FOC-004` forbids one
+ *     across a figure, whose background is half of what braille draws with, and
+ *     §018's figure 5 draws the focused pane by its border;
+ *   - any other child keeps I100's region ground, which the caller lays behind
+ *     the child's painted lines through `based`.
+ *
+ * `null` for a pane focus does not name. One function, so `mosaic` and `split`
+ * cannot light a pane two ways.
+ */
+export function paneFocus(
+  containerId: string,
+  child: Block,
+  ctx: RenderContext,
+): Readonly<{ forward: FocusState } | { ground: string }> | null {
+  const focus = ctx.focus ?? null;
+  if (focus === null || focus.blockId !== containerId || focus.rowId !== child.id) return null;
+  if (ctx.focusShapeOf(child) === "frame") return { forward: { ...focus, blockId: child.id, rowId: child.id } };
+  return { ground: groundSequence("surface.focusGround", ctx.theme, ctx.capabilities) };
+}
+
+/**
+ * Whether `surface` is painted as a band at these capabilities (C10 I45, I66):
+ * a ground whose one ink answers for every slot drawn on it, so tone carries
+ * nothing there.
+ *
+ * **The resolver's answer and not the theme's.** This read `bandInk` alone and
+ * said *band* at 1 bit, where no surface is painted — so a painter asking it
+ * disagreed with the frame it was painting. One predicate, so the two cannot.
+ */
+export function isBand(theme: ResolvedTheme, surface: string, caps: Pick<TerminalCapabilities, "colourDepth">): boolean {
+  return bandAt(theme, surface, caps);
+}
+
 export function selectionStyle(theme: ResolvedTheme, caps: TerminalCapabilities): Style {
   const bg = background("surface.selection", theme, caps);
   return bg.background === undefined ? { inverse: true } : bg;
@@ -370,4 +487,85 @@ export function rows(lines: readonly string[]): readonly string[] {
 /** One row, as an element. */
 export function row(spans: readonly Span[]): readonly string[] {
   return rows([paint(spans)]);
+}
+
+/**
+ * The theme's background, re-established after every reset in a finished row
+ * (C22 I65, C10 I25).
+ *
+ * **One place repairs every reset a row contains**, which the walk did not expect
+ * and the implementation settled: `fitStyled` closes a cut line, `composite`
+ * writes two per composited row, `paint()` closes each styled run the *shell*
+ * draws — and by the time a row reaches here all of them are **inside this
+ * string**. `render-frame`'s per-row prefix is the one outside, and it is
+ * answered by the row's own leading base landing immediately after it.
+ *
+ * **And the set is not `SGR_RESET`, which is the correction the code made to the
+ * walk.** L1's rendered rows do not contain a full reset at all: Ink closes a
+ * foreground run with `39` and a background run with `49`, and the two are not
+ * equivalent here. `39` restores the default *foreground* and a base survives
+ * it untouched. **`49` restores the default *background* — the terminal's, not
+ * ours** — and a patch row ends with exactly that, so the padding after it would
+ * show through. The walk counted the sites that write `\x1b[0m` and the property
+ * that matters is *returns a channel to the terminal's default*, which `49`
+ * satisfies and `39` does not.
+ *
+ * **Blind spot, stated rather than left to be discovered**: a compound sequence
+ * carrying `0` or `49` among other parameters — `\x1b[0;1m` — is not repaired.
+ * Nothing in the tree emits one; `sgr()` never writes `0`, and Ink writes both
+ * closers alone. It is a measurement rather than a guarantee.
+ *
+ * **The base is a default and not a span**, which is the whole distinction: a
+ * wash sets `background` on the cells between two offsets, and every reset in
+ * the tree returns to the *terminal's* default rather than to ours. That is why
+ * a selection's wash still wins for its own cells — it sets the channel
+ * explicitly — and why the base resumes immediately after it closes.
+ *
+ * **And every row closes itself**, which is what the walk expected to need a
+ * lifecycle change for. A row that ended with the base live would leave an
+ * attribute on the wire that outlives the frame — the alternate screen restores
+ * cell contents and not SGR state — so `suspend()` and `release()` would each
+ * owe a reset, on the cursor shape's third-category path (C01 I20). Closing the
+ * row costs the same four bytes and owes nothing: no live attribute ever escapes
+ * a single row, so a handoff, a resize, an exit and a fault are all covered by
+ * the same rule and none of them needs to know a background exists.
+ *
+ * Nothing is written where a theme inherits: `sgr(NO_STYLE)` is empty, so the
+ * arm every session runs today costs one comparison per frame and produces byte
+ * for byte what it produced before.
+ *
+ * **L1, with two consumers** (C11 I25, C22 I65). It lived in `shell/paint.ts`
+ * for the session's own base colour; C11's expanded detail needs the same thing
+ * one layer down — a ground behind lines a child has already painted — and a
+ * second copy of an escape-repair pass is the class this module exists to hold
+ * one of. The mechanism is identical and only the base differs: a theme's
+ * inherited surface there, `surface.bgElev` here.
+ */
+/**
+ * A surface ref as the sequence that opens it — `based`'s `base`, from a token.
+ *
+ * Here so the one caller that needs a ground behind already-painted lines does
+ * not import `sgr` to build it: the escape and the token both stay on this side
+ * of the seam, and a theme that inherits the surface answers `NO_STYLE`, whose
+ * sequence is `""` — which `based` returns unchanged (C10 I25, `R-COL-004`).
+ */
+export function groundSequence(
+  ref: ColourRef,
+  theme: ResolvedTheme,
+  caps: TerminalCapabilities,
+): string {
+  return sgr(background(ref, theme, caps));
+}
+
+export function based(lines: readonly string[], base: string): readonly string[] {
+  if (base === "") return lines;
+  // **One regexp per call, not one per row.** `toTerminalDefault()` is a
+  // factory because a `/g` pattern carries `lastIndex` and a shared one is a
+  // hazard across independent scans — but `String.replace` with a global
+  // pattern sets `lastIndex` to 0 before it iterates and leaves it there, so
+  // reuse inside a single pass is safe and the allocation was per row per frame.
+  const toDefault = toTerminalDefault();
+  return lines.map(
+    (line) => `${base}${line.replace(toDefault, (seq) => `${seq}${base}`)}${SGR_RESET}`,
+  );
 }

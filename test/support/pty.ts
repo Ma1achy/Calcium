@@ -666,6 +666,25 @@ export type InteractivePty = {
    */
   waitForFrame(ok: (frame: readonly string[]) => boolean, ms?: number): Promise<void>;
   /**
+   * Resolve once `pattern` appears in output received **after this call**, or
+   * reject after `ms`.
+   *
+   * **`waitFor` after a step can be answered by output from before it** (F1525).
+   * Measured over every tier-5 row: a `KEYFRAME a` wait that the sixteenth key
+   * before it had already satisfied, so 24 of 40 latency samples timed nothing;
+   * a post-resize wait answered by the pre-resize frame; a far side's answer
+   * waited for by a string the prompt's own echo carried. Call it immediately
+   * after the `type` or `resize` it follows, with no `await` between, so every
+   * byte the step caused arrives after the mark.
+   *
+   * **It cannot see a step written in the same tick as an earlier one.** Bytes
+   * in flight from the earlier step arrive after the mark too — C22 T5.4's
+   * `queued`, answered by the rest frame `⇥` did not draw. That is a question
+   * about the present state, and `waitForFrame` on a fact only the step
+   * produces is the wait for it.
+   */
+  waitForNew(pattern: RegExp, ms?: number): Promise<RegExpExecArray>;
+  /**
    * The exit code, or reject after `ms` (default 20 s).
    *
    * **It was unbounded, and that is what a 75-second failure with no message
@@ -756,7 +775,8 @@ export function interactivePty(
    * original bytes are gone.
    */
   const bytes = new TextDecoder("utf-8");
-  const waiters: { re: RegExp; resolve: (m: RegExpExecArray) => void }[] = [];
+  /** `from` is where in `output` a waiter starts looking — `waitForNew`'s mark. */
+  const waiters: { re: RegExp; from: number; resolve: (m: RegExpExecArray) => void }[] = [];
   const exitWaiters: ((code: number) => void)[] = [];
   const reads: { at: number; bytes: number }[] = [];
 
@@ -767,7 +787,7 @@ export function interactivePty(
     output += text;
     feed(text);
     for (let i = waiters.length - 1; i >= 0; i -= 1) {
-      const m = waiters[i]!.re.exec(output);
+      const m = waiters[i]!.re.exec(output.slice(waiters[i]!.from));
       if (m !== null) {
         waiters[i]!.resolve(m);
         waiters.splice(i, 1);
@@ -790,6 +810,24 @@ export function interactivePty(
     const { ready, partial } = atEscapeBoundary(held + chunk);
     held = partial;
     paint.apply(ready);
+  }
+
+  /** Resolve once `re` matches `output` from `from` on, or reject after `ms`. */
+  function wait(re: RegExp, from: number, ms: number): Promise<RegExpExecArray> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`never saw ${String(re)}${from > 0 ? " after the mark" : ""} in:\n${output.slice(-2000)}`)),
+        ms,
+      );
+      waiters.push({
+        re,
+        from,
+        resolve: (m) => {
+          clearTimeout(timer);
+          resolve(m);
+        },
+      });
+    });
   }
 
   return {
@@ -842,19 +880,10 @@ export function interactivePty(
     waitFor(re, ms = 15_000) {
       const existing = re.exec(output);
       if (existing !== null) return Promise.resolve(existing);
-      return new Promise((resolve, reject) => {
-        const timer = setTimeout(
-          () => reject(new Error(`never saw ${String(re)} in:\n${output.slice(-2000)}`)),
-          ms,
-        );
-        waiters.push({
-          re,
-          resolve: (m) => {
-            clearTimeout(timer);
-            resolve(m);
-          },
-        });
-      });
+      return wait(re, 0, ms);
+    },
+    waitForNew(re, ms = 15_000) {
+      return wait(re, output.length, ms);
     },
     done(ms = 20_000) {
       if (exited !== null) return Promise.resolve(exited);

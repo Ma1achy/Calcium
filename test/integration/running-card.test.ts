@@ -15,7 +15,7 @@ import { result } from "../support/transport.js";
 import { doc, tableOf } from "../support/blocks.js";
 import { b } from "../../src/shell/builders/index.js";
 import { commandRows } from "../../src/shell/paint.js";
-import { entryLayout, measureEntry, renderEntryPieces, windowEntry } from "../../src/shell/entry-layout.js";
+import { BODY_INDENT, entryLayout, measureEntry, renderEntryPieces, windowEntry } from "../../src/shell/entry-layout.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { DARK_THEME, FULL_CAPS, visible } from "../support/render.js";
@@ -75,9 +75,15 @@ function appender(): () => ViewPatch {
 const FRAMES = spinnerFrames(FULL_CAPS);
 const SPIN = (second: number): string => FRAMES[second % FRAMES.length] ?? "";
 
-const headerOf = (blocks: readonly Block[]): { glyph: string | undefined; text: string } | null => {
+const headerOf = (
+  blocks: readonly Block[],
+): { glyph: string | undefined; state: string | undefined; text: string } | null => {
   const first = blocks[0];
-  return first?.kind === "notice" ? { glyph: first.glyph, text: first.text } : null;
+  // **The state is read back as well as the glyph** (C09 I45): the composer's
+  // whole job at the head is to say which state the call is in, and a reader
+  // that took only the character would agree with itself at every rung while
+  // the fact moved.
+  return first?.kind === "notice" ? { glyph: first.glyph, state: first.state, text: first.text } : null;
 };
 
 /** A second at a time, so every one-second wake fires the way it does in a session. */
@@ -97,7 +103,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     expect(entry()?.streaming, "step 3 appended a streaming entry").toBe(true);
     // First assertion — the card, not `blocks: []` (T6.80).
     expect(headerOf(entry()?.doc.blocks ?? []), "the header is a `step` notice, the spinner alone below one second (C23 I58)").toEqual({
-      glyph: "step",
+      glyph: "work-unit", state: "running",
       text: `tail(web.log) · ${SPIN(0)}`,
     });
 
@@ -181,7 +187,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     const routed = h.transcript.entries[1];
     expect(routed?.id, "same entry").toBe(queued?.id);
     expect(routed?.doc.blocks, "one block: the header replaced the notice").toHaveLength(1);
-    expect(headerOf(routed?.doc.blocks ?? [])).toEqual({ glyph: "step", text: `tail(web.log) · ${SPIN(0)}` });
+    expect(headerOf(routed?.doc.blocks ?? [])).toEqual({ glyph: "work-unit", state: "running", text: `tail(web.log) · ${SPIN(0)}` });
     seconds(h, 2);
     expect(headerOf(h.transcript.entries[1]?.doc.blocks ?? [])?.text).toBe(`tail(web.log) · ${SPIN(2)} 2s`);
 
@@ -220,7 +226,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     h.pipeline.submit("/ps --quiet");
     await settled(h.pipeline);
 
-    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])).toEqual({ glyph: "step", text: `ps(--quiet) · ${SPIN(0)}` });
+    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])).toEqual({ glyph: "work-unit", state: "running", text: `ps(--quiet) · ${SPIN(0)}` });
     seconds(h, 2);
     expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe(`ps(--quiet) · ${SPIN(2)} 2s`);
 
@@ -232,8 +238,8 @@ describe("C23 I54 — the pending entry is the running card", () => {
     // **Reversed 2026-09-05** (C23 I55): this read *no header survives a replacement*
     // and the card is now composed over the replacement — one header, block 0.
     // No count in the result and no failure: `verb · duration`, never `ok` (C23 I59).
-    expect(headerOf(entry?.doc.blocks ?? []), "and the header is composed over it").toEqual({ glyph: "step", text: "ps(--quiet) · 2s" });
-    expect((entry?.doc.blocks ?? []).filter((blk) => blk.kind === "notice" && blk.glyph === "step"), "exactly one").toHaveLength(1);
+    expect(headerOf(entry?.doc.blocks ?? []), "and the header is composed over it").toEqual({ glyph: "work-unit", state: "succeeded", text: "ps(--quiet) · 2s" });
+    expect((entry?.doc.blocks ?? []).filter((blk) => blk.kind === "notice" && blk.state !== undefined), "exactly one").toHaveLength(1);
   });
 
   it("T4.46 (C23 I54; F795): a bare verb is a bare header — `ps`, not `ps()` — and grows its figure the same way", async () => {
@@ -243,7 +249,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     });
     h.pipeline.submit("/ps");
     await settled(h.pipeline);
-    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? []), "no arguments, no parentheses").toEqual({ glyph: "step", text: `ps · ${SPIN(0)}` });
+    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? []), "no arguments, no parentheses").toEqual({ glyph: "work-unit", state: "running", text: `ps · ${SPIN(0)}` });
     seconds(h, 2);
     expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe(`ps · ${SPIN(2)} 2s`);
     // The control is T4.43 above: `ps(--quiet)` keeps its parentheses.
@@ -319,7 +325,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     capture("settled");
 
     console.log(`LANEP-FRAMES\n${captured.join("\n")}\nLANEP-FRAMES-END`);
-    expect(visible(frame()[1] ?? "").trimEnd()).toBe("⏺︎ tail(web.log) · 2m 1s");
+    expect(visible(frame()[1] ?? "").trimEnd()).toBe("● tail(web.log) · 2m 1s");
   });
 
   // The card kept on settlement — C23 I55/I56, ruled 2026-09-05. Before these
@@ -364,9 +370,9 @@ describe("C23 I54 — the pending entry is the running card", () => {
     held.release?.();
     await settled(h.pipeline);
     const blocks = h.transcript.entries[0]?.doc.blocks ?? [];
-    expect(headerOf(blocks), "the header is block 0, with the duration; no count, so no outcome (C23 I59)").toEqual({ glyph: "step", text: "ps · 2s" });
+    expect(headerOf(blocks), "the header is block 0, with the duration; no count, so no outcome (C23 I59)").toEqual({ glyph: "work-unit", state: "succeeded", text: "ps · 2s" });
     expect(blocks.slice(1).map((blk) => blk.id), "the result's own blocks follow it, in order").toEqual(["r1", "r2"]);
-    expect(blocks.slice(1).some((blk) => blk.kind === "notice" && blk.glyph === "step"), "one header, not two").toBe(false);
+    expect(blocks.slice(1).some((blk) => blk.kind === "notice" && blk.state !== undefined), "one header, not two").toBe(false);
     expect(atSettle, "one settle change, and the document it wrote carries the header").toHaveLength(1);
     expect(headerOf(atSettle[0] ?? [])?.text).toBe("ps · 2s");
 
@@ -376,7 +382,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     await settled(h2.pipeline);
     await settled(h2.pipeline);
     const failed = h2.transcript.entries[0]?.doc.blocks ?? [];
-    expect(headerOf(failed)).toEqual({ glyph: "step", text: "ps(--quiet) · failed" });
+    expect(headerOf(failed)).toEqual({ glyph: "work-unit", state: "failed", text: "ps(--quiet) · failed" });
     expect(failed[1]?.kind, "the status box is the body").toBe("status");
     expect(h2.transcript.entries[0]?.doc.status).toBe("error");
 
@@ -385,11 +391,11 @@ describe("C23 I54 — the pending entry is the running card", () => {
     h3.pipeline.submit("/guide");
     await settled(h3.pipeline);
     const local = h3.transcript.entries[0]?.doc.blocks ?? [];
-    expect(headerOf(local), "a local verb below one second with no count: the verb alone").toEqual({ glyph: "step", text: "guide" });
+    expect(headerOf(local), "a local verb below one second with no count: the verb alone").toEqual({ glyph: "work-unit", state: "succeeded", text: "guide" });
     expect(h3.transcript.entries[0]?.doc.meta.transport, "a local document's verdict is its status").toBe("local");
   });
 
-  it("T4.48 (C23 I56, C22 I83, I84): the frame after `/ps` settles hangs the body four cells in under a `⎿` at the header's text column, the header flush, and the measured height is the painted height", async () => {
+  it("T4.48 (C23 I56, C22 I83, I84): the frame after `/ps` settles hangs the body BODY_INDENT cells in under a `⎿` at the header's text column, the header flush, and the measured height is the painted height", async () => {
     const registry = createBlockRegistry({ defaults: true });
     const h = pipelineHarness({
       adapt: () => doc({ command: "adapted", blocks: [b.raw("NAME   STATUS", { id: "r1" }), b.raw("web    running", { id: "r2" })] }),
@@ -403,21 +409,21 @@ describe("C23 I54 — the pending entry is the running card", () => {
     expect(headerOf(blocks)?.text).toBe("ps");
 
     // **Through the shell's layout, as `visibleRows` and C14's wrapper both do**
-    // (C22 §6l.4 D, §6l.6): the header at 80, the body at 76 with the hook at 2.
+    // (C22 §6l.4 D, §6l.6): the header at 80, the body at 75 with the hook at 2.
     const options = { theme: DARK_THEME, capabilities: FULL_CAPS };
     const height = measureEntry(registry.measureSequence, blocks, 80);
     const drawn = renderEntryPieces(registry, windowEntry(entryLayout(blocks, 80), 0, height, registry), options);
     expect(drawn.rows, "measured rows are painted rows").toHaveLength(height);
     expect(drawn.faults).toEqual([]);
     const rows = drawn.rows.map((l) => visible(l).trimEnd());
-    expect(rows[0], "the header at column 0, no `ok` (C23 I59)").toBe("⏺︎ ps");
-    expect(rows[1]?.startsWith("  ⎿ "), "the body's first row under the hook, the hook at column 2").toBe(true);
-    for (const row of rows.slice(2)) expect(row === "" || row.startsWith("  │ "), "every body row after the first under the bar (C22 I88)").toBe(true);
+    expect(rows[0], "the header at column 0, no `ok` (C23 I59)").toBe("● ps");
+    expect(rows[1]?.startsWith("  ⎿  "), "the body's first row under the hook, the hook at column 2").toBe(true);
+    for (const row of rows.slice(2)) expect(row === "" || row.startsWith("  │  "), "every body row after the first under the bar (C22 I88)").toBe(true);
     // **The indent is the shell's, not the document's** (I56): the blocks carry
     // no gutter of their own, so a second composer does not indent twice.
     expect(blocks.slice(1).every((blk) => blk.kind !== "notice" || blk.glyph !== "continuation")).toBe(true);
-    const flat = renderSequenceToLines(registry, blocks.slice(1), 76, options).map((l) => visible(l).trimEnd());
-    expect(rows[1]).toBe(`  ⎿ ${flat[0] ?? ""}`);
+    const flat = renderSequenceToLines(registry, blocks.slice(1), 80 - BODY_INDENT, options).map((l) => visible(l).trimEnd());
+    expect(rows[1]).toBe(`  ⎿  ${flat[0] ?? ""}`);
   });
 });
 
@@ -427,7 +433,7 @@ describe("C23 — the call grammar's head states", () => {
     key: { name, ctrl: false, meta: false, shift: false, sequence: name },
   });
   const heads = (blocks: readonly Block[]): string[] =>
-    blocks.flatMap((blk) => (blk.kind === "notice" && blk.glyph === "step" ? [blk.text] : []));
+    blocks.flatMap((blk) => (blk.kind === "notice" && blk.state !== undefined ? [blk.text] : []));
 
   it("T4.49 (C23 I58, §8f P9): a stream reads the spinner alone at 0 s, spinner and `1s` after one wake with the frame advanced by exactly one, and the final figure with no spinner at `end`; ASCII draws the set's ASCII pair", async () => {
     const gate = gatedStream();
@@ -620,7 +626,9 @@ describe("C23 — the call grammar's head states", () => {
       state: "error",
       message: "stream failed: Error: socket closed",
     });
-    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error"), "no error notice anywhere in the card").toBe(false);
+    // **Other than the head** (C04 I141): a failed head is `error`-toned by
+    // design (R-BLK-214). The row guards the literal `✗` line, which has no `state`.
+    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error" && blk.state === undefined), "no error notice anywhere in the card").toBe(false);
     expect(h.transcript.entries[0]?.streaming, "settled").toBe(false);
 
     // **The retry's two numbers live in two places** (C09 §3a: three numbers on
@@ -708,5 +716,23 @@ describe("C23 — the call grammar's head states", () => {
       { settled: true },
     );
     expect(heads(mixed.blocks)[0]).toBe("agent(review) · 8s · 3 of 3");
+  });
+});
+
+describe("C23 I54 — a namespaced verb's card", () => {
+  it("T4.108 (C23 I54, F1430): `/serving scale web 3` reads `serving scale(web 3)`, and a one-word verb its arguments", async () => {
+    /** The head a held invoke leaves at dispatch, for one submitted line. */
+    const headAt = async (line: string): Promise<string | undefined> => {
+      const h = pipelineHarness({ invoke: () => new Promise<RawResult>(() => undefined) });
+      h.pipeline.submit(line);
+      await settled();
+      return headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text;
+    };
+    // **The sub-verb is the verb's, never an argument**: C18's argv begins with
+    // the verb split on spaces, and slicing one word left `scale` inside the
+    // parentheses — `container stats(stats worker)` in every docker still.
+    expect(await headAt("/serving scale web 3")).toBe(`serving scale(web 3) · ${SPIN(0)}`);
+    // The control: a one-word verb, where one word and the verb's length agree.
+    expect(await headAt("/tail a.log")).toBe(`tail(a.log) · ${SPIN(0)}`);
   });
 });

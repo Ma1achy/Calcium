@@ -51,7 +51,7 @@ function harness(fetch: () => Promise<Identity | null>, at = 1_000_000) {
 
 const token = (expiresAt: number | null): Identity => ({
   user: "m",
-  email: "m@fmx.io",
+  email: "s@example.com",
   groups: [],
   expiresAt,
 });

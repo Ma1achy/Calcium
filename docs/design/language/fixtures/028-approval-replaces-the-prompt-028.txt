@@ -1,0 +1,18 @@
+  calcium   ✦ qwen3-coder-next   effort high        localhost:8000   22:14
+──────────────────────────────────────────────────────────────────────────────
+
+● Read construct.ts · 0.2s · 2,847 lines
+
+● Edit src/shell/construct.ts · ✦ waiting
+
+
+──────────────────────────────────────────────────────────────────────────────
+ ⟩ Approve edit   src/shell/construct.ts  +4 −1
+
+ 1263   const el = elementsOf(entryId);
+ 1264 - if (!el) return null;
+ 1264 + if (el.length === 0) return null;
+
+  approve    deny    show full diff    always allow edits here
+──────────────────────────────────────────────────────────────────────────────
+←→ choose   ⏎ answer

@@ -16,7 +16,9 @@
 // `PlotForm` came back into an app file under the framework's own name, beside a
 // comment describing the framework's declaration — the drift `LocalContext` was
 // published to prevent, reached through an index instead of by hand.
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
+
+import type { AskAnswer, AskOptions, QuestionOutcome } from "../../src/index.js";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
@@ -206,5 +208,24 @@ describe("C24 T2.21 (I34) — a consumer does not index for a name src/ declares
     expect(bad, "`form` fires and `label` clears — a string has no name to publish").toEqual([
       "PlotForm",
     ]);
+  });
+});
+
+describe("C24 I42, I43 — the question's public types", () => {
+  it("T2.34 (C24 I42, I43): the entry's declaration names AskAnswer, QuestionOutcome and AskOptions; signal and expiresAfterMs optional; outcome the three words", () => {
+    // **Named by the entry, read from the tree** — a handler awaiting `ctx.ask`
+    // imports these by name, so the names are the surface.
+    const published = publishedNames((f) => SOURCE.get(f) ?? "", ENTRIES);
+    for (const name of ["AskAnswer", "QuestionOutcome", "AskOptions", "Choice"]) {
+      expect(published.has(name), `${name} is published`).toBe(true);
+    }
+    // The shapes, at the type level: both additions optional, so every
+    // existing caller compiles unchanged, and `outcome` exactly the three.
+    expectTypeOf<QuestionOutcome>().toEqualTypeOf<"answered" | "cancelled" | "expired">();
+    expectTypeOf<AskAnswer["outcome"]>().toEqualTypeOf<QuestionOutcome>();
+    expectTypeOf<AskOptions["signal"]>().toEqualTypeOf<AbortSignal | undefined>();
+    expectTypeOf<AskOptions["expiresAfterMs"]>().toEqualTypeOf<number | undefined>();
+    const bare: AskOptions = { question: "q", choices: [{ key: "y", label: "yes" }] };
+    expect(bare.signal, "an option left out is absent").toBeUndefined();
   });
 });

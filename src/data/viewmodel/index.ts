@@ -16,6 +16,7 @@ export type {
   AdapterMeta,
   LocalDocument,
   ProducedMeta,
+  CallState,
   Glyph,
   HeadingLevel,
   Action,
@@ -29,8 +30,10 @@ export type {
   Code,
   ColumnDef,
   Comparison,
+  ChipKind,
   DocumentMeta,
   DocumentStatus,
+  EchoChip,
   ErrorLike,
   Events,
   Group,
@@ -38,6 +41,7 @@ export type {
   KeyValue,
   Logs,
   Measure,
+  CopyFn,
   MeasureFn,
   MergeRow,
   Notice,
@@ -59,6 +63,15 @@ export type {
   Patch,
   PatchResult,
   Pills,
+  Choice,
+  Control,
+  Tape,
+  Tree,
+  TreeNode,
+  Split,
+  Form,
+  FormField,
+  FormButton,
   Plot,
   Camera,
   PlotForm,
@@ -98,9 +111,12 @@ export type {
   ViewPatch,
 } from "./types.js";
 
-export { ACTION_KINDS, CAMERA_DEFAULT, COLORMAP_NAMES, GLYPH_REQUIRED_TONES, HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_HIDEABLE_SERIES, HAS_X_TITLE, HAS_Y_GUTTER, HIERARCHY_MAX_DEPTH, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, SCHEMA, STYLE_ARMS, TONES } from "./types.js";
+// C04 §5c — the trail's five forms, and which of them survive 1-bit (I123, C09 I91).
+export { TRAIL_ANIMATION, TRAIL_COLOUR_FORMS, TRAIL_FORMS } from "./types.js";
+export type { TrailForm } from "./types.js";
+export { ACTION_KINDS, CALL_HEAD_GLYPH, CALL_STATE_TONE, CALL_STATES, CAMERA_DEFAULT, COLORMAP_NAMES, GLYPH_REQUIRED_TONES, HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_HIDEABLE_SERIES, HAS_X_TITLE, HAS_Y_GUTTER, HIERARCHY_MAX_DEPTH, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, RAMP_ONE_SHOTS, SCHEMA, STYLE_ARMS, TONES } from "./types.js";
 
-export { BlockShapeError, block, cell, deepFreeze, descendants, document, rebuild } from "./construct.js";
+export { BlockShapeError, block, cell, deepFreeze, descendants, document, rebuild, withoutStreaming } from "./construct.js";
 
 // `absentMessage` and `wrongTypeMessage` travel because C05's parser checks required fields
 // too, and C04 I114 is one ruling rather than two copies of a sentence (F995).
@@ -127,6 +143,9 @@ export {
   ROW_GUTTER,
   atLeastOne,
   childWidths,
+  splitColumns,
+  splitPaneKey,
+  splitPanes,
   placeable,
   sequenceHeight,
   groupChildWidths,

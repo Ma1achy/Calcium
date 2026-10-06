@@ -9,10 +9,9 @@
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -o pipefail -c
 
-.PHONY: install hooks quantised check enforce catalogue instruments roadmap regime test golden e2e audit proof all clean
+.PHONY: install check-fast quantised check design design-check released chromium design-browser enforce catalogue instruments roadmap regime test golden e2e audit proof all clean
 
 install:            ## npm ci, no install scripts, then the one named build (A04 §3)
-	git config core.hooksPath .githooks
 	npm ci --ignore-scripts
 	npm rebuild node-pty --ignore-scripts=false
 	@node -e "require('node-pty')" \
@@ -21,7 +20,7 @@ install:            ## npm ci, no install scripts, then the one named build (A04
 	@# arrive** (F156). F150 wired both examples' own `check` scripts into that
 	@# target and did not wire their install, so it passed on a machine that had
 	@# run them before and failed on the first clean checkout — CI's `fast` job,
-	@# 19 seconds in, `TS2307: Cannot find module '@fmx/calcium'`.
+	@# 19 seconds in, `TS2307: Cannot find module 'calcium-tui'`.
 	@#
 	@# Two things are needed and only one is obvious. Their `node_modules` is
 	@# the obvious half. The other is `dist/`: an example resolves the package
@@ -35,8 +34,11 @@ install:            ## npm ci, no install scripts, then the one named build (A04
 	@# the asymmetry reads as known rather than as an oversight.
 	cd examples/docker && npm install --ignore-scripts --no-audit --no-fund
 
-hooks:              ## point git at .githooks — pre-commit runs `make enforce` (A04 §5)
-	git config core.hooksPath .githooks
+check-fast:         ## typecheck, tests related to the changed files, flow tests for the touched area (BASE=<ref> to diff against a ref)
+	bash tools/check-fast.sh
+
+themes:             ## C10 §4b — the ten themes, projected from the design registry (R-THM-001)
+	node tools/theme/from-registry.mjs
 
 quantised:          ## C10 I41 — the shipped themes' quantisations, regenerated from dist/ (T3.73 holds it to the code)
 	npm run build
@@ -44,7 +46,7 @@ quantised:          ## C10 I41 — the shipped themes' quantisations, regenerate
 
 check:              ## type-check and lint, including the examples
 	npm run check
-	@# **The examples resolve `@fmx/calcium` to `dist/`, and `dist/` is built by
+	@# **The examples resolve `calcium-tui` to `dist/`, and `dist/` is built by
 	@# `e2e` — the LAST target in `all`** (F447). So on any commit that widens a
 	@# public type, this target type-checks the examples against the *previous*
 	@# commit's build and passes; the failure surfaces on the next run, attributed
@@ -71,7 +73,78 @@ check:              ## type-check and lint, including the examples
 	  cd "$$(dirname $$d)" && npm run check && cd - >/dev/null; \
 	done
 
-enforce:            ## A03 — module graph, source scans, supply chain
+# **The design language's own consistency, and it is a PREREQUISITE of `enforce`.**
+# `docs/design/language/calcium-registry.json` is the normative source for appearance,
+# interaction and keyboard navigation; the HTML beside it is a projection. A commit that
+# moves one and not the other leaves the two disagreeing, and `check-calcium.mjs`
+# rebuilds the HTML in memory and compares — so a stale projection is a red gate rather
+# than a thing a reader notices later.
+#
+# **The two scripts cover each other and NEITHER IS SUFFICIENT ALONE** — measured here by
+# forging R-STA-002 twice. `lint-immutable.mjs` compares a rule's *stored* `contentDigest`
+# against the released baseline, so editing the text and leaving the digest alone passes it:
+# it reports `content … intact` having checked a recorded field, not the content. What
+# catches that is `check-calcium.mjs`, which RECOMPUTES the digest and fails on
+# `immutable rule content drifted`. Invert it — move the text and the digest together, a
+# consistent forgery — and the recompute agrees while `lint-immutable` fails on
+# `released digest changed`, because the baseline is outside the file being edited.
+# So: the checker holds the registry to itself, the lint holds it to the release, and a
+# run of one is not a run of the other.
+#
+# **Beside `enforce` rather than inside `npm run enforce`**, because A03 is the module
+# graph and the source scans and this is neither — it is the design's own record checking
+# itself. The pre-commit hook runs `make enforce`, so the dependency is what makes the
+# rule *regenerate the HTML in the same commit* enforced instead of remembered.
+design-check:       ## the registry ↔ HTML projection, released-rule immutability, the ledger
+	node docs/design/language/check-calcium.mjs
+	node docs/design/language/lint-immutable.mjs
+	@# **The ledger belongs here and not in `roadmap`**, which reports and never
+	@# fails. Its fourth check is a claim about the tree that goes stale the
+	@# moment a rule lands, so it has to gate rather than report.
+	node tools/rule-status.mjs
+	@# The fixtures are the page's projection (AUTHORITY.md §Fixtures); --check writes nothing.
+	npx tsx tools/design/fixtures.ts --check
+	@# The themes are the registry's projection (C10 §4b); --check renders in memory and writes nothing.
+	node tools/theme/from-registry.mjs --check
+
+# **The page's own conformance checks, executed** (AUTHORITY.md §Browser conformance).
+# `chromium` is the explicit install step — pinned by version and digest, into `.cache/`
+# (A04 §3) — and `design-browser` proves the runner can see a failure before it
+# loads the page. Not inside `design-check`: the pre-commit hook must not need a
+# 120 MB download.
+chromium:           ## fetch the pinned headless Chromium, verify its digest, unpack it
+	node tools/design/chromium.mjs install
+
+design-browser: chromium  ## the generated page in the pinned browser: every flag pass, no console error
+	npx vitest run --dir test/browser
+
+# **Not inside `design-check`**, because its subject is a ref the working tree cannot
+# supply: a clone with no `origin/main` fails it by design (AUTHORITY.md §Release 4),
+# and the pre-commit hook must not depend on what was last fetched.
+released:           ## the released baseline against origin/main's copy — added, never changed or removed
+	node tools/design/released-against.mjs --ref origin/main
+
+design:             ## regenerate the HTML, KEYS.md and the fixtures from the registry
+	node docs/design/language/build-calcium.mjs
+	npx tsx tools/design/fixtures.ts
+	@# KEYS.md's first half is the registry's projection and check-calcium compares
+	@# it by prefix; build-calcium does not write it, so a release that only ran
+	@# the two lines above left the revision stale and design-check refused it.
+	npx tsx tools/keymap-table.mjs
+
+# **The types are a gate, and they were not one.** `make enforce` ran 402 files
+# of source scans, the suite ran 6 416 rows, golden 528, tier 5 136 and three
+# examples — all green over a `test/support/` file with a module path that
+# resolves to nothing and two tape members whose `state` is not a `CallState`.
+# Nothing in the chain compiles the tests: vitest strips types rather than
+# checking them, and `npm run check` was a command a person remembered. The
+# tape's two members drew **no mark at all**, which is what an unset optional
+# field looks like from a frame — a defect the golden recorded and could not
+# report, because an absent mark is a legible picture.
+typecheck:          ## tsc over src and test — vitest strips types, it does not check them
+	npx tsc --noEmit
+
+enforce: design-check typecheck  ## A03 — module graph, source scans, supply chain
 	npm run enforce
 
 # **A gate that reads a generated artefact has to generate it** — the `check`
@@ -92,7 +165,15 @@ catalogue:          ## the frames `instruments` and `test` sweep — generated, 
 
 # **A prerequisite, not a step in `all`** — the degraded jobs run `make test` alone
 # and PC11 lives in the suite too, so the dependency has to travel with the target.
-instruments: catalogue  ## every instrument's own fixture, and the inventory by equality (group 9)
+#
+# **`chromium` and the build for the same reason.** The design page's runner has
+# its fixture under `test/browser/`, which needs the pinned browser; and eight
+# fixtures read `dist/` — `profile.mjs`'s from the start, then the bundle, the
+# quantised writer, three benches and the docker recorder. A stale `dist/` is
+# worse than a missing one: the rows pass against the previous commit's code
+# (`check`'s F447, one target on). `chromium` fetches once and verifies after.
+instruments: catalogue chromium  ## every instrument's own fixture, and the inventory by equality (group 9)
+	npm run build
 	node tools/instruments.mjs
 
 mutate: catalogue     ## every mutation run, serially, the tree hashed either side (F952) — SHARD=k/n ONLY=substr
@@ -137,6 +218,12 @@ regime:             ## what a source-scan pass costs *here*, beside the recorded
 	node tools/scan-cost.mjs
 
 test: catalogue               ## tiers 1-4, and the examples' own suites
+	@# **`example-bins` executes each example's launcher, and the launcher reads
+	@# `dist/`** — so this target read a generated artefact without generating it,
+	@# F447's class at the second gate (F1459). CI ran `check` first and hid it;
+	@# a rebased worktree ran `test` first and failed F56's three rows on the
+	@# pre-rebase build, then passed them 16 of 16 once `e2e` had rebuilt.
+	npm run build
 	npm run test
 	@# **The example suites were in no target at all** — `make check` type-checks
 	@# them and nothing ran them, so `examples/docker`'s 313 rows could go red

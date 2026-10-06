@@ -147,6 +147,116 @@ export const ONE_PER_KIND: Readonly<Record<KnownBlockKind, Block>> = Object.free
     ],
   }),
 
+  // §018 — **a radio group, and the second option chosen rather than the
+  // first** (C09 I105). Element zero is the degenerate one: with `linear`
+  // chosen, *focused* and *chosen* land on the same option in every corpus
+  // frame, and the cell the invariant is about — focused and NOT chosen —
+  // would be unreachable from this representative.
+  choice: block({
+    kind: "choice",
+    id: "choice-1",
+    label: "scale",
+    exclusive: true,
+    options: [
+      { id: "linear", label: "linear" },
+      { id: "log", label: "log", chosen: true },
+      { id: "log2", label: "log2" },
+    ],
+  }),
+
+  // §018 — a slider with its handle off centre, so the two halves of the track
+  // are different lengths and a frame that drew them equal would say so.
+  control: block({
+    kind: "control",
+    id: "control-1",
+    label: "learning rate",
+    at: 0.42,
+    value: "3e-4",
+  }),
+
+  // C04 §3ao — the tape. **Five members, one running and one settled**, so
+  // the representative reaches both orderings of the state part (§030) and is
+  // wide enough that the corpus's narrow widths slide the window rather than
+  // drawing it whole — a fixture that always fits tests the ladder's first
+  // rung and nothing below it.
+  tape: block({
+    kind: "tape",
+    id: "tape-1",
+    members: [
+      { id: "seams", label: "seams", detail: "2:53", state: "succeeded" },
+      { id: "arm", label: "arm", detail: "3:46", state: "succeeded" },
+      { id: "count", label: "count", detail: "4:02", state: "running" },
+      { id: "probe", label: "probe", detail: "0:11", state: "queued" },
+      { id: "trace", label: "trace", detail: "1:30", state: "failed" },
+    ],
+    current: "count",
+  }),
+
+  // C04 §3ap — §105's own tree. **Three depths, a collapsed folder, a leaf
+  // at the root and two asides**, so the representative reaches every rung of
+  // C04 I130's ladder across the corpus's widths — guides at the wide ones, the
+  // asides gone and the indent capped at the narrow ones — and both halves of
+  // the twisty pair.
+  tree: block({
+    kind: "tree",
+    id: "tree-1",
+    nodes: [
+      {
+        id: "src",
+        label: "src",
+        expanded: true,
+        children: [
+          {
+            id: "interaction",
+            label: "interaction",
+            expanded: true,
+            children: [
+              { id: "parser", label: "parser", children: [{ id: "decode", label: "decode.ts" }] },
+              { id: "frame", label: "frame.ts", aside: "4.1 kB" },
+            ],
+          },
+          { id: "data", label: "data", children: [] },
+        ],
+      },
+      { id: "package", label: "package.json", aside: "1.2 kB" },
+    ],
+  }),
+
+  // C04 §3aq — §105's split. **The left pane overflows and the right does
+  // not**, so the divider carries the left pane's thumb (C04 I133 S2) and the
+  // right pane draws no bar of its own — both halves of the column rule in one
+  // representative. The right pane is a `code` block, which declares no
+  // elements, so the pane's own element (§3aq S6) is reached too.
+  split: block({
+    kind: "split",
+    id: "split-1",
+    height: 4,
+    children: [
+      block({ kind: "raw", id: "split-files", text: "src/\n  interaction/\n  data/\n  presentation/\n  shell/\nREADME.md\npackage.json" }),
+      block({
+        kind: "code",
+        id: "split-code",
+        language: "typescript",
+        text: "export function layout(b, w, h) {\n  b = chooseRep(b, w);\n  solveW(b, w);\n  return b;\n}",
+      }),
+    ],
+  }),
+
+  // §105's form, whole: an error replacing a hint, a hint kept, a default button.
+  form: block({
+    kind: "form",
+    id: "form-1",
+    fields: [
+      { id: "name", label: "name", value: "prism-serve" },
+      { id: "port", label: "port", value: "80", hint: "the port it listens on", error: "ports below 1024 need root" },
+      { id: "replicas", label: "replicas", value: "3", hint: "0 stops the service" },
+    ],
+    buttons: [
+      { id: "save", label: "save", submit: true, action: { kind: "fill", label: "save", command: "serve" } },
+      { id: "cancel", label: "cancel" },
+    ],
+  }),
+
   tip: block({
     kind: "tip",
     id: "tip-1",
@@ -413,7 +523,7 @@ export function psTable(
           {
             text: string;
             tone?: "ok" | "error" | "muted";
-            glyph?: "running" | "ok" | "error" | "queued";
+            glyph?: "work-unit" | "ok" | "error" | "queued";
             spark?: readonly number[];
           }
         >;
@@ -423,7 +533,7 @@ export function psTable(
         id: `r${i + 1}`,
         cells: {
           expand: { text: "" },
-          glyph: { text: "", glyph: "running" },
+          glyph: { text: "", glyph: "work-unit" },
           uuid: { text: uuids[i % uuids.length] ?? "0000000" }, // cells-ok
           family: { text: `family-${String(i + 1)}` },
           status: { text: states[i % states.length] ?? "running" }, // cells-ok
@@ -440,7 +550,7 @@ export function psTable(
           spark: { text: "", spark: lossCurve(12 + (i % 5)) },
           age: { text: ages[i % ages.length] ?? "1m" }, // cells-ok
           kind: { text: "candidate" },
-          owner: { text: "malachy@fmx.io" },
+          owner: { text: "someone@example.com" },
           mr: { text: `!12${String(i)}` },
         },
       };
@@ -660,7 +770,7 @@ export const THE_ILLUSTRATION: Hunk = hunkOf(
     "     matchLabels:",
     "-      app: volatility-estimator",
     "+      app: volatility-estimator",
-    "+      prism.fmx.io/family: volatility",
+    "+      prism.example.com/family: volatility",
     "   replicas: 2",
     "   template:",
   ],

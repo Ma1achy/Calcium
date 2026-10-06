@@ -8,18 +8,19 @@
 // Every component involved was finished and had its own passing suite.
 import { describe, expect, it, vi } from "vitest";
 
-import { defaultKeymap } from "../../src/interaction/router/keymap.js";
+import { defaultKeymap, keySlot, RESERVED_ACTIONS } from "../../src/interaction/router/keymap.js";
 import { MENU_ID } from "../../src/interaction/completion/index.js";
 import { SEARCH_ID } from "../../src/interaction/history/index.js";
-import { buildGraph } from "../support/session.js";
+import { buildGraph, COPY_MODES } from "../support/session.js";
 import { createKeyEffects } from "../../src/shell/keys.js";
-import { createFocusStore } from "../../src/interaction/router/focus.js";
+import { createFocusStore, FOCUS_ORDER } from "../../src/interaction/router/focus.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import type { Graph } from "../../src/shell/construct.js";
 
 import { producerContext } from "../support/producer-context.js";
 import { navElement } from "../support/focus.js";
 import type { Action } from "../../src/data/viewmodel/index.js";
+import type { NavElement } from "../../src/presentation/blocks/index.js";
 const key = (k: { name: string; ctrl?: boolean; meta?: boolean; shift?: boolean }): Key => ({
   name: k.name,
   ctrl: k.ctrl ?? false,
@@ -55,32 +56,51 @@ function recordingViewport(): {
 }
 
 /** A dismissable layer, so `activeTarget` resolves to `overlay` (C16 §3). */
-/**
- * A pushed view, so `activeTarget` resolves to `pushedView` (C16 I24).
- *
- * Pushed directly rather than through a `view` action: this suite is about the
- * effect table being total, and driving an action would make the row depend on
- * C23's dispatch as well. The view's own file drives it the real way.
- */
-function openView(graph: Graph): void {
-  graph.overlays.push({
-    id: "probe-view",
-    kind: "view",
-    placement: { kind: "fill" },
-    content: [],
-    dismissable: true,
-  });
-}
-
 function openOverlay(graph: Graph): void {
   graph.overlays.push({
     id: "probe",
     kind: "overlay",
     placement: { kind: "centred" },
     content: [],
-    dismissable: true,
+    blocking: false,
+    dismissal: "escape",
     // Declared, because a centred layer must be (C15 I20).
     width: 20,
+  });
+}
+
+/**
+ * A child surface, so the `child` rung has a subject (C16 I49).
+ *
+ * **Nothing is cleared first, and that is the measurement C22 I110 bought.**
+ * Until the child's blocks became an entry the attach pushed a `kind: "view"`
+ * layer, C15 refused a view onto a non-empty stack, and a peek left by an
+ * earlier binding in this walk made the attach throw — so the helper opened by
+ * emptying the stack. The entry route touches no layer at all.
+ */
+function attachChild(graph: Graph): void {
+  graph.surface.open({
+    schema: "calcium.child-surface/1",
+    id: "probe-child",
+    keymap: [],
+    render: () => [],
+    onAction: () => undefined,
+  });
+}
+
+/**
+ * A panel, which is anchored, non-blocking and closed by `escape` — and refused
+ * in any other combination (C15 I27). The menu's four rows and the search's one
+ * answer here rather than at `overlay` since M8.
+ */
+function openPanel(graph: Graph): void {
+  graph.overlays.push({
+    id: "probe-panel",
+    kind: "panel",
+    placement: { kind: "anchored", row: 20, rows: 1, prefer: "above" },
+    content: [],
+    blocking: false,
+    dismissal: "escape",
   });
 }
 
@@ -148,7 +168,50 @@ function enterLive(graph: Graph): void {
     );
   }
   graph.editor.clear();
+  // **From the prompt, as a user arrives** — `enterInside` below does the same.
+  // Without it the walk's previous row decides where `↓` lands: the inside's
+  // `copy` row (C16 §6c) leaves focus in `interact` mode, where `⇥` is the
+  // inside's and not `liveBlock`'s, and the next `liveBlock` row fails for a
+  // reason that has nothing to do with its own effect.
+  graph.focus.reset();
   graph.router.dispatch(press({ name: "down" }));
+}
+
+/**
+ * Focus **inside** a block, reached the way a reader reaches it (C26 I26, §102).
+ *
+ * `enterLive`'s argument one rung up: through the keystrokes rather than by
+ * calling `setMode`, so the setup is a claim about the mechanism. The block has
+ * to be one with an inside — a plot with a camera, which is what declares
+ * `viewState` — because `⏎` on a table row dispatches its `activate` instead.
+ */
+function enterInside(graph: Graph): void {
+  if (!graph.transcript.entries.some((e) => e.doc.command === "/plot")) {
+    graph.transcript.append(
+      {
+        schema: "tui.view/1",
+        command: "/plot",
+        status: "ok",
+        blocks: [{ kind: "plot", id: "camera-plot", form: "line", height: 3, camera: { azimuth: 0 }, series: [{ label: "s", values: [1, 2, 3] }] }],
+        meta: {
+          verb: "plot",
+          adapter: "passthrough",
+          exitCode: 0,
+          durationMs: 0,
+          truncated: false,
+          argv: [],
+          stderr: "",
+          transport: "local",
+          origin: "user",
+        },
+      } as never,
+      { streaming: true },
+    );
+  }
+  graph.editor.clear();
+  graph.focus.reset();
+  graph.router.dispatch(press({ name: "down" }));
+  graph.router.dispatch(press({ name: "enter" }));
 }
 
 describe("C22 §3 step 11 — the effect table", () => {
@@ -157,24 +220,90 @@ describe("C22 §3 step 11 — the effect table", () => {
     // is the shape that let fourteen bindings go unexecuted while every test
     // passed: the list agrees with itself, and the table it was copied from is
     // free to grow a row nobody dispatches. `/help` renders that row.
-    const { graph } = await buildGraph();
+    //
+    // **Every reserved id has a handler here** (C16 §6c, C22 I134). Without
+    // one a reserved row resolves as though absent and the key passes — which
+    // is the design, and would read here as a row reaching nothing. With one,
+    // the walk also shows each reserved row reaches the application.
+    const handled = new Set<string>();
+    const keyActions = Object.fromEntries(
+      Object.keys(RESERVED_ACTIONS).map((id) => [id, () => void handled.add(id)]),
+    );
+    const { graph } = await buildGraph({ keyActions });
     graph.lifecycle.acquire();
 
     expect(defaultKeymap.length, "the table is not empty, so this is not vacuous").toBeGreaterThan(0);
 
+    const base = defaultKeymap.filter((b) => b.profile !== "enhanced-terminal");
+    // **The enhanced routes are skipped, and the skip is checked rather than
+    // asserted** (C16 I35, I36, M6). This graph is a default-terminal session,
+    // so a route that resolves only under the Kitty protocol reaches no handler
+    // here — correctly. What the walk would lose is the *action*, and it loses
+    // nothing: I36 requires every action to have a base route, so each skipped
+    // row's effect is still exercised by the row that carries it. Asserted,
+    // because a skip nobody checks is a hole shaped like a decision.
     for (const b of defaultKeymap) {
+      if (b.profile !== "enhanced-terminal") continue;
+      expect(
+        base.some((r) => r.action === b.action),
+        `${b.action} is skipped here and covered by its default-terminal route`,
+      ).toBe(true);
+    }
+
+    /** Rows pressed at, or dispatched to, a target other than their own (F1457, ruling 88). */
+    const misaimed: string[] = [];
+    for (const b of base) {
       if (b.target === "overlay") openOverlay(graph);
+      if (b.target === "panel") openPanel(graph);
+      // **The `child` rung needs a child** (C16 I49). Without one `activeTarget`
+      // answers `prompt` and `⌃]` is typed into the editor — the row would fail
+      // for a reason that has nothing to do with whether its effect exists,
+      // which is the argument `pushedView` made one target earlier.
+      if (b.target === "child") attachChild(graph);
       // `liveBlock` needs both halves of what `activeTarget` reads: a live
       // entry in C13 and focus stored there (C16 §3).
-      if (b.target === "liveBlock") enterLive(graph);
-      // **The target that had no way to be reached from here** (C16 I24). Until
-      // this line, `pushedView`'s rows would have been dispatched with no view
-      // open — `activeTarget` would answer `prompt`, `n` would be typed into
-      // the editor, and the row would have failed for a reason that has nothing
-      // to do with whether its effect exists.
-      if (b.target === "pushedView") openView(graph);
+      if (b.target === "liveBlock") {
+        // **A re-run leaves nothing to enter** (F1457): `⇧⏎` re-runs the live
+        // entry, and the entry it leaves live is a status and a notice with no
+        // element, so `↓` stayed at the prompt and the next re-run row was
+        // pressed there — consumed as `insertNewline`. A fresh table for each
+        // re-run row, as T2.17's `liveBlock` way in does for every row.
+        if (b.action === "rerunEntry") graph.transcript.append(LIVE_DOC as never, { streaming: true });
+        enterLive(graph);
+      }
+      // **The prompt, and `global`'s way in, from the prompt** (F1457): a row
+      // with no setup was pressed wherever the previous row left focus, and
+      // `prompt:⌥v` was answered by `liveBlock`'s own `⌥v`.
+      if (b.target === "prompt" || b.target === "global") graph.focus.reset();
+      // **The inside needs a block that has one** (C26 I26, §102). `enterLive`'s
+      // table declares no view state, so `⏎` there dispatches a row action and
+      // leaves the mode alone — the row would fail for a reason that has nothing
+      // to do with whether its effect exists, which is `child`'s argument above.
+      if (b.target === "interaction") enterInside(graph);
+      // **The watch row is a stored location** (C16 I76): without it the row's
+      // digits are typed into the editor, which is the `child` argument again.
+      if (b.target === "watchRow") graph.focus.toWatches("w", 0);
+      // **The `copy` rung's two targets, and they were unreachable** (C16 I50).
+      // `FRAME` hard-wired both flags to `false`, so no row at either could
+      // resolve — and `nativeSelection`'s `escape` row passed anyway, consumed
+      // by whatever layer the previous iteration had left open. The second
+      // target arriving at the same rung is what made that visible, which is
+      // the argument for walking a table rather than listing it.
+      COPY_MODES.native = b.target === "nativeSelection";
+      COPY_MODES.semantic = b.target === "semanticSelection";
+      const row = `${b.target}:${keySlot(b.key)} -> ${b.action}`;
+      // **The precondition, asserted** (`test/support/README.md`, F1457): a
+      // row pressed wherever the previous one left focus is consumed
+      // *somewhere*, and passes for a reason other than the one it names.
+      // `global` is not a place focus rests, so its rows are pressed at the
+      // prompt and reach it as step 3's fallback.
+      const expected = b.target === "global" ? "prompt" : b.target;
+      if (graph.router.target !== expected) misaimed.push(`${row} pressed at ${graph.router.target}`);
       const consumed = graph.router.dispatch(press(b.key));
-      expect(consumed, `${b.target}:${b.key.name} -> ${b.action} reached no handler`).toBe(true);
+      expect(consumed, `${row} reached no handler`).toBe(true);
+      // And where it was dispatched, read from the router's own record.
+      const at = graph.router.lastStages.find((st) => st.startsWith("target:"));
+      if (at !== undefined && at !== `target:${expected}`) misaimed.push(`${row} dispatched at ${at}`);
       if (b.target === "overlay") graph.overlays.dismiss("probe");
       // **Every layer, not just the probe.** `reverseSearch` is a *prompt*
       // binding that pushes one, and nothing here was taking it back down — so
@@ -184,8 +313,23 @@ describe("C22 §3 step 11 — the effect table", () => {
       // claimed to have reset, and the failure named the new binding rather
       // than the leak.
       while (graph.overlays.top !== null) graph.overlays.dismiss(graph.overlays.top.id);
+      // **And the inside, for the same reason** (C22 I133): `exitInside` used to
+      // be the last `interaction` row and left the mode as it found it; with
+      // `keepField` after it — a no-op with no field held — the walk stayed
+      // inside and every `liveBlock` row after it resolved at `interaction`.
+      if (b.target === "interaction") graph.focus.setMode("navigate");
+      if (b.target === "watchRow") graph.focus.reset();
+      COPY_MODES.native = false;
+      COPY_MODES.semantic = false;
       graph.editor.clear();
     }
+    // **Sixteen entries before ruling 88**, eight rows pressed and dispatched
+    // elsewhere: F1457's two, and six `global` rows pressed at `liveBlock`,
+    // where `pageup` and `pagedown` are `liveBlock`'s own block paging.
+    expect(misaimed, "every row is pressed at the target its binding names").toEqual([]);
+    expect([...handled].sort(), "every reserved row reached its application handler").toEqual(
+      Object.keys(RESERVED_ACTIONS).sort(),
+    );
   });
 
   it("T2.14 (C16 I21): every editing operation C17 exposes is reached by some binding", async () => {
@@ -226,6 +370,20 @@ describe("C22 §3 step 11 — the effect table", () => {
       "insert",
       "setText",
       "clear",
+      // **The borrow, and it is excluded on the invariant's own words** (C17
+      // I28, §101). `snapshot` is a read like `selection`; `restore` is
+      // explicitly *not an edit* — that is the half of I28 T1.50 asserts, and
+      // a key that could reach it would put the reader's held line back
+      // whenever they pressed it, which is not an editing operation but a
+      // second owner's undo. The driver is the question (C23 I73), and the
+      // question is not a binding at this target.
+      "snapshot",
+      "restore",
+      // **The rest of the borrow, excluded for the same reason** (C17 I29,
+      // §052). `hold` and `resume` swap the owner's undo stack with the line;
+      // a key reaching either would hand one owner's history to the other.
+      "hold",
+      "resume",
       // **Roadmap 30's two, and each is excluded for its own reason.**
       // `resolved` is a *read* like `text` — the buffer with chips expanded, for
       // the submission site — and not an editing operation at all. `insertChip`
@@ -233,7 +391,20 @@ describe("C22 §3 step 11 — the effect table", () => {
       // table does not index: a **paste**, in the same handler, which is why a
       // scan over key bindings cannot see it.
       "resolved",
+      // `resolved`'s sibling (C17 I37): where each chip stands in it, from the one
+      // loop, read at the same submission site and nowhere else.
+      "resolvedChips",
       "insertChip",
+      // **A reader, and the one a projection asks** (C17 I27, §5d). It answers
+      // which chip the caret is on and edits nothing; its caller is C22's
+      // preview, which is derived from the caret rather than bound to a key —
+      // so a scan over key bindings cannot see it and should not.
+      "chipAt",
+      // **Driven by the shell after an editor returns** (C17 I35, C22 I144).
+      // `⌥o` is a binding, and it reaches `editChip` through an asynchronous
+      // handoff rather than as the key's effect — the edit is what came back
+      // from `$EDITOR`, which a scan over key bindings cannot see.
+      "editChip",
       // Construction rather than an edit — it records no undo unit and
       // `createEditor` is its only caller (C17 §5).
       "seed",
@@ -261,9 +432,22 @@ describe("C22 §3 step 11 — the effect table", () => {
     }) as typeof real;
 
     const effects = createKeyEffects({
+      // No reply holds the line in this harness (C23 I77).
+      reply: () => null,
+      emit: () => undefined,
+      submit: () => undefined,
+      // C22 I133 — the prompt's `⏎` is a row now, so this walk reaches it; the
+      // line it sends is the composition root's to resolve, and nothing here is.
+      submitPrompt: () => undefined,
+      keepField: () => undefined,
+      runAction: () => undefined,
+      focusTranscript: () => undefined,
+      watchKeys: { focusPrevious: () => undefined, step: () => undefined, open: () => undefined },
+      previewKeys: { scroll: () => undefined, open: () => undefined },
+      // C16 I49 — the child's one exit. Counted here rather than stubbed
+      // silent, because this harness is the one that walks every action.
+      detachChild: () => undefined,
       editor: spy,
-      // The third owner of `pushedView`, as the root wires it (C28 §3c).
-      profileView: graph.profileView,
       pageBlock: graph.pageBlock,
       orbitBlock: graph.orbitBlock,
       tiltBlock: graph.tiltBlock,
@@ -274,41 +458,19 @@ describe("C22 §3 step 11 — the effect table", () => {
       completion: graph.completion,
       overlays: graph.overlays,
       history: graph.history,
-      // A stand-in: this suite drives the editing bindings, and the view's own
-      // seven have their own file. A double rather than the real one because
-      // `createPatchView` subscribes to a transcript, and a suite about `⌃w`
-      // should not be constructing one.
-      patchView: {
-        open: () => null,
-        move: () => false,
-        // The section gesture (C16 I33). `false` is the patch view's real
-        // answer — one file, one section — so the double is not weaker than its
-        // subject here.
-        sectionNext: () => false,
-        sectionPrev: () => false,
-        pop: () => false,
-      },
-      // The same stand-in reason, and `openFor: null` is load-bearing rather
-      // than filler: it is what `onView` reads to decide which view owns a
-      // motion, so a double reporting a view open would silently route this
-      // suite's bindings to the wrong one.
-      documentView: {
-        open: () => null,
-        fill: () => false,
-        putBlock: () => false,
-        // C22 I48's seam. A stub, because this file drives the keymap rather than
-        // the view — but present, because the type is what says the two agree.
-        patch: () => ({ ok: false, reason: "closed" }) as const,
-        blockAt: () => null,
-        move: () => false,
-        sectionNext: () => false,
-        sectionPrev: () => false,
-        pop: () => false,
-        openFor: null,
-      },
-      releaseView: () => undefined,
-    enterCopyMode: () => undefined,
-    exitCopyMode: () => undefined,
+    enterNativeSelection: () => undefined,
+    enterSemanticSelection: () => undefined,
+    escapeSemanticSelection: () => undefined,
+    selectEntryUnderCaret: () => undefined,
+    selectAllLoadedEntries: () => undefined,
+    copySelectedEntries: () => undefined,
+    copyAndLeaveSemanticSelection: () => undefined,
+    toggleSemanticRect: () => undefined,
+    toast: () => undefined,
+    paneOffset: () => 0,
+    moveDivider: () => undefined,
+    moveSemanticCaret: () => undefined,
+    exitNativeSelection: () => undefined,
       manifest: null,
       viewport: recordingViewport().viewport,
       anchor: () => ({ row: 10, rows: 1 }),
@@ -342,9 +504,14 @@ describe("C22 §3 step 11 — the effect table", () => {
       },
     });
 
-    // Every prompt binding, through the table dispatch uses.
+    // Every binding a key at the prompt reaches, through the table dispatch
+    // uses: the prompt's rows, and the `global` rows whose key the prompt does
+    // not bind — step 3 answers those when the prompt passes (C16 §6c). `⌥⇧C`
+    // became a `global` row there, and it is the one path to `collapse`.
+    const promptSlots = new Set(defaultKeymap.filter((b) => b.target === "prompt").map((b) => keySlot(b.key)));
     for (const b of defaultKeymap) {
-      if (b.target !== "prompt") continue;
+      const reached = b.target === "prompt" || (b.target === "global" && !promptSlots.has(keySlot(b.key)));
+      if (!reached) continue;
       const effect = effects.table[b.action];
       expect(effect, `${b.action} has no effect`).toBeDefined();
       effect?.();
@@ -365,7 +532,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     expect(unreached, "a C17 editing method no key can reach").toEqual([]);
   });
 
-  it("T1.4l (C09 I13): a constructed graph can render all twenty-two kinds", async () => {
+  it("T1.4l (C09 I13): a constructed graph can render all twenty-eight kinds", async () => {
     // **`table`, `plot` and `patch` register through the public mechanism, and
     // nobody called it.** `defaults: true` ships C09's sixteen; the other
     // three came from C11, C12 and C25 and no composition root registered them,
@@ -390,7 +557,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     // C04 T2.10 holds the derivable half -- a literal list checked against
     // `BlockKind` at compile time, where adding a kind is a type error. This row
     // is the runtime half and it can only count.
-    expect(graph.blocks.kinds.length, "C09's nineteen and the three registered").toBe(22);
+    expect(graph.blocks.kinds.length, "C09's twenty-five and the three registered").toBe(28);
   });
 
   it("T2.15 (C16 I22): ↓ into the live block, ↑ and Esc back out — as one sequence", async () => {
@@ -451,6 +618,114 @@ describe("C22 §3 step 11 — the effect table", () => {
     graph.transcript.append(LIVE_DOC as never, { streaming: true });
     graph.router.dispatch(press({ name: "down" }));
     expect(graph.router.target, "and a table is entered").toBe("liveBlock");
+  });
+
+  it("T2.17 (C16 I78): every focus target with keymap rows has a rung handler that consumes them", async () => {
+    // **The class, not a fourth instance** (F1339). `interaction`, then
+    // `nativeSelection` (F765), then `watchRow` each arrived with table rows and
+    // no handler registered at the target: the router's own rung takes `⌃c` and
+    // nothing else, so every row resolved and was never consulted. T1.4h found
+    // the third, and only once its fixture put focus on the row — a target it
+    // had no setup for was walked from wherever the previous row left focus,
+    // and the key was consumed *somewhere*. So this row is over `FOCUS_ORDER`
+    // rather than over the table, and asserts where it stands before it
+    // presses anything.
+    //
+    // **Reserved rows get handlers, as in T1.4h** (C16 §6c, C22 I134): with
+    // none a reserved row passes by design, which would read here as the
+    // defect.
+    const keyActions = Object.fromEntries(Object.keys(RESERVED_ACTIONS).map((id) => [id, () => undefined]));
+    const { graph } = await buildGraph({ keyActions });
+    graph.lifecycle.acquire();
+
+    /**
+     * How each target becomes the active one. **Keyed by `FOCUS_ORDER`'s own
+     * type**, so a tenth target is a compile error here until it has a way in,
+     * and the loop below refuses an absent entry at run time as well.
+     * `global` is not a place focus rests — `activeTarget` never answers it —
+     * so its rows are pressed at the prompt and reach it as step 3's fallback.
+     */
+    const REACH = {
+      child: attachChild,
+      overlay: openOverlay,
+      nativeSelection: () => void (COPY_MODES.native = true),
+      semanticSelection: () => void (COPY_MODES.semantic = true),
+      panel: openPanel,
+      interaction: enterInside,
+      prompt: (g: Graph) => g.focus.reset(),
+      watchRow: (g: Graph) => g.focus.toWatches("w", 0),
+      // A fresh table each time: `⇧⏎` re-runs the live entry, and the entry it
+      // leaves live has no rows to enter.
+      liveBlock: (g: Graph) => {
+        g.transcript.append(LIVE_DOC as never, { streaming: true });
+        g.focus.reset();
+        g.router.dispatch(press({ name: "down" }));
+      },
+      global: (g: Graph) => g.focus.reset(),
+    } satisfies Record<(typeof FOCUS_ORDER)[number], (g: Graph) => void>;
+
+    /** The stages that say the rung passed the key on (C16 §4 steps 3 and 5). */
+    const PASSED = ["global", "dropped", "child:consumed", "modal-blocked"];
+    const answered = new Map<string, number>();
+    const beforeLadder: string[] = [];
+    const shadowed: string[] = [];
+    const base = defaultKeymap.filter((b) => b.profile !== "enhanced-terminal");
+
+    for (const t of FOCUS_ORDER) {
+      const reach: ((g: Graph) => void) | undefined = (REACH as Record<string, (g: Graph) => void>)[t];
+      expect(reach, `${t} has no way in — add one to REACH`).toBeDefined();
+      for (const b of base.filter((r) => r.target === t)) {
+        const row = `${t}:${keySlot(b.key)} -> ${b.action}`;
+        reach?.(graph);
+        // **The precondition, asserted** (`test/support/README.md`): the row
+        // is about the target's handler, and a key pressed anywhere else says
+        // nothing about it.
+        expect(graph.router.target, `${row}: the fixture did not reach the target`).toBe(t === "global" ? "prompt" : t);
+        graph.router.dispatch(press(b.key));
+        const stages = graph.router.lastStages;
+        const at = stages.findIndex((st) => st.startsWith("target:"));
+        if (at === -1) {
+          // An intercept answered before the ladder (C16 I40, C16 I75) — `host.detach`,
+          // the page-scroll chords. Not a rung's key, so not this row's.
+          beforeLadder.push(row);
+        } else if (t === "global") {
+          if (!stages.includes("global")) {
+            // The prompt took it first — `?` is typed (C16 §6c's precedence).
+            shadowed.push(row);
+          } else {
+            expect(stages, `${row}: reached the fallback and nothing took it`).not.toContain("dropped");
+            answered.set(t, (answered.get(t) ?? 0) + 1);
+          }
+        } else {
+          expect(stages[at], `${row}: dispatched at another target`).toBe(`target:${t}`);
+          const after = stages.slice(at + 1);
+          expect(
+            after.filter((st) => PASSED.includes(st)),
+            `${row}: the rung passed a key its own table binds — no handler at ${t} consults the keymap`,
+          ).toEqual([]);
+          answered.set(t, (answered.get(t) ?? 0) + 1);
+        }
+        while (graph.overlays.top !== null) graph.overlays.dismiss(graph.overlays.top.id);
+        graph.focus.setMode("navigate");
+        graph.focus.reset();
+        COPY_MODES.native = false;
+        COPY_MODES.semantic = false;
+        graph.editor.clear();
+      }
+    }
+
+    // **Every target is exercised by at least one row its handler answers**,
+    // and the one exception is compared by equality: `child`'s only base row is
+    // `⌃]`, which C16 I75 takes before the ladder so that no handler is offered it.
+    const unanswered = FOCUS_ORDER.filter((t) => (answered.get(t) ?? 0) === 0);
+    expect(unanswered, "targets whose every row is answered before the ladder").toEqual(["child"]);
+    // The two residues, by equality, so a row moving into either is seen.
+    expect(beforeLadder, "rows an intercept answers").toEqual([
+      "child:c+] -> hostDetach",
+      "global:m+up -> scrollPageUp",
+      "global:m+down -> scrollPageDown",
+    ]);
+    expect(shadowed, "global rows the prompt takes first").toEqual(["global:? -> helpKeymap"]);
   });
 
   it("T1.4h2 (C22 I26): the effects that are observable from outside, each asserted", async () => {
@@ -619,6 +894,7 @@ describe("C22 §3 step 11 — the effect table", () => {
     const { graph } = await buildGraph({
       pipeline: () => ({
         submit: (line: string) => void submitted.push(line),
+        emitLocal: async () => undefined,
         seal: () => undefined,
         sealed: true,
         liveStreams: 0,
@@ -629,7 +905,7 @@ describe("C22 §3 step 11 — the effect table", () => {
         register: () => undefined,
         onAction: () => undefined,
         identityNotice: () => undefined,
-        releaseView: () => undefined,
+        refuse: () => undefined,
         visibilityChanged: () => undefined,
       resized: () => undefined,
         producerContext: () => producerContext(),
@@ -690,75 +966,11 @@ describe("C22 §3 step 12 — the read loop", () => {
     expect(graph.editor.resolved.split("\n"), "and all of them arrived").toHaveLength(200);
   });
 
-  it("T1.4h4 (C22 I46): Esc on a document view releases its parts, and before the dismiss", () => {
-    // **The wiring, not the mechanism.** T4.74 asserts that `release` stops a
-    // view's parts, by calling `release`. Removing `deps.releaseView()` from
-    // `viewPop` leaves that row green — the mechanism still works and nothing
-    // reaches it, which is the third instance in this branch of a test that
-    // verifies a thing and not its connection.
-    //
-    // Order matters and is asserted: release first, so a fetch resolving during
-    // the pop finds no registration rather than a half-dismissed view.
-    const order: string[] = [];
-    const effects = createKeyEffects({
-      // Stubs, and named as such: `viewPop` touches none of these four, and a
-      // real editor here would be scenery the row does not use.
-      editor: {},
-      completion: {},
-      overlays: {},
-      history: { entries: [], append: () => undefined },
-      patchView: {
-        open: () => null,
-        move: () => false,
-        pop: () => {
-          order.push("patch-pop");
-          return false;
-        },
-      },
-      documentView: {
-        open: () => null,
-        fill: () => false,
-        putBlock: () => false,
-        blockAt: () => null,
-        move: () => false,
-        sectionNext: () => false,
-        sectionPrev: () => false,
-        pop: () => {
-          order.push("dismiss");
-          return true;
-        },
-        // Open, which is the state the branch under test needs. A double
-        // reporting `null` here routes to the patch view and the row passes
-        // while asserting nothing — the state the test claims must be built.
-        openFor: "/ps --watch",
-      },
-      releaseView: () => void order.push("release"),
-      visibilityChanged: () => undefined,
-      resized: () => undefined,
-      manifest: null,
-      viewport: recordingViewport().viewport,
-      anchor: () => ({ row: 10, rows: 1 }),
-      overlayRegion: () => ({ width: 80, height: 24 }),
-      redraw: () => undefined,
-      focus: createFocusStore(),
-      liveElements: () => [],
-      liveEntryId: () => null,
-      focusedElements: () => [],
-      focusedEntryId: () => null,
-      neighbourEntry: () => null,
-      cursorBlock: () => undefined,
-      rerunEntry: () => undefined,
-      onAction: () => undefined,
-      schedule: (fn: () => void) => {
-        fn();
-        return { [Symbol.dispose]: () => undefined };
-      },
-    } as unknown as Parameters<typeof createKeyEffects>[0]);
-
-    effects.table["viewPop"]?.();
-    expect(order, "released at the pop, and before it").toEqual(["release", "dismiss"]);
-    expect(order, "and the patch view was not the one popped").not.toContain("patch-pop");
-  });
+  // ~~**T1.4h4**~~ — **struck with the document view** (C22 §13a, R-EXA-082, F1253). It
+  // asserted that `viewPop` released the view's parts *before* dismissing it — the wiring
+  // rather than the mechanism, which is a distinction worth keeping even though this
+  // instance of it has gone. There is no pushed view to pop and no parts registered
+  // against one; a run's parts are its entry's, and C13 evicts them with the entry.
 
   it("T1.14 (C22 I32): a lone Esc reaches the router without a second keystroke", async () => {
     // **The empty batch is the one that needs a wake.** `Esc` is held for
@@ -841,21 +1053,13 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
     const effects = createKeyEffects({
       editor: {},
       completion: {},
-      overlays: {},
+      // **The one read construction makes** (C15 I32): the effects subscribe to
+      // the stack to hold a displaced panel, so a stand-in without it throws
+      // before any row here runs.
+      overlays: { subscribe: () => ({ [Symbol.dispose]: () => undefined }) },
       history: { entries: [], append: () => undefined, next: () => null },
-      patchView: { open: () => null, move: () => false, pop: () => false },
-      documentView: {
-        open: () => null,
-        fill: () => false,
-        putBlock: () => false,
-        blockAt: () => null,
-        move: () => false,
-        sectionNext: () => false,
-        sectionPrev: () => false,
-        pop: () => false,
-        openFor: null,
-      },
-      releaseView: () => undefined,
+      // No reply holds the line (C23 I77).
+      reply: () => null,
       visibilityChanged: () => undefined,
       resized: () => undefined,
       manifest: null,
@@ -1000,21 +1204,13 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
     const effects = createKeyEffects({
       editor: { copyText: (t: string) => void kill.push(t) },
       completion: {},
-      overlays: {},
+      // **The one read construction makes** (C15 I32): the effects subscribe to
+      // the stack to hold a displaced panel, so a stand-in without it throws
+      // before any row here runs.
+      overlays: { subscribe: () => ({ [Symbol.dispose]: () => undefined }) },
       history: { entries: [], append: () => undefined, next: () => null },
-      patchView: { open: () => null, move: () => false, pop: () => false },
-      documentView: {
-        open: () => null,
-        fill: () => false,
-        putBlock: () => false,
-        blockAt: () => null,
-        move: () => false,
-        sectionNext: () => false,
-        sectionPrev: () => false,
-        pop: () => false,
-        openFor: null,
-      },
-      releaseView: () => undefined,
+      // No reply holds the line (C23 I77).
+      reply: () => null,
       visibilityChanged: () => undefined,
       resized: () => undefined,
       manifest: null,
@@ -1039,6 +1235,10 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
       cursorBlock: () => undefined,
       rerunEntry: () => undefined,
       onAction: () => undefined,
+      // C22 I116 — the copy's confirmation; these rows are about the clipboard.
+      toast: () => undefined,
+      paneOffset: () => 0,
+      moveDivider: () => undefined,
       schedule: (fn: () => void) => {
         fn();
         return { [Symbol.dispose]: () => undefined };
@@ -1112,134 +1312,22 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
   });
 });
 
-describe("C16 I33 — the section gesture, at one target and three owners", () => {
-  /**
-   * The three owners as doubles, each counting what it was asked.
-   *
-   * `openFor` and `section` are the state the ladder reads, so they are built
-   * rather than defaulted: a double reporting no view open routes the gesture
-   * to the patch view and the row passes while asserting nothing.
-   */
-  const owners = (up: "profile" | "document" | "patch") => {
-    const calls: string[] = [];
-    const answer = (who: string, verdict: boolean) => () => {
-      calls.push(who);
-      return verdict;
-    };
-    const deps = {
-      editor: {},
-      completion: {},
-      overlays: {},
-      history: { entries: [], append: () => undefined },
-      profileView: {
-        section: up === "profile" ? "app" : null,
-        nextCard: () => false,
-        move: () => false,
-        pop: () => false,
-        // **`true` here and `false` at the other two**, so a ladder that ran
-        // every owner would be caught by the count as well as by the answer.
-        sectionNext: answer("profile:next", true),
-        sectionPrev: answer("profile:prev", true),
-      },
-      documentView: {
-        open: () => null,
-        fill: () => false,
-        putBlock: () => false,
-        blockAt: () => null,
-        move: () => false,
-        pop: () => false,
-        sectionNext: answer("document:next", false),
-        sectionPrev: answer("document:prev", false),
-        openFor: up === "document" ? "/ps --watch" : null,
-      },
-      patchView: {
-        open: () => null,
-        move: () => false,
-        pop: () => false,
-        sectionNext: answer("patch:next", false),
-        sectionPrev: answer("patch:prev", false),
-      },
-      releaseView: () => undefined,
-      visibilityChanged: () => undefined,
-      resized: () => undefined,
-      manifest: null,
-      viewport: recordingViewport().viewport,
-      anchor: () => ({ row: 10, rows: 1 }),
-      overlayRegion: () => ({ width: 80, height: 24 }),
-      redraw: () => undefined,
-      focus: createFocusStore(),
-      liveElements: () => [],
-      liveEntryId: () => null,
-      focusedElements: () => [],
-      focusedEntryId: () => null,
-      neighbourEntry: () => null,
-      cursorBlock: () => undefined,
-      rerunEntry: () => undefined,
-      onAction: () => undefined,
-      schedule: (fn: () => void) => {
-        fn();
-        return { [Symbol.dispose]: () => undefined };
-      },
-    } as unknown as Parameters<typeof createKeyEffects>[0];
-    return { effects: createKeyEffects(deps), calls };
-  };
-
-  it("T1.3v (C16 I33): `tab` is one binding at `pushedView`, a different one at `liveBlock`, and the section gesture reaches whichever owner is up", () => {
-    // **The keymap half — one table, two targets.** The ladder is what
-    // separates them, so a second table for the profiler would satisfy every
-    // assertion about the view and be the thing C16 I24 exists to refuse.
-    const row = (target: string, shift: boolean): string | undefined =>
-      defaultKeymap.find(
-        (b) => b.target === target && b.key.name === "tab" && (b.key.shift ?? false) === shift,
-      )?.action;
-
-    expect(row("pushedView", false)).toBe("viewNextSection");
-    expect(row("pushedView", true)).toBe("viewPrevSection");
-    expect(row("liveBlock", false), "the same key one target over").toBe("entryNext");
-    expect(row("liveBlock", true)).toBe("entryPrev");
-    expect(row("prompt", false), "and `complete` at the prompt, which never meets them").toBe(
-      "complete",
-    );
-
-    // **The ladder half — each owner, and only that owner.** The profile view
-    // wins when a section is open; the document view when it has an `openFor`;
-    // the patch view otherwise. Asserted as the *set* of calls, because an
-    // effect that asked every owner and returned the first `true` would answer
-    // correctly for the profiler and wrongly for the other two.
-    for (const [up, next, prev] of [
-      ["profile", "profile:next", "profile:prev"],
-      ["document", "document:next", "document:prev"],
-      ["patch", "patch:next", "patch:prev"],
-    ] as const) {
-      const { effects, calls } = owners(up);
-      effects.table["viewNextSection"]?.();
-      effects.table["viewPrevSection"]?.();
-      expect(calls, `${up} is the owner, alone`).toEqual([next, prev]);
-    }
-
-    // **The member is required rather than optional, and this is the reading
-    // that says why.** An owner with one section and an owner at its last
-    // section both answer `false`, so the return value cannot tell *no further
-    // section* from *no sections at all* — and an optional member would add a
-    // third silence indistinguishable from both. The patch view's `false` is a
-    // real answer (one file is one section) and the profile view's `true` is
-    // the same call on the same gesture; nothing in the return separates a
-    // refusal from an absence, which is the whole of C16 I33's argument.
-    //
-    // What is assertable here is the consequence: the effect discards the
-    // verdict, so **a refusal is not retried at another owner**. The patch view
-    // refuses every time, and the gesture stops there rather than walking down
-    // the ladder looking for an owner that says yes — which is what a `false`
-    // read as *not mine* would do, and is the defect this shape prevents.
-    const refusing = owners("patch");
-    refusing.effects.table["viewNextSection"]?.();
-    refusing.effects.table["viewNextSection"]?.();
-    expect(refusing.calls, "asked twice, and no other owner consulted").toEqual([
-      "patch:next",
-      "patch:next",
-    ]);
-  });
-});
+// **T1.3v is struck with the target and its nine actions** (R-EXA-082, F1254).
+//
+// It was C16 I33's measured instance: `tab` is one binding at `pushedView` and
+// a different one at `liveBlock`, and the section gesture reaches whichever
+// owner is up. There were three owners — the patch view, the document view and
+// the profiler's deck — and the row's whole value was that a shared target with
+// several owners is where a *silence* is indistinguishable from a refusal. All
+// three are gone: a run's detail expands in place, a verb's result is an entry,
+// and the profiler's deck is an entry.
+//
+// **I33 is amended rather than retired** (C16 I33): its live subject is
+// `panel`, whose owners are a completion menu, a reverse search and a command
+// palette, and the rule is the same one — an owner that cannot answer says so
+// rather than doing nothing. The row that would assert it is M15's, where the
+// second panel owner lands; there is one today, so writing it now would be a
+// row about a union with one member.
 
 describe("C26 §5c — the call's head under ⏎ and y, owed at the spec commit", () => {
   it.todo(
@@ -1289,5 +1377,107 @@ describe("C22 §6 — a keystroke cancels a pending completion (I39)", () => {
     stdin.emit("\u001b[200~pasted\u001b[201~");
 
     expect(cancel, "a paste supersedes a pending request as a keystroke does").toHaveBeenCalled();
+  });
+});
+
+/**
+ * C26 I26, I27 — the way in, the way out, and the arrows inside (§102, §018).
+ */
+describe("the inside (C26 I26, I27, §102)", () => {
+  const insideEffects = () => {
+    const focus = createFocusStore();
+    const fired: Action[] = [];
+    const moves: string[] = [];
+    const withView = (id: string, row: number): NavElement =>
+      Object.freeze({ ...navElement(id, row), viewState: true });
+    const elements = [
+      // **A plain element beside the one with an inside**, so *enters* and
+      // *enters on everything* are separable: with only the plot in the list,
+      // a build that ignored the declaration would pass every row here.
+      { blockId: "a", element: navElement("row", 0, { kind: "fill", label: "a", command: "a" }) },
+      { blockId: "p", element: withView("plot", 1) },
+    ];
+    const effects = createKeyEffects({
+      editor: {},
+      completion: {},
+      // **The one read construction makes** (C15 I32): the effects subscribe to
+      // the stack to hold a displaced panel, so a stand-in without it throws
+      // before any row here runs.
+      overlays: { subscribe: () => ({ [Symbol.dispose]: () => undefined }) },
+      history: { entries: [], append: () => undefined, next: () => null },
+      // No reply holds the line (C23 I77).
+      reply: () => null,
+      visibilityChanged: () => undefined,
+      resized: () => undefined,
+      manifest: null,
+      viewport: recordingViewport().viewport,
+      anchor: () => ({ row: 10, rows: 1 }),
+      overlayRegion: () => ({ width: 80, height: 24 }),
+      redraw: () => undefined,
+      focus,
+      liveElements: () => elements,
+      liveEntryId: () => "e1",
+      focusedEntryId: () => "e1",
+      focusedElements: () => elements,
+      neighbourEntry: () => null,
+      orbitBlock: (d: number) => void moves.push(`orbit${String(d)}`),
+      tiltBlock: (d: number) => void moves.push(`tilt${String(d)}`),
+      cursorBlock: (d: number) => void moves.push(`cursor${String(d)}`),
+      rerunEntry: () => undefined,
+      onAction: (action: Action) => void fired.push(action),
+      schedule: (fn: () => void) => {
+        fn();
+        return { [Symbol.dispose]: () => undefined };
+      },
+    } as unknown as Parameters<typeof createKeyEffects>[0]);
+    return { effects, focus, fired, moves };
+  };
+
+  it("T1.160 (C26 I26, §102): ⏎ on an element declaring view state enters, and esc leaves", () => {
+    const { effects, focus, fired } = insideEffects();
+    focus.enterLiveBlock("e1", { blockId: "p", elementId: "plot" });
+
+    effects.table["rowActivate"]?.();
+    expect(focus.current, "the way IN — ⏎ enter (§102)").toMatchObject({ mode: "interact" });
+    expect(fired, "entering is not an action; nothing fired").toEqual([]);
+
+    effects.table["exitInside"]?.();
+    expect(focus.current, "esc out (§102)").toMatchObject({ mode: "navigate" });
+  });
+
+  it("T1.161 (C26 I26): ⏎ on an element that declares none dispatches its activate instead", () => {
+    // **The control, and the whole of §018's *arrowing down a document past
+    // three sliders*** read from the entry side: without it the row above
+    // passes against a build that enters on every element, which would put an
+    // ordinary table row into a mode with no way to act.
+    const { effects, focus, fired } = insideEffects();
+    focus.enterLiveBlock("e1", { blockId: "a", elementId: "row" });
+
+    effects.table["rowActivate"]?.();
+    expect(focus.current, "no inside declared, so no mode change").toMatchObject({ mode: "navigate" });
+    expect(fired, "the element's own action").toEqual([{ kind: "fill", label: "a", command: "a" }]);
+  });
+
+  it("T2.172 (C26 I27, C16 I28, §102): the inside's arrows drive what the element declared", () => {
+    const { effects, moves } = insideEffects();
+
+    // §102's control row: `←→ orbit   ↑↓ tilt`. The horizontal arrow reaches
+    // both writers and each resolves the focused block itself — a kind has a
+    // camera **or** a cursor, never both, which is what makes one action total.
+    effects.table["insideLeft"]?.();
+    expect(moves).toEqual(["orbit-1", "cursor-1"]);
+
+    moves.length = 0; // cells-ok — a recorded-call count, not a width
+    effects.table["insideRight"]?.();
+    expect(moves).toEqual(["orbit1", "cursor1"]);
+
+    // **The vertical arm is what says the resolution is by declaration and not
+    // by key**: a crosshair runs along one axis, so `↑`/`↓` reach the camera
+    // alone. A build that routed all four arrows to both writers passes the two
+    // rows above and fails here.
+    moves.length = 0; // cells-ok — a recorded-call count, not a width
+    effects.table["insideUp"]?.();
+    effects.table["insideDown"]?.();
+    expect(moves).toEqual(["tilt1", "tilt-1"]);
   });
 });

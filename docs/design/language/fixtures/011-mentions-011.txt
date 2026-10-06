@@ -1,0 +1,21 @@
+@ pulls a file into the turn, and it is a chip like a paste
+
+──────────────────────────────────────────────────────────────────────────────
+ › src/interaction/parser/parse.ts        184 lines · 6.2 KB
+   src/interaction/parser/parse-test.ts    88 lines
+   docs/components/C17_line_editor.md      1,204 lines · 48 KB
+ 3 of 41   ↑↓ move   ⏎ attach   esc cancel
+──────────────────────────────────────────────────────────────────────────────
+❯ why does @parse▌
+──────────────────────────────────────────────────────────────────────────────
+⏎ attach   ⇥ complete   esc cancel
+
+once attached it is a chip, and the size travels with it
+  ❯ why does [parse.ts · 184L] lose the nesting?
+
+the size is shown BEFORE you attach, and warns past a threshold —
+because attaching a 48 KB file is the commonest way a turn quietly
+eats a third of the window.
+
+  ▲ C17_line_editor.md is 48 KB — about 12k tokens, 24% of what
+    is left. Attach anyway, or attach a range?

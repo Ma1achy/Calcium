@@ -21,15 +21,18 @@ import {
   placeable,
   sequenceHeight,
 } from "../../../data/viewmodel/index.js";
-import type { Block, Group, MeasureFn, Mosaic, MosaicRect, Panel, Scroll, WidthFn } from "../../../data/viewmodel/index.js";
+import type { Block, CopyFn, Group, MeasureFn, Mosaic, MosaicRect, Panel, Scroll, WidthFn } from "../../../data/viewmodel/index.js";
 import { axesOf, groupPlacements, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
 import { cells, sliceCells, stripControl, truncate } from "../../text.js";
-import { glyphCells, glyphFor, glyphs } from "../glyphs.js";
-import { clampSpans, paint, rows, tone } from "../paint.js";
-import { composeRow, fitRow, placeRows, type Placed } from "../../rows.js";
+import { SPINNER_CELLS, glyphs, scrollbarSet, spinnerFrameAt } from "../glyphs.js";
+import { scrollbarColumn } from "../scrollbar.js";
+import { based, clampSpans, paint, paneFocus, rows, tone } from "../paint.js";
+import { composeRow, fitRow, placeRows, rowCells, type Placed } from "../../rows.js";
 import { layout, measure as solveHeight, type Box, type Size } from "../../layout/index.js";
 import type { BlockDefinition, Rendered, RenderContext, Windowed } from "../types.js";
+import { recede } from "../../theme/index.js";
+import { glyphTick } from "../ramp.js";
 
 // **`rowsOfAll` stood here and is gone with the arm it gated.** It answered
 // `null` when any child returned an element, and every container branched on
@@ -47,8 +50,43 @@ import type { BlockDefinition, Rendered, RenderContext, Windowed } from "../type
 
 // --- panel -----------------------------------------------------------------
 
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+/**
+ * How old a reading is, in the units the design's own figures use (C09 I109):
+ * `45s`, `4m`, `1h12m`, `2d 4h` — §047's `updated 4m ago`, §081's `23m` and
+ * `1h12m`, §047's `2d 4h`.
+ *
+ * **Coarser than `elapsed` on purpose.** A stale notice is read at a glance and
+ * a second-by-second count past a minute is motion in chrome that must stay
+ * legible. Exported so C23's driver can ask *would the figure change* before it
+ * writes (C23 I78), which only the function that draws it can answer.
+ */
+export function age(ms: number): string {
+  const t = Math.max(0, ms);
+  if (t < MINUTE) return `${String(Math.floor(t / 1000))}s`;
+  if (t < HOUR) return `${String(Math.floor(t / MINUTE))}m`;
+  if (t < DAY) return `${String(Math.floor(t / HOUR))}h${String(Math.floor((t % HOUR) / MINUTE))}m`;
+  return `${String(Math.floor(t / DAY))}d ${String(Math.floor((t % DAY) / HOUR))}h`;
+}
+
+/** §047's notice, from C04 I127's figure. */
+const staleNotice = (ms: number): string => `updated ${age(ms)} ago`;
+
 export const panelDefinition: BlockDefinition<Panel> = {
   kind: "panel",
+
+  // §7a — the title, then the children (I86). The title is text a producer
+  // wrote and the border is not, so the frame goes and the words stay. The
+  // footer is dropped: it is where this component puts counts and hints it
+  // computed, which is rendering by the same test the border fails.
+  copy: (block, copyChild) =>
+    [
+      block.title,
+      joinChildren(block.children, copyChild),
+    ].filter((t) => t !== "").join("\n"),
 
   measure(block: Panel, width: number, measureChild: MeasureFn): number {
     // **The engine's** (C29 I12). A panel's children are a sequence, so
@@ -76,11 +114,19 @@ export const panelDefinition: BlockDefinition<Panel> = {
     const rail = (text: string | undefined, live: boolean): number => {
       const shown = stripControl(text ?? "");
       if (shown === "") return 0;
-      return cells(shown) + (live ? glyphCells("live") + 1 : 0) + 5; // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
+      // **One cell for the spinner frame and one for its space** — a constant
+      // rather than a lookup, and that is what makes `measure` capability-free
+      // here: every frame of every set is one cell at both alphabets (T2.75,
+      // T2.70), so the reservation cannot depend on which set is resolved. It
+      // read `glyphCells("live") + 1` while a static rail held the slot.
+      return cells(shown) + (live ? SPINNER_CELLS + 1 : 0) + 5; // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
     };
+    // **The notice is furniture beside the title** (I109): a space each side and
+    // the one horizontal before the corner — `─ updated 4m ago ─┐`.
+    const notice = block.staleForMs === undefined ? 0 : cells(staleNotice(block.staleForMs)) + 3; // narrow-ok — as above
     return Math.max(
       1,
-      Math.min(w, Math.max(framed, rail(block.title, block.live === true), rail(block.footer, false))),
+      Math.min(w, Math.max(framed, rail(block.title, block.live === true) + notice, rail(block.footer, false))),
     );
   },
 
@@ -99,21 +145,40 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // One helper for both rails, because they are the same construction
     // mirrored — and two copies would be two places for the fill arithmetic to
     // drift, which is the arithmetic a border that does not close reports.
-    const railPart = (text: string | undefined): string => {
-      const shown = truncate(stripControl(text ?? ""), Math.max(0, inner - 3), ctx.capabilities);
+    const railPart = (text: string | undefined, room = inner): string => {
+      const shown = truncate(stripControl(text ?? ""), Math.max(0, room - 3), ctx.capabilities);
       return shown === "" ? "" : ` ${shown} `;
     };
 
-    // **The `live` slot, reachable at last** (C04 I39, F18). It rides in the
-    // title's own text, so the fill arithmetic below is untouched and a panel is
-    // still children + 2 — and it comes through `glyphFor`, so it is `|` under
-    // ASCII rather than a `▌` an app wrote into its title and could not degrade.
+    // **The stale notice takes its room first** (I109) — `updated 4m ago` at the
+    // inline end, one horizontal before the corner — because it is the one
+    // thing in the frame that must stay legible (§047). The title gets what is
+    // left, and only once the title is gone does the notice truncate.
+    const noticePart = block.staleForMs === undefined
+      ? ""
+      : railPart(staleNotice(block.staleForMs));
+    const noticeCells = cells(noticePart, ctx.capabilities.ambiguousWidth);
+    const noticeRoom = noticeCells === 0 ? 0 : noticeCells + 1;
+
+    // **A live region is marked by a spinner frame, not by a static rail**
+    // (C04 I39, F18, R-GLY-003). It was `Glyph.live`'s `▌`, and M4 retires that
+    // token for two reasons that are both the design's: the design carries no
+    // static live mark — liveness is the spinner (§030) — and `▌` is the
+    // design's selection rail and caret (§017), so a repository token stood on
+    // a design character for a fact the design draws another way. Retiring it
+    // also freed `|` for `Glyph.quote`'s rail, which `focus` had pushed off `>`.
+    //
+    // **The frame rides in the title's own text**, so the fill arithmetic below
+    // is untouched and a panel is still children + 2. Every frame of every set
+    // is one cell at both alphabets (T2.75, T2.70), so the title does not
+    // change width as it animates and `measure` never sees the tick (I8).
     const titlePart = railPart(
       block.live === true
-        ? `${glyphFor("live", ctx.capabilities)} ${stripControl(block.title)}`.trimEnd()
+        ? `${spinnerFrameAt(ctx.capabilities, glyphTick(ctx.tick, ctx.motion)) || g.dotted} ${stripControl(block.title)}`.trimEnd()
         : block.title,
+      inner - noticeRoom,
     );
-    const fill = Math.max(0, inner - cells(titlePart, ctx.capabilities.ambiguousWidth));
+    const fill = Math.max(0, inner - cells(titlePart, ctx.capabilities.ambiguousWidth) - noticeRoom);
 
     const top = paint(
       clampSpans(
@@ -121,6 +186,10 @@ export const panelDefinition: BlockDefinition<Panel> = {
           { text: g.topLeft, style: dim },
           { text: titlePart, style: tone("accent", ctx.theme, ctx.capabilities) },
           { text: g.horizontal.repeat(fill), style: dim },
+          ...(noticeRoom === 0 ? [] : [
+            { text: noticePart, style: tone("warn", ctx.theme, ctx.capabilities) },
+            { text: g.horizontal, style: dim },
+          ]),
           { text: g.topRight, style: dim },
         ],
         width,
@@ -151,7 +220,11 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // be drawn, or a panel with nothing in it renders shorter than it measures
     // — which is the empty-container case arriving through the one kind that
     // is *not* an empty container.
-    const rendered = block.children.map((child) => ctx.renderChild(child, inner));
+    // **The content dims and the chrome does not** (I110, §047): the children
+    // draw under the receded theme, and everything above is this panel's own
+    // paint under the theme it was handed.
+    const childTheme = block.staleForMs === undefined ? undefined : recede(ctx.theme);
+    const rendered = block.children.map((child) => ctx.renderChild(child, inner, childTheme));
     const total = sequenceHeight(block.children, inner, ctx.measureChild);
     const side = paint([
       { text: Array.from({ length: Math.max(1, total) }, () => g.vertical).join("\n"), style: dim },
@@ -276,8 +349,11 @@ function scrollMeasureBox(block: Scroll, width: number, measureChild: MeasureFn)
  * (C04 I98). The residue row is chrome on top of this in both cases, which is
  * what makes a collapsed box *the residue row and nothing else* without a second
  * rule about what it draws.
+ *
+ * **Exported for the shell's pull** (I126), which had its own copy of this
+ * line: a box's window is asked of the kind that draws it.
  */
-function interiorOf(block: Scroll): number {
+export function interiorOf(block: Scroll): number {
   return block.collapsed === true ? 0 : block.height; // cells-ok — a row count
 }
 
@@ -286,6 +362,50 @@ function contentHeight(block: Scroll, width: number, measureChild: MeasureFn): n
   const ranges = childRanges(block, width, measureChild);
   const last = ranges.at(-1); // cells-ok — a child count, not a width
   return last === undefined ? 0 : last.to;
+}
+
+/**
+ * Whether this box spends a column on a bar, and the width its content gets
+ * (C09 I93, §7f, §021).
+ *
+ * **Measured at the full width, and re-measured one cell narrower only if it
+ * overflowed.** The circularity to avoid is obvious once stated: a bar takes a
+ * column, a narrower content can be taller, and taller content is what decides
+ * whether there is a bar. Narrowing never *shortens* content, so overflow at
+ * the full width implies overflow at the narrower one and the question is
+ * settled in one step rather than at a fixed point nobody can read.
+ *
+ * **`measure` is unchanged by this** and that is deliberate: its answer turns
+ * on `content > interior` at the full width, which is the same test that puts
+ * the bar there. The re-measure can only grow the content, so the residue row
+ * it decides does not move either.
+ *
+ * **Exported because the shell asks it too** (I126). A box's ceiling is its
+ * content less its height, and the content is the children measured at the
+ * width this function answers — so a shell clamping a scroll against its
+ * children at the box's full width clamped against a different document from
+ * the one drawn. `width` is the box's content width, as a definition sees it.
+ */
+export function barOf(
+  block: Scroll,
+  width: number,
+  measureChild: MeasureFn,
+): Readonly<{ contentWidth: number; content: number; bar: boolean }> {
+  const interior = interiorOf(block);
+  const full = contentHeight(block, width, measureChild);
+  if (full <= interior) return { contentWidth: width, content: full, bar: false };
+  // **A collapsed box has no interior for a bar to sit in**, and it draws the
+  // residue row alone (C04 I98). Reserving the column there would narrow that
+  // row's text for a bar that `scrollbarColumn` answers `null` for anyway.
+  if (interior === 0) return { contentWidth: width, content: full, bar: false };
+  // **A bar needs a column and something to sit beside it.** At a width of one
+  // there is no room for both, and `max(1, width - 1)` drew a two-cell row at a
+  // width of one — the overrun that wraps the alternate screen (C09 I1, F1211).
+  // It is *a bar that cannot move is decoration* on the other axis: where the
+  // column cannot be spent, nothing is drawn and the content keeps the width.
+  if (width <= 1) return { contentWidth: width, content: full, bar: false };
+  const narrow = width - 1; // cells-ok — a width less its bar
+  return { contentWidth: narrow, content: contentHeight(block, narrow, measureChild), bar: true };
 }
 
 /**
@@ -311,36 +431,54 @@ function offsetOf(block: Scroll, ctx: RenderContext, content: number): number {
 }
 
 /**
- * A child's source text, for C26 I17's semantic copy.
+ * A child's source text — **the registry's answer, not this file's** (§7a, I86).
  *
- * **The source and never the rendering**: no width is consulted, so a truncated
- * cell and a dropped column cannot reach it and the text is the same at every
- * terminal size. A kind whose source this cannot express contributes nothing
- * rather than its painted rows, which is the invariant's own direction — and
- * `table` is deliberately absent, because C11 already declares a richer `copy`
- * per row and a second answer here would be two sources for one fact.
+ * **It was a private switch here and it was wrong in a way that read as
+ * deliberate.** The comment said *the source and never the rendering*, which is
+ * true, and *a kind whose source this cannot express contributes nothing rather
+ * than its painted rows*, which is the right direction — and it answered six
+ * kinds and `""` for every other, so five of the seven kinds `R-SEL-004` names
+ * copied blank. `table` was *deliberately absent, because C11 already declares a
+ * richer `copy` per row and a second answer here would be two sources for one
+ * fact*: a correct argument about sources and the wrong conclusion about
+ * granularity. A row's copy and a table's are one source at two sizes.
+ *
+ * `null` is a kind that declines and is dropped; `""` would be a blank line, and
+ * a blank line is the entry separator.
  */
-function copyTextOf(child: Block): string {
-  switch (child.kind) {
-    case "raw":
-    case "notice":
-    case "tip":
-    case "code":
-      return child.text;
-    case "logs":
-      return child.lines.map((l) => l.message).join("\n");
-    case "scroll":
-      return child.children
-        .map(copyTextOf)
-        .filter((t) => t !== "")
-        .join("\n");
-    default:
-      return "";
-  }
+/**
+ * A child's `copy` as a spreadable member, or nothing (§7a, I86).
+ *
+ * `exactOptionalPropertyTypes` is what makes this a function rather than
+ * `?? undefined`: the type says `copy?: string`, and *present and undefined* is
+ * a third state it does not have. A declining child contributes no member.
+ */
+const copyOrNothing = (text: string | null): Readonly<{ copy?: string }> =>
+  text === null || text === "" ? {} : { copy: text };
+
+function joinChildren(children: readonly Block[], copyChild: CopyFn): string {
+  return children
+    .map(copyChild)
+    .filter((t): t is string => t !== null && t !== "")
+    .join("\n");
 }
 
 export const scrollDefinition: BlockDefinition<Scroll> = {
   kind: "scroll",
+  // C09 I137 — the bar is its furniture: the thumb takes the accent while focus is inside the box, and a child is never painted (§7f).
+  focusShape: "frame",
+
+  // C09 I124, C04 I98 — the fold is the flag inverted, and only where the box
+  // declares one: a scroll without `collapsed` has no collapsed form, so there
+  // is nothing to toggle and `expand` naming it says so (C23 I84). This was the
+  // dispatcher's `kind === "scroll"` arm, moved to the kind that owns the flag.
+  fold: (block) => (block.collapsed === undefined ? null : { ...block, collapsed: !block.collapsed }),
+
+  // §7a — the children that answered, one newline apart (I86). **Not two**:
+  // two is `R-SEL-004`'s entry separator and this is inside one entry. A child
+  // that declines is dropped rather than joined as empty, which is the whole of
+  // the omission ruling.
+  copy: (block, copyChild) => joinChildren(block.children, copyChild),
 
   /**
    * `height`, plus the residue row where the content cannot fit (C04 I47, C04 I49).
@@ -360,8 +498,15 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
   },
 
   /** One per child, at block level — which is what makes C04 I47's refusal expressible. */
-  elements(block: Scroll, width: number, measureChild: MeasureFn): readonly NavElement[] {
+  elements(block: Scroll, width: number, measureChild: MeasureFn, copyChild: CopyFn): readonly NavElement[] {
     const w = normaliseWidth(width);
+    // **The rows at the width the children are drawn at** (I126). `render`
+    // lays them out at `barOf`'s content width, one column in from a bar, and
+    // a child that wraps at that column is a row taller than it is at `w` — so
+    // rows taken at `w` put the second child on the first one's second row, and
+    // the pointer and the pull both believed it. The columns stay the box's
+    // whole width below: the bar is the box's, and a pointer on it is in the box.
+    const { contentWidth: laidAt } = barOf(block, w, measureChild);
     // **A block declaring a collapsed form carries the toggle on every element**
     // (C04 I98). Declared by presence: a scroll without the field has no fold
     // and no affordance. The target is the block, because `expand`'s dispatcher
@@ -377,7 +522,7 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
             }),
           };
     return Object.freeze(
-      childRanges(block, w, measureChild).map((r) =>
+      childRanges(block, laidAt, measureChild).map((r) =>
         Object.freeze({
           id: r.child.id,
           level: "block" as const,
@@ -390,7 +535,7 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
           // key that did nothing and said nothing — the empty-block class. `y`
           // on a container has an obvious meaning and it was unimplemented
           // rather than refused.
-          copy: copyTextOf(r.child),
+          ...copyOrNothing(copyChild(r.child)),
         }),
       ),
     );
@@ -433,11 +578,12 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // The child count, which is what a container's cost is proportional to and
     // what no duration states. Each child is its own node; this is how many.
     ctx.probe?.gauge("scroll.children", block.children.length); // cells-ok — a count of items, not a display width
-    const width = normaliseWidth(ctx.width);
+    const full = normaliseWidth(ctx.width);
     const interior = interiorOf(block);
-    const content = contentHeight(block, width, ctx.measureChild);
+    // **The column is decided before anything is laid out**, because it is the
+    // width every child is measured and drawn at (§7f).
+    const { contentWidth: width, content, bar } = barOf(block, full, ctx.measureChild);
     const offset = offsetOf(block, ctx, content);
-    const g = glyphs(ctx.capabilities);
 
     const ranges = childRanges(block, width, ctx.measureChild);
     const shown = ranges.filter((r) => r.to > offset && r.from < offset + interior);
@@ -448,15 +594,24 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // the interior: the route's own terminal measured 7 rows and painted 32,
     // with `follow` inert and the residue counting against a window that was
     // never applied (F855). `windowChild` returns `null` where the slice would
-    // cost the container something — an atomic kind, a floor, a cap, a residual
-    // — and the child is then kept whole, which is what every child got before.
+    // cost the container something — an atomic kind, a floor, a cap, a residual.
+    //
+    // **And a refused child is cropped, not kept whole** (C09 I135, D16). A row
+    // is a string, so cutting the whole render to `[from, to)` is exact where a
+    // kind declines to slice itself — which is what `split`'s `paneRows` already
+    // did. Kept whole, three 76-cell notices in a box of 3 drew the second
+    // notice's second row where the residue belongs, and a plot of 8 in a box
+    // of 2 measured 3 and painted 9.
     const pieces = shown.map((r) => {
       const height = r.to - r.from;
       const from = Math.max(0, offset - r.from); // cells-ok — a row index
       const to = Math.min(height, offset + interior - r.from); // cells-ok — a row index
-      const piece =
-        from === 0 && to === height ? r.child : (ctx.windowChild(r.child, width, from, to)?.block ?? r.child);
-      return { child: r.child, rendered: ctx.renderChild(piece, width) };
+      if (from === 0 && to === height) return { child: r.child, rendered: ctx.renderChild(r.child, width) };
+      const slice = ctx.windowChild(r.child, width, from, to);
+      return {
+        child: r.child,
+        rendered: slice === null ? ctx.renderChild(r.child, width).slice(from, to) : ctx.renderChild(slice.block, width),
+      };
     });
     let residueRow: string | null = null;
     // **The residue, both directions** (C04 I49). A settled container keeps the
@@ -486,8 +641,8 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
       // the affordance is `activate`, and the footer shows its label (C16 I19).
       const text =
         interior === 0
-          ? `${g.residue} +${String(content)} more`
-          : `${g.residue} ${String(above)} above, ${String(below)} below`;
+          ? `${glyphs(ctx.capabilities).residue} +${String(content)} more`
+          : `${glyphs(ctx.capabilities).residue} ${String(above)} above, ${String(below)} below`;
       residueRow = paint(clampSpans([{ text: truncate(text, width, ctx.capabilities), style: dim }], width, ctx.capabilities));
     }
 
@@ -518,14 +673,14 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
     // because both readings drew two rows; strengthening the row to ask *which*
     // two is what said so.
     //
-    // **So a child taller than the box is still drawn whole and C25 I1 is still
-    // false for that one case** — named in T2.28b rather than replaced by a
-    // frame showing the wrong rows. §3c trace 1 rules it *aligns to its top*,
-    // and taking a child's top rows needs a windowing seam `RenderContext` does
-    // not have: it offers `measureChild` and `renderChild` and nothing that
-    // slices. A ruling naming an operation the layer below lacks — C23 §8a A4's
-    // class, and the remedy is a seam rather than a clip.
-    const drawn = shown.reduce((n, r) => n + ctx.measureChild(r.child, width), 0);
+    // **A child taller than the box is sliced, or cropped where it refuses the
+    // slice** (C09 I58, I135) — the seam this paragraph once said was missing is
+    // `windowChild`, and the crop covers what it declines.
+    //
+    // **The pads are counted from the rows drawn, not the rows measured** (I135).
+    // Counting from `measureChild` charged a cut child its whole height, so a box
+    // whose pieces drew fewer rows than their measures was short of `interior`.
+    const drawn = pieces.reduce((n, p) => n + p.rendered.length, 0); // cells-ok — a row count
     const padCount = Math.max(0, interior - drawn); // cells-ok — a row count, not a width
 
     // **The rows arm** (C09 I73): the shown pieces' rows, the pads as empty
@@ -539,6 +694,29 @@ export const scrollDefinition: BlockDefinition<Scroll> = {
       // paint time where nothing could see it.
       for (const rows of pieceRows) for (const row of rows) lines.push(fitRow(row, width));
       for (let i = 0; i < padCount; i += 1) lines.push(""); // cells-ok — a row count
+      // **The bar runs beside the interior and not beside the residue row**
+      // (§7f). They answer different questions — *where* against *how far* —
+      // and §021 draws both on one box, so the residue row keeps the full
+      // width and the bar keeps the rows it describes.
+      if (bar) {
+        const column = scrollbarColumn(interior, content, offset, scrollbarSet(ctx.capabilities));
+        if (column !== null) {
+          // **`accent` while focus is inside the box, `muted` otherwise**
+          // (§021, C26 §7) — the same rule the focused container's border
+          // takes, and the tone is the whole column's: §021 draws the two
+          // states as the same glyphs at two tones.
+          const held = ctx.focus !== null && ctx.focus.blockId === block.id;
+          const ink = tone(held ? "accent" : "muted", ctx.theme, ctx.capabilities);
+          for (let i = 0; i < interior; i += 1) { // cells-ok — a row count
+            const row = lines[i] ?? "";
+            // **`rowCells`, not `cells`** (C09 I73): a rendered row carries
+            // SGR, and a plain measure counts the escape bytes as cells — the
+            // pad then comes out zero and the bar sits against the text.
+            const pad = " ".repeat(Math.max(0, width - rowCells(row)));
+            lines[i] = row + pad + paint([{ text: column[i] ?? "", style: ink }]);
+          }
+        }
+      }
       if (residueRow !== null) lines.push(residueRow);
       return lines;
     }
@@ -590,6 +768,14 @@ function mosaicRoom(
 
 export const mosaicDefinition: BlockDefinition<Mosaic> = {
   kind: "mosaic",
+  // C09 I137 — a pane is lit through its child when the child is a frame, and takes I100's ground otherwise.
+  focusShape: "frame",
+
+  // §7a — the children that answered, one newline apart (I86). **Not two**:
+  // two is `R-SEL-004`'s entry separator and this is inside one entry. A child
+  // that declines is dropped rather than joined as empty, which is the whole of
+  // the omission ruling.
+  copy: (block, copyChild) => joinChildren(block.children, copyChild),
 
   /**
    * `height`, at every width (C04 I71).
@@ -610,7 +796,7 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
    * neighbouring cell — which is the whole difference between a grid and a
    * sequence.
    */
-  elements(block: Mosaic, width: number): readonly NavElement[] {
+  elements(block: Mosaic, width: number, _measureChild: MeasureFn, copyChild: CopyFn): readonly NavElement[] {
     const parsed = parseAreas(block.areas);
     if (!parsed.ok) return Object.freeze([]);
     const w = normaliseWidth(width);
@@ -633,7 +819,7 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
             level: "block" as const,
             rows: Object.freeze({ from: rect.top, to: rect.top + room.height }),
             cols: Object.freeze({ from: rect.left, to: rect.left + room.width }),
-            copy: copyTextOf(child),
+            ...copyOrNothing(copyChild(child)),
           }),
         ];
       }),
@@ -677,12 +863,45 @@ export const mosaicDefinition: BlockDefinition<Mosaic> = {
     // cuts an over-wide row (F1211). A cell whose grid position leaves it no
     // room is not drawn, which is what it has always been; what changed is that
     // the rect no longer says it is zero cells wide.
+    // **A focused pane takes the region's ground** (I100, §017 `R-COL-005`,
+    // `R-FOC-004`). A pane is a *region* in §017's vocabulary — more than one
+    // row, holding a child rather than being one — so it takes `focusGround`
+    // and not the item's accent and not a border it has not got.
+    //
+    // **The container paints it because the child cannot.** A pane's element id
+    // is the child's id and the focus names `(mosaic.id, child.id)`; a child's
+    // own predicate tests its **own** block id — `plot`'s `focusedOn` is
+    // `blockId === id && rowId === id` — which a mosaic-scoped focus never
+    // matches, so a focused pane holding a plot could not light it however the
+    // plot were written.
+    //
+    // **`based` and not a span pass**: the child has already painted its lines,
+    // so the ground has to survive every reset inside them (C11 I25). Each row
+    // is padded to the rect's width first — a ground needs cells to paint, and
+    // the rect is the pane's whole extent whatever its child chose to fill.
+    //
+    // **Amended by I137: a pane holding a `frame` is lit through its child.**
+    // The container forwards the focus to the child's own element and paints
+    // no ground — the case this comment's second paragraph said could not
+    // happen *however the plot were written*, which was true of the plot and
+    // not of the container. `paneFocus` decides, from the child's declaration.
     const drawable = block.children.flatMap((child, i) => {
       const rect = rects[i];
       if (rect === undefined) return [];
       const room = mosaicRoom(rect, width, height);
       if (room === null) return [];
-      return [{ child, rect, room, drawn: ctx.renderChild(child, room.width) }];
+      const lit = paneFocus(block.id, child, ctx);
+      const drawn =
+        lit !== null && "forward" in lit
+          ? ctx.renderChild(child, room.width, undefined, lit.forward)
+          : ctx.renderChild(child, room.width);
+      const paneGround = lit !== null && "ground" in lit ? lit.ground : "";
+      if (paneGround === "") return [{ child, rect, room, drawn }];
+      // **Inside untouched** (`R-FOC-004`): the child's own lines are unchanged
+      // and a ground is put behind them. Stripping it gives back what the
+      // unfocused pane drew, byte for byte.
+      const padded = drawn.map((line) => `${line}${" ".repeat(Math.max(0, room.width - rowCells(line)))}`); // cells-ok — the pane's own residue
+      return [{ child, rect, room, drawn: based(padded, paneGround) }];
     });
 
     const childRows = drawable.map(({ drawn }) => drawn);
@@ -861,6 +1080,27 @@ function panelMeasureBox(block: Panel, width: number, own: Size, measureChild?: 
 }
 
 /**
+ * The room a panel gives its children at an outer size — **the same box**,
+ * asked for its padding rather than solved (C09 I1, the `panel` row: *children
+ * + 2, measured at `w - 2`*).
+ *
+ * For a producer that is told a size and draws inside a panel it does not
+ * build: a captured child's blocks are framed by the shell (C22 I110), so what
+ * it is told is this less the entry around it (C24 I41). A second subtraction
+ * written at that call site would agree today and drift the day the border
+ * does, which is `childWidths`' argument one layer out. **Both axes floor at
+ * one**, as every width here does.
+ */
+export function panelInterior(width: number, height: number): Readonly<{ width: number; height: number }> {
+  const box = panelMeasureBox({ kind: "panel", id: "", title: "", children: [] }, width, { kind: "grow" });
+  const rails = (box.padding?.t ?? 0) + (box.padding?.b ?? 0);
+  return Object.freeze({
+    width: insetWidth(normaliseWidth(width)),
+    height: Math.max(1, Math.floor(height) - rails),
+  });
+}
+
+/**
  * A group's own measured height (C04 I102) — **the one computation, so
  * `measure` and `window`'s decline branch cannot drift** (C09 I69). A column is
  * a C29 box and takes `measure`; a row takes its tallest placed child and
@@ -881,6 +1121,12 @@ function groupHeight(block: Group, width: number, measureChild: MeasureFn): numb
 
 export const groupDefinition: BlockDefinition<Group> = {
   kind: "group",
+
+  // §7a — the children that answered, one newline apart (I86). **Not two**:
+  // two is `R-SEL-004`'s entry separator and this is inside one entry. A child
+  // that declines is dropped rather than joined as empty, which is the whole of
+  // the omission ruling.
+  copy: (block, copyChild) => joinChildren(block.children, copyChild),
 
   measure(block: Group, width: number, measureChild: MeasureFn): number {
     // **`groupHeight`, the one computation** (C09 I69): a column is a sequence

@@ -177,7 +177,9 @@ describe("C18 tier 5 — in a real session", () => {
       // bar landed. The seventh matcher widened for the bar; the first six were in
       // the tree, and this one was reachable only at the runner's width.
       const squash = (s: string): string => s.replace(/\s+/gu, "");
-      const ungutter = (r: string): string => r.replace(/^(  ⎿ |  │ |    )/u, "");
+      // The rail's column leads every transcript row (C14 I57), so the gutter
+      // is one column in; the eighth matcher, for the eighth widening.
+      const ungutter = (r: string): string => r.replace(/^ (  ⎿ |  │ |    )/u, "");
       const joined = (f: readonly string[]): string => squash(f.map(ungutter).join(""));
       await pty.waitForFrame((f) => joined(f).includes(squash("argv=ps --search=")), 20_000);
       const frame = pty.frame.join("\n");

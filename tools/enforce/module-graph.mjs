@@ -342,7 +342,21 @@ function isTypeOnly(clause) {
   return /^type\b/.test(clause.trim());
 }
 
-function importsOf(file, readFile, includeTypeOnly = false) {
+/**
+ * **Exported for the mutation sweep's reach check** (F1243), which is the queued
+ * consumer CLAUDE.md's rule asks for: a mutation run declares a command and a
+ * set of mutated files, and nothing compared the two — a mutation in a module
+ * no test the command loads can import is compiled, run against a suite that
+ * cannot see it, and reported as a **survivor**, which in that harness is a
+ * claim about the tests. `anchors.mjs` walks from each of a run's test files
+ * through this function and asks whether the mutated file is reachable.
+ *
+ * Shared rather than copied for the reason `inkOn` is shared (C10 I46): a second
+ * import reader is a second set of forms to miss — a bare import, an
+ * `export … from`, an inline `import { type X, y }` — and the layer rules
+ * already depend on this one being right.
+ */
+export function importsOf(file, readFile, includeTypeOnly = false) {
   const src = readFile(file);
   const out = [];
 
@@ -359,7 +373,8 @@ function importsOf(file, readFile, includeTypeOnly = false) {
   return out;
 }
 
-function resolve(file, spec) {
+/** Exported beside `importsOf`, for the same consumer: a specifier is only an edge once resolved. */
+export function resolve(file, spec) {
   if (!spec.startsWith(".")) return null;          // external, not our concern
   const dir = file.split("/").slice(0, -1).join("/");
   const parts = (dir + "/" + spec).split("/");
@@ -395,6 +410,8 @@ const MODE_OWNERS = {
   MOUSE:          "src/terminal/lifecycle.ts",
   MOUSE_ANY:      "src/terminal/lifecycle.ts",
   KITTY_KEYBOARD: "src/terminal/lifecycle.ts",
+  FOCUS_REPORT:   "src/terminal/lifecycle.ts",
+  TITLE_STACK:    "src/terminal/lifecycle.ts",
   SCROLL_REGION:  "src/terminal/frame-scheduler.ts",
   SYNC_UPDATE:    "src/terminal/frame-scheduler.ts",
 };
@@ -635,6 +652,8 @@ export const BUILDER_OMISSIONS = Object.freeze({
   // pickers are the registry and the refresh driver, both inside the framework, and a builder
   // would hand the number to someone with no way to know what will be drawn in it.
   "status.elapsedMs": "C09 I32, C23 I52 — supplied by whoever holds the clock, which is the refresh driver and never a builder",
+  "notice.trailSince": "C04 I109, C22 I131 — the tick a ripple trail's one-shot began on, stamped by the shell at each arrival; the tick is the session's counter and never leaves it, so a builder setting it would name a moment it cannot see",
+  "panel.staleForMs": "C04 I127, C23 I78 — `status.elapsedMs`'s argument: the age of a reading is known only to the refresh driver, which holds the clock and the last success; a builder setting it would assert a staleness nothing measured",
   "status.spinner": "C09 I32 — the frame set is the renderer's, chosen per capability set; a consumer owning a `status` (C24 I30) is handed no frames to name",
 
   "keyValue.keyWidth":
@@ -642,6 +661,17 @@ export const BUILDER_OMISSIONS = Object.freeze({
     "could not see the field (F430). It is what a *window* carries so its key column describes " +
     "the block it came from rather than the slice it shows; a hand-built keyValue setting it " +
     "would assert a column its own labels do not justify. `window` is the one writer",
+
+  "keyValue.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
+  "steps.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
+  "events.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
+  "comparison.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
+  "patch.expanded":
+    "C09 I124, C25 I11 — reader state the fold writes: `true` on the first `⏎` and removed on the second, so collapsing gives back the block the producer made. A producer shipping a block already expanded is setting aside the cap or the shed it chose to write, which it can do by not writing them; the registry's `fold` is the one writer",
 
   // **`plot.camera` was here and is gone**, on the commit that built
   // `plot3d`. Its reason was sharper than *not yet built* — a plot declaring
@@ -656,6 +686,11 @@ export const BUILDER_OMISSIONS = Object.freeze({
     "pins what the *parent* derived; a hand-built table setting it would assert two rows its " +
     "own rows do not justify. `window` is the one writer and it recomputes rather than " +
     "remembers, so the pin cannot describe the previous document",
+  "table.current":
+    "C04 I150, C11 I33 — the row a chooser is on, and the one chooser over a table is C19's " +
+    "completion menu, which builds its blocks in L3 and never through `b.table`. No surface built " +
+    "with the builder walks a current, so an option there would be a mark no key moves; it lands " +
+    "with the first surface that has a chooser over a table, as `b.tape`'s `current` did",
   "table.presorted":
     "C11 I19 — the same argument one field over, about an order rather than a presence. " +
     "`sortedRows` is not idempotent under a slice because `kindOf` reads the values present, " +
@@ -1628,6 +1663,31 @@ export function checkOneStorePerComponent(files, readFile = (f) => readFileSync(
 
 /** Members whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_MEMBERS = Object.freeze({
+  // --- C09 I114's revert mark, registered ahead of the rows that draw it ---
+  //
+  // **The queued consumers are §005's stopped-edit row and §064's reverted
+  // entry**, neither built. Ruling 17 registered the mark, and SS65 makes a
+  // current registry record with no slot red, so the slot lands with the record
+  // rather than with its first row. The day either row draws `↺`, this entry is
+  // itself the violation.
+  "GlyphSet.revert":
+    "C09 I114, parked 17 — `↺` / `<`, the undo affordance §005 and §064 draw beside a muted "
+    + "label. Registered on the ruling; SS65 requires the slot for the record. T2.176 holds both.",
+  // --- C23 I76's operation surface, ahead of the producer that reports one ---
+  //
+  // **The queued consumer is an adapter that emits an operation, and none
+  // does.** §036's verb is the application's — *the head names what is
+  // HAPPENING, not a tool — a gerund* — and nothing in `src/` can compose a
+  // gerund or knows which of its processes is one. What lands here is the half
+  // the caller cannot decide: the bracket while it runs, the flattening when it
+  // stops, and the bar going with the motion. The day a producer reports an
+  // operation, this entry is itself the violation.
+  "OperationSpec.delta":
+    "C23 I76, §036 — what the operation has ACHIEVED so far, in its own units, read by "
+    + "`operationHeader` into the aside. A string rather than a number because *a percentage "
+    + "is the same word for all four, and the unit is what tells you whether 44% is nearly "
+    + "done*; the units are the caller's and nothing in src/ can supply them yet. T1.71 holds "
+    + "the four running shapes against the four stopped ones.",
   // --- C29 §7g's frames, groundwork ahead of their first caller -------------
   //
   // **The queued consumer is named and the rule's honest form is what allows
@@ -1887,10 +1947,10 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "C25 I22 — each hunk's first body row, read by windowRows inside window.ts so a planned window " +
     "walks the window's rows only (F1191); held to a full scan by T1.25",
   "Unit.lineFrom":
-    "C25 I19 — a unit's first line, read by the builder and windowRows inside window.ts; the " +
+    "C25 I19a — a unit's first line, read by the builder and windowRows inside window.ts; the " +
     "type is published only because WindowPlan.rows names it (C25 I22)",
   "Unit.lineTo":
-    "C25 I19 — a unit's end line, read by the builder and windowRows inside window.ts; the " +
+    "C25 I19a — a unit's end line, read by the builder and windowRows inside window.ts; the " +
     "type is published only because WindowPlan.rows names it (C25 I22)",
   "Lanes.pos":
     "C12 I139 — the position lane: read by the cull, the projection and the span inside " +
@@ -1944,10 +2004,10 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
   "SurfaceActionEvent.phase":
     "application boundary — the surface consumer maps native or synthesized " +
     "press/repeat/release phases onto application actions",
-  "PushedSurface.onClose":
+  "ChildSurface.onClose":
     "application boundary — the surface owner releases its process and model state " +
     "when Calcium reports closure",
-  "PushedSurfaceHandle.inputFidelity":
+  "ChildSurfaceHandle.inputFidelity":
     "application boundary — the app renders the reduced-fidelity disclosure",
 
   // **The second entry of that category, and it arrived by a satisfier going
@@ -2165,9 +2225,18 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "C17 diagnostics — the undo stack's depth, so T2.x can assert `UNDO_LIMIT` without " +
     "reaching into the buffer. Sibling of `killBuffer` above",
   "LineEditor.redoDepth": "C17 diagnostics — the redo half of `undoDepth`, same disposal",
-  "OverlayManager.hasView":
-    "C15 diagnostics — whether a pushed view is on the stack. `src/shell` asks the overlay " +
-    "for its `Placed` and never for this; the tests use it to assert push/pop pairing",
+  "Delta.before":
+    "C08's fixture diff — the value a corpus entry held before, rendered by the formatter in " +
+    "the same file and asserted by the fixture suites. `after` is read across the seam and " +
+    "this one is not, which is the pair being asymmetric rather than the field being dead",
+  "Profiler.setTier":
+    "C28 — the tier control, and **it has no caller in `src/` since the profiler's deck became " +
+    "a transcript entry** (C28 I50 retired, R-EXA-082, F1254). The deck was the one seam that " +
+    "moved a tier at run time, raising to `spans` for a layer's lifetime and restoring at the " +
+    "pop; an entry has no close to restore from, so the verb refuses in words instead. The " +
+    "recorder keeps the operation because a tier is a property of a live recording and " +
+    "`TuiConfig.profile.tier` is the only thing that sets one today — the blocker to watch is " +
+    "a second seam that can both raise a tier and be told when to put it back",
   "TranscriptStore.payloadOf":
     "C13 — an entry's payload by id, for tests asserting what a patch actually wrote. The " +
     "viewport reads entries through the view, not the store",
@@ -2220,9 +2289,6 @@ export const UNCONSUMED_MEMBERS = Object.freeze({
     "have caught it. Needs the action dispatch route (F21) before anything can reach it",
   "HistoryStore.resetNavigation":
     "C20 — clears navigation state; the shell resets by submitting. Unverified. F97's group",
-  "HistoryStore.clearConfirmLayer":
-    "C20 — dismisses the clear-confirmation overlay; the shell dismisses via the router's " +
-    "`dismiss` action. Unverified. F97's group",
 
   // === F84: the `export type` cohort ======================================
   //
@@ -3471,6 +3537,22 @@ export function checkExportedArguments(files, readFile = (f) => readFileSync(f, 
 
 /** Functions whose absence from the rest of `src/` is deliberate, each with why. */
 export const UNCONSUMED_FUNCTIONS = Object.freeze({
+  // **`bandFourBitShortfalls` measures a curation, not a terminal** (C10 I61).
+  // It scores the curated 4-bit band pairs on the reference sixteen — the legacy
+  // Windows console's, `ANSI16_WINDOWS_HEX`, not xterm's defaults — and a
+  // running terminal's sixteen are its own and unknowable, so no load-time
+  // caller could measure anything real with it. Its subject is the table, as
+  // C10 I44's pin's is, and T2.64 holds it by equality. It goes the day a
+  // theme can curate its own 4-bit pairs and a loader has to judge them.
+  bandFourBitShortfalls:
+    "C10 I61 — the curated 4-bit band pairs scored on the reference palette, consumed by "
+    + "T2.64 and by no caller in src/: a terminal's own sixteen colours are not knowable at "
+    + "load, so the measurement's subject is the curation and not a session",
+  operationRows:
+    "C23 I76, §036 — the operation's head and its bar, composed by the shell the day an "
+    + "adapter reports an operation. Parked because the verb is a gerund the caller supplies "
+    + "and no producer in src/ names one; `design-surfaces` §036 draws all eight cases and "
+    + "T1.72 holds the bar's absence in three stopped states rather than one.",
   // **`shadeRgb` is the reference the packed form is held against** (C10 I42).
   // The painter took `shadePacked` (C12 I132) and `shadeColour` deliberately
   // stays on `overChannels`, so the tuple form has no caller in `src/` — and
@@ -3585,6 +3667,11 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
   // **`toolCallDoc` left here on 2026-09-05** (Lane P, C23 I54): the expiry was
   // *the first `src/` call*, and `execution.ts` step 3 is it — the pending entry
   // is the card. The entry was self-expiring by the equality arm, as written.
+
+  // **The clipboard's two L0 mechanisms left here on 2026-09-29** (review batch
+  // 4, M10.1, C14 I61): `shell/clipboard.ts` builds the OSC 52 write and
+  // `session.ts` finds and writes the tool, so the equality arm expired all
+  // three, as it did `toolCallDoc`.
 });
 
 /**
@@ -3600,7 +3687,7 @@ export const UNCONSUMED_FUNCTIONS = Object.freeze({
  * MG26 — no module outside `testing/` and `fixtures/` imports them
  * (C24 I8, T2.3).
  *
- * `@fmx/calcium/testing` and `@fmx/calcium/fixtures` are dev-only entry points, and I8
+ * `calcium-tui/testing` and `calcium-tui/fixtures` are dev-only entry points, and I8
  * says they are absent from a production bundle. Until C24 there was no
  * production bundle: with `src/index.ts` at `export {}`, nothing rooted the
  * graph, so the claim had nothing to be false about — A03 §2's vacuity class

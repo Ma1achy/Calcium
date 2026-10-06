@@ -2,12 +2,13 @@
  * Which cursor shape the focused thing wants (C22 I63, §6f, roadmap entry 45).
  *
  * **The style keys on the focus target and the position keys on the layer, and
- * they are not the same partition.** `FOCUS_ORDER` has seven members and
- * exactly two — `overlay` and `pushedView`, the two `kind`s of `overlayTop` —
- * are layers. The other five have no `Placed` at all, and the prompt, which is
- * the entry's own example of a target wanting its own shape, is one of them. So
- * a `cursorStyle` on `Layer` would cover two-sevenths of its subject while
- * reading as total.
+ * they are not the same partition.** `FOCUS_ORDER` has eight members and
+ * exactly two — `overlay` and `panel`, the two `kind`s of `overlayTop` — are
+ * layers. (It was nine and three until `pushedView` retired with the layer kind
+ * it read, R-EXA-082.) The other six have no `Placed` at all, and the
+ * prompt, which is the entry's own example of a target wanting its own shape,
+ * is one of them. So a `cursorStyle` on `Layer` would cover a third of its
+ * subject while reading as total.
  *
  * `activeTarget` answers on every dispatch and a layer does not, which is what
  * makes the target the key that is always defined. Position stays exactly where

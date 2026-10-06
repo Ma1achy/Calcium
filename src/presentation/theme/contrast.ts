@@ -30,7 +30,9 @@
  * the two wider arms are refused by measurement below.
  */
 
-import type { PaletteSpec, ThemeError, ThemeTokens } from "./types.js";
+import type { PaletteSpec, TextGround, ThemeError, ThemeTokens } from "./types.js";
+import { TEXT_GROUNDS } from "./four-bit.generated.js";
+import { ANSI16_WINDOWS_HEX } from "./colormap.js";
 import { TONES } from "../../data/viewmodel/index.js";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -98,11 +100,61 @@ const FLOORS: Readonly<Record<string, number>> = Object.freeze({
    * ground with dark ink and needs no exception. Lightening the red to satisfy
    * this number would undo a decision rather than repair an oversight, and §4d
    * carries the figures that say which.
+   *
+   * **RETIRED — and the reasoning above was right about a constraint that no
+   * longer binds** (C10 I32, amended against the design registry, R-THM-001).
+   * The exception existed because ONE value had to be both legible on `bgElev`
+   * and dark enough to hold white, and the cube says no such value exists on a
+   * dark page. The registry does not ask one value to do both: `tone.error` and
+   * `surfaces.errorGround` are authored separately, so dark's tone moves from
+   * `#c62828` to `#f05a5a` — **2.83 against `bgElev` becomes 4.78** — while the
+   * ground keeps `#c62828` and keeps holding white at 5.62.
+   *
+   * **Measured over all ten shipped themes before this was removed**, because a
+   * floor deleted on one theme's evidence is a floor deleted on a guess: the
+   * tightest is `dark` on `bgElev` at **4.78** and every other theme has more
+   * room. `FLOORS` is now empty of tone exceptions and `DEFAULT_FLOOR` governs.
    */
-  error: 2.5,
 });
 
 export const DEFAULT_FLOOR = 4.5;
+
+/** A selection band against the page (R-THM-005) — the ground is its only ground-level carrier; the `▌` rail is its second (C14 I58). */
+export const BAND_VS_PAGE = 3;
+/** A focus band against the page (R-THM-005) — relaxed, because the focus mark carries focus. */
+export const FOCUS_VS_PAGE = 2;
+/** The two bands against each other (R-THM-005) — they can be adjacent rows. */
+export const BAND_VS_BAND = 3;
+
+/**
+ * **The ink a named surface actually takes for a colour reference.**
+ *
+ * A theme may compose a different value for a `(ground, ref)` pairing
+ * (`ThemeTokens.composed`, R-THM-001), and every floor is a claim about the pair
+ * that lands — so measuring the flat slot against a ground the theme composes
+ * away is asserting something the renderer never draws.
+ *
+ * **Exported because three checks in this file and four test rows all need it**,
+ * and the alternative is five copies of one lookup. That is the same argument
+ * `keySlot` makes in `keymap.ts`: a second formatter is a second thing to drift —
+ * and it was measured here, in the direction the argument predicts. The three
+ * checks were patched one at a time because each was found only when the previous
+ * one went green, and the tests reimplement the ratio loop rather than call
+ * `validateTokens`, so they kept the birthday clause the src had already lost.
+ */
+export function inkOn(tokens: ThemeTokens, ref: string, surfaceName: string): string {
+  // **A band answers for every ref, and it answers first** (R-THM-005). The band
+  // ink is the ink for everything drawn on that surface, so it outranks both a
+  // per-slot composition and the flat slot — a band whose ratio a later
+  // composition could undercut would be a promise held everywhere except where
+  // somebody was specific, which is the failure mode inverted rather than fixed.
+  const band = tokens.bandInk?.[surfaceName];
+  if (band !== undefined) return band;
+  const composed = tokens.composed?.[`surface.${surfaceName}`]?.[ref];
+  if (composed !== undefined) return composed;
+  const [family, slot] = ref.split(".");
+  return (family === undefined || slot === undefined ? undefined : tokens.palettes[family]?.slots[slot]) ?? "";
+}
 
 export function floorFor(slot: string): number {
   return FLOORS[slot] ?? DEFAULT_FLOOR;
@@ -118,14 +170,44 @@ export function floorFor(slot: string): number {
  * happens to make that ground — the class, not the instance.
  */
 export function textSurfaces(tokens: ThemeTokens): readonly (readonly [string, string])[] {
-  return [
-    ["bg", tokens.surfaces.bg],
-    ["bgElev", tokens.surfaces.bgElev],
-  ];
+  // **The `page` rows of the registry's table** (C10 I60), and nothing named
+  // here. `focusGround` joined them as the third instance of one class
+  // (R-THM-004): a focused region washes its whole extent, so every meaning ink
+  // lands on it — seven inks short across `dark` and `light` and sixteen of
+  // nineteen in each high-contrast theme when it was added, none reported,
+  // because a floor whose scope is a list is silent about whatever is not on the
+  // list. The list is now the registry's, and this function only reads it.
+  return rowsOf("page", tokens).map(([row, hex]) => [row.ground, hex] as const);
 }
 
 /**
- * §4a — the two diff surfaces, and the twelve slots that land on them.
+ * Every ground a renderer paints text on, with the refs that land on it (C10
+ * I60, R-THM-004) — the floor's whole scope, as one table.
+ *
+ * `textSurfaces`' three page grounds take every meaning slot; the diff grounds
+ * take §4a's twelve (the `diff` rows); `bgDeep` takes the prompt chip's `tone.meta`
+ * (`R-BLK-628`). **`bgDeep` was excluded on the premise that no text lands on it**,
+ * and the chip had been painting there the whole time: 6.38 and 6.51 : 1 against
+ * the high-contrast themes' 7, reported by nothing, because the scope was a list.
+ * A03 SS67 now requires every ground a renderer names beside text to be a ground
+ * here or an entry on its exclusion list, so the next one fails the build.
+ */
+export function textGrounds(
+  tokens: ThemeTokens,
+): readonly (readonly [surface: string, ground: string, refs: readonly string[]])[] {
+  return Object.freeze(
+    rowsOf(undefined, tokens).map(([row, hex]) => [row.ground, hex, refsOf(row, tokens)] as const),
+  );
+}
+
+/**
+ * The rows of the registry's table (`terminalPalettes.textGrounds`, C10 I60) a
+ * walker selects — by pairing, or every row — each with the ground's hex, and
+ * a row whose ground the theme lacks skipped.
+ *
+ * §4a's row, the `diff` pairing — the two diff surfaces, and the twelve slots that
+ * land on them — is the one whose reasoning was written here when it was a list,
+ * and it still holds of the registry's row:
  *
  * **A separate pairing rather than two more entries in `textSurfaces`.**
  * `textSurfaces` drives *every* `meaning` slot, so adding these there would bind
@@ -149,31 +231,41 @@ export function textSurfaces(tokens: ThemeTokens): readonly (readonly [string, s
  * leave the numbers and the marker unchecked on the surface they are drawn on,
  * which is C10 T2.14b's other direction.
  */
-const DIFF_SURFACES = Object.freeze(["diffAdd", "diffRemove"]);
-
-const DIFF_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  syntax: Object.freeze([
-    "keyword", "string", "comment", "number", "key", "type", "function", "operator", "punctuation",
-  ]),
-  tone: Object.freeze(["ok", "error", "muted"]),
-});
+function rowsOf(pairing: string | undefined, tokens: ThemeTokens): readonly (readonly [TextGround, string])[] {
+  const surfaces = tokens.surfaces as Readonly<Record<string, string | undefined>>;
+  return TEXT_GROUNDS.flatMap((row) => {
+    if (pairing !== undefined && row.pairing !== pairing) return [];
+    const hex = surfaces[row.ground];
+    return hex === undefined ? [] : [[row, hex] as const];
+  });
+}
 
 /**
- * §4b — the selection wash, and exactly one slot lands on it.
- *
- * **`tone.default` alone, and the narrowness is the same decision `DIFF_SLOTS`
- * makes rather than a smaller version of it.** The prompt's text is `default`;
- * ghost text is `muted` and is drawn *after* the buffer's last cluster, so it is
- * adjacent to a selection and never inside one.
- *
- * **The measured figures, because they are what would tempt a widening.** On the
- * light theme `muted` is 2.14–2.42 : 1 against every candidate wash, under its own
- * 2.5 floor — so pairing it would reject a theme for a failure nobody can see, and
- * the fix would look like weakening the check. That is C10 §4's argument for
- * excluding `bgDeep`, in the mirror: do not validate a slot against a surface that
- * slot never lands on.
+ * A row's refs as `palette.slot` — `meaning` expanded to every slot of every
+ * palette this theme says carries meaning. One expansion for every walker, so a
+ * row the registry writes as `meaning` is never read as empty by one of them.
  */
-const SELECTION_SLOTS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+function refsOf(row: TextGround, tokens: ThemeTokens): readonly string[] {
+  if (row.refs === "meaning") {
+    return Object.entries(tokens.palettes)
+      .filter(([, palette]) => palette.carries === "meaning")
+      .flatMap(([name, palette]) => Object.keys(palette.slots).map((slot) => `${name}.${slot}`));
+  }
+  return Object.entries(row.refs).flatMap(([palette, names]) => names.map((slot) => `${palette}.${slot}`));
+}
+
+/**
+ * §4b — the selection wash, and the floor it always had.
+ *
+ * **`tone.default` is the pairing every theme has whether it says so or not.**
+ * The prompt's text is `default` and no theme composes it away, so it is the one
+ * ref that cannot be derived from a theme's own declarations — a pairing read
+ * only off `composed` would be empty for a theme that composes nothing, which is
+ * a scope that shrinks to nothing exactly where a theme is plainest.
+ *
+ * Everything else on this ground is derived: see `selectionPairs` (C10 I49).
+ */
+const SELECTION_BASE: Readonly<Record<string, readonly string[]>> = Object.freeze({
   tone: Object.freeze(["default"]),
 });
 
@@ -190,6 +282,32 @@ const SELECTION_SLOTS: Readonly<Record<string, readonly string[]>> = Object.free
  * land together and are checked together. At the meaning floor, because a tag
  * reading *this failed* is meaning rather than decoration.
  */
+/**
+ * §073's chosen pair, and it is `errorTagPairs`' shape exactly (C10 I51).
+ *
+ * **Both sides come from `surfaces`, so both are read from `surfaces`.**
+ * `validateDiffSurfaces` takes its foreground from
+ * `tokens.palettes[palette].slots[slot]` and `continue`s when it finds nothing,
+ * so a pair whose ink lives in `surfaces` would be skipped **in silence** — a
+ * check that cannot fire dressed as one that passes (A03 §2). The error tag was
+ * written that way once and caught; this one is written from the correction.
+ *
+ * At the meaning floor, because a chosen affordance reads *this is the one*.
+ */
+export function pickPairs(
+  tokens: ThemeTokens,
+): readonly (readonly [string, string, string, string])[] {
+  const ground = tokens.surfaces.pick;
+  const ink = tokens.surfaces.pickInk;
+  // **Absent is a rung, not a defect** — a theme with no chosen ground sends the
+  // button to its brackets (C09 I102), which is the carrier that survives one
+  // bit anyway. Both halves are asked, because half a pair is the state this
+  // invariant exists to refuse.
+  if (ground === undefined || ink === undefined) return Object.freeze([]);
+  if (!isHex(ground) || !isHex(ink)) return Object.freeze([]);
+  return Object.freeze([["pickInk", ink, "pick", ground] as const]);
+}
+
 export function errorTagPairs(
   tokens: ThemeTokens,
 ): readonly (readonly [string, string, string, string])[] {
@@ -208,35 +326,55 @@ export function errorTagPairs(
  * dressed as one that passes (A03 §2). Written the first way and caught here:
  * both sides come from `surfaces`, so both are read from `surfaces`.
  */
-function validateErrorTag(tokens: ThemeTokens): readonly ThemeError[] {
+function validateSurfacePair(
+  pairs: readonly (readonly [string, string, string, string])[],
+  why: string,
+): readonly ThemeError[] {
   const errors: ThemeError[] = [];
-  for (const [inkName, ink, groundName, ground] of errorTagPairs(tokens)) {
+  for (const [inkName, ink, groundName, ground] of pairs) {
     const measured = ratio(ink, ground);
     if (measured >= DEFAULT_FLOOR) continue;
     errors.push({
       path: `surfaces.${inkName}`,
       message:
         `"${inkName}" (${ink}) is ${measured.toFixed(2)} : 1 against ${groundName} ` +
-        `(${ground}), below the ${DEFAULT_FLOOR} : 1 meaning floor — the tag says ` +
-        `something failed, so it carries meaning rather than decoration, and the ` +
+        `(${ground}), below the ${DEFAULT_FLOOR} : 1 meaning floor — ${why}, and the ` +
         `pair moves together because neither half is measured without the other`,
     });
   }
   return errors;
 }
 
+/**
+ * **Two pairs, one walk** (C10 I51). `pick`/`pickInk` arrived with exactly
+ * `errorGround`/`errorInk`'s shape — a ground with its own ink, neither half
+ * borrowable — so a second copy of this loop would be a second place for the
+ * floor to drift. The message's middle clause is what differs and it is the
+ * argument for the floor, which is the part worth keeping per pair.
+ */
+function validateSurfacePairs(tokens: ThemeTokens): readonly ThemeError[] {
+  return [
+    ...validateSurfacePair(
+      errorTagPairs(tokens),
+      "the tag says something failed, so it carries meaning rather than decoration",
+    ),
+    ...validateSurfacePair(
+      pickPairs(tokens),
+      "a chosen affordance reads *this is the one*, which is meaning rather than decoration",
+    ),
+  ];
+}
+
 /** The pairing, exposed so the suite can assert its shape rather than its results. */
 export function diffPairs(tokens: ThemeTokens): readonly (readonly [string, string, string, string])[] {
   const out: (readonly [string, string, string, string])[] = [];
-  for (const surface of DIFF_SURFACES) {
-    const hex = (tokens.surfaces as Readonly<Record<string, string>>)[surface];
-    if (hex === undefined || !isHex(hex)) continue;
-    for (const [palette, slots] of Object.entries(DIFF_SLOTS)) {
-      for (const slot of slots) {
-        const value = tokens.palettes[palette]?.slots[slot];
-        if (value === undefined || !isHex(value)) continue;
-        out.push([palette, slot, surface, hex]);
-      }
+  for (const [row, hex] of rowsOf("diff", tokens)) {
+    if (!isHex(hex)) continue;
+    for (const ref of refsOf(row, tokens)) {
+      const [palette = "", slot = ""] = ref.split(".");
+      const value = tokens.palettes[palette]?.slots[slot];
+      if (value === undefined || !isHex(value)) continue;
+      out.push([palette, slot, row.ground, hex]);
     }
   }
   return Object.freeze(out);
@@ -251,7 +389,7 @@ export function diffPairs(tokens: ThemeTokens): readonly (readonly [string, stri
  * `tone.default` must not be in the diff pairing. They were right: `diffPairs`
  * means *the diff surfaces' pairing*, and a function whose name says one thing
  * and whose contents say two is how a check stops being readable. The same
- * argument `DIFF_SLOTS` already makes about `textSurfaces`, one level down.
+ * argument the `diff` row already makes about `textSurfaces`, one level down.
  */
 export function selectionPairs(
   tokens: ThemeTokens,
@@ -259,13 +397,36 @@ export function selectionPairs(
   const hex = tokens.surfaces.selection;
   if (!isHex(hex)) return Object.freeze([]);
 
+  // **The pairing is derived from the theme's own compositions** (C10 I49,
+  // §4b.1). A composed `(ground, ref)` value is the design saying *this ref
+  // lands on this ground* — nobody repaints a slot for a surface it never
+  // meets — so the scope rule is unchanged and its premise is read off the
+  // design instead of off this tree's prompt.
+  //
+  // **It had to be derived rather than widened by hand, and the reason is what
+  // this closes.** The list was `tone.default` alone on an argument that was
+  // right about the prompt and not about the transcript; meanwhile the
+  // generator's `^`-anchored selector match dropped seven declared values,
+  // every one of them on this ground and six of them `muted`. A list nobody
+  // edits cannot notice a value nobody delivered. Derived, the two move
+  // together: a composition that arrives enters the check on the same commit,
+  // and one that stops being declared leaves it.
+  const refs = new Set<string>();
+  for (const [palette, slots] of Object.entries(SELECTION_BASE)) {
+    for (const slot of slots) refs.add(`${palette}.${slot}`);
+  }
+  for (const ref of Object.keys(tokens.composed?.["surface.selection"] ?? {})) refs.add(ref);
+
   const out: (readonly [string, string, string, string])[] = [];
-  for (const [palette, slots] of Object.entries(SELECTION_SLOTS)) {
-    for (const slot of slots) {
-      const value = tokens.palettes[palette]?.slots[slot];
-      if (value === undefined || !isHex(value)) continue;
-      out.push([palette, slot, "selection", hex]);
-    }
+  for (const ref of [...refs].sort()) {
+    const [palette, slot] = ref.split(".");
+    if (palette === undefined || slot === undefined) continue;
+    // **The flat slot must exist, and a composition for a slot the palette does
+    // not carry is not a pairing.** `inkOn` would answer with the composed value
+    // and the pair would read as measured, on a ref no palette can resolve.
+    const value = tokens.palettes[palette]?.slots[slot];
+    if (value === undefined || !isHex(value)) continue;
+    out.push([palette, slot, "selection", hex]);
   }
   return Object.freeze(out);
 }
@@ -330,7 +491,17 @@ function validateDecorationText(tokens: ThemeTokens): readonly ThemeError[] {
   for (const [palette, slot, surfaceName, hex] of decorationTextPairs(tokens)) {
     const value = tokens.palettes[palette]?.slots[slot];
     if (value === undefined) continue;
-    const measured = ratio(value, hex);
+    // The same composition `validatePalette` honours, for the same reason: the
+    // ink this ground takes is the one that lands on it.
+    //
+    // **Through `inkOn` rather than reading `composed` directly**, which is the
+    // fourth time that lookup has been written out and the second time a copy of
+    // it has been left behind by a change: a band (R-THM-005) answers for every
+    // ref on its surface and a direct read of `composed` cannot see one, so this
+    // check would have measured a flat categorical slot against a band the
+    // renderer never paints it on.
+    const ink = inkOn(tokens, `${palette}.${slot}`, surfaceName) || value;
+    const measured = ratio(ink, hex);
     // **Written as the positive form rather than as `>= DEFAULT_FLOOR` and
     // `continue`**, which is how `validateErrorTag` two functions up says the
     // same thing — and a second copy of that line makes *its* mutation anchor
@@ -359,16 +530,33 @@ function validateDiffSurfaces(tokens: ThemeTokens): readonly ThemeError[] {
     const value = tokens.palettes[palette]?.slots[slot];
     if (value === undefined) continue;
 
+    // **A floor lives wherever a pair is formed**, so a theme feature that changes
+    // which ink meets a ground has to reach every one of them or it silently holds
+    // a slot to a pairing that is never drawn. There are three such sites — this,
+    // `validatePalette` and `validateDecorationText` — and composition was missed
+    // at two of them when it landed, then bands were missed at all three, because
+    // each site had its own copy of the lookup.
+    //
+    // **So none of them has one now.** `inkOn` is the single answer to *what ink
+    // does this ground take*, and a fourth site added tomorrow gets every
+    // mechanism by calling it rather than by being remembered.
+    const ink = inkOn(tokens, `${palette}.${slot}`, surface) || value;
+
     const floor = floorFor(slot);
-    const measured = ratio(value, hex);
+    const measured = ratio(ink, hex);
     if (measured >= floor) continue;
 
+    // **The remedy changed with composition and the sentence had to.** It read
+    // *the background moves rather than the slot*, which was the only answer when
+    // an ink was one value everywhere; a theme may now move the ink on this ground
+    // alone, and that is the cheaper of the two.
     errors.push({
       path: `palettes.${palette}.${slot}`,
       message:
-        `"${slot}" is ${measured.toFixed(2)} : 1 against ${surface} (${hex}), ` +
-        `below its floor of ${floor} : 1 — a background is a surface text ` +
-        `lands on, so the background moves rather than the slot`,
+        `"${slot}" is ${measured.toFixed(2)} : 1 against ${surface} (${hex})` +
+        `${ink === value ? "" : ` (composed as ${ink})`}, below its floor of ` +
+        `${floor} : 1 — a background is a surface text lands on, so the background ` +
+        `moves, or this theme composes a different ink for this ground`,
     });
   }
 
@@ -414,6 +602,28 @@ export const REQUIRED_SLOTS: Readonly<Record<string, readonly string[]>> = Objec
   ]),
 });
 
+/** The greatest ratio two colours can have: white on black. */
+const MAX_RATIO = 21;
+
+/**
+ * **A declared floor is a ratio a pair can meet, and not less than the common
+ * one** (C10 I64). Two readers take the field differently — `validateHighContrast`
+ * holds a pair to `max(floor, floorFor(slot))`, `validateBands` to the floor
+ * itself — so a value one of them shrugs off empties the other: `NaN` fails no
+ * comparison, `0` is met by every ratio, and `3` checks a band below the floor
+ * every other theme owes. The domain is stated here, once, rather than repaired
+ * in each reader. Absent is legal and means the common floor.
+ */
+function validateFloor(tokens: ThemeTokens): readonly ThemeError[] {
+  const floor = tokens.floor;
+  if (floor === undefined) return Object.freeze([]);
+  if (Number.isFinite(floor) && floor >= DEFAULT_FLOOR && floor <= MAX_RATIO) return Object.freeze([]);
+  return Object.freeze([{
+    path: "floor",
+    message: `a declared floor of ${String(floor)} is not a promise a theme can make: it must be a finite ratio from ${DEFAULT_FLOOR} : 1, the common floor, to ${MAX_RATIO} : 1, white on black`,
+  }]);
+}
+
 /**
  * The families and slots a theme must carry (I30).
  *
@@ -451,7 +661,7 @@ function validateRequiredSlots(tokens: ThemeTokens): readonly ThemeError[] {
 }
 
 export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
-  const errors: ThemeError[] = [];
+  const errors: ThemeError[] = [...validateFloor(tokens)];
   const surfaces = Object.entries(tokens.surfaces);
 
   for (const [name, value] of surfaces) {
@@ -466,15 +676,238 @@ export function validateTokens(tokens: ThemeTokens): readonly ThemeError[] {
   const bgs = isHex(tokens.surfaces.bg) && isHex(tokens.surfaces.bgElev) ? textSurfaces(tokens) : [];
 
   for (const [paletteName, palette] of Object.entries(tokens.palettes)) {
-    errors.push(...validatePalette(paletteName, palette, bgs, tokens.surfaces.bg));
+    errors.push(...validatePalette(paletteName, palette, bgs, tokens.surfaces.bg, tokens));
   }
 
   errors.push(...validateRequiredSlots(tokens));
   errors.push(...validateDiffSurfaces(tokens));
-  errors.push(...validateErrorTag(tokens));
+  errors.push(...validateSurfacePairs(tokens));
   errors.push(...validateDecorationText(tokens));
+  errors.push(...validateBands(tokens));
+  errors.push(...validateHighContrast(tokens));
   errors.push(...validateVariant(tokens));
 
+  return Object.freeze(errors);
+}
+
+/**
+ * **The four contrasts a band declares, checked as stated** (R-THM-005).
+ *
+ * Not one rule with four consequences but four separate claims, because they bind
+ * for four different reasons and a reader meeting a failure needs the reason, not
+ * the number. The rule text carries them in the same order and the same words.
+ *
+ * **Why they are not all the same figure.** The ink keeps the theme's declared
+ * ratio because that is the promise. The selection band keeps 3 : 1 against the
+ * page because the ground is selection's *only* carrier — R-SEL-006 gives
+ * selection the ground and focus the mark, so a selection band that does not read
+ * is a fact with nothing carrying it. The focus band keeps only 2 : 1 against the
+ * page because the focus mark already carries focus at the declared ratio and the
+ * band need only read as an extent. And the two bands keep 3 : 1 from each other
+ * because they can be adjacent rows, which is the pair a reader actually compares.
+ *
+ * **It follows that the focus band is the one nearer the page** and selection the
+ * one further from it — a consequence of the constraints rather than a choice, and
+ * the reason `hcDark`'s selection is the bright band while `hcLight`'s is the dark
+ * one. Measured before the values were written: the previous grounds sat at
+ * 1.01 : 1 from each other in `hcLight`, separated by hue alone.
+ */
+export function validateBands(tokens: ThemeTokens): readonly ThemeError[] {
+  const errors: ThemeError[] = [];
+  const bands = tokens.bandInk ?? {};
+
+  // **Every band has a 4-bit pair, and the pair is two indices** (C10 I61).
+  // Structural, so it binds at load: a band with no pair resolves at 4-bit to
+  // no ground and one index per tone, the state I61 was written against. The
+  // pair's contrast is a claim about a reference palette and is T2.64's, not
+  // this gate's — a user's sixteen are the user's.
+  //
+  // **First, and in both directions** (question 55). This sat after the
+  // `isHex(bg)` return below, so a theme inheriting its page could declare a
+  // band with no pair; and it iterated `bandInk` alone, so a pair with no band
+  // was never read. Each is a 4-bit band one reader painted and the other did
+  // not, and `bandAt` (I66) now paints neither — refused here, a theme cannot
+  // ship a band it silently does not draw.
+  for (const name of Object.keys(bands)) {
+    const pair = tokens.bandFourBit?.[name];
+    if (pair === undefined) {
+      errors.push({
+        path: `bandFourBit.${name}`,
+        message: "a band with no 4-bit pair has no ground at colourDepth 4 and one index per tone on it (C10 I61)",
+      });
+    } else if (pair.ground === pair.ink) {
+      errors.push({
+        path: `bandFourBit.${name}`,
+        message: `ground and ink are both index ${String(pair.ground)} — a band whose ink is its ground draws nothing on it (C10 I61)`,
+      });
+    }
+  }
+  for (const name of Object.keys(tokens.bandFourBit ?? {})) {
+    if (bands[name] === undefined) {
+      errors.push({
+        path: `bandFourBit.${name}`,
+        message: "a 4-bit pair with no band declares a band at colourDepth 4 alone, which nothing paints (C10 I61, I66)",
+      });
+    }
+  }
+
+  if (tokens.bandInk === undefined) return Object.freeze(errors);
+  const bg = tokens.surfaces.bg;
+  if (!isHex(bg)) return Object.freeze(errors);
+  const promised = tokens.floor ?? DEFAULT_FLOOR;
+
+  // **The band's name IS the surface's name** (I45). This read *`focusGround` if
+  // the name is `focusGround`, otherwise `selection`* — correct for the two
+  // entries that exist and wrong for a third the moment there is one, silently:
+  // its ink would have been measured against the selection wash, and the gate
+  // would have passed or failed for a ground the band never lands on. A lookup
+  // written for a two-member population and keyed by exclusion answers wrongly
+  // for the third member and reports nothing.
+  //
+  // `surfaces` is a closed record and `Object.entries` hands back `string`, so
+  // the lookup is the one place the two cannot be joined by the type. `bandInk`
+  // is keyed by `SurfaceName`, which is what makes the cast safe, and T2.55 is
+  // what holds it: a third band measured against its own ground in both
+  // directions — a bad one reported, a good one silent.
+  const grounds = tokens.surfaces as Readonly<Record<string, string | undefined>>;
+  const groundOf = (name: string): string | undefined => {
+    const v = grounds[name];
+    return v !== undefined && isHex(v) ? v : undefined;
+  };
+  const say = (path: string, got: number, need: number, what: string): void => {
+    errors.push({
+      path,
+      message:
+        `${got.toFixed(2)} : 1, below the ${need} : 1 a band declares — ${what}`,
+    });
+  };
+
+  for (const [name, ink] of Object.entries(bands)) {
+    const ground = groundOf(name);
+    if (ground === undefined || !isHex(ink)) continue;
+    const measured = ratio(ink, ground);
+    if (measured < promised) {
+      say(`bandInk.${name}`, measured, promised,
+        "a band's ink is the ink for everything on it, so this is the theme's promise for the whole band");
+    }
+  }
+
+  const focus = bands["focusGround"] === undefined ? undefined : groundOf("focusGround");
+  const selection = bands["selection"] === undefined ? undefined : groundOf("selection");
+
+  if (selection !== undefined) {
+    const measured = ratio(selection, bg);
+    if (measured < BAND_VS_PAGE) {
+      say("surfaces.selection", measured, BAND_VS_PAGE,
+        "the ground is selection's only ground-level carrier, so a selection band that does not read leaves the rail carrying it alone");
+    }
+  }
+  if (focus !== undefined) {
+    const measured = ratio(focus, bg);
+    if (measured < FOCUS_VS_PAGE) {
+      say("surfaces.focusGround", measured, FOCUS_VS_PAGE,
+        "the focus mark already carries focus, so the band need only read as an extent — but it must read as one");
+    }
+  }
+  if (focus !== undefined && selection !== undefined) {
+    const measured = ratio(focus, selection);
+    if (measured < BAND_VS_BAND) {
+      say("surfaces.focusGround", measured, BAND_VS_BAND,
+        "the two bands can be adjacent rows, and telling them apart by hue alone is the failure a high-contrast theme exists to prevent");
+    }
+  }
+
+  return Object.freeze(errors);
+}
+
+/**
+ * C10 I45's four band constraints, measured on the **4-bit** pairs against the
+ * reference palette (C10 I61).
+ *
+ * Not part of `validateTokens`, and on purpose: the ratios are a claim about the
+ * reference palette — the legacy Windows console's sixteen, `ANSI16_WINDOWS_HEX`
+ * — and not about any terminal a theme loads in, so a shortfall is
+ * a fact T2.64 holds to a named list rather than a reason to refuse the theme.
+ * The page is `fourBit["surface.bg"]`, as the resolver draws it.
+ */
+export function bandFourBitShortfalls(
+  tokens: ThemeTokens,
+): readonly Readonly<{ path: string; measured: number; need: number }>[] {
+  const pairs = tokens.bandFourBit;
+  const pageIndex = tokens.fourBit["surface.bg"];
+  if (pairs === undefined || pageIndex === undefined) return Object.freeze([]);
+  const hex = (i: number): string => ANSI16_WINDOWS_HEX[i] ?? "#000000";
+  const page = hex(pageIndex);
+  const promised = tokens.floor ?? DEFAULT_FLOOR;
+  const out: { path: string; measured: number; need: number }[] = [];
+  const hold = (path: string, measured: number, need: number): void => {
+    if (measured < need) out.push({ path, measured: Math.round(measured * 100) / 100, need });
+  };
+  for (const [name, pair] of Object.entries(pairs)) {
+    hold(`${name}.ink`, ratio(hex(pair.ink), hex(pair.ground)), promised);
+  }
+  const focus = pairs["focusGround"];
+  const selection = pairs["selection"];
+  if (selection !== undefined) hold("selection.page", ratio(hex(selection.ground), page), BAND_VS_PAGE);
+  if (focus !== undefined) hold("focusGround.page", ratio(hex(focus.ground), page), FOCUS_VS_PAGE);
+  if (focus !== undefined && selection !== undefined) {
+    hold("focusGround.selection", ratio(hex(focus.ground), hex(selection.ground)), BAND_VS_BAND);
+  }
+  return Object.freeze(out);
+}
+
+/**
+ * **R-THM-002 — a theme that promises more than the floor is held to what it
+ * promised.**
+ *
+ * The high-contrast themes are named for a ratio and shipped without one. 7 : 1
+ * lived in a roadmap entry and in a single contract row, which is a claim about
+ * the tokens as they stood rather than a constraint on the ones that follow —
+ * and it went stale the way that shape always does: porting the themes to the
+ * registry left `hcLight` at 6.55 : 1 on `bgElev` for eight refs, below a
+ * promise nothing could read.
+ *
+ * **A separate function rather than a term inside `floorFor`, because it is a
+ * different kind of claim.** `FLOORS` is per slot and says what a *slot* needs;
+ * this is per theme and says what a *theme* undertakes, over every pair in
+ * `textGrounds` — every ground it paints text on and the inks that land there
+ * (C10 I60). Folding one into the other would
+ * make `floorFor(slot)` answer differently depending on a theme it is not given,
+ * and four call sites would have to start passing one.
+ *
+ * **The greater of the two, so a declared floor can only raise.** A theme
+ * declaring `2` would otherwise weaken `muted`'s own 2.5 — a promise that
+ * promises less is not a promise, and the shape A03 §2 calls vacuous.
+ *
+ * **Composition is honoured**, as everywhere else: a floor is a claim about the
+ * pair that lands, and `hcLight` keeps this promise precisely *by* composing
+ * four darker inks for its elevated ground rather than moving the ground.
+ */
+export function validateHighContrast(tokens: ThemeTokens): readonly ThemeError[] {
+  const promised = tokens.floor;
+  if (promised === undefined) return Object.freeze([]);
+  if (!isHex(tokens.surfaces.bg) || !isHex(tokens.surfaces.bgElev)) return Object.freeze([]);
+
+  const errors: ThemeError[] = [];
+  // **Over the whole table** (C10 I60): the diff grounds and the chip's well are
+  // grounds this theme paints text on, and a promise kept only on the page is
+  // the promise the scope-as-a-list broke three times.
+  for (const [surface, ground, refs] of textGrounds(tokens)) {
+    if (!isHex(ground)) continue;
+    for (const ref of refs) {
+      const [paletteName, slot] = ref.split(".") as [string, string];
+      const need = Math.max(promised, floorFor(slot));
+      const ink = inkOn(tokens, ref, surface);
+      if (!isHex(ink)) continue;
+      const measured = ratio(ink, ground);
+      if (measured < need) {
+        errors.push({
+          path: `palettes.${paletteName}.${slot}`,
+          message: `"${slot}" is ${measured.toFixed(2)} : 1 against ${surface} (${ground}), below the ${need} : 1 this theme declares — a theme named for a ratio keeps it on every surface it paints, or it composes an ink for that ground`,
+        });
+      }
+    }
+  }
   return Object.freeze(errors);
 }
 
@@ -518,6 +951,14 @@ function validatePalette(
   palette: PaletteSpec,
   bgs: readonly (readonly [string, string])[],
   bg: string,
+  /**
+   * **The whole token set, where this took `composed` alone.** A floor is a claim
+   * about the ink a ground actually takes, and that answer now has more than one
+   * source — a band (R-THM-005) as well as a composition. Narrowing the parameter
+   * to the one mechanism that existed when it was written is what made bands
+   * invisible here; `inkOn` is the answer, and it needs the set.
+   */
+  tokens: ThemeTokens,
 ): readonly ThemeError[] {
   const errors: ThemeError[] = [];
   const seen = new Map<string, string>();
@@ -559,12 +1000,20 @@ function validatePalette(
 
     const floor = floorFor(slot);
     for (const [surfaceName, surface] of bgs) {
-      const measured = ratio(value, surface);
+      // **Measure the ink this ground actually takes, not the flat slot.** Where
+      // the theme composes a different value for `(ground, ref)` that value is
+      // what lands, and holding the flat one to a floor it is never drawn at is
+      // the containment-is-not-correctness shape: an assertion about a pairing
+      // the renderer does not produce. `nord.info` is the case — 4.64 : 1 on
+      // `bg`, 3.74 on `bgElev`, and `#95b5d5` on `bgElev`, which is 4.72.
+      const ink = inkOn(tokens, `${paletteName}.${slot}`, surfaceName) || value;
+      const measured = ratio(ink, surface);
       if (measured < floor) {
+        const via = ink === value ? "" : ` (composed as ${ink})`;
         errors.push({
           path,
           message:
-            `"${slot}" is ${measured.toFixed(2)} : 1 against ${surfaceName} (${surface}), ` +
+            `"${slot}" is ${measured.toFixed(2)} : 1 against ${surfaceName} (${surface})${via}, ` +
             `below its floor of ${floor} : 1`,
         });
       }

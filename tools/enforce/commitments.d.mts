@@ -187,6 +187,33 @@ export declare function checkInvariantCoverage(
   exempt?: readonly string[],
 ): { violations: Violation[]; uncited: number; retired: number; declared: number };
 
+/** SP15 — every row whose title starts with a test-row id, with SP9's attribution. */
+export declare function rowIdsIn(
+  file: string,
+  text: string,
+): { id: string; spec: string | null; line: number }[];
+
+/** A03 SP15 — within one spec, a test row's id is titled in one file. */
+export declare function checkRowFiles(
+  testFiles: readonly string[],
+  readFile?: (file: string) => string,
+  exempt?: readonly string[],
+): { violations: Violation[]; rows: number; unowned: number; split: number };
+
+/** SP16 — every test row id a spec declares retired: struck, or headed superseded, retired or struck. */
+export declare function retiredRowsOf(
+  file: string,
+  readFile?: (file: string) => string,
+): Set<string>;
+
+/** A03 SP16 — a titled row locates the row its spec declares, not the file owner's and not a retired one. */
+export declare function checkRowResolves(
+  testFiles: readonly string[],
+  specs: readonly string[],
+  readFile?: (file: string) => string,
+  exempt?: readonly string[],
+): { violations: Violation[]; rows: number; misfiled: number; dangling: number };
+
 /** Every invariant a spec lists as retired, each carrying a finding number. */
 export declare function retiredInvariantsOf(
   file: string,

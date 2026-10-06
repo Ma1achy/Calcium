@@ -80,8 +80,10 @@ const MUTATIONS = [
     // container green.
     name: "the element list stops at the box's height",
     file: SRC,
-    from: "      childRanges(block, w, measureChild).map((r) =>",
-    to: "      childRanges(block, w, measureChild).filter((r) => r.to <= block.height).map((r) =>",
+    // Re-anchored when C09 I126 laid the rows out at the bar's width (`laidAt`);
+    // the mutation is the same clip.
+    from: "      childRanges(block, laidAt, measureChild).map((r) =>",
+    to: "      childRanges(block, laidAt, measureChild).filter((r) => r.to <= block.height).map((r) =>",
     expect: "T2.22",
   },
   {
@@ -162,18 +164,21 @@ const MUTATIONS = [
     // container whose content fits and wrong exactly where the ruling applies.
     name: "the container copies only the children the box can show",
     file: SRC,
-    from: "          copy: copyTextOf(r.child),",
-    to: "          copy: r.to <= block.height ? copyTextOf(r.child) : \"\",",
+    from: "          ...copyOrNothing(copyChild(r.child)),",
+    to: "          ...copyOrNothing(r.to <= block.height ? copyChild(r.child) : null),",
     expect: "T2.35",
   },
   {
     // **The join stopping at one level.** A child that is itself a container
-    // carries its children's sources, and a `default` arm swallowing `scroll`
-    // reads as total — the switch answers every kind, and answers one wrongly.
+    // carries its children's sources, and the switch that used to live here had
+    // a `default` arm that read as total while answering one kind wrongly. The
+    // switch is gone (C09 §7a, I86) and the recursion is `scroll`'s own `copy`,
+    // so the mutation is the container declining instead of joining — the same
+    // observable, one file closer to the decision.
     name: "a nested container contributes no source",
     file: SRC,
-    from: "    case \"scroll\":\n      return child.children",
-    to: "    case \"scroll-not\":\n      return child.children",
+    from: "  copy: (block, copyChild) => joinChildren(block.children, copyChild),\n\n  /**\n   * `height`, plus the residue",
+    to: "  copy: () => null,\n\n  /**\n   * `height`, plus the residue",
     expect: "T2.35b",
   },
   {

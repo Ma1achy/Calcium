@@ -11,6 +11,8 @@
 // `attrs()` strips the colour pair so a row reads as the attribute placement
 // alone; the colour's presence is asserted separately where it matters.
 import { describe, expect, it } from "vitest";
+import { body } from "../support/table-gutter.js";
+import { focusStyle } from "../../src/presentation/blocks/paint.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import type { Block, Ramp, TextSpan } from "../../src/data/viewmodel/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
@@ -66,7 +68,8 @@ describe("C04 §3am — spans at the edges", () => {
     const lines = tables().renderToLines(table, 6);
     const cell = lines.find((l) => visible(l).includes("ij"));
     expect(cell, "the tail is what the frame shows").toBeDefined();
-    expect(visible(cell ?? "").trimEnd()).toMatch(/^…[a-j]*ij$/u);
+    // Read past the table's reserved focus gutter (C11 I15, §5b).
+    expect(body(visible(cell ?? "")).trimEnd()).toMatch(/^…[a-j]*ij$/u);
     expect(attrs(cell ?? "")).toContain(`${BOLD}ij${UNBOLD}`);
     expect(attrs(cell ?? ""), "the marker is not inside the span").not.toContain(`${BOLD}…`);
   });
@@ -101,7 +104,7 @@ describe("C04 §3am — spans at the edges", () => {
     const lines = tables().renderToLines(table, 20);
     const cell = lines.find((l) => visible(l).includes("abc"));
     expect(cell).toBeDefined();
-    expect(visible(cell ?? "").trimEnd()).toBe("✓ abcdef");
+    expect(body(visible(cell ?? "")).trimEnd()).toBe("✓ abcdef"); // past the focus gutter (C11 I15)
     expect(attrs(cell ?? "")).toContain(`${BOLD}abc${UNBOLD}`);
     expect(attrs(cell ?? ""), "the glyph and its space are outside the span").not.toContain(`${BOLD}✓`);
   });
@@ -219,8 +222,26 @@ describe("C09 §5 — tone and value, the frames", () => {
     const [unfocused] = tables().renderToLines(table, 20);
     expect(unfocused).toContain(`${identifier}make`);
     const [focused] = measurable({ definitions: [tableDefinition], focus: { blockId: "t", rowId: "r0" } }).renderToLines(table, 20);
-    expect(focused).toContain(`${accent}run make now`);
-    expect((focused ?? "").match(/\x1b\[38;/gu), "one colour on the focused row").toHaveLength(1);
+
+    // **Three facts now, where there was one** (C10 I47, C11 I15, §5b): the
+    // focused row takes the **focus ground** rather than sharing selection's, it
+    // keeps `accent` as the ink, and the reserved gutter carries `▸` in the same
+    // accent. The row's own property — the `identifier` run absorbed, one colour
+    // across the cell — is unchanged and is still what is asserted; what moved
+    // is that the colour is no longer the *first* thing on the line.
+    expect(visible(focused ?? ""), "the mark in the reserved column").toContain("▸ run make now");
+    // **The mark carries the accent *and* the ground** (§5c). This asserted
+    // `accent` immediately followed by `▸`, which held while the gutter was
+    // painted on the page; the ground now opens between them, because the
+    // reserved column is part of the row it leads. The two sequences and the
+    // mark, in that order, is a **stronger** claim than the contiguous pair —
+    // it says both which ink and which ground, where the old form said the ink
+    // and was silent about the cell.
+    const ground = sgr(focusStyle(DARK_THEME, FULL_CAPS));
+    expect(focused, "the mark takes the accent, on the row's ground").toContain(`${accent}${ground}▸ `);
+    expect(focused, "and the row takes the focus ground").toContain(ground);
+    const inRow = (focused ?? "").slice((focused ?? "").indexOf("run make now"));
+    expect(inRow.match(/\x1b\[38;/gu) ?? [], "no second colour inside the row").toHaveLength(0);
   });
 });
 

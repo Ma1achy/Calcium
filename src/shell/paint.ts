@@ -30,21 +30,34 @@
  */
 
 import { renderSequenceToLines } from "../presentation/render-lines.js";
-import type { RenderScratch } from "../presentation/blocks/types.js";
-import { cells, hardWrapCells, sliceCells } from "../presentation/text.js";
-import { paint as paintSpans, tone, selectionStyle } from "../presentation/blocks/paint.js";
-import { SGR_RESET, sgr, toTerminalDefault } from "../terminal/escapes.js";
-import { HEADER_ROWS, HEADER_RULE_ROWS, promptFor, PROMPT_GUTTER } from "./config.js";
-import { glyphs } from "../presentation/blocks/index.js";
-import { composite } from "./composite.js";
+import type { Motion, RenderScratch } from "../presentation/blocks/types.js";
+import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
+import { neutraliseControl } from "../data/text.js";
+import {
+  background,
+  based,
+  focusShapeStyle,
+  paint as paintSpans,
+  isBand,
+  selectionStyle,
+  tone,
+  withBackground,
+  type Span,
+} from "../presentation/blocks/paint.js";
+import { SGR_RESET, sgr, sgrPattern } from "../terminal/escapes.js";
+import { HEADER_ROWS, HEADER_RULE_ROWS, MIN_COLUMNS, promptFor, PROMPT_GUTTER } from "./config.js";
+import { glyphs, scrollbarColumn, scrollbarSet } from "../presentation/blocks/index.js";
+import { composite, type LayerView } from "./composite.js";
 import type { ChromeCache, ChromeRole } from "./chrome-cache.js";
 import { exact, FrameError } from "./frame-error.js";
 import { gutterMatchesPrompt, heightsSum, promptTop, type Composed } from "./frame.js";
-import type { Block } from "../data/viewmodel/index.js";
+import type { Label } from "./types.js";
+import type { Block, EchoChip } from "../data/viewmodel/index.js";
+import { echoRows, type EchoCaps } from "./echo.js";
 import type { Placed } from "../viewport/overlay/index.js";
 import type { Cell, CellSpan } from "../interaction/editor/index.js";
 import type { BlockRegistry } from "../presentation/blocks/index.js";
-import { resolveBase } from "../presentation/theme/index.js";
+import { resolveBase, resolveHueBand, resolveTone } from "../presentation/theme/index.js";
 import type { ResolvedTheme } from "../presentation/theme/index.js";
 import type { Style } from "../presentation/theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -56,6 +69,8 @@ export type PaintDeps = Readonly<{
   registry: BlockRegistry;
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /** The reader's motion preference (C09 I99); absent is `"full"`. */
+  motion?: Motion;
   /** C22 I102 — the session's chrome cache; absent in a harness that paints once. */
   chrome?: ChromeCache;
   /**
@@ -67,6 +82,18 @@ export type PaintDeps = Readonly<{
   /** C17's display rows, already wrapped and gutter-aware (C17 §2, I18). */
   promptRows: () => readonly string[];
   /**
+   * Are the prompt's rows a **replacing question's** rather than the editor's
+   * (C23 I73, I74, §7f, §101)?
+   *
+   * **The gutter is the whole of what this changes here.** `❯ ` and its
+   * continuation spaces are the editor's mark, and a question drawn under them
+   * is a box indented two cells with a prompt character on its top border —
+   * which is what shipped for one run of T4.70. The spinner and the ghost go
+   * with it for the same reason: both are appearance written into the
+   * **editor's** row, and there is no editor row here.
+   */
+  promptReplaced: () => boolean;
+  /**
    * C15's boxes, placed against the frame's own `overlayRegion` (C22 I28).
    *
    * A function rather than a value for the same reason the two above are, and
@@ -75,6 +102,22 @@ export type PaintDeps = Readonly<{
    * §3 already produced once.
    */
   overlays: () => readonly Placed[];
+  /**
+   * A layer's own row offset, as the wheel left it (C16 I74). Optional: absent
+   * is *every layer at its top*, which is every frame nobody has wheeled.
+   */
+  layerScroll?: (id: string) => number;
+  /**
+   * A layer's boxes' offsets and the box its keys move (C22 I141). Absent is
+   * every layer unscrolled.
+   */
+  layerView?: (id: string) => LayerView;
+  /**
+   * C14's scroll, for the transcript's bar (C14 I62), and whether focus is in
+   * the transcript — the thumb's tone. Absent draws no bar, which is a harness
+   * that paints a frame with no viewport behind it.
+   */
+  transcriptBar?: () => Readonly<{ topRow: number; totalRows: number; focused: boolean }>;
   /** C17's cursor as a cell in the prompt's own layout (C17 §2). */
   promptCursor: () => Cell;
   /** The session's render scratch (C12 I107), for a 3D plot inside a layer. */
@@ -92,6 +135,17 @@ export type PaintDeps = Readonly<{
    * Empty when there is no region, so the common case costs one array.
    */
   promptSelection: () => readonly CellSpan[];
+  /**
+   * Which cells of the prompt are a chip's (C17 I26, §5c).
+   *
+   * **Off the same walk the rows came from**, like the selection above and for
+   * the same reason: a ground measured anywhere else parts company with the
+   * drawn row at exactly the boundaries the seam exists for. Geometry is
+   * untouched — cells to style, never cells to add.
+   *
+   * Empty when the prompt holds no chip, so the common case costs one array.
+   */
+  promptChips: () => readonly CellSpan[];
   /** Whether the prompt is where keys are going — C16's derived focus. */
   promptFocused: () => boolean;
   /**
@@ -168,10 +222,100 @@ function spinnerGlyph(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWid
  * comes from C09's table so the ASCII tier gets `-` from the same place every
  * other rule in the frame does.
  */
-function rule(width: number, deps: PaintDeps): string {
-  const text = glyphs(deps.capabilities).horizontal.repeat(width);
-  if (deps.capabilities.colourDepth === 1) return text;
-  return paintSpans([{ text, style: tone("muted", deps.theme, deps.capabilities) }]);
+function rule(width: number, deps: PaintDeps, label: Label | null = null): string {
+  const glyph = glyphs(deps.capabilities).horizontal;
+  const mark = labelSpansOf(label, width, deps);
+  if (mark === null) {
+    const text = glyph.repeat(width);
+    if (deps.capabilities.colourDepth === 1) return text;
+    return paintSpans([{ text, style: tone("muted", deps.theme, deps.capabilities) }]);
+  }
+  return paintSpans(mark);
+}
+
+
+/**
+ * The upper rule's spans when a label is drawn, or `null` when it is shed.
+ *
+ * **Inline-end with one trailing glyph, and painted as a ground** (§069,
+ * `R-COL-003`): *a name is a THING, and things take a ground*. `bgElev` is the
+ * design's rest-ground for a thing (`R-BLK-490`); the rule's own glyphs keep
+ * the muted tone they always had, so the row is the same row with a span in it.
+ *
+ * **Shed by the frame, never by the caller** (`R-BLK-175` ranks it 1 of 4 in
+ * the whole degradation order). Two conditions, and neither is a number chosen
+ * here. The first is `MIN_COLUMNS` — §069's *at 60 columns the label drops
+ * before anything else, and the frame still works*, which names the narrowest
+ * width the frame draws at at all: at that width the label is gone and the
+ * three rules are not, which is what *still works* means as a mechanism.
+ *
+ * **It is `<=` rather than `<`, and the difference is the whole rule.** A
+ * strict comparison against a private copy of 60 is unreachable: below 60 there
+ * is no frame — `fallback.ts` replaces it with the *Needs 60x24* notice — so the
+ * label's floor could only ever fire where the rule it sits on does not exist.
+ * A mutation setting that copy to 0 survived, which is how it was found: A03
+ * §2's vacuity class, arriving as two constants that had to agree with nothing
+ * holding them together.
+ *
+ * The second is derived rather than chosen: the label is gone whenever it would
+ * not leave at least one rule glyph to its left — a label that filled the row
+ * would have stopped being a label.
+ *
+ * **At 1-bit there is no ground, so the label takes the unpainted rung, `[name]`**
+ * (C22 I147, §6r). Plain text would put the application's identity in the rule's
+ * own voice, which is what `R-COL-003` separates. The brackets separate it
+ * without a colour, as they do for a chip (C17 I25) and a button (C09 I102).
+ * They take the two cells the ground's padding takes, so every threshold below
+ * is the same at every depth.
+ */
+function labelSpansOf(
+  label: Label | null,
+  width: number,
+  deps: PaintDeps,
+): readonly Span[] | null {
+  if (label === null || width <= MIN_COLUMNS) return null;
+  const unpainted = deps.capabilities.colourDepth === 1;
+  const glyph = glyphs(deps.capabilities).horizontal;
+  const ambiguous = deps.capabilities.ambiguousWidth;
+  const glyphCells = cells(glyph, ambiguous);
+  if (glyphCells <= 0) return null;
+
+  // ` <label> ` between the rule and its one trailing glyph — the fixture's
+  // `──── calcium ─`, whose two spaces are what keep the name off the dashes.
+  const text = unpainted ? `[${label.text}]` : ` ${label.text} `;
+  const used = cells(text, ambiguous) + glyphCells;
+  const left = width - used;
+  if (left < glyphCells) return null;
+  const lead = glyph.repeat(Math.floor(left / glyphCells));
+  // The remainder when the glyph is two cells wide — spaces rather than a
+  // half glyph, and on the left where the rule is, not against the label.
+  const pad = left - cells(lead, ambiguous);
+
+  const muted = tone("muted", deps.theme, deps.capabilities);
+  // **No span takes a style at 1-bit, the dashes included.** The bare rule is
+  // plain text there (`rule`), and `muted` at 1-bit is dim, so a styled dash
+  // would make the labelled rule a different rule from the one beside it. A hue
+  // has nothing to paint with (I114), and the brackets are the carrier.
+  if (unpainted) return [{ text: lead + " ".repeat(pad) }, { text }, { text: glyph }];
+  // **The hue the application named, or `bgElev` when it named none** (I114,
+  // §070, C10 I55). Both the band and its ink come from the hue, because the
+  // ink on a band is a property of the band — a label whose ink is guessed is
+  // the failure `R-THM-005` exists to prevent. A name no theme carries paints
+  // the untinted ground rather than nothing: the name arrives from a config
+  // file where a person typed it, so the reachable wrong input is a misspelling.
+  const band = label.hue === undefined ? null : resolveHueBand(deps.theme, label.hue, deps.capabilities);
+  // **The ink is resolved against the ground it lands on** (C10 I48): `tone`'s
+  // fourth argument is the composition step, so a theme that repaints `default`
+  // on `bgElev` is honoured here rather than measured elsewhere and drawn flat.
+  const ink = band === null ? tone("default", deps.theme, deps.capabilities, "bgElev") : band.ink;
+  const ground = withBackground(ink, band === null
+    ? background("surface.bgElev", deps.theme, deps.capabilities)
+    : band.ground);
+  return [
+    { text: lead + " ".repeat(pad), style: muted },
+    { text, style: ground },
+    { text: glyph, style: muted },
+  ];
 }
 
 /**
@@ -192,6 +336,7 @@ function region(
     renderSequenceToLines(deps.registry, b, w, {
       theme: deps.theme,
       capabilities: deps.capabilities,
+      ...(deps.motion === undefined ? {} : { motion: deps.motion }),
       ...(deps.probe === undefined ? {} : { probe: deps.probe }),
     });
   // **Once per content** (C22 I102): the chrome's blocks are rebuilt every
@@ -241,11 +386,35 @@ export function commandRows(
   // resolved at module scope and both forms must be `PROMPT_GUTTER.first`
   // cells — otherwise the height C14 virtualises against and the row the
   // composer draws disagree about the same entry.
-  caps: Pick<TerminalCapabilities, "unicode">,
+  caps: EchoCaps,
+  /**
+   * The line's chips (C04 I152). **Where they describe `command`, the echo is
+   * the prompt's walk** (I153): a chip is one wrap unit drawn as its label,
+   * and its content's line breaks never reach the frame. Absent, or a range
+   * that does not lie in `command`, and the rows below are unchanged.
+   */
+  echo?: readonly EchoChip[],
 ): readonly string[] {
   if (command === "") return [];
+  const walked = echoRows(command, echo, width, caps);
+  if (walked !== null) return walked.rows;
   const body = Math.max(1, width - PROMPT_GUTTER.first);
-  const wrapped = hardWrapCells(command, body);
+  // **Line by line, and no row holds a break** (C22 I33, amended). A paste or a
+  // resolved chip puts `\n` in the command, `hardWrapCells` measures it as
+  // nothing, and written raw inside a row it moved the terminal down mid-row —
+  // near the bottom, scrolling the alternate screen. Each line is wrapped on
+  // its own, as the prompt draws the same buffer. A blank line keeps its row
+  // because `hardWrapCells("")` is `[""]`, not `[]`.
+  //
+  // **Neutralised before it is wrapped** (I33 amended, C17 I36, F1401). The
+  // command is the reader's line and this row is not a block, so C09 I127's
+  // resolve never sees it: a bidi override typed at the prompt was written raw
+  // here and reordered the echo. Before the wrap, so the `<U+202E>` form's
+  // eight cells are in the height the measurer takes from this same function.
+  // `entry.doc.command` keeps the character; only the row shows it.
+  const wrapped = command
+    .split(/\r\n|\r|\n/u)
+    .flatMap((line) => hardWrapCells(neutraliseControl(line), body));
   const prompt = promptFor(caps);
   return wrapped.map((row, i) =>
     (i === 0 ? prompt : " ".repeat(PROMPT_GUTTER.cont)) + row,
@@ -357,8 +526,12 @@ function shows(window: PromptWindow, row: number): boolean {
   return row >= window.first && row < window.first + window.count;
 }
 
+/** A cell range of a squared-off row and the style it takes. */
+type StyledRange = Readonly<{ from: number; to: number; style: Style }>;
+
 /**
- * The selection wash, applied to a squared-off row (entry 23).
+ * A squared-off row with its grounds applied, in one pass (entry 23, C17 §5c,
+ * `R-STA-002`).
  *
  * **After `exact`, and that is where the full-row half comes from.** The row is
  * already padded to `width`, so a span running to `width` washes the padding
@@ -366,19 +539,304 @@ function shows(window: PromptWindow, row: number): boolean {
  * stop at the last cluster, pass every assertion about which characters are in
  * the region, and only be visible in a frame-read.
  *
- * **Reverse video is the 1-bit rung and it is here rather than in the theme.**
- * `resolveBackground` answers `NO_STYLE` where there is no colour, so a wash
- * alone would fall straight from a background to nothing. `inverse` needs no
- * colour at all and is supported essentially everywhere, which is what stops the
- * ladder having a hole in the middle.
+ * **Reverse video is the 1-bit rung and it is in `selectionStyle` rather than in
+ * the theme.** `resolveBackground` answers `NO_STYLE` where there is no colour,
+ * so a wash alone would fall straight from a background to nothing. `inverse`
+ * needs no colour at all and is supported essentially everywhere, which is what
+ * stops the ladder having a hole in the middle.
+ *
+ * **One pass, because `sliceCells` cannot read a row it has already painted.**
+ * This was `washed` and took a single span; the chip's ground made a second,
+ * and applying it by calling the old function twice would have measured SGR
+ * bytes as cells the second time round — the later range landing in the wrong
+ * place, with a frame-read the only thing that would show it. So the row is cut
+ * once at every boundary.
+ *
+ * **The ranges arrive resolved, not overlapping**, and resolving them is the
+ * caller's because the precedence is `R-STA-002`'s and belongs where the facts
+ * are known: a copy selection outranks a structural surface, so a chip under a
+ * selection is washed and not double-painted.
  */
-function washed(row: string, span: CellSpan, deps: PaintDeps): string {
-  // L1's ladder, not a private copy: the wash, else `inverse` (C11 I14; F769).
-  const style = selectionStyle(deps.theme, deps.capabilities);
-  const before = sliceCells(row, 0, span.from);
-  const inside = sliceCells(row, span.from, span.to);
-  const after = sliceCells(row, span.to, cells(row, deps.capabilities.ambiguousWidth));
-  return `${before}${paintSpans([{ text: inside, style }])}${after}`;
+function styled(row: string, ranges: readonly StyledRange[], caps: Pick<TerminalCapabilities, "ambiguousWidth">): string {
+  if (ranges.length === 0) return row;
+  const width = cells(row, caps.ambiguousWidth);
+  const order = [...ranges].sort((a, b) => a.from - b.from);
+  let out = "";
+  let at = 0;
+  for (const range of order) {
+    const from = Math.max(at, range.from);
+    if (range.to <= from) continue;
+    out += sliceCells(row, at, from);
+    out += paintSpans([{ text: sliceCells(row, from, range.to), style: range.style }]);
+    at = range.to;
+  }
+  return out + sliceCells(row, at, width);
+}
+
+/**
+ * A chip is a well (`R-BLK-628`) in the meta tone (`R-BLK-116`), resolved
+ * against the ground it lands on (C10 I48) rather than measured flat. The
+ * prompt's and the echo's (C22 I153), so the two cannot draw one chip two ways.
+ */
+function chipWell(theme: ResolvedTheme, capabilities: TerminalCapabilities): Style {
+  return withBackground(
+    tone("meta", theme, capabilities, "bgDeep"),
+    background("surface.bgDeep", theme, capabilities),
+  );
+}
+
+/**
+ * The echo's rows with each chip painted as the prompt paints it (C22 I153,
+ * I154; §6t.2 rows 7, 8).
+ *
+ * At rest a chip is the prompt's well; **focused, it takes the box shape's
+ * treatment** (C09 I137) — `meta` over `focusGround`, whole-shape inversion
+ * where no ground resolves — and the resting ground does not outlive focus.
+ * At 1 bit the well resolves to nothing and the bracketed label carries it
+ * (C17 I25). `focused` is the index into the echo's chips, or `null`.
+ *
+ * Rows without a chip come back as they went in, so an echo holding none is
+ * byte for byte what `commandRows` drew.
+ */
+export function paintEchoRows(
+  rows: readonly string[],
+  chips: readonly CellSpan[],
+  focused: number | null,
+  theme: ResolvedTheme,
+  capabilities: TerminalCapabilities,
+): readonly string[] {
+  if (chips.length === 0) return rows; // cells-ok — a chip count
+  const well = chipWell(theme, capabilities);
+  const focus = { ...tone("meta", theme, capabilities, "focusGround"), ...focusShapeStyle(theme, capabilities) };
+  return rows.map((row, at) => {
+    const ranges = chips.flatMap((span, i) =>
+      span.row === at ? [{ from: span.from, to: span.to, style: i === focused ? focus : well }] : [],
+    );
+    return ranges.length === 0 ? row : styled(row, ranges, capabilities); // cells-ok — a range count
+  });
+}
+
+/**
+ * The chip grounds a row takes, minus any the selection has claimed (`R-STA-002`).
+ *
+ * **The precedence is the design's: a copy selection outranks a structural
+ * surface, and one cell takes one ground.** So a chip the wash reaches gives up
+ * its ground entirely.
+ *
+ * **Entirely, and that is a property rather than a simplification.** The first
+ * version subtracted the wash from the chip and emitted the pieces either side,
+ * on the reading that a chip could be half selected. It cannot: **a chip is one
+ * grapheme** (C17 I25), so a region endpoint is either before it or after it and
+ * `selectionSpans` can only ever produce a wash that covers the whole label or
+ * none of it. The two-piece branch was a rule with nothing to be wrong about,
+ * and the row that was written to exercise it could not construct the input.
+ * T1.68 asserts the property the simplification rests on instead.
+ */
+function chipRanges(
+  spans: readonly CellSpan[],
+  wash: CellSpan | undefined,
+  style: Style,
+): readonly StyledRange[] {
+  const out: StyledRange[] = [];
+  for (const span of spans) {
+    const overlaps = wash !== undefined && wash.from < span.to && wash.to > span.from;
+    if (!overlaps) out.push({ from: span.from, to: span.to, style });
+  }
+  return out;
+}
+
+/**
+ * Which rendered rows take the selection ground (C14 I39).
+ *
+ * **One row per selected block, at the block's first row** — `R-SEL-003`'s
+ * third clause, *never on every cell of its body*. Pure and here rather than
+ * inside the render loop so the claim has an artefact: the session's screen
+ * model drops SGR, so a frame read one layer up can see a row move and cannot
+ * see a ground, which is why `session-paint.test.ts` reads `paint()`'s return
+ * rather than the modelled screen.
+ *
+ * `from` is the window's first row in the entry's own space, so a block whose
+ * first row is above the window contributes nothing: the ground goes on the
+ * first row, and a window beginning below it is showing the body.
+ */
+export function washedRowsOf(
+  spans: readonly Readonly<{ key: string; from: number; to: number }>[],
+  selected: ReadonlySet<string>,
+  entryId: string,
+  from: number,
+  lineCount: number,
+): ReadonlySet<number> {
+  const rows = new Set<number>();
+  for (const sp of spans) {
+    if (!selected.has(sp.key)) continue;
+    if (sp.key.slice(0, sp.key.indexOf("\u0000")) !== entryId) continue;
+    const at = sp.from - from;
+    if (at >= 0 && at < lineCount) rows.add(at);
+  }
+  return rows;
+}
+
+/**
+ * The rows the rail leads, as a set (C14 I57, I58, T1.77): the washed rows —
+ * one per selected block — unioned with each selected element's first row.
+ *
+ * One function because the union is the claim: a block selection and an
+ * element selection in the same window both take the rail, and a frame that
+ * consults only one of them draws the other's rows blank-led.
+ */
+export function railRowsOf(washed: ReadonlySet<number>, elements: ReadonlySet<number>): ReadonlySet<number> {
+  return elements.size === 0 ? washed : washed.size === 0 ? elements : new Set([...washed, ...elements]);
+}
+
+/**
+ * The first rows of an entry's **selected elements** (C14 I58, C26 I16).
+ *
+ * `focus.selected` is drawn by the block that holds each element — C11 washes
+ * a table row with no knowledge of the frame — so the rail beside it is the
+ * frame's, placed from the entry's elements. `placed` is `elementsOfEntry` at
+ * the transcript's width, whose rows are in the entry's block space, as `from`
+ * is. The first row only: a wrapped row's continuation carries nothing in the
+ * gutter (`R-SEL-016`).
+ */
+export function selectedElementRowsOf(
+  placed: readonly Readonly<{ blockId: string; element: Readonly<{ id: string; rows: Readonly<{ from: number }> }> }>[],
+  selected: readonly Readonly<{ blockId: string; rowId: string }>[],
+  from: number,
+  lineCount: number,
+): ReadonlySet<number> {
+  const rows = new Set<number>();
+  if (selected.length === 0) return rows;
+  const wanted = new Set(selected.map((s) => `${s.blockId}\u0000${s.rowId}`));
+  for (const p of placed) {
+    if (!wanted.has(`${p.blockId}\u0000${p.element.id}`)) continue;
+    const at = p.element.rows.from - from;
+    if (at >= 0 && at < lineCount) rows.add(at);
+  }
+  return rows;
+}
+
+/**
+ * The rail's cell (C14 I58, ruling 68) — `▌` in `accent` on the selection
+ * ground, or `|` where the rung is ASCII.
+ *
+ * **Never `inverse`, and that is why it is not the wash.** `selectionStyle`
+ * answers `inverse` where there is no colour, and an inverted `▌` is a
+ * right-half block: the mark would say a different thing at 1-bit than at every
+ * other rung. So the rail takes the selection ground only where the ground is a
+ * background, and at 1-bit it is the glyph upright beside an inverted row.
+ *
+ * **The ink through `tone(…, "selection")`**, the one path every renderer uses,
+ * so a banded theme's rail is the band's ink (C10 I45, C14 I53) with nothing
+ * here knowing which themes band.
+ */
+export function railCell(theme: ResolvedTheme, capabilities: TerminalCapabilities): string {
+  const ground = selectionStyle(theme, capabilities);
+  const style: Style = {
+    ...tone("accent", theme, capabilities, "selection"),
+    ...(ground.background === undefined ? {} : { background: ground.background }),
+  };
+  return paintSpans([{ text: glyphs(capabilities).rail, style }]);
+}
+
+/** Column 0 of a transcript row that carries no rail (C14 I57). */
+export const RAIL_BLANK = " ";
+
+/**
+ * The frame's copy of an entry's lines, with the selected rows grounded
+ * (C14 I40).
+ *
+ * **Returns a new array and never touches the one it was given**, which is the
+ * whole of I40: the caller has already written `lines` into the render cache,
+ * and the cache keys on nine axes of which the selection is none. A wash baked
+ * into the stored lines would serve a selected frame to a later unselected
+ * read — C22 I71's *correct frame, previous state*, the symptom whose report
+ * says *it froze*.
+ *
+ * A tenth cache axis would also be correct, and would bust an entry's whole
+ * slot on every keystroke in the mode: one rung coarser than the cost C22 I103
+ * split `tick` out to avoid.
+ */
+export function washSelectedRows(
+  lines: readonly string[],
+  rows: ReadonlySet<number>,
+  theme: ResolvedTheme,
+  capabilities: TerminalCapabilities,
+  width: number,
+): readonly string[] {
+  if (rows.size === 0) return lines;
+  return lines.map((row, i) => (rows.has(i) ? washRow(row, theme, capabilities, width) : row));
+}
+
+/**
+ * The rectangle's cells under the selection ground, on the frame's copy of an
+ * entry's lines (C14 I60, I40).
+ *
+ * `rect`'s rows are the entry's block rows and `from` is the window's first, as
+ * in {@link washedRowsOf}; its columns are entry-line cells, inclusive. **The
+ * wash is {@link washRow} over the cells alone**, so the precedence and the
+ * 1-bit rung are the block wash's and nothing here decides them; the cells
+ * either side keep the style they were drawn in, because `sliceCells` opens a
+ * tail with the style in effect where it starts. Returns the lines unchanged
+ * where the rectangle has no row in the window, and never touches the array it
+ * was given (I40).
+ */
+export function washRectCells(
+  lines: readonly string[],
+  rect: Readonly<{ fromRow: number; toRow: number; fromColumn: number; toColumn: number }>,
+  from: number,
+  theme: ResolvedTheme,
+  capabilities: TerminalCapabilities,
+): readonly string[] {
+  const lo = rect.fromRow - from;
+  const hi = rect.toRow - from;
+  if (hi < 0 || lo >= lines.length) return lines;
+  const amb = capabilities.ambiguousWidth;
+  const left = rect.fromColumn;
+  const right = rect.toColumn + 1;
+  return lines.map((row, i) => {
+    if (i < lo || i > hi) return row;
+    const before = fitStyled(sliceCells(row, 0, left, amb), left, SGR_RESET, amb);
+    const inner = washRow(sliceCells(row, left, right, amb), theme, capabilities, right - left);
+    return `${before}${SGR_RESET}${inner}${sliceCells(row, right, Number.MAX_SAFE_INTEGER, amb)}`;
+  });
+}
+
+/**
+ * A whole row under the selection ground (C14 I39, I41, `R-SEL-003`,
+ * `R-SEL-006`).
+ *
+ * **Over the finished line, which is what makes the precedence an order.** The
+ * focus mark and a patch's own inks are already in the text; this changes the
+ * ground under them, so *selection wins the ground while focus keeps its mark*
+ * is the sequence of two operations rather than a case in a table.
+ *
+ * L1's ladder, not a private copy: the wash, else `inverse` where there is no
+ * colour (C09 §paint) — so 1-bit needs no rung of its own here either.
+ */
+export function washRow(
+  row: string,
+  theme: ResolvedTheme,
+  capabilities: TerminalCapabilities,
+  width: number,
+): string {
+  // **A band's ink is total** (C14 I53, C10 I45): on a theme that bands its
+  // selection, the wash carries the band's ink as well as its ground, so a
+  // page ink never lands on the band. `tone(…, "selection")` is the one path
+  // to that ink — `inkOn` answers the band before any slot.
+  const band = isBand(theme, "selection", capabilities) ? tone("default", theme, capabilities, "selection") : {};
+  const wash = sgr({ ...selectionStyle(theme, capabilities), ...band });
+  // **Fitted by display cells, escapes whole** (C09 I63). `cells` counts an
+  // escape's bytes, so a styled row measured wider than it was and got no pad —
+  // the ground stopped at the text on every row that carried a colour.
+  const fitted = fitStyled(row, width, SGR_RESET, capabilities.ambiguousWidth);
+  if (wash === "") return fitted;
+  // **Re-opened after every sequence, not laid once under the row** (C14 I52).
+  // Each span of a finished line closes with a reset, so one opening lasted to
+  // the first of them; and a span opening its own ground — a focused row's —
+  // displaced the wash, which is the precedence inverted. `based` re-asserts
+  // only after a reset because what sits above a base may displace it; the
+  // selection is the top ground, so nothing may.
+  return `${wash}${fitted.replace(sgrPattern(), (seq) => `${seq}${wash}`)}${SGR_RESET}`;
 }
 
 /** The wash, or reverse video where there is no colour to wash with (§4b). */
@@ -389,6 +847,7 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
   // reader has a specific question about and no span could answer.
   using _s = deps.probe?.span("prompt") ?? NO_SPAN;
   const cap = frame.promptRows;
+  const replaced = deps.promptReplaced();
   const cursor = deps.promptCursor();
   const window = promptWindow(frame, deps.promptRows(), cursor.row, deps.capabilities);
   const windowed = window.rows;
@@ -405,13 +864,40 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
     if (shows(window, span.row)) spans.set(span.row - window.first + window.offset, span);
   }
 
+  // **The chips, mapped through the same window** (I62) — a ground on a row the
+  // window does not show is a ground on someone else's row.
+  const chips = new Map<number, CellSpan[]>();
+  for (const span of deps.promptChips()) {
+    if (!shows(window, span.row)) continue;
+    const at = span.row - window.first + window.offset;
+    (chips.get(at) ?? chips.set(at, []).get(at) ?? []).push(span);
+  }
+  const chipStyle = chips.size === 0 ? undefined : chipWell(deps.theme, deps.capabilities);
+
   const out: string[] = [];
   for (let i = 0; i < cap; i += 1) {
     const body = windowed[i] ?? "";
-    const gutter = i === 0 ? promptFor(deps.capabilities) : " ".repeat(PROMPT_GUTTER.cont);
+    const gutter = replaced
+      ? ""
+      : i === 0
+        ? promptFor(deps.capabilities)
+        : " ".repeat(PROMPT_GUTTER.cont); // cells-ok — the gutter's own width
     const squared = exact(gutter + body, width);
     const span = spans.get(i);
-    out.push(span === undefined ? squared : washed(squared, span, deps));
+    const onRow = chips.get(i);
+    if (span === undefined && onRow === undefined) {
+      out.push(squared);
+      continue;
+    }
+    // **One pass over the row, because the two grounds meet on it.** Painting
+    // the wash and then the chips would measure SGR bytes as cells the second
+    // time round; `styled` cuts the row once at every boundary, and
+    // `chipRanges` has already given the selection its cells (`R-STA-002`).
+    const ranges = [
+      ...(onRow === undefined || chipStyle === undefined ? [] : chipRanges(onRow, span, chipStyle)),
+      ...(span === undefined ? [] : [{ from: span.from, to: span.to, style: selectionStyle(deps.theme, deps.capabilities) }]),
+    ];
+    out.push(styled(squared, ranges, deps.capabilities));
   }
 
   // **The spinner is appearance and never geometry** (I38, C19 §7). It goes on
@@ -432,7 +918,9 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
     ? cursor.row - window.first + window.offset
     : out.length - 1;
   const row = out[last];
-  if (row !== undefined && deps.spinning()) {
+  // **Not over a question** (C23 I74): the spinner marks the token being
+  // completed at the caret, and there is no caret while the prompt is replaced.
+  if (row !== undefined && !replaced && deps.spinning()) {
     const at = cells(row.trimEnd(), deps.capabilities.ambiguousWidth);
     if (at + 1 <= width) out[last] = exact(`${sliceCells(row, 0, at)}${spinnerGlyph(deps.capabilities)}`, width);
     return out;
@@ -477,63 +965,6 @@ function ghostStyle(deps: PaintDeps): Style {
  * that wrote 41 would scroll. Neither is recoverable by the caller, so the
  * frame is refused and C22 draws the fallback.
  */
-/**
- * The theme's background, re-established after every reset in a finished row
- * (C22 I65, C10 I25).
- *
- * **One place repairs every reset a row contains**, which the walk did not expect
- * and the implementation settled: `fitStyled` closes a cut line, `composite`
- * writes two per composited row, `paint()` closes each styled run the *shell*
- * draws — and by the time a row reaches here all of them are **inside this
- * string**. `render-frame`'s per-row prefix is the one outside, and it is
- * answered by the row's own leading base landing immediately after it.
- *
- * **And the set is not `SGR_RESET`, which is the correction the code made to the
- * walk.** L1's rendered rows do not contain a full reset at all: Ink closes a
- * foreground run with `39` and a background run with `49`, and the two are not
- * equivalent here. `39` restores the default *foreground* and a base survives
- * it untouched. **`49` restores the default *background* — the terminal's, not
- * ours** — and a patch row ends with exactly that, so the padding after it would
- * show through. The walk counted the sites that write `\x1b[0m` and the property
- * that matters is *returns a channel to the terminal's default*, which `49`
- * satisfies and `39` does not.
- *
- * **Blind spot, stated rather than left to be discovered**: a compound sequence
- * carrying `0` or `49` among other parameters — `\x1b[0;1m` — is not repaired.
- * Nothing in the tree emits one; `sgr()` never writes `0`, and Ink writes both
- * closers alone. It is a measurement rather than a guarantee.
- *
- * **The base is a default and not a span**, which is the whole distinction: a
- * wash sets `background` on the cells between two offsets, and every reset in
- * the tree returns to the *terminal's* default rather than to ours. That is why
- * a selection's wash still wins for its own cells — it sets the channel
- * explicitly — and why the base resumes immediately after it closes.
- *
- * **And every row closes itself**, which is what the walk expected to need a
- * lifecycle change for. A row that ended with the base live would leave an
- * attribute on the wire that outlives the frame — the alternate screen restores
- * cell contents and not SGR state — so `suspend()` and `release()` would each
- * owe a reset, on the cursor shape's third-category path (C01 I20). Closing the
- * row costs the same four bytes and owes nothing: no live attribute ever escapes
- * a single row, so a handoff, a resize, an exit and a fault are all covered by
- * the same rule and none of them needs to know a background exists.
- *
- * Nothing is written where a theme inherits: `sgr(NO_STYLE)` is empty, so the
- * arm every session runs today costs one comparison per frame and produces byte
- * for byte what it produced before.
- */
-function based(lines: readonly string[], base: string): readonly string[] {
-  if (base === "") return lines;
-  // **One regexp per call, not one per row.** `toTerminalDefault()` is a
-  // factory because a `/g` pattern carries `lastIndex` and a shared one is a
-  // hazard across independent scans — but `String.replace` with a global
-  // pattern sets `lastIndex` to 0 before it iterates and leaves it there, so
-  // reuse inside a single pass is safe and the allocation was per row per frame.
-  const toDefault = toTerminalDefault();
-  return lines.map(
-    (line) => `${base}${line.replace(toDefault, (seq) => `${seq}${base}`)}${SGR_RESET}`,
-  );
-}
 
 /**
  * C15's placed layers, bracketed (C28 I39).
@@ -645,7 +1076,10 @@ export function paint(
       // below it, whatever the footer holds. The lower one is drawn with a
       // footer of zero rows too: a frame whose bottom edge moved with whether
       // the app returned a block would flicker on content (§6l.2 row 3).
-      rule(width, deps),
+      // **The upper rule carries the label; the other two stay bare** (I111,
+      // §6l.10) — *two rules with two labels is a header, and the header
+      // already exists*.
+      rule(width, deps, frame.label),
       ...promptRegion(frame, deps, width),
       rule(width, deps),
       // **The composed height, not `1`** (I80, I82). `region()` truncates to it
@@ -669,6 +1103,8 @@ export function paint(
       // to what the paint built them at.
       columns: width,
       ...(deps.scratch === undefined ? {} : { scratch: deps.scratch }),
+      ...(deps.layerScroll === undefined ? {} : { layerScroll: deps.layerScroll }),
+      ...(deps.layerView === undefined ? {} : { layerView: deps.layerView }),
     });
   }
 
@@ -802,5 +1238,37 @@ function transcript(frame: Composed, deps: PaintDeps, width: number): readonly s
   for (let i = 0; i < frame.region.height - blank; i += 1) {
     out.push(exact(rows[i] ?? "", width));
   }
-  return out;
+  return withTranscriptBar(out, frame, deps, width);
+}
+
+/**
+ * The transcript's bar, on the margin column (C14 I62, `R-BLK-164`).
+ *
+ * **The margin is the one column no row writes** (C22 I109), so the bar costs
+ * no reflow and no measurement: each region row is already `width` cells, and
+ * its last cell is replaced. `scrollbarColumn` answers `null` for a transcript
+ * that fits — *a bar that cannot move is decoration* — and nothing changes.
+ * The set and the arithmetic are a `scroll` box's own (C09 §7f), and the thumb
+ * takes `accent` while focus is in the transcript, `muted` otherwise
+ * (`R-BLK-160`), the whole column at one tone as §021 draws it.
+ */
+function withTranscriptBar(
+  rows: string[],
+  frame: Composed,
+  deps: PaintDeps,
+  width: number,
+): string[] {
+  const scroll = deps.transcriptBar?.();
+  if (scroll === undefined || width < 2) return rows;
+  const column = scrollbarColumn(frame.region.height, scroll.totalRows, scroll.topRow, scrollbarSet(deps.capabilities));
+  if (column === null) return rows;
+  const ink = sgr(resolveTone(scroll.focused ? "accent" : "muted", deps.theme, deps.capabilities));
+  const amb = deps.capabilities.ambiguousWidth;
+  const inner = width - 1; // cells-ok — a width less its margin column
+  // `fitStyled` after the cut: a wide cluster straddling the margin is cut
+  // whole and padded, so the bar is always the row's last cell.
+  return rows.map(
+    (row, i) =>
+      `${fitStyled(sliceCells(row, 0, inner, amb), inner, SGR_RESET, amb)}${SGR_RESET}${ink}${column[i] ?? ""}${SGR_RESET}`,
+  );
 }

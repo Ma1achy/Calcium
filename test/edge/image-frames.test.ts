@@ -534,24 +534,44 @@ describe("C22 I77 — the wake", () => {
       const png = b.image({ id: "p", data: rgbPng64(8, 8, () => [255, 0, 0]), height: 3, alt: "red" });
 
       // **The still.** One frame after the entry lands, then nothing for a second.
+      // **Wakes, read as the delays they were armed with** — renders cannot
+      // see them. Since C22 I103 took the tick out of the slot, a wake that
+      // changes no frame is a cache hit and draws nothing, so a ticker armed at
+      // the floor wakes more often and still renders six: the render count
+      // below agreed with that mutation and let it survive. Measured
+      // 2026-09-24: each wake arms three timers, two at the frame scheduler's
+      // ~16.7 ms and the wake itself; correct, the wakes are `200 100 168 100
+      // 168 100`, and armed at the 100 ms floor they are eight `100`s.
+      const timers = vi.spyOn(globalThis, "setTimeout");
+      const intervals = vi.spyOn(globalThis, "setInterval");
+      const armed = (): number => timers.mock.calls.length + intervals.mock.calls.length;
+      /** The wakes among the timers armed since `from`: longer than a frame. */
+      const wakesSince = (from: number): number[] =>
+        timers.mock.calls.slice(from).map((c) => Number(c[1] ?? 0)).filter((ms) => ms > 1000 / 60 + 1);
       const s = watching();
       const bs = await session(s.definition, [{ kind: "count", id: "c" }, png]);
       const stillBefore = s.frames().length;
       expect(stillBefore, "it rendered at all").toBeGreaterThan(0);
+      const stillArmed = armed();
       for (let i = 0; i < 30; i += 1) await wake(bs, 33);
+      expect(armed() - stillArmed, "a still arms nothing").toBe(0);
       expect(s.frames().length - stillBefore, "a still costs nothing: no wake, no render").toBe(0);
 
       // **The animation, on a rasterising arm.** Frame 0 shows for 100 ms and
       // frame 1 for 200, so the frame changes at 100, 300, 400, 600, 700 and
-      // 900 ms — six changes in 990 ms, so about six renders and not thirty:
-      // the ticker is armed for the next frame, not for the floor. Measured
+      // 900 ms — six changes in 990 ms, so six renders and six wakes, where a
+      // ticker armed at the 100 ms floor would wake eight times. Measured
       // with the validator patched: 6.
       const g = watching();
       const bg = await session(g.definition, [{ kind: "count", id: "c" }, gif]);
       const before = g.frames().length;
       expect(g.frames().at(-1) ?? 0, "frame 0 at first").toBe(0);
+      const gifArmed = timers.mock.calls.length;
       for (let i = 0; i < 30; i += 1) await wake(bg, 33);
       const renders = g.frames().length - before;
+      const wakes = wakesSince(gifArmed);
+      expect(wakes, "one wake per frame change: six, where the floor gives eight").toHaveLength(6);
+      expect(Math.max(...wakes), "and armed for the next frame, past the floor").toBeGreaterThan(100);
       expect(renders, "it woke at all").toBeGreaterThanOrEqual(5);
       expect(renders, "and at its delays rather than every 33 ms").toBeLessThanOrEqual(8);
       // **The frame follows the clock**: the sequence of indices the renders saw

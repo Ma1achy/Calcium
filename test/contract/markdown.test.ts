@@ -6,6 +6,7 @@
 // paragraph. So the shapes are checked once and the frame is read for the three
 // constructs whose target was a decision rather than a correspondence.
 import { describe, expect, it } from "vitest";
+import { body } from "../support/table-gutter.js";
 
 import { block, markdownBlocks, validateBlock } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
@@ -187,7 +188,9 @@ describe("roadmap 11 — the named subset, as blocks", () => {
     expect(kinds(markdownBlocks("| h |\n| x |")), "no delimiter, no table — T2.43's arm at one column").toEqual(["raw"]);
 
     // The frame: a one-column table draws its header and its row, nothing else.
-    expect(frame(markdownBlocks("| h |\n|---|\n| x |"), FULL_CAPS, 12)).toEqual(["h", "x"]);
+    // The rows carry the table's reserved focus gutter (C11 I15, §5b); this row
+    // is about the table having one column, not about where its ink starts.
+    expect(frame(markdownBlocks("| h |\n|---|\n| x |"), FULL_CAPS, 12).map(body)).toEqual(["h", "x"]);
   });
 
   it("T2.45 (the frame): a list item draws the glyph slot, and it degrades", () => {
@@ -344,8 +347,12 @@ describe("roadmap 11 — the named subset, as blocks", () => {
     // Ambiguous and draws two cells where the terminal says wide.
     expect(cells("⎸", "narrow")).toBe(1);
     expect(cells("⎸", "wide"), "Neutral — one cell under both conventions").toBe(1);
-    expect(cells("▌", "wide"), "which is why `live`'s mark could not be reused").toBe(2);
-    expect(frame([quote], ASCII_CAPS, 24)[0]?.startsWith("> ")).toBe(true);
+    expect(cells("▌", "wide"), "which is why the design's own rail could not be reused").toBe(2);
+    // **The ASCII half is `|` since M4, and it was `>`.** Both are plain text's
+    // own quote bars; `>` is also the design's focus mark (R-GLY-003) and the
+    // two shared a row's lead, which is SS64's first real finding. `|` was held
+    // by `Glyph.live`, retired in the same change (C04 I39).
+    expect(frame([quote], ASCII_CAPS, 24)[0]?.startsWith("| ")).toBe(true);
 
     // **A blockquote's body is prose, out by name.** One notice has one glyph,
     // so a heading inside a quote is the characters it is written with.

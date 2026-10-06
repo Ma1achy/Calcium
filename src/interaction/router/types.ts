@@ -12,6 +12,20 @@ export type Key = Readonly<{
   ctrl: boolean;
   meta: boolean;
   shift: boolean;
+  /**
+   * `⌘` on macOS, the Windows key elsewhere — Kitty modifier bit 8 (C16 I34).
+   *
+   * **Optional, and it can only ever be `true` where the protocol said so.**
+   * `modifiersOf`'s legacy arm keeps folding bit 8 into `meta` **without a
+   * protocol** (C16 I41), deliberately: on a terminal with no protocol `⌘a`
+   * genuinely arrives as `Alt-a`, and a decoder
+   * that guessed otherwise would make one wire form two bindings. So the field is
+   * safe to add — absent is *this terminal cannot tell*, not *not pressed*.
+   *
+   * It exists because `⌘↑` and `↑` were one key: two registry bindings resolved
+   * against the live keymap by accident, which is the measurement §6a is built on.
+   */
+  super?: boolean;
   /** The raw bytes, for diagnostics. */
   sequence: string;
   /** The wire family, when a complete enhanced-keyboard sequence supplied it. */
@@ -23,9 +37,55 @@ export type Key = Readonly<{
  * the union that order is exhaustive over.
  */
 export type FocusTarget =
+  /**
+   * An attached child owns the keyboard above everything (§103, R-OWN-002).
+   *
+   * **It was reachable only from inside the Ctrl-C branch** (C16 §3a W5), because
+   * a child was not a target and had nothing to register on — so `⌃c` reached it
+   * and `esc` could not, where R-OWN-002 names both. A rung with no target is a
+   * special case with a ladder drawn around it.
+   *
+   * Its bindings — `⌃]` host escape, `⌥esc` enhanced detach — and its second
+   * subject, `openSurface`, arrive in M9. The target lands here so the rung is
+   * reachable rather than declared, which is the vacuity T2.5 exists to catch.
+   */
+  | "child"
   | "overlay"
-  | "copyMode"
-  | "pushedView"
+  | "nativeSelection"
+  /**
+   * Semantic copy mode — Calcium's own selection over the transcript (C14 §6a,
+   * C16 §5d, I50, `R-SEL-005`, `R-SEL-009`).
+   *
+   * **The second target at the `copy` rung, and the rung is not two.** `RUNG_OF`
+   * maps it and `nativeSelection` to `copy`, so every rule written over the
+   * ladder — a confirm dominating, an intercept's verdict, the footer's owner
+   * line — answers once for both. They are two *targets* because their `escape`
+   * rows disagree and for no other reason: the handoff leaves on one press, and
+   * this mode's first press clears a selection if there is one.
+   *
+   * That is M5's separation of rung from target at its second instance. The
+   * first was `panel` beside `pushedView`, and the view retiring (R-EXA-082,
+   * F1254) retired the illustration rather than the claim — which is exactly
+   * what a second instance is worth having for.
+   */
+  | "semanticSelection"
+  /**
+   * A panel — completion, reverse search, a command palette (C15 §2c, I27,
+   * R-BLK-109, R-BLK-866).
+   *
+   * **A ninth target at a rung that already had one, which is M5's point made
+   * concrete**: targets are not rungs, and the map is many-to-one. `substate` is
+   * the rung — *FIND and COMPLETION are PROMPT SUBSTATES, the prompt relabelled*
+   * — and a panel is what occupies it.
+   *
+   * **It shared the rung with `pushedView`, and that is how M5's claim was
+   * demonstrated** (R-EXA-082, F1254): two targets at one rung, separate because
+   * they bound the same chords to different verbs — `escape` was `dismiss` on a
+   * panel and `viewPop` on a view, R-KEY-003's *unless the current owner
+   * explicitly captures the action*. The view is gone and the rung still is not
+   * the target, which is the claim standing without its first illustration.
+   */
+  | "panel"
   /**
    * C26 I2 — interaction mode, and it is **a target rather than a flag**.
    *
@@ -37,14 +97,118 @@ export type FocusTarget =
    * their order *is* `FOCUS_ORDER`'s and the two cannot disagree. A mode
    * consulted *before* dispatch would be a second priority list, and the ladder
    * would acquire an order of its own again — which is the artefact whose
-   * existence produced the copy-mode-above-overlay contradiction against
+   * existence produced the native-selection-above-overlay contradiction against
    * A02 §2. C26 §8a trace 5 is where that was found, and it is the strongest
    * constraint the walk placed on this component's shape.
    */
   | "interaction"
   | "prompt"
+  /**
+   * The footer's watch row (C16 I76, §6d, ruling 50, §085).
+   *
+   * **A position of the `scope` rung, not a rung of its own** — the registry's
+   * A WATCH record says *the footer is not a scope*, and the row raises no
+   * owner: it is where the reader's keys are while they stand in it, as
+   * `liveBlock` is. `RUNG_OF` maps it to `scope`.
+   */
+  | "watchRow"
   | "liveBlock"
   | "global";
+
+/**
+ * **Who owns the keyboard** — the design's ladder, one rung per owner (§103,
+ * R-OWN-001).
+ *
+ * `FocusTarget` above is *where* a key goes; this is *who is answering*. They
+ * were one union while the tree had four special cases where the design has one
+ * ladder — a question, native selection, an attached PTY and a block's interior — and
+ * §103 opens by naming exactly that: *"§15 listed SCOPES and never said what a
+ * scope competes with."*
+ *
+ * **`scope` is one rung over two targets, and that is the design's shape rather
+ * than a compromise.** §103's SCOPE row reads *prompt · transcript*: one owner,
+ * whose *position* is the prompt or the transcript, which is what `stored.at`
+ * has always been. Collapsing the two targets into one handler list would have
+ * run the live block's handler while focus sat at the prompt, and — because
+ * `installLadder` registers `liveBlock` before `prompt` — in the reverse of the
+ * ladder's own order. C16 §3a W3 is that row of the walk; the separation of
+ * *rung* from *target* is what makes it a non-question instead of a hazard.
+ */
+export type OwnerRung =
+  | "child"
+  | "copy"
+  | "question"
+  | "substate"
+  | "inside"
+  | "scope";
+
+/** Every rung, highest first — the order §103 draws (R-OWN-001). */
+export const OWNER_RUNGS: readonly OwnerRung[] = Object.freeze([
+  "child",
+  "copy",
+  "question",
+  "substate",
+  "inside",
+  "scope",
+]);
+
+/**
+ * The rung each target answers for, so the two orders cannot disagree (A02 Seam 3).
+ *
+ * `global` is **not** a rung: §103's ladder is the owners that compete, and the
+ * global keymap is what is left when none of them claimed the key. It is read
+ * below the ladder, exactly as it is dispatched.
+ */
+export const RUNG_OF: Readonly<Record<Exclude<FocusTarget, "global">, OwnerRung>> = Object.freeze({
+  child: "child",
+  overlay: "question",
+  nativeSelection: "copy",
+  semanticSelection: "copy",
+  panel: "substate",
+  interaction: "inside",
+  prompt: "scope",
+  watchRow: "scope",
+  liveBlock: "scope",
+});
+
+/**
+ * What a rung decides about an action (§103, R-OWN-001).
+ *
+ * **Four, where the tree had a boolean** — and the boolean is why a blocking
+ * question could drop a key in silence and read as correct: `false` meant *pass
+ * downward* and *consume without acting* indistinguishably, so a refusal had no
+ * way to say it was one (C16 §3a W2, W6). R-HON-004 and R-INT-009 both require
+ * it to: *a refusal states its reason*, *a rejected command explains why*.
+ *
+ * - `handle` — this is the one owner that acts.
+ * - `reject` — consume it, and explain where silence would look broken.
+ * - `pass` — continue downward.
+ *
+ * **Three, and `global-intercept` is not one of them** (C16 I64). It was the
+ * fourth, and no handler produced it: `runRung` read it as *not `pass`*, so a
+ * handler that returned it was consumed with no stage and nothing acting. It is
+ * a thing an **intercept** declares — take the route's own exception, ahead of
+ * the ladder — and a handler has no exception to take. So it lives on
+ * `InterceptVerdict`, and a handler naming it does not compile.
+ */
+export type Verdict = "handle" | "reject" | "pass";
+
+/**
+ * What an intercept declares at one rung (C16 I64, §103).
+ *
+ * - `handle` — continue to the rung, which answers the route with its own verb.
+ *   Only `interrupt` declares it: a child's signal, a substate's pop and a
+ *   scope's cancel are three verbs, and the rung is where they are told apart.
+ * - `reject` — consume it, run no rung, and say why (I62).
+ * - `global-intercept` — take the intercept's declared `exception`; the ladder is
+ *   not consulted.
+ *
+ * `handle` meant the second of these for `page-scroll` and the wheel until review
+ * batch 2, and `dispatch` asked `intercept !== "interrupt"` to know which verb
+ * the word was — one word, two meanings, and the branch on the intercept id was
+ * where the second one lived.
+ */
+export type InterceptVerdict = "handle" | "reject" | "global-intercept";
 
 /**
  * Where focus is, as a thing that can be resolved (C26 I10, §8b.7).
@@ -143,7 +307,19 @@ export type StoredFocus =
        */
       anchor: ElementAddress | null;
       mode: "navigate" | "interact";
-    }>;
+    }>
+  /**
+   * On the footer's watch row (C16 I76, §6d).
+   *
+   * **By id, with the index beside it**, because the row's members go away on
+   * their own — a watch drops at its entry's settle (C22 I130) — and neither
+   * half answers alone. The id keeps the selection on its watch when one ahead
+   * of it drops; the index says where to land when the selected one itself
+   * drops, which an id that no longer exists cannot (C26 I10's *nearest
+   * survivor forward*, on a row). When the last watch drops the id names
+   * nothing and the index resolves to nothing, and focus stays (`R-COR-002`).
+   */
+  | Readonly<{ at: "watches"; id: string; index: number }>;
 
 export type InputEvent =
   | Readonly<{
@@ -184,7 +360,14 @@ export type InputEvent =
        * true of it without a consumer changing (I30, C01 I21).
        */
       motion: boolean;
-    }>;
+    }>
+  /**
+   * A focus report, `ESC [ I` or `ESC [ O` (I61, C22 I127). **Never routed**:
+   * not a key, not an activation and not a pointer event, so it takes no stage
+   * and leaves I44's guard and I45's arm as they were. L4 reads it before
+   * dispatch; the router returns at once if one reaches it.
+   */
+  | Readonly<{ kind: "focus"; focused: boolean }>;
 
 /**
  * A binding, declaratively (C16 §6).
@@ -300,6 +483,17 @@ export type KeyAction =
   // through the real decoder (I17).
   | "entryPrev"
   | "entryNext"
+  // --- a split's panes and its divider (C04 §3aq, C26 I28, C16 I59) ----------
+  //
+  // `←`/`→` at `liveBlock` move along the focused row (C26 I30) and, at its
+  // end, cross a split's divider — the one way focus leaves a pane, which is
+  // what *explicit focus transfer* means. `⌥←`/`⌥→` move the divider a cell;
+  // at `prompt` the same chord is word motion (§019), and the ladder is what
+  // tells them apart.
+  | "elementLeft"
+  | "elementRight"
+  | "dividerLeft"
+  | "dividerRight"
   // --- the horizontal pair (C12 §3s, C22 I76) --------------------------------
   //
   // `←`/`→` at `liveBlock`. The vertical pair steps elements and the horizontal
@@ -308,8 +502,31 @@ export type KeyAction =
   // its crosshair; a kind with no horizontal interior is a no-op, which is the
   // camera family's precedent (C22 I75) and the cost of binding before every
   // consumer exists. A table's column cursor is the second consumer (C26 §11).
-  | "cursorLeft"
-  | "cursorRight"
+  // **Amended — the four arrows are the inside's, at `interaction`** (C16 I28,
+  // C26 I26, I27, §102). The pair above described `liveBlock`, where a crosshair
+  // stepped from outside the plot is the commit `R-INT-005` forbids. One action
+  // per arrow, resolving by what the focused element declared: a camera takes
+  // the horizontal as azimuth and the vertical as tilt, a cursor takes the
+  // horizontal as a sample step and has no vertical, a kind with neither is a
+  // no-op. Two actions on one key at one target is the duplicate this table
+  // refuses, so the resolution has to be by declaration — and §102's kind table
+  // makes it total, since a kind has a camera **or** a cursor, never both.
+  | "insideLeft"
+  | "insideRight"
+  | "insideUp"
+  | "insideDown"
+  /** `esc out` (§102) — leave the inside and stay on the element (C26 I14). */
+  | "exitInside"
+  // --- the two `⏎`s the owner line names (C22 I133, ruling 63) --------------
+  //
+  // Both were branches in `construct.ts` that tested `enter` by name, so the
+  // footer's `⏎ send` and `⏎ keep` were chords the keymap did not hold — a hint
+  // with no row behind it is C16 I19's second keymap. As rows, the line looks
+  // them up like every other chip and a rebinding moves them.
+  /** Send the prompt's line (C23 §2) — the scope rung's primary action. */
+  | "submit"
+  /** Keep what a held form field holds (C22 I118, C16 I60). */
+  | "keepField"
   // --- re-run the focused entry (C23 I18) ------------------------------------
   //
   // **Not an action kind.** The five `Action` kinds fire against a document's
@@ -319,10 +536,6 @@ export type KeyAction =
   // notebook's *re-run this cell* and an agent harness's *retry that tool call*
   // — are this key on a settled entry.
   | "rerunEntry"
-  | "orbitLeft"
-  | "orbitRight"
-  | "tiltDown"
-  | "tiltUp"
   | "dollyIn"
   | "dollyOut"
   | "cameraReset"
@@ -346,6 +559,64 @@ export type KeyAction =
   | "toggleSeries9"
   | "blockPageDown"
   | "blockPageUp"
+  // --- §6a, M6: the design’s actions that had no route ---------------------
+  //
+  // **`helpKeymap` and `focusTranscript` do something; the fifteen below do
+  // nothing, on purpose** (I38). §6’s closed set makes an action with no
+  // executor uncompilable, so the alternative to a declared no-op is leaving the
+  // chord unbound — and an unbound chord is one an application takes, so the
+  // feature arrives needing a key that is gone.
+  | "helpKeymap"
+  | "focusTranscript"
+  // --- the watch row (C16 I76, I77, §6d, ruling 50) --------------------------
+  //
+  // **`focusPrevious` is `⇧⇥` at the prompt**, and it was `focusTranscript`'s
+  // row until the row existed: it goes to the watch row while a watch stands
+  // and to the transcript otherwise, so the old name would have been a lie on
+  // exactly the frames it matters. `focusTranscript` keeps its meaning at the
+  // row's own `⇧⇥` — backward past the row.
+  //
+  // **Nine jump names, because an effect takes no key** — `agent1`–`agent9`'s
+  // reason and `toggleSeries1`–`9`'s.
+  | "focusPrevious"
+  | "watchPrev"
+  | "watchNext"
+  | "watchOpen"
+  | "watchJump1"
+  | "watchJump2"
+  | "watchJump3"
+  | "watchJump4"
+  | "watchJump5"
+  | "watchJump6"
+  | "watchJump7"
+  | "watchJump8"
+  | "watchJump9"
+  // **The chip preview's three** (C22 I143, C22 I144, ruling 53 amended): chords
+  // the prompt does not bind, answered at `panel` after the prompt declines.
+  | "previewScrollUp"
+  | "previewScrollDown"
+  | "previewOpen"
+  | "agentNext"
+  | "agentPrevious"
+  | "agent1"
+  | "agent2"
+  | "agent3"
+  | "agent4"
+  | "agent5"
+  | "agent6"
+  | "agent7"
+  | "agent8"
+  | "agent9"
+  | "postureCycle"
+  // **The one key a captured child does not get** (C16 I49, R-BLK-908). It is
+  // in the union rather than handled inside the child's own handler because the
+  // reservation is the host's: the chord has to be collision-tested against
+  // every other route before an attach is allowed, and a key a handler swallows
+  // privately is a key no table can be asked about.
+  | "hostDetach"
+  | "valuesToggle"
+  | "queueDrop"
+  | "enterSemanticSelection"
   // `enter` on a focused row, and the union's gap was the whole of F21: a row
   // could be moved to and not acted on. `actions.ts` implements all five arms
   // and nothing in `src/` reached it, so an app could declare a `view` action,
@@ -369,55 +640,139 @@ export type KeyAction =
   | "scrollPageDown"
   | "scrollTop"
   | "scrollBottom"
-  // --- the pushed view (I24) -----------------------------------------------
+  // **The pushed view's nine actions are gone with its three surfaces** (C22
+  // §13a, C25 §3b, C28 §3c, R-EXA-082, F1254). `pushedView` had been in
+  // `FocusTarget` since C16 was written with no binding anywhere — vacuous for as
+  // long as nothing pushed a view — then carried eleven rows for three producers,
+  // and is vacuous again with no producer. This time the target goes too.
   //
-  // `pushedView` has been in `FocusTarget` since C16 was written and had no
-  // binding anywhere: `activeTarget` resolved to a target with an empty handler
-  // set and every key fell through to step 3. Vacuous only for as long as
-  // nothing pushed a view, which is the same shape as `frameworkSources` and as
-  // the editing bindings above.
-  //
-  // `viewPop` is `Esc`, and it is **not** §5's Ctrl-C rung under another name:
-  // that rung is cancellation and this is the view's own dismissal (A01 D7).
-  //
-  | "viewNextHunk"
-  | "viewPrevHunk"
-  | "viewTop"
-  | "viewBottom"
-  | "viewPageUp"
-  | "viewPageDown"
-  // **The section gesture, and it is one row per key rather than one per owner**
-  // (I33, added 2026-09-12). `n`/`p` move the view's own unit — a hunk, a block,
-  // a card — and these move its *section*: a file, a heading, a group. The
-  // ruling that nothing would be added to this target held while the profiler
-  // had four panes and is withdrawn at thirty-seven cards (C28 §3c). The member
-  // is required on every owner rather than optional, because an owner that
-  // answers nothing is indistinguishable from a view with one section, and a
-  // reader who learns the key does nothing here stops pressing it everywhere.
-  | "viewNextSection"
-  | "viewPrevSection"
-  | "viewPop"
-  // --- copy mode (C16 §5b) -------------------------------------------------
+  // I33's section gesture retires with them and its reasoning is kept: *a member
+  // required on every owner rather than optional, because an owner that answers
+  // nothing is indistinguishable from a view with one section.* That is a rule
+  // about interfaces with several implementers, and it applies to the next one.
+  // --- native selection (C16 §5b) -------------------------------------------------
   //
   // **Entry and exit, and the exit is the target's own dismissal** (C16 §5c,
   // 2026-09-05). This read *the exit is §5's rung and not an action* for as long
-  // as `⌃c` was the only way out — and measured, `Esc` in copy mode was dropped
-  // silently on a frozen screen. A `copyMode`-target row has no order of its own:
-  // it resolves at the moment `activeTarget` answers `copyMode`, exactly as the
+  // as `⌃c` was the only way out — and measured, `Esc` in native selection was dropped
+  // silently on a frozen screen. A `nativeSelection`-target row has no order of its own:
+  // it resolves at the moment `activeTarget` answers `nativeSelection`, exactly as the
   // rung does, so I24's objection to a *second mechanism* was true of a `global`
-  // row and not of this one. `⌃c` stays the ladder's; `pushedView` has the same
-  // pair (`viewPop` and the rung).
+  // row and not of this one. `⌃c` stays the ladder's; an overlay has the same
+  // pair (`dismiss` and the rung). `pushedView` was the instance cited here and
+  // the kind is deleted (R-EXA-082, F1254).
   //
   // A mode with entry and no exit is B1; a mode with an exit and no entry is
   // the same defect inverted, and just as testable.
-  | "enterCopyMode"
-  | "exitCopyMode";
+  | "enterNativeSelection"
+  | "exitNativeSelection"
+  // **A key native selection declines, and nothing in Calcium acts on it**
+  // (C16 I66, §6c table B, ruling 65). `?` while the terminal holds the
+  // selection: the frame is frozen, so the help entry would land unseen, and a
+  // pass in the ladder's sense reaches step 3's `global` `?`, which is that.
+  | "passToTerminal"
+  // --- semantic copy mode (C14 §6a, C16 §5d) ---------------------------------
+  //
+  // **One exit, and it clears first** (I51, §5d D1/D2). `escapeSemanticSelection`
+  // clears a selection if there is one and leaves when there is none. There was
+  // a second, `exitSemanticSelection`, which always left and sat on `RouterDeps`
+  // for the `⌃c` rung; §103 has COPY MODE reject the interrupt (I62, ruling 59),
+  // so the rung and the verb went together.
+  //
+  // `a` and `A` are `R-SEL-008`'s and are bound at this target only: the rule
+  // gives them bare keycaps, which is legible exactly because no other target
+  // can be active while this one is. `⌃A` is deliberately not bound — *a key
+  // that silently produces a clipboard of megabytes is a trap.*
+  | "escapeSemanticSelection"
+  | "selectEntryUnderCaret"
+  | "selectAllLoadedEntries"
+  // `y` — the same keycap as the transcript's element copy, over whole entries
+  // (`R-SEL-004`, C14 §6a). **Its own action and not `copySelection`**, which
+  // is the prompt's `⌥w`: an effect is resolved per action rather than per
+  // target, so sharing the name would give this key the editor's region copy.
+  | "copySelectedEntries"
+  // `⏎` — the same copy, and the mode's other way out (C14 I59, I47,
+  // R-BLK-838's *leaves by esc, or a copy*). A second action and one copy path.
+  | "copyAndLeaveSemanticSelection"
+  // `⌃V` — the rectangle (C14 I60, ruling 36), a target-local keycap as `a`,
+  // `A` and `y` are.
+  | "toggleSemanticRect"
+  // The caret's four (C14 I36, I37, §6c). **Plain arrows move and shifted ones
+  // extend**, and the pair is why both exist: a mode whose only vertical key
+  // extends cannot put the caret anywhere without selecting on the way. The
+  // shifted two are the registry's `selection.up`/`selection.down` taking a
+  // third target; the plain two the registry does not name, because moving a
+  // caret is not an action the design has a chord for.
+  | "moveSemanticCaretUp"
+  | "moveSemanticCaretDown"
+  | "extendSemanticSelectionUp"
+  | "extendSemanticSelectionDown"
+  // **The horizontal four, which only the rectangle takes** (C14 I60, rulings
+  // 36, 70). At block granularity a block is atomic and has no horizontal
+  // extent, so they do nothing there — and the owner line names them only
+  // while the rectangle is up.
+  | "moveSemanticCaretLeft"
+  | "moveSemanticCaretRight"
+  | "extendSemanticSelectionLeft"
+  | "extendSemanticSelectionRight";
 
 export type Binding = Readonly<{
   target: FocusTarget;
-  key: Readonly<{ name: string; ctrl?: boolean; meta?: boolean; shift?: boolean }>;
+  key: Readonly<{ name: string; ctrl?: boolean; meta?: boolean; shift?: boolean; super?: boolean }>;
   action: string;
+  /**
+   * Which terminals this route is for (C16 I35, §6a).
+   *
+   * Absent means **both** — the ordinary case, and the reason the field is a
+   * condition rather than a second table. `enhanced-terminal` resolves only where
+   * `capabilities.keyboardProtocol === "kitty"`; `default-terminal` is the route
+   * an xterm without it can deliver, and I36 requires every action to have one.
+   */
+  profile?: "default-terminal" | "enhanced-terminal";
+  /**
+   * The registry record this row spells, by id (C16 §6c, I42 amended).
+   *
+   * Absent on a row whose chord the registry does not name. Internal —
+   * `Binding` is not published — and read by the gate, which asks from the
+   * table's side whether a row spelling a registry chord says which (T1.37).
+   */
+  registry?: string;
+  /**
+   * What a reserved row does when no handler is registered (C16 §6c, C22 I134).
+   *
+   * The meaning the reservation displaced: `⌥⌫` was `killWordLeft` before the
+   * registry gave it to `queue.drop`. A reserved row without one resolves as
+   * though it were absent.
+   */
+  fallback?: KeyAction;
 }>;
+
+/**
+ * The registry ids of the actions the design names and the tree reserves —
+ * what `TuiConfig.keyActions` is keyed by (C24 I39, C16 §6c, ruling 64).
+ *
+ * The design's spelling, because an application reads it in the registry,
+ * `/help` and `docs/KEYS.md`. `keymap.ts`'s `RESERVED_ACTIONS` is total over
+ * it, so the type and the table cannot name different sets.
+ */
+export type ReservedKeyAction =
+  | "agent.next"
+  | "agent.previous"
+  | "agent.1"
+  | "agent.2"
+  | "agent.3"
+  | "agent.4"
+  | "agent.5"
+  | "agent.6"
+  | "agent.7"
+  | "agent.8"
+  | "agent.9"
+  | "posture.cycle"
+  | "values.toggle"
+  | "queue.drop";
+
+/** A terminal’s profile, resolved from C02’s record (§6a, R-CAP-001). */
+export type KeyProfile = "default-terminal" | "enhanced-terminal";
 
 /** A built-in row: a `Binding` whose action is one L4 implements (I19). */
 export type BuiltinBinding = Binding & Readonly<{ action: KeyAction }>;
@@ -432,12 +787,20 @@ export type BlockKeymap = readonly Readonly<{
  * What the decoder needs to know about the terminal, as data.
  *
  * A subset of C02's record rather than the record itself: the decoder branches
- * on exactly these two, and taking the whole thing would let a later edit reach
- * for a third without anyone noticing it had grown a dependency.
+ * on exactly these, and taking the whole thing would let a later edit reach for
+ * another without anyone noticing it had grown a dependency.
+ *
+ * **It grew to three, which is the mechanism working rather than failing**
+ * (C16 I41). `keyboardProtocol` is here because `modifiersOf` needs it: bit 8 of
+ * an `CSI 1;m X` modifier is Meta in xterm's encoding and Super in kitty's, the
+ * byte is identical, and only the negotiated protocol says which chord arrived.
+ * The point of the subset is that a third field is a visible decision, and this
+ * is one — declared, not reached for.
  */
 export type DecodeCapabilities = Readonly<{
   bracketedPaste: boolean;
   mouse: boolean;
+  keyboardProtocol: "none" | "kitty";
 }>;
 
 export type DecoderOptions = Readonly<{

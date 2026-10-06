@@ -220,9 +220,16 @@ describe("T6.5, T6.6, T6.7, T6.13, T6.14, T6.23 (I7, I8, I9, I16, I18, I27): the
 });
 
 describe("T6.10, T6.11, T6.12 (I14, I4, I12): the rest", () => {
-  it("a dismissable clear confirm lets a stray Esc wipe history", async () => {
+  it("C20's search built as a question would have nothing to answer it", async () => {
+    // **Amended in review batch 2** (C16 ruling 61): this was the clear
+    // confirm's dismissal, and the confirm is retired. What I14 still holds is
+    // that no layer of C20's is a question — a question needs an answer
+    // callback, and C20 has none to give.
     const { store } = await openWith(three);
-    expect(store.clearConfirmLayer().dismissable).toBe(false);
+    store.searchOpen("");
+    const layer = store.searchLayer({ row: 20, rows: 1 });
+    expect(layer.kind).toBe("panel");
+    expect(layer.owner?.rung).toBe("substate");
   });
 
   it("storing consecutive duplicates makes `↑` walk the same command", async () => {

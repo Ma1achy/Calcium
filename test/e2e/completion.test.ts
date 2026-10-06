@@ -46,9 +46,14 @@ describe("C19 tier 5 — at a real prompt", () => {
 
       // The enum's values, from the manifest rather than from a source that
       // guesses: `status` is declared `enum` with exactly these three.
-      await pty.waitFor(/running/, 15_000);
-      await pty.waitFor(/failed/, 15_000);
-      await pty.waitFor(/queued/, 15_000);
+      //
+      // **On the frame `⇥` drew, with its selection** (F1525): all three were
+      // in the stream from the rest menu before `⇥` had answered, and `↓⏎`
+      // behind an in-flight `⇥` acts on the line as it stands (ruling 106).
+      await pty.waitForFrame(
+        (f) => f.some((r) => r.includes("⏎ accept")) && ["running", "failed", "queued"].every((v) => f.some((r) => r.includes(v))),
+        15_000,
+      );
 
       // **Selectable, then inserted.** `↓` moves the selection and Enter
       // accepts it, so the prompt ends up carrying a value the user never
@@ -56,7 +61,7 @@ describe("C19 tier 5 — at a real prompt", () => {
       // that candidates appeared would miss.
       pty.type("\u001b[B");
       pty.type("\r");
-      await pty.waitFor(/--status=failed/, 15_000);
+      await pty.waitForFrame((f) => promptRow(f).includes("--status=failed"), 15_000);
     } finally {
       pty.kill();
     }
@@ -119,15 +124,21 @@ describe("C19 tier 5 — at a real prompt", () => {
       pty.type("/ps --status=");
       pty.type("\t");
 
-      await pty.waitFor(/running/, 15_000);
-
+      // **On the frame `⇥` drew** (F1525): every one of these was in the stream
+      // from the rest menu and the typed line before `⇥` had answered.
+      //
       // **Every candidate, not just the first.** A menu clamped to one row by a
       // short region shows `running` and satisfies a test that stopped there.
-      await pty.waitFor(/queued/, 15_000);
-
+      //
       // And above the prompt rather than over it: the prompt still carries what
       // was typed, so the layer did not take its rows.
-      await pty.waitFor(/--status=/, 15_000);
+      await pty.waitForFrame(
+        (f) =>
+          f.some((r) => r.includes("⏎ accept")) &&
+          ["running", "queued"].every((v) => f.some((r) => r.includes(v))) &&
+          promptRow(f).includes("--status="),
+        15_000,
+      );
     } finally {
       pty.kill();
     }
@@ -208,4 +219,38 @@ describe("C19 tier 5 — at a real prompt", () => {
       pty.kill();
     }
   }, 60_000);
+});
+
+describe("C19 tier 5 — a key behind an in-flight request (ruling 106)", () => {
+  it("T5.6 (C19 I15, ruling 106 a, b; F1524): ⇥⏎ in one write through a PTY runs /ps --status= and leaves no candidate row over an empty prompt", async () => {
+    // **The locksmith's `tabenter-noresize` mode**, 3 of 3 red at a1284cb0:
+    // one write puts both keys in one read, so `⏎` is routed while `⇥`'s
+    // request is in flight, and its result opened the values over the next,
+    // empty prompt.
+    const pty = session();
+    try {
+      await pty.waitFor(PROMPT, 15_000);
+      pty.type("/ps --status=");
+      // **The menu at rest, as a frame** (F1525): `queued` in the stream is
+      // not evidence the line it belongs to is the one on screen.
+      await pty.waitForFrame((f) => promptRow(f).includes("/ps --status=") && f.some((r) => r.includes("queued")), 15_000);
+      pty.type("\t\r");
+      // Ruling 106 (a): `⏎` at rest submits the line shown, which refuses.
+      await pty.waitForFrame((f) => f.some((r) => r.includes("bad_value")), 15_000);
+      // **Once the frame settles**: the defect arrived after the submit's
+      // frame, which already read correctly, so waiting for the right frame
+      // would pass on the wrong session.
+      await new Promise((r) => setTimeout(r, 500));
+      const frame = pty.frame;
+      const shown = `\n${frame.join("\n")}`;
+      expect(promptRow(frame).trim(), `the prompt is empty:${shown}`).toBe("❯");
+      expect(
+        frame.filter((r) => /^\s*(›\s*)?(running|failed|queued)\b/u.test(r)),
+        `no candidate row stands over it:${shown}`,
+      ).toEqual([]);
+      expect(frame.some((r) => r.includes("⏎ send")), `the owner line is the bare prompt's:${shown}`).toBe(true);
+    } finally {
+      pty.kill();
+    }
+  }, 40_000);
 });

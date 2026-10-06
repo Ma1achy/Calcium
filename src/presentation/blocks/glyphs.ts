@@ -14,7 +14,8 @@
  * `ascii` is for terminals that cannot draw beyond it at all — a terminal that
  * has box drawing and no astral planes still gets `┌` and `✓`.
  */
-import type { Glyph, Marker3 } from "../../data/viewmodel/types.js";
+import type { CallState, Glyph, Marker3 } from "../../data/viewmodel/types.js";
+import { CALL_HEAD_GLYPH } from "../../data/viewmodel/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 import { cells } from "../text.js";
 
@@ -98,9 +99,10 @@ export type GlyphSet = Readonly<{
    * right for a reference line and wrong for the one mark that has to survive a
    * dense column. This one sits on the rule, where nothing else is drawn.
    *
-   * It shares a code point with `warning` and never shares a figure: one is a
-   * notice's tone mark and one is a plot's axis. Named separately so a theme or
-   * a substitution can move either without moving the other.
+   * It shares a code point with the vocabulary's `warn` token and never shares
+   * a figure: one is a notice's tone mark and one is a plot's axis. Named
+   * separately so a theme or a substitution can move either without moving the
+   * other.
    */
   cursorMark: string;
   candleHollow: string;
@@ -135,6 +137,19 @@ export type GlyphSet = Readonly<{
    * *different* from `-` and `|`.
    */
   heavyHorizontal: string;
+  /**
+   * A continuous control's handle while the reader is **inside** it (C09 I106,
+   * §018) — `\u25c9` against `filled`'s `\u25cf`.
+   *
+   * **Its ASCII arm is `filled`'s, deliberately.** §018 draws the inside handle
+   * as a ring because a plain-text fixture cannot show a ground, and *INSIDE is
+   * weight plus a painted handle* names the weight first: the track carries
+   * inside at every rung — `\u2500` against `\u2501`, `-` against `=` — where the
+   * handle carries it only where the two characters differ. One carrier that
+   * dies and one that does not is the declaration C09 I106 makes rather than a
+   * collision nobody noticed (F161's hazard, answered by naming it).
+   */
+  handleInside: string;
   heavyVertical: string;
   diamond: string;
   /** Mean and median in one cell, so *they coincide* never reads as *it is missing* (C12 I33). */
@@ -162,14 +177,42 @@ export type GlyphSet = Readonly<{
   cross: string;
   filled: string;
   hollow: string;
+  /**
+   * An unchosen option in an exclusive choice — the registry's `choice-open`
+   * (C09 I123). `○` like `hollow`, and a slot of its own because the ASCII
+   * halves differ: `@` here, `o` for the plot's hollow marker.
+   */
+  choiceOpen: string;
   dotted: string;
   blocked: string;
-  warning: string;
+  // **No `warning`** (C09 I138, ruling 85): it had one reader, the status's
+  // mark, which is `cross` now. `▲` stays the vocabulary's `warn` token.
   bar: string;
 
   // Sort indicators — the active column's header (C11 §4, A01 A.4).
   sortAsc: string;
   sortDesc: string;
+
+  /**
+   * A metric's movement, leading a table cell (C09 I111, C11 I30, §088 §4).
+   *
+   * **Here and not in `GLYPH_TABLE`, because a producer never names it.** The
+   * direction is the sign of the cell's `trend` and the tone its column's
+   * polarity (C04 I128), so a producer-namable slot would be a second way to
+   * paint the arrow with a tone the rule did not choose.
+   */
+  trendUp: string;
+  /**
+   * **`V` at ASCII, not `v`** (question 38): `v` is `collapse`'s in the row's
+   * lead, and the lead and a cell share one content row (SS64).
+   */
+  trendDown: string;
+  /**
+   * **A reading that held** (question 37): `→`, and `=` at ASCII, in the default
+   * tone. No mark is not *flat* — it is a cell with no comparison at all — so a
+   * held reading draws a mark of its own and an absent trend draws none.
+   */
+  trendFlat: string;
 
   // Progress.
 
@@ -183,6 +226,50 @@ export type GlyphSet = Readonly<{
    * second time by a rule rather than by an author.
    */
   residue: string;
+  /**
+   * The tape's left residue mark — *n members are off the left end* (C04 I124,
+   * §095, `R-GLY-003`).
+   *
+   * **A third answer beside `residue` rather than a use of it**, and the design
+   * is what separates them: a residue says *some rows are not shown*, and this
+   * says *the window starts here and what is before it is still there*. §095
+   * puts both on one screen — the gutter's `⋯` leads the row the tape is drawn
+   * in — so one mark would have to mean two things a reader can see together.
+   */
+  tapeLeft: string;
+  /**
+   * The tape's right residue mark — *n members are off the right end*.
+   *
+   * **`»` has a second rôle and this slot is not it.** §003, §004 and §007 lead
+   * the mode line with `» auto ✦ …`, which is a chrome row's lead in its own
+   * strip and not a shed count. Nothing renders it yet, and the registry's own
+   * record says its first renderer registers it as its own mark rather than
+   * reusing this one — a shared mark with two meanings is F161's hazard, and
+   * here the two meanings are a count and a lead.
+   */
+  tapeRight: string;
+  /**
+   * The undo affordance — `↺ redo` on a reverted entry, `↺ revert` on a stopped
+   * one (C09 I114, §005, §064, parked 17). Drawn `accent` beside a `muted` label.
+   *
+   * **The ASCII half `<` is a proposal awaiting approval**, and measured rather
+   * than picked: `~` was the first reach and is `nested`'s, and a content row
+   * holds both `row-lead` and `inline`. Its consumers — §005's stopped-edit row
+   * and §064's reverted entry — are queued, not built.
+   */
+  revert: string;
+  /**
+   * The selection rail — the registry's `selection-rail` (C14 I58, ruling 68,
+   * `R-THM-005`). Drawn by the frame in column 0 of the transcript beside each
+   * selected row's first row, never by a block: selection's second carrier, the
+   * ground being its first.
+   *
+   * **The same characters as `bar` and a slot of its own**, for `choiceOpen`'s
+   * reason: `bar` is a form's caret and a plot's glyph, and this is a gutter
+   * mark. Two meanings on one slot is F161's hazard, and the domains differ —
+   * `gutter` meets neither `plot` nor `form`.
+   */
+  rail: string;
   /**
    * The separator between a call head's fields — `verb · args · duration ·
    * outcome` (C09 I49, `AGENT_TUI_DESIGN.md` §9e).
@@ -200,6 +287,10 @@ export type GlyphSet = Readonly<{
 
 const UNICODE: GlyphSet = Object.freeze({
   residue: "\u22ef",
+  tapeLeft: "\u00ab",
+  tapeRight: "\u00bb",
+  revert: "\u21ba",
+  rail: "\u258c",
   separator: "\u00b7",
   horizontal: "─",
   vertical: "│",
@@ -221,6 +312,7 @@ const UNICODE: GlyphSet = Object.freeze({
   candleCross: "┿",
   crossing: "┼",
   heavyHorizontal: "━",
+  handleInside: "◉",
   heavyVertical: "┃",
   diamond: "◆",
   diamondTee: "◈",
@@ -232,18 +324,52 @@ const UNICODE: GlyphSet = Object.freeze({
   cross: "✗",
   filled: "●",
   hollow: "○",
+  choiceOpen: "○",
   dotted: "◌",
   blocked: "⊘",
-  warning: "▲",
   bar: "▌",
 
-  sortAsc: "↑",
-  sortDesc: "↓",
+  // **`▴` and `▾`, not `↑`/`↓`** — the design's sort marks (§078, §081,
+  // R-BLK-626/637/639). Both are Ambiguous, exactly as the arrows were, so the
+  // set's wholesale collapse to ASCII at `wide` is unchanged; the ASCII halves
+  // `^` and `v` are what they always were.
+  sortAsc: "▴",
+  sortDesc: "▾",
+
+  // `↑`, `↓` and `→` — the registry's `trend-up`, `trend-down` and `trend-flat`.
+  // All three Ambiguous, so the set's collapse to ASCII at `wide` takes them with
+  // the rest (C09 I48).
+  trendUp: "\u2191",
+  trendDown: "\u2193",
+  trendFlat: "\u2192",
 
 });
 
 const ASCII: GlyphSet = Object.freeze({
-  residue: "~",
+  // **`...` and not `~`** (R-GLY-003, §096, §095). The registry declares
+  // `ellipsis` with `reservedCells: 3`, and the design is the source of truth on
+  // the character. `~` was chosen by T2.5's 1:1-by-cell-count rule — three dots
+  // against one `⋯` — and that rule was amended rather than dodged: what it
+  // protected was *no column moves when the rung changes*, and a 1:1 character
+  // was only ever one way of getting it.
+  //
+  // **It is not padded to that reservation**, because this mark stands in no
+  // column: `reservedCells` records the widest rendering, and R-GLY-003 binds
+  // the padding to fixed columns only. A residue lead is followed by its own
+  // count and nothing else, so it reads `⋯ 5 more` and `... 5 more` and the
+  // two cells a slot would have spent go to whatever is beside it —
+  // measurably, the pie chart's figure, whose legend column is sized by its
+  // widest row. `FREE_WIDTH_SLOTS` is where that is declared.
+  residue: "...",
+  // `[` and `]`, which the registry names — not `<<` and `>>`. Two cells where
+  // the mark is one breaks T2.5's 1:1 pairing, and the count beside it is what
+  // makes the direction readable without the chevron doing it.
+  tapeLeft: "[",
+  tapeRight: "]",
+  revert: "<",
+  // `|` — the rail's own column is its domain, `gutter`, so the quote rail's
+  // and the tree guide's `|` sit in columns this never shares (C14 I58).
+  rail: "|",
   // `:` and not `-` (F834): `-` is `TURN_ASCII`'s first frame, and a dispatched
   // head read `verb - -`. The rung is a character no set's ASCII frames use.
   separator: ":",
@@ -265,6 +391,7 @@ const ASCII: GlyphSet = Object.freeze({
   candleHollow: "=",
   candleFilled: "#",
   heavyHorizontal: "=",
+  handleInside: "*",
   heavyVertical: "H",
   candleCross: "+",
   crossing: "+",
@@ -278,15 +405,112 @@ const ASCII: GlyphSet = Object.freeze({
   cross: "x",
   filled: "*",
   hollow: "o",
+  choiceOpen: "@",
   dotted: ".",
   blocked: "/",
-  warning: "!",
   bar: "|",
 
   sortAsc: "^",
   sortDesc: "v",
 
+  trendUp: "^",
+  trendDown: "V",
+  // `=` is free in the content row: its other two uses are figure marks (SS64).
+  trendFlat: "=",
+
 });
+
+/**
+ * The cells one spinner frame occupies, at every set and every rung.
+ *
+ * **A constant, and the constant is what a capability-free measurer needs.**
+ * `measure` receives width and no capability record (C04 §5), so a reservation
+ * for an animating mark can only be correct if every frame of every set is the
+ * same width — which T2.75 and T2.70 assert over the whole catalogue rather
+ * than leaving it to whoever adds the next set.
+ */
+export const SPINNER_CELLS = 1;
+
+/**
+ * The `GlyphSet` rôles whose two renderings need **not** be the same width.
+ *
+ * **The fixed-column rule and its exception, stated together.** A mark in a
+ * fixed column — a gutter, a row's lead, a frame's edge — must be the same
+ * width at every capability rung, because content beside it aligns to that
+ * column and a mark that changed width would move the alignment when the
+ * terminal changed alphabet. That is what C09 I5 protects and what every
+ * `Glyph` and almost every `GlyphSet` rôle holds.
+ *
+ * **A residue lead is not a fixed column.** It is followed only by its own
+ * count — `⋯ 5 more`, `... 5 more` — so nothing aligns to it and the padding
+ * buys nothing but two cells of gap the design does not draw (§095,
+ * R-BLK-867). The registry's `reservedCells: 3` is the width of the widest
+ * rendering, not a column to pad every rendering into.
+ *
+ * The in-row shed mark `⋯N` is the same argument reached from the other end:
+ * `shedRow` measures it against the room left and drops it when reserving it
+ * would clip the row it announces, so there is nothing beside it to keep still.
+ */
+export const FREE_WIDTH_SLOTS: ReadonlySet<keyof GlyphSet> = new Set<keyof GlyphSet>(["residue"]);
+
+/**
+ * The glyph each call state draws **when shape has to carry it** (C09 I45,
+ * R-BLK-125, §030).
+ *
+ * Above the monochrome rung the design draws one `●` for every state and lets
+ * **tone** say which — so the head mark is a constant and the state is a
+ * colour. At 1 bit, and in ASCII, tone is gone and the only carrier left is
+ * the shape, so each state takes its own mark. Both halves of R-COR-003 are
+ * then the glyph and the outcome word, neither of which is a colour.
+ */
+export const CALL_STATE_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freeze({
+  queued: "queued",
+  // **Not `work-unit`, which is `running`'s here** (C04 I149): a waiting head
+  // drawn as a running one says the tool is working while it waits on you.
+  waiting: "warn",
+  running: "work-unit",
+  succeeded: "ok",
+  failed: "error",
+  cancelled: "cancelled",
+});
+
+/**
+ * Whether tone can carry a fact at these capabilities.
+ *
+ * **Asked at render, never at production.** A producer composing a call head
+ * has never seen a capability record — `callHead` runs in `shell/documents.ts`
+ * — and focus and theme move per frame without the document being re-produced.
+ * So the block carries a *state* and the renderer resolves it here.
+ *
+ * ASCII counts as no tone for this purpose even on a colour terminal: the
+ * ASCII rung is a whole alphabet stepping down together, and a `*` head with
+ * five meanings distinguished only by colour is the collapse §030 accepts
+ * because it has `●` to fall back on, which ASCII does not.
+ *
+ * **And per cell, on a band** (C10 I45, R-THM-005). A band's ink is total, so a
+ * cell on one has spent its tone exactly as a 1-bit terminal has. `onBand` is
+ * the ground's answer and the capability record cannot give it: in `hcDark` a
+ * focused head is on a band and every other head on the page is not. The
+ * caller also passes it for a head on a receded panel (I110, question 56),
+ * where every ink is `dim` and the tone is spent per panel rather than per cell.
+ */
+export function toneCarries(caps: GlyphCaps & Pick<TerminalCapabilities, "colourDepth">, onBand = false): boolean {
+  return caps.colourDepth > 1 && caps.unicode !== "ascii" && !onBand;
+}
+
+/**
+ * The head mark a call in `state` draws at these capabilities (C09 I45).
+ *
+ * Every candidate is one cell with indent 0, which is what lets `measure` stay
+ * capability-free while the character moves: `GLYPH_INDENT` holds one entry and
+ * it is not one of these, so resolving by capability moves no geometry.
+ */
+export function headMark(state: CallState, caps: Parameters<typeof toneCarries>[0], onBand = false): Glyph {
+  // Where tone carries, the state's toned mark — `●`, or `○` for a call that
+  // has not started (R-BLK-220). It was `work-unit`'s for all five, so a queued head
+  // was a filled dot beside a running one whose spinner had not ticked (F1261).
+  return toneCarries(caps, onBand) ? CALL_HEAD_GLYPH[state] : CALL_STATE_GLYPH[state];
+}
 
 /** The pairs, for the test that asserts each is 1:1 (T2.5). */
 export const SUBSTITUTIONS: readonly (readonly [string, string])[] = Object.freeze(
@@ -307,8 +531,9 @@ export const SUBSTITUTIONS: readonly (readonly [string, string])[] = Object.free
  * any more: `profileCard` takes one and is exported, and MG29 is right that a
  * consumer with no name for a parameter's type cannot supply it. Every existing
  * caller hands over a whole capability record, which this still accepts — the
- * in-tree caller is `shell/profile-view.ts`, handing `detection.capabilities`
- * whole, since the drawing round (C28 §3c).
+ * in-tree caller of `profileCard` is `/profile`'s handler, handing the local
+ * context's `capabilities` whole (C23 §2, C28 §3c); it was `profile-view.ts`
+ * until the pushed view retired (R-EXA-082, F1254).
  */
 export type GlyphCaps = Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">;
 
@@ -345,10 +570,28 @@ export function glyphs(caps: GlyphCaps): GlyphSet {
  * exception is a **second category** rather than a slow spinner — see
  * `fullramp`.
  *
- * **`ascii` is paired by shape of motion, not by name.** Degradation preserves
- * meaning rather than appearance, and a bloom falling to a rotation loses more
- * than it needs to: a pulse falls to a pulse, a rotation to a rotation, a
- * counter is already ASCII, a toggle to two frames.
+ * **`ascii` is the registry's, per set** (I98, `R-MOT-010`, `R-MOT-011`).
+ * Degradation preserves meaning rather than appearance, and a bloom falling to
+ * a rotation loses more than it needs to — which is the right principle and was
+ * applied at the wrong granularity. This read *paired by shape of motion, not by
+ * name*, and paired **nineteen sets onto three families**: `PULSE_ASCII`,
+ * `TURN_ASCII` and `TOGGLE_ASCII`. So `bounce`, whose motion is a vertical
+ * bounce, fell to a grow ramp, and `triangle`, which turns through four
+ * directions, fell to `-\|/`. **A correct sentence justifying the wrong
+ * decision**, which is the one shape review cannot catch.
+ *
+ * **And the cost was the cadence, not only the characters.** The rung was a
+ * four- or five-frame pattern at the *same interval*, so `braille` — ten frames
+ * at 80 ms, an 800 ms cycle — spun at 320 ms in ASCII, two and a half times
+ * faster. The registry fits its pattern to the set's own frame count
+ * (`asciiTrajectory: "fit-cycle"`), which holds each glyph longer, and that is
+ * what `R-MOT-010`'s *shape of its motion* means. `R-MOT-011` — one alphabet,
+ * one cadence — was green on the collapse the whole time, with three consistent
+ * families and no mismatch.
+ *
+ * **The fitted rung no longer keeps the set's cycle** (question 40): every ASCII
+ * rung steps at `ASCII_INTERVAL_MS`, so the nine sets sharing `|/-\` turn it at
+ * one rate. The pattern's shape is kept; its duration is the rung's.
  *
  * **`narrowOnly` is a tier and not a refusal**, which is what `ambiguousWidth`
  * changed. Every frame of these sets is `East_Asian_Width=Ambiguous` — the
@@ -364,9 +607,13 @@ type SpinnerSet = Readonly<{
   narrowOnly?: boolean;
 }>;
 
+// **The two ASCII-native sets' own frames** — `line` and `balloon` draw these at
+// every rung, so the constant is a shared *alphabet* and not a shared fallback
+// (I98). `braille2` and `arc` held them as a fallback until both were
+// registered; `TOGGLE_ASCII` went with the port, since `toggle` was its only
+// holder and the registry answers `<`/`>`.
 const PULSE_ASCII = Object.freeze([".", "o", "O", "@", "*"]);
 const TURN_ASCII = Object.freeze(["-", "\\", "|", "/"]);
-const TOGGLE_ASCII = Object.freeze(["+", "x"]);
 const DIGITS = Object.freeze(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
 
 /**
@@ -377,6 +624,119 @@ const DIGITS = Object.freeze(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"])
  * that stops the next addition being `▓ ▒ ░`.
  */
 export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze({
+  /**
+   * The agent's mark — the `✦` walk (§095, §030, `R-MOT-002`, `R-MOT-005`).
+   *
+   * **Ported from the registry whole**, frames and interval alike: 82 frames at
+   * 120 ms is a 9.84 s cycle, which the registry states and this does not
+   * recompute. It is the mark a tape's running member draws in its duration
+   * slot, and §095's figure is where its `✦` comes from.
+   *
+   * **The ASCII rung is the composite, and the measurement that said otherwise
+   * was about a collapse** (I98). This read *the ASCII rung needs no composite*,
+   * because all five sets the `asciiTrajectory` names — `fullramp grow bloom
+   * starfield pulse` — carried `PULSE_ASCII`, the same five frames, so the walk
+   * visited one ramp five times. That was true of the tree and not of the
+   * design: the registry gives `starfield` a twinkle (`.+*@*+`) and `grow` a
+   * growth (`.oO@Oo`), and the composite over the five is eighty-two frames that
+   * actually change family. A measurement is about what it measured, and this
+   * one measured the thing being fixed.
+   */
+  agent: Object.freeze({
+    frames: Object.freeze([
+      "⋅",
+      "∘",
+      "◦",
+      "✧",
+      "✦",
+      "✢",
+      "✲",
+      "✵",
+      "✶",
+      "✷",
+      "✱",
+      "✺",
+      "✹",
+      "✸",
+      "✼",
+      "✻",
+      "❃",
+      "❁",
+      "✾",
+      "❀",
+      "✿",
+      "❂",
+      "✿",
+      "❀",
+      "✾",
+      "❁",
+      "❃",
+      "✻",
+      "✼",
+      "✸",
+      "✹",
+      "✺",
+      "✱",
+      "✷",
+      "✶",
+      "✵",
+      "✲",
+      "✢",
+      "✦",
+      "✧",
+      "◦",
+      "∘",
+      "✦",
+      "✢",
+      "✲",
+      "✶",
+      "✷",
+      "✹",
+      "✺",
+      "✹",
+      "✷",
+      "✶",
+      "✲",
+      "✢",
+      "⋅",
+      "✧",
+      "✦",
+      "✢",
+      "✻",
+      "✾",
+      "❀",
+      "✿",
+      "❀",
+      "✾",
+      "✻",
+      "✢",
+      "✦",
+      "✧",
+      "✶",
+      "✷",
+      "✸",
+      "✹",
+      "✺",
+      "✹",
+      "✸",
+      "✷",
+      "✢",
+      "✲",
+      "✱",
+      "✻",
+      "✱",
+      "✲",
+    ]),
+    intervalMs: 120,
+    // **Narrow-only, and the registry says so before the measurement does.**
+    // Its `capabilityPolicy` is `unicode-narrow-or-ascii`, and measuring the
+    // frames agrees: `⋅`, `∘` and `◦` are East Asian Ambiguous and draw two
+    // cells at `wide` where the other seventy-six draw one. A set of mixed
+    // widths cannot ship (C09 I93's rule, one subject over), so the whole
+    // walk takes the ASCII rung there rather than three frames of it.
+    narrowOnly: true,
+    ascii: Object.freeze([".", ".", ".", ".", ".", ".", ".", "o", "o", "o", "o", "o", "o", "o", "O", "O", "O", "O", "O", "O", "O", "@", "@", "@", "@", "@", "@", "@", "O", "O", "O", "O", "O", "O", "O", "o", "o", "o", "o", "o", "o", "o", ".", ".", "o", "o", "O", "O", "@", "@", "O", "O", "o", "o", ".", ".", ".", "o", "o", "O", "O", "@", "@", "@", "O", "O", "o", "o", ".", ".", "+", "*", "@", "@", "*", "+", ".", "o", "O", "@", "O", "o"]),
+  }),
   // braille — the de-facto default, and narrow everywhere.
   /**
    * **Named `braille` and not `dots`, and the rename is a finding.** MG24
@@ -394,7 +754,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   braille: Object.freeze({
     frames: Object.freeze(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
     intervalMs: 80,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "|", "|", "/", "/", "-", "-", "-", "\\", "\\"]),
   }),
   braille2: Object.freeze({
     frames: Object.freeze(["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"]),
@@ -402,25 +762,25 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
     // cycle, which is outside the 800–1600 band the same document states.
     // The rule is right and the row was not — found by asserting the rule.
     intervalMs: 110,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "|", "/", "/", "-", "-", "\\", "\\"]),
   }),
   bounce: Object.freeze({
     frames: Object.freeze(["⠁", "⠂", "⠄", "⠂"]),
     intervalMs: 130,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze(["_", "-", "^", "-"]),
   }),
   orbit: Object.freeze({
     frames: Object.freeze(["⠁", "⠈", "⠐", "⠠", "⢀", "⡀", "⠄", "⠂"]),
     intervalMs: 90,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "|", "/", "/", "-", "-", "\\", "\\"]),
   }),
 
   // dingbats — these vary by weight and spoke count, so they pulse rather than
   // rotate, and a rotation built from them reads as a flicker.
   grow: Object.freeze({
     frames: Object.freeze(["✦", "✢", "✲", "✶", "✷", "✹", "✺", "✹", "✷", "✶", "✲", "✢"]),
-    intervalMs: 90,
-    ascii: PULSE_ASCII,
+    intervalMs: 120,
+    ascii: Object.freeze([".", ".", "o", "o", "O", "O", "@", "@", "O", "O", "o", "o"]),
   }),
   /**
    * **`narrowOnly` because of one frame**, and the catalogue is wrong about it:
@@ -435,14 +795,14 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
    */
   bloom: Object.freeze({
     frames: Object.freeze(["⋅", "✧", "✦", "✢", "✻", "✾", "❀", "✿", "❀", "✾", "✻", "✢", "✦", "✧"]),
-    intervalMs: 95,
-    ascii: PULSE_ASCII,
+    intervalMs: 120,
+    ascii: Object.freeze([".", ".", ".", "o", "o", "O", "O", "@", "@", "@", "O", "O", "o", "o"]),
     narrowOnly: true,
   }),
   starfield: Object.freeze({
     frames: Object.freeze(["✶", "✷", "✸", "✹", "✺", "✹", "✸", "✷"]),
-    intervalMs: 110,
-    ascii: PULSE_ASCII,
+    intervalMs: 120,
+    ascii: Object.freeze([".", ".", "+", "*", "@", "@", "*", "+"]),
   }),
 
   /**
@@ -457,12 +817,9 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
    * form is two cells wherever the font prefers it whatever the locale says.
    */
   fullramp: Object.freeze({
-    frames: Object.freeze([
-      "⋅", "∘", "◦", "✧", "✦", "✢", "✲", "✵", "✶", "✷", "✱",
-      "✺", "✹", "✸", "✼", "✻", "❃", "❁", "✾", "❀", "✿", "❂",
-    ]),
-    intervalMs: 130,
-    ascii: PULSE_ASCII,
+    frames: Object.freeze(["⋅", "∘", "◦", "✧", "✦", "✢", "✲", "✵", "✶", "✷", "✱", "✺", "✹", "✸", "✼", "✻", "❃", "❁", "✾", "❀", "✿", "❂", "✿", "❀", "✾", "❁", "❃", "✻", "✼", "✸", "✹", "✺", "✱", "✷", "✶", "✵", "✲", "✢", "✦", "✧", "◦", "∘"]),
+    intervalMs: 120,
+    ascii: Object.freeze([".", ".", ".", ".", ".", ".", ".", "o", "o", "o", "o", "o", "o", "o", "O", "O", "O", "O", "O", "O", "O", "@", "@", "@", "@", "@", "@", "@", "O", "O", "O", "O", "O", "O", "O", "o", "o", "o", "o", "o", "o", "o"]),
     // `⋅ ∘ ◦` — see `bloom`.
     narrowOnly: true,
   }),
@@ -474,14 +831,14 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   hex: Object.freeze({
     frames: Object.freeze([..."0123456789abcdef"]),
     intervalMs: 110,
-    ascii: Object.freeze([..."0123456789abcdef"]),
+    ascii: Object.freeze(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"]),
   }),
   binary4: Object.freeze({
     frames: Object.freeze(
       Array.from({ length: 16 }, (_unused, n) => String.fromCodePoint(0x2800 + n)),
     ),
     intervalMs: 120,
-    ascii: DIGITS,
+    ascii: Object.freeze(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"]),
   }),
 
   // toggle — a heartbeat rather than a spin. Two frames need ~400 ms or they
@@ -490,7 +847,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   toggle: Object.freeze({
     frames: Object.freeze(["⊶", "⊷"]),
     intervalMs: 400,
-    ascii: TOGGLE_ASCII,
+    ascii: Object.freeze(["<", ">"]),
     narrowOnly: true,
   }),
 
@@ -506,13 +863,13 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   circleQuarters: Object.freeze({
     frames: Object.freeze(["◴", "◷", "◶", "◵"]),
     intervalMs: 140,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "/", "-", "\\"]),
     narrowOnly: true,
   }),
   boxBounce: Object.freeze({
     frames: Object.freeze(["▖", "▘", "▝", "▗"]),
     intervalMs: 140,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "/", "-", "\\"]),
     narrowOnly: true,
   }),
   arc: Object.freeze({
@@ -522,13 +879,13 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
     // `dots2`. Two of fifteen, which is why the band is asserted rather than
     // trusted.
     intervalMs: 130,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "|", "/", "-", "-", "\\"]),
     narrowOnly: true,
   }),
   growVertical: Object.freeze({
     frames: Object.freeze(["▁", "▃", "▄", "▅", "▆", "▇", "▆", "▅", "▄", "▃"]),
     intervalMs: 100,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze([".", ".", "o", "o", "O", "@", "@", "O", "O", "o"]),
     narrowOnly: true,
   }),
   /**
@@ -543,37 +900,37 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   growHorizontal: Object.freeze({
     frames: Object.freeze(["▏", "▎", "▍", "▌", "▋", "▊", "▉", "▊", "▋", "▌", "▍", "▎"]),
     intervalMs: 120,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze([".", ".", "o", "o", "O", "O", "@", "@", "O", "O", "o", "o"]),
     narrowOnly: true,
   }),
   noise: Object.freeze({
     frames: Object.freeze(["▓", "▒", "░"]),
     intervalMs: 100,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze(["#", "*", "."]),
     narrowOnly: true,
   }),
   boxBounce2: Object.freeze({
     frames: Object.freeze(["▌", "▀", "▐", "▄"]),
     intervalMs: 120,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "/", "-", "\\"]),
     narrowOnly: true,
   }),
   triangle: Object.freeze({
     frames: Object.freeze(["◢", "◣", "◤", "◥"]),
     intervalMs: 120,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["v", "<", "^", ">"]),
     narrowOnly: true,
   }),
   circleHalves: Object.freeze({
     frames: Object.freeze(["◐", "◓", "◑", "◒"]),
     intervalMs: 120,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "/", "-", "\\"]),
     narrowOnly: true,
   }),
   pipe: Object.freeze({
     frames: Object.freeze(["┤", "┘", "┴", "└", "├", "┌", "┬", "┐"]),
     intervalMs: 100,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["|", "|", "/", "/", "-", "-", "\\", "\\"]),
     narrowOnly: true,
   }),
   // **The cardinal four, since F833.** The set shipped as eight, and the four
@@ -584,7 +941,7 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   arrow: Object.freeze({
     frames: Object.freeze(["←", "↑", "→", "↓"]),
     intervalMs: 200,
-    ascii: TURN_ASCII,
+    ascii: Object.freeze(["<", "^", ">", "v"]),
     narrowOnly: true,
   }),
 
@@ -594,12 +951,34 @@ export const SPINNER_SETS: Readonly<Record<string, SpinnerSet>> = Object.freeze(
   pulse: Object.freeze({
     frames: Object.freeze(["✢", "✲", "✱", "✻", "✱", "✲"]),
     intervalMs: 120,
-    ascii: PULSE_ASCII,
+    ascii: Object.freeze([".", "o", "O", "@", "O", "o"]),
   }),
 });
 
 /** The default, and the set this returned before it took a name. */
 const DEFAULT_SET = "braille";
+
+/**
+ * The ASCII rung's one cadence, in milliseconds — the registry's
+ * `spinnerPolicy.asciiIntervalMs` (C09 I112, question 40, `R-MOT-011`).
+ *
+ * **One number for the rung, not one per set.** Nine sets share `|/-\` at nine
+ * intervals between 80 and 140 ms, six share `.oO@Oo` and two share `0–f`; a
+ * shared alphabet at several rates is two spinners that look alike and disagree
+ * about how busy the machine is. 120 is the mode of the one, the median of the
+ * other and a member of the third, and §039 says *nothing varies its rate*.
+ * T2.73 holds this equal to the registry's.
+ */
+const ASCII_INTERVAL_MS = 120;
+
+/**
+ * Whether a set draws its ASCII frames at these capabilities — the one test
+ * `spinnerFrames` and `spinnerIntervalMs` both ask, so the frames and the
+ * cadence cannot come from two different rungs.
+ */
+function atAsciiRung(caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">, set: SpinnerSet): boolean {
+  return caps.unicode === "ascii" || (set.narrowOnly === true && caps.ambiguousWidth === "wide");
+}
 
 function setFor(name: string): SpinnerSet {
   return SPINNER_SETS[name] ?? SPINNER_SETS[DEFAULT_SET] ?? { frames: [], intervalMs: 80, ascii: [] };
@@ -623,8 +1002,7 @@ export function spinnerFrames(
   name: string = DEFAULT_SET,
 ): readonly string[] {
   const set = setFor(name);
-  if (caps.unicode === "ascii") return set.ascii;
-  return set.narrowOnly === true && caps.ambiguousWidth === "wide" ? set.ascii : set.frames;
+  return atAsciiRung(caps, set) ? set.ascii : set.frames;
 }
 
 /**
@@ -785,6 +1163,12 @@ type BarStyle = Readonly<{
   on: string;
   off: string;
   narrowOnly?: boolean;
+  /**
+   * **A cell's eighths, emptiest first** (C09 I136, §7j) — the partial cell a
+   * sub-cell alphabet draws between its full cells and its blanks. `braille`'s
+   * alone: every other texture steps a whole cell at a time.
+   */
+  steps?: readonly string[];
 }>;
 
 /**
@@ -796,7 +1180,12 @@ type BarStyle = Readonly<{
  * the code — and the golden frames are what said so, at the ASCII widths, after
  * the unicode ones had already gone green.
  */
-const BAR_ASCII: BarStyle = Object.freeze({ on: "#", off: "." });
+// **`-` and not `.`, and the registry is why** (C09 I94, `R-PRG-001`, §033).
+// The pair shipped as `#`/`.` from the day the table existed and no row could
+// see it: every assertion over `BAR_STYLES` measures a width or a fallback, and
+// a width row is satisfied by any one-cell glyph. `.` is an absence where `-` is
+// a track, which is what the fixture draws.
+const BAR_ASCII: BarStyle = Object.freeze({ on: "#", off: "-" });
 
 /**
  * The styles, and `ascii` is the floor every arm falls to.
@@ -831,7 +1220,15 @@ const BAR_STYLES: Readonly<Record<string, BarStyle>> = Object.freeze({
   // **No `narrowOnly`, and it is the only one.** Braille is `Neutral`, so it is
   // one cell under both conventions — which is what makes it the style a wide
   // terminal keeps rather than the one it loses.
-  braille: Object.freeze({ on: "⣿", off: " " }),
+  //
+  // **And it steps in eighths** (C09 I136, §7j, ruling 32's amendment): the left
+  // dot column fills bottom to top, then the right — U+2840, 2844, 2846, 2847,
+  // 28C7, 28E7, 28F7, 28FF — the registry's `steps`, character for character.
+  braille: Object.freeze({
+    on: "⣿",
+    off: " ",
+    steps: Object.freeze(["\u2840", "\u2844", "\u2846", "\u2847", "\u28C7", "\u28E7", "\u28F7", "\u28FF"]),
+  }),
   ascii: BAR_ASCII,
 });
 
@@ -847,7 +1244,7 @@ export const DEFAULT_BAR_STYLE = "block";
 export function barStyle(
   caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
   name: string = DEFAULT_BAR_STYLE,
-): Readonly<{ on: string; off: string }> {
+): Readonly<{ on: string; off: string; steps?: readonly string[] }> {
   const style = BAR_STYLES[name] ?? BAR_STYLES[DEFAULT_BAR_STYLE];
   if (style === undefined) return BAR_ASCII;
   if (caps.unicode === "ascii") return BAR_ASCII;
@@ -856,6 +1253,70 @@ export function barStyle(
 
 /** The style names, for the catalogue's own row and for a consumer listing them (C24 §6). */
 export const barStyleNames = (): readonly string[] => Object.freeze(Object.keys(BAR_STYLES));
+
+/**
+ * The scrollbar's four glyphs, and whether this rung has half-row forms at all
+ * (C09 §7f, I93, §021).
+ *
+ * **A set rather than four `GlyphSet` slots**, on `BAR_STYLES`' own precedent.
+ * The ASCII rung has no half-row form, so slots would carry a duplicate `#` —
+ * three Unicode characters against one ASCII one, which is exactly the 1:1
+ * property T2.5 asserts over `SUBSTITUTIONS`. A set can say *this rung has
+ * none*; a pair cannot say it without lying.
+ *
+ * Here rather than in `blocks/scrollbar.ts` beside the arithmetic, because this
+ * file is where a mark the framework draws lives (C09 I22, SS47) — and because
+ * the thing it is modelled on is twenty lines above it.
+ */
+export type ScrollbarSet = Readonly<{
+  track: string;
+  thumb: string;
+  /** The thumb's lower half — *starts mid-row*. Never drawn where `half` is false. */
+  thumbStart: string;
+  /** The thumb's upper half — *ends mid-row*. */
+  thumbEnd: string;
+  /** Whether a row is two positions or one. */
+  half: boolean;
+}>;
+
+const SCROLLBAR_UNICODE_SET: ScrollbarSet = Object.freeze({
+  track: "\u2502",
+  thumb: "\u2503",
+  thumbStart: "\u257d",
+  thumbEnd: "\u257f",
+  half: true,
+});
+
+const SCROLLBAR_ASCII_SET: ScrollbarSet = Object.freeze({
+  track: "|",
+  thumb: "#",
+  thumbStart: "#",
+  thumbEnd: "#",
+  half: false,
+});
+
+/** Every member of the Unicode rung, for the check that runs on the set (C09 I93). */
+export const SCROLLBAR_UNICODE: readonly string[] = Object.freeze([
+  SCROLLBAR_UNICODE_SET.track,
+  SCROLLBAR_UNICODE_SET.thumb,
+  SCROLLBAR_UNICODE_SET.thumbStart,
+  SCROLLBAR_UNICODE_SET.thumbEnd,
+]);
+
+/**
+ * The set for a rung, degrading whole (C09 I93, C02 I9).
+ *
+ * Every member is two cells at `ambiguousWidth: "wide"` here — `DRAWN_AS_GEOMETRY`
+ * widens the box-drawing block entire, a deliberate one-directional deviation
+ * from the property (F665) and a superset of §021's own reason. A two-cell glyph
+ * in a one-column bar is not a one-column bar, so the whole set takes ASCII.
+ */
+export function scrollbarSet(
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): ScrollbarSet {
+  if (caps.unicode === "ascii") return SCROLLBAR_ASCII_SET;
+  return caps.ambiguousWidth === "wide" ? SCROLLBAR_ASCII_SET : SCROLLBAR_UNICODE_SET;
+}
 
 /** The set names, in catalogue order — what `Status.spinner` may name (C24 §6). */
 export const spinnerSetNames = (): readonly string[] => Object.freeze(Object.keys(SPINNER_SETS));
@@ -866,9 +1327,47 @@ export const spinnerSetNames = (): readonly string[] => Object.freeze(Object.key
  * **The interval belongs to the set**, so this is the same lookup rather than a
  * second table: a caller holding frames from one set and an interval from
  * another is the drift the pairing exists to prevent.
+ *
+ * **And to the rung, given the capabilities** (C09 I112, question 40): where the
+ * set draws its ASCII frames every set steps at `ASCII_INTERVAL_MS`. With no
+ * capabilities the answer is the Unicode rung's, which is the set's own.
  */
-export function spinnerIntervalMs(name: string = DEFAULT_SET): number {
-  return setFor(name).intervalMs;
+export function spinnerIntervalMs(
+  name: string = DEFAULT_SET,
+  caps?: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+): number {
+  const set = setFor(name);
+  return caps !== undefined && atAsciiRung(caps, set) ? ASCII_INTERVAL_MS : set.intervalMs;
+}
+
+/**
+ * The animation time one `ctx.tick` counts, in milliseconds (C09 I112, C22 I74).
+ *
+ * C03's `spinner` window and the fastest shipped interval (F1197), so no set
+ * skips a frame at this resolution — T2.70's interval band holds every set at or
+ * above it.
+ */
+export const TICK_MS = 80;
+
+/**
+ * A set's frame at `tick`, stepping at the **set's own** interval (C09 I112).
+ *
+ * It was `frames[tick % frames.length]` over a counter that advanced once per
+ * the fastest interval on screen, so every set took that set's rate — `agent`
+ * at 120 ms stepped every 80 beside a braille spinner. The tick is time now,
+ * and this is the one place that turns it into a frame. For the default set,
+ * at 80 ms, the index is `tick` exactly.
+ */
+export function spinnerFrameAt(
+  caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">,
+  tick: number,
+  name: string = DEFAULT_SET,
+): string {
+  const frames = spinnerFrames(caps, name);
+  const count = frames.length; // cells-ok — a frame count
+  if (count === 0) return "";
+  const step = Math.floor((tick * TICK_MS) / spinnerIntervalMs(name, caps));
+  return frames[step % count] ?? "";
 }
 
 // --- the `Glyph` vocabulary (C04 §5, C09 §4) --------------------------------
@@ -888,6 +1387,15 @@ export function spinnerIntervalMs(name: string = DEFAULT_SET): number {
  */
 const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: string]>> =
   Object.freeze({
+    // **`⟩` U+27E9 and `›` U+203A, and they are not the same mark** (C09 I88,
+    // `R-GLY-003`). The first leads a question, the second marks the current
+    // item in a row you navigate — a chooser row or a tape, never a transcript
+    // gutter, which is `focus`'s `▸`. Both were `current` and canonical in the
+    // registry with no character here, and `SS64` could not see either: it
+    // compares the marks on both sides, and a mark absent from one side never
+    // enters a pair.
+    question: ["\u27e9", "?"],
+    current: ["\u203a", "*"],
     ok: ["✓", "+"],
     warn: ["▲", "!"],
     error: ["✗", "x"],
@@ -901,12 +1409,26 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     info: ["\u24d8", "i"],
     pending: ["◌", "."],
     working: ["◐", "%"],
-    running: ["●", "*"],
+    "work-unit": ["●", "*"],
     queued: ["○", "o"],
     cancelled: ["⊘", "/"],
-    expand: ["▸", ">"],
-    collapse: ["▾", "v"],
-    live: ["▌", "|"],
+    // **`▹` U+25B9 HOLLOW, and the ASCII half is `(`** — a collapsed row
+    // (§024, R-BLK-928). Hollow says *there is something behind this*; the
+    // filled `▸` is focus and keeps its own token below, so the two facts no
+    // longer share one slot. `:` was the first ASCII pick and was withdrawn:
+    // it is `GlyphSet.separator` and `dashedVertical`, which the registry's
+    // own collision check could not see (F1246, SS59).
+    expand: ["▹", "("],
+    // **`▿` U+25BF, hollow, and the ASCII half stays `v`** — an expanded row.
+    // `v` is also `sort-desc`'s ASCII, and that is not a collision: sort marks
+    // live in the table header and disclosure in a row's lead, which the
+    // domain table keeps apart.
+    collapse: ["▿", "v"],
+    // **The focus mark, in the gutter C11 I15 reserves** (§017, R-BLK-131).
+    // It had no token: `definition.ts` painted focus with `glyphFor("expand")`
+    // and reserved its width with `glyphCells("expand")`, so a change to the
+    // disclosure mark would have moved the focus gutter. Two facts, two slots.
+    focus: ["▸", ">"],
     bullet: ["•", "-"],
     // **`⎸` U+23B8 is `East_Asian_Width=Neutral` — one cell under both
     // conventions** — where `▌`, `│`, `┃`, `▎`, `▏`, `┆`, `┊` and `╎` are all
@@ -916,8 +1438,12 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     // first slot picked *because* of that measurement. Not `live`'s `▌` for
     // F161's reason as well: a shared mark acquires a consumer that cannot take
     // it, and a live gutter and a quotation are two rôles in one position.
-    // The ASCII half is plain text's own quotation mark.
-    quote: ["⎸", ">"],
+    // **The ASCII half is `|` since M4, and it was `>`.** Both are plain text's
+    // own quotation marks; `>` is also the design's focus mark, and the two
+    // shared a row's lead — SS64's first real finding. `|` is what every
+    // box-drawing vertical already degrades to, and it was held by `live`,
+    // which M4 retires (C04 I39).
+    quote: ["⎸", "|"],
     // **`⁃` U+2043 is Neutral too**, where the bullets a reader reaches for —
     // `◦`, `‣`, `▪` — are Ambiguous. The ASCII half is `~`, the mark C04 §5
     // already gives a bounded region, and deliberately not `-`: that is
@@ -931,19 +1457,134 @@ const GLYPH_TABLE: Readonly<Record<Glyph, readonly [unicode: string, ascii: stri
     // `unicode` alone. Recorded because §4's note says a third set of narrow
     // survivors is the better answer the day someone measures one, and this is
     // one. The ASCII half is `tree(1)`'s rendering of the same hook.
-    continuation: ["⎿", "`"],
-    // **`⏺` U+23FA BLACK CIRCLE FOR RECORD, followed by U+FE0E** (C09 I45,
-    // F854). The base has an emoji presentation form, which is why it left this
-    // slot under F823 — and refusing the character was the wrong remedy. The
-    // selector says *draw the preceding character as text*, `cells()` counts it
-    // zero (measured, not assumed), and the mark is one cell by every table.
     //
-    // It is the character the slot means: Miscellaneous Technical, beside ⏵
-    // PLAY and ⏸ PAUSE, and a call in progress is a recording. `⬤` U+2B24, which
-    // held the slot between F823 and this, is a circle of the right size and
-    // nothing else.
-    step: ["\u23fa\ufe0e", "*"],
+    // **The ASCII half is the registry's `` `- ``, two cells, and the slot
+    // reserves two at every rung** (C09 I5, R-GLY-001, R-GLY-003): `⎿` is
+    // padded to the reservation where it is drawn, so the text after it lands
+    // in one column at both. It was `` ` `` alone — half the design's mark,
+    // which is how every slot stayed one cell.
+    continuation: ["⎿", "`-"],
   });
+
+/**
+ * The screen regions each `Glyph` can appear in — what a collision means (SS59).
+ *
+ * **Uniqueness is a property of a region, not of the alphabet.** The ASCII half
+ * is one character out of about ninety printable ones, and three structures draw
+ * from it — this table, `GlyphSet` below, and the design registry. Requiring
+ * every mark in the tree to differ from every other spends the alphabet on pairs
+ * a reader never meets: the sort marks live on a table's header row and
+ * disclosure in a content row's lead, so both may take `v`. What the model
+ * refuses is the pair that shares a row — `row-lead` and `inline` are both
+ * inside `content-row`, which is why a lead mark and a field separator may not
+ * take the same character (F1246).
+ *
+ * **Every member is `row-lead`, and that is what this table is.** `GLYPH_TABLE`
+ * is the vocabulary a *block* names, and a block's glyph is drawn in the gutter
+ * — the first row's lead cell, or every row's for a rail. The table exists all
+ * the same: an assignment that falls out of one sentence today is still the
+ * assignment, and a member added in some other position has somewhere to say so
+ * rather than being covered by a default nobody wrote down.
+ */
+export const GLYPH_DOMAINS: Readonly<Record<Glyph, readonly string[]>> = {
+  question: ["row-lead"],
+  // **Not `row-lead`, and the registry's own record is the measurement**: over
+  // every `›` in the design not one is a transcript gutter. Recording it here
+  // would spend `*` against `work-unit`'s head mark for a position `›` never
+  // occupies.
+  // **And a form's default button** (C09 I119): §105 draws `› save`.
+  current: ["chooser-row", "tape", "form"],
+  ok: ["row-lead"],
+  warn: ["row-lead"],
+  // **And a form field's error** (C04 I136): §105 — *the same ✗ and the same
+  // tone as every other failure*.
+  error: ["row-lead", "form"],
+  info: ["row-lead"],
+  pending: ["row-lead"],
+  working: ["row-lead"],
+  "work-unit": ["row-lead"],
+  queued: ["row-lead"],
+  cancelled: ["row-lead"],
+  // **And a tree's twisty** (C04 I131): the same pair in the tree's own indent
+  // columns, where the guide beside it is `vertical`.
+  expand: ["row-lead", "tree"],
+  collapse: ["row-lead", "tree"],
+  focus: ["row-lead"],
+  bullet: ["row-lead"],
+  quote: ["row-lead"],
+  nested: ["row-lead"],
+  continuation: ["row-lead"],
+};
+
+/**
+ * The same, for the set C09 draws from on its own account.
+ *
+ * **Unlike `GLYPH_DOMAINS` this one is not one sentence**, because `GlyphSet`'s
+ * rôles are spread across the screen: a frame's own rows, a plot's drawing
+ * region, a table's header, and — for the status group — a block's lead. The
+ * status group is `row-lead` *and* `plot`: `g.cross` leads a failed status block
+ * (`kinds/status.ts`, C09 I138) while `g.hollow`, `g.filled` and `g.dotted` are points and
+ * outliers inside a plot (`plot/roles.ts`, `plot/glyph-row.ts`).
+ */
+export const GLYPH_SET_DOMAINS: Readonly<Record<keyof GlyphSet, readonly string[]>> = {
+  // The residue mark is a whole row in a container and an in-row shed mark in a
+  // table cell (`kinds/containers.ts`, `shed.ts`) — both, and both inside a row.
+  residue: ["row-lead", "inline"],
+  tapeLeft: ["inline"],
+  tapeRight: ["inline"],
+  revert: ["inline"],
+  // Column 0 of the transcript region, which the frame reserves (C14 I57).
+  rail: ["gutter"],
+  separator: ["inline"],
+
+  horizontal: ["border"],
+  // **And a tree's guide** (C04 I130) — block content in the indent columns,
+  // not the transcript gutter, so it does not meet the quote rail's `|`.
+  vertical: ["border", "tree"],
+  dashedVertical: ["border"],
+  dashedHorizontal: ["border"],
+  topLeft: ["border"],
+  topRight: ["border"],
+  bottomLeft: ["border"],
+  bottomRight: ["border"],
+  teeDown: ["border"],
+  teeUp: ["border"],
+  teeLeft: ["border"],
+  teeRight: ["border"],
+  stubDown: ["border"],
+  stubUp: ["border"],
+  stubLeft: ["border"],
+  stubRight: ["border"],
+  crossing: ["border"],
+  heavyHorizontal: ["border"],
+  handleInside: ["control"],
+  heavyVertical: ["border"],
+  calloutTee: ["border"],
+
+  cursorMark: ["plot"],
+  candleHollow: ["plot"],
+  candleFilled: ["plot"],
+  candleCross: ["plot"],
+  diamond: ["plot"],
+  diamondTee: ["plot"],
+  // **And a form field's caret** (C09 I119): a block has no terminal cursor.
+  bar: ["plot", "form"],
+
+  tick: ["row-lead", "plot"],
+  cross: ["row-lead", "plot"],
+  filled: ["row-lead", "plot"],
+  hollow: ["row-lead", "plot"],
+  choiceOpen: ["row-lead"],
+  dotted: ["row-lead", "plot"],
+  blocked: ["row-lead", "plot"],
+
+  sortAsc: ["table-header"],
+  sortDesc: ["table-header"],
+
+  trendUp: ["inline"],
+  trendDown: ["inline"],
+  trendFlat: ["inline"],
+};
 
 /** The pairs, for the test that asserts each is 1:1 by cell count (I5). */
 export const GLYPH_SUBSTITUTIONS: readonly (readonly [string, string])[] = Object.freeze(
@@ -966,12 +1607,6 @@ export const GLYPH_TOKENS: readonly Glyph[] = Object.freeze(
  * T2.5b asserted the 1:1 rule at one arm while more than half its members broke
  * it at the other.
  */
-const AMBIGUOUS_TOKENS: ReadonlySet<Glyph> = new Set(
-  (Object.keys(GLYPH_TABLE) as Glyph[]).filter(
-    (token) => cells(GLYPH_TABLE[token][0], "wide") !== cells(GLYPH_TABLE[token][1], "wide"), // ambiguousWidth "wide" for both halves: the one arm where they can differ
-  ),
-);
-
 /**
  * A block's glyph slot, resolved against capabilities. The single place either
  * character enters a frame.
@@ -983,7 +1618,15 @@ const AMBIGUOUS_TOKENS: ReadonlySet<Glyph> = new Set(
 export function glyphFor(token: Glyph, caps: Pick<TerminalCapabilities, "unicode" | "ambiguousWidth">): string {
   const pair = GLYPH_TABLE[token];
   if (caps.unicode === "ascii") return pair[1];
-  return caps.ambiguousWidth === "wide" && AMBIGUOUS_TOKENS.has(token) ? pair[1] : pair[0];
+  // **The whole vocabulary, not the Ambiguous members** (I48, §093). A set is
+  // legible because its members were drawn by one hand; resolving per token
+  // drew `*` for `work-unit` beneath a `⎿` continuation with `✓` and `✗` as
+  // outcomes — eleven of eighteen fallen and seven still Unicode, which is C02
+  // I9's *mostly ASCII dressed as Unicode* inside one alphabet. The rule the
+  // old line implemented was about **width**, and it was right about width:
+  // every slot is one cell at either arm either way, which is why `glyphCells`
+  // needs no capability and why nothing caught this.
+  return caps.ambiguousWidth === "wide" ? pair[1] : pair[0];
 }
 
 /**
@@ -1001,7 +1644,13 @@ export function glyphCells(token: Glyph): number {
   // this replaces said *2:2 at wide*, which assumed both halves Ambiguous;
   // none of the ASCII halves is (F825). Passing a capability here would make a
   // property of the table depend on the terminal reading it.
-  return cells(GLYPH_TABLE[token][0]); // narrow-ok
+  //
+  // **The reservation: the widest of the two** (I5, R-GLY-001, *reservedCells
+  // equal to its widest representation*), derived from the table rather than
+  // written beside it. One cell for every token but `continuation`, whose
+  // ASCII half is `` `- ``; the renderer pads the narrower one to it.
+  const [unicode, ascii] = GLYPH_TABLE[token];
+  return Math.max(cells(unicode), cells(ascii)); // narrow-ok
 }
 
 /**

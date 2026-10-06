@@ -124,22 +124,28 @@ describe("C09 §5 — tone and value, tier 6", () => {
 describe("C10 §4e — span attributes, tier 6", () => {
   it("C10 T6.85 (C10 I33, C04 I89): composing a span's tone with the block's instead of replacing it → T1.22's tone arm still passes on colour and T2.26 fails at 1-bit", () => {
     const ctx1 = { theme, capabilities: caps(1) as never };
+    // **`meta`, where this row read `identifier` until C10 I50.** §074 puts
+    // `identifier` on the emphasised rung beside `ok`, and a revert row whose
+    // two tones share a typographic class cannot tell replacement from
+    // composition at all — both readings give `{bold: true}`. The row would
+    // have gone green for the edit it exists to refuse. `meta` is `normal`,
+    // which is the property this row was always about and never the tone.
     const ok1 = resolveTone("ok", theme, caps(1));
-    const identifier1 = resolveTone("identifier", theme, caps(1));
+    const meta1 = resolveTone("meta", theme, caps(1));
     expect(ok1).toEqual({ bold: true });
-    expect(identifier1).toEqual({});
+    expect(meta1).toEqual({});
     // Ruled: replacement. The run is the normal class, no bits.
-    expect(runStyle({ text: "x", tone: "identifier" }, ok1, ctx1)).toBe(identifier1);
+    expect(runStyle({ text: "x", tone: "meta" }, ok1, ctx1)).toBe(meta1);
     // The edit: composition. The block's `bold` survives under the run, and
     // the row T2.26 asserts — `let ` bold, `x` not — paints `x` bold too.
-    const composed = { ...ok1, ...identifier1 };
+    const composed = { ...ok1, ...meta1 };
     expect(composed).toEqual({ bold: true });
-    expect(composed).not.toEqual(identifier1);
+    expect(composed).not.toEqual(meta1);
     // At 24-bit the two readings agree on colour, which is why T1.22 alone
     // could not tell them apart and the 1-bit row exists.
     const ok24 = resolveTone("ok", theme, FULL_CAPS);
-    const identifier24 = resolveTone("identifier", theme, FULL_CAPS);
-    expect({ ...ok24, ...identifier24 }.colour).toEqual(identifier24.colour);
+    const meta24 = resolveTone("meta", theme, FULL_CAPS);
+    expect({ ...ok24, ...meta24 }.colour).toEqual(meta24.colour);
   });
 
   it("T6.84 (C10 I33): routing an attribute through a slot → T1.22 fails on colour; gating italic on unicode → T3.11 fails", () => {
@@ -187,11 +193,68 @@ describe("C10 §4e — span attributes, tier 6", () => {
     expect(kit.renderToLines(ramped, 20)).not.toEqual(kit.renderToLines(plain, 20));
   });
 
-  it("T6.94 (C04 I109): widening RampAnimation with sweep → T2.117's refusal row admits an event the render cannot time", () => {
-    expect(RAMP_ANIMATIONS).not.toContain("sweep");
-    expect(refused(span({ fill: "palette", animate: "sweep" }))).toBe(true);
-    // The union is the record: six members, and the validator's set is built from it.
-    expect(RAMP_ANIMATIONS).toHaveLength(6);
+  it("T6.94 (C04 I109, R-MOT-012): narrowing RampAnimation back to six \u2192 a design effect is refused at the gate", () => {
+    // **This row inverted when I109 did.** It used to assert `sweep` is *not* in
+    // the union — *an event the render cannot time* — and the reason was false in
+    // this tree: the clock is injected and a one-shot that stamps its start is
+    // timeable. R-MOT-012 registers twenty-three effects and all twenty-three
+    // ship, so what has to be shown now is the opposite direction: narrowing the
+    // union refuses a ramp the design draws.
+    expect(RAMP_ANIMATIONS).toContain("sweep");
+    expect(refused(span({ fill: "palette", animate: "sweep" }))).toBe(false);
+
+    // **The union is the record**, and the validator's set is built from it — so
+    // a member removed from the union becomes a refusal at the gate with no
+    // other edit. Asserted as the count *and* as a construction, because a
+    // count alone is satisfied by swapping one member for another.
+    expect(RAMP_ANIMATIONS).toHaveLength(24);
+    expect(refused(span({ fill: "palette", animate: "cascade" as never })), "and a name the design does not carry is still refused").toBe(true);
+  });
+
+  it("T6.94a (C04 I109): one stamp per frame rather than one per ramp \u2192 nothing fails but this row", () => {
+    // **Measured, not argued: making this revert fails this row and nothing
+    // else — T2.117g included.** That row calls `animateT` directly, so it is
+    // handed two stamps by construction and answers twice however `paint.ts`
+    // reads them. What it cannot see is whether the renderer passes each ramp
+    // *its own* stamp or one number off the render context for the whole frame,
+    // and the two are indistinguishable in any frame holding a single one-shot,
+    // which is every frame the rest of this suite draws.
+    //
+    // So this row puts two one-shots in **one document** and goes through the
+    // public render. Under the revert — a single `RenderContext.since` — the
+    // two spans would be handed the same elapsed time and the mixed document
+    // would render exactly as the uniform one does.
+    const text = "aaaaaaaaaa          bbbbbbbbbb";
+    const shot = (since: number): Ramp => ({ fill: "gradient", from: "default", to: "accent", animate: "sweep", since });
+    const pair = (a: number, b: number): Block =>
+      block({ kind: "notice", id: "n", tone: "info", text,
+        spans: [{ from: 0, to: 10, ramp: shot(a) }, { from: 20, to: 30, ramp: shot(b) }] });
+
+    const at = (tick: number, b: Block): readonly string[] =>
+      measurable({ theme: DARK_THEME, capabilities: FULL_CAPS, tick }).renderToLines(b, 40);
+
+    // Stamped four ticks apart, the two spans are four ticks apart.
+    expect(at(4, pair(0, 4)), "two stamps in one frame do not collapse").not.toEqual(at(4, pair(0, 0)));
+
+    // And the elapsed time is measured from each ramp's own stamp, not from the
+    // frame: shifting both stamps and the tick together is the same picture.
+    expect(at(8, pair(4, 4)), "the whole frame slid four ticks and nothing moved").toEqual(at(4, pair(0, 0)));
+
+    // The geometry is untouched either way — appearance animates, geometry
+    // never does — which is the carve-out that binds whatever the stamp says.
+    const kit = measurable({ theme: DARK_THEME, capabilities: FULL_CAPS });
+    for (const w of [40, 20, 12]) expect(kit.measure(pair(0, 4), w), `at ${String(w)}`).toBe(kit.measure(pair(0, 0), w));
+  });
+
+  it("T6.95a (C04 I109): dropping the `since` guard \u2192 a periodic ramp takes a stamp nothing reads", () => {
+    // **The revert is a field that looks like it does something.** `since` is a
+    // one-shot's start; on `shimmer` nothing reads it, so a caller who set it
+    // would watch a frame that never responds and have no error to go on. The
+    // guard is what turns that into a construction error at the call site.
+    expect(refused(span({ fill: "gradient", from: "default", to: "accent", animate: "shimmer", since: 3 } as never))).toBe(true);
+    expect(refused(span({ fill: "gradient", from: "default", to: "accent", animate: "sweep", since: 3 } as never))).toBe(false);
+    // And a stamp is a tick: a negative one is a start before the session.
+    expect(refused(span({ fill: "gradient", from: "default", to: "accent", animate: "sweep", since: -1 } as never))).toBe(true);
   });
 
   it("T6.95 (C04 I108): the progress arm dropping its checkRamp call → T1.29's bar half admits every refused ramp; a kind marked none has no member to carry a ramp", () => {

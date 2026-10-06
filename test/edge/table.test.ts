@@ -1,5 +1,6 @@
 // C11 tier 3 — the widths and the contents nobody designs for.
 import { describe, expect, it } from "vitest";
+import { atContent, body } from "../support/table-gutter.js";
 import { planColumns, tableDefinition } from "../../src/presentation/table/index.js";
 import { psColumns, psTable } from "../support/blocks.js";
 import { ASCII_CAPS, FULL_CAPS, measurable, visible } from "../support/render.js";
@@ -18,6 +19,40 @@ function widthsOf(lines: readonly string[]): readonly number[] {
 }
 
 describe("C11 tier 3 — edges", () => {
+  it("T3.22 (I15): at widths 1, 2 and 3 every row fits, measure agrees, and the gutter outranks the data", () => {
+    // Every row kind this renderer emits: header, a focused body row, an expanded
+    // row's detail, the action bar — and, separately, the empty message.
+    const base = psTable({ rows: 3, expanded: [1], detail: true });
+    const full: Table = {
+      ...base,
+      rows: base.rows.map((row, i) =>
+        i === 0 ? { ...row, actions: [{ kind: "fill" as const, label: "≡ logs", command: "/ps --logs" }] } : row,
+      ),
+    };
+    const empty: Table = { kind: "table", id: "e", columns: psColumns(), rows: [], emptyMessage: "No results." };
+    const head = full.rows[0]!.id;
+    const kits = [FULL_CAPS, ASCII_CAPS].map((capabilities) =>
+      measurable({ definitions: [tableDefinition], capabilities, focus: { blockId: full.id, rowId: head } }),
+    );
+    for (const kit of kits) {
+      for (const width of [1, 2, 3]) {
+        for (const block of [full, empty]) {
+          const lines = kit.renderToLines(block, width);
+          for (const [i, line] of lines.entries()) {
+            expect(cells(visible(line)), `${block.id} row ${String(i)} at ${String(width)}`).toBeLessThanOrEqual(width);
+          }
+          expect(lines.length, `${block.id} measure at ${String(width)}`).toBe(kit.measure(block, width)); // cells-ok
+        }
+      }
+      // The focused row is the mark and no data where the gutter fills the width —
+      // the header is row 0, the focused row sorts to row 1.
+      const focusedAt = (width: number): string =>
+        visible(kit.renderToLines(full, width).find((line) => visible(line).trimStart().length > 0 && /[▸>]/u.test(visible(line))) ?? "");
+      expect(focusedAt(2).trimEnd(), "width 2: the mark alone").toMatch(/^[▸>]$/u);
+      expect(focusedAt(1), "width 1: the mark's first cell").toMatch(/^[▸>]$/u);
+    }
+  });
+
   it("T3.1: zero columns renders the empty message and does not throw", () => {
     const block: Table = { kind: "table", id: "z", columns: [], rows: [], emptyMessage: "No results." };
     const lines = r.renderToLines(block, 40);
@@ -93,9 +128,11 @@ describe("C11 tier 3 — edges", () => {
     // Eight double-width glyphs are 16 cells and do not fit a 12-cell column, so
     // the cell truncates — and the row is still exactly the width it was planned
     // at, which is the property `.length` would break.
-    const lines = r.renderToLines(block, 24);
-    for (const width of widthsOf(lines)) expect(width).toBeLessThanOrEqual(24);
-    expect(cells(visible(lines[1] ?? ""))).toBe(22);
+    // **Rendered two cells wider and read past the gutter** (C11 I15, §5b), so
+    // the columns get the 24 this row is about.
+    const lines = r.renderToLines(block, atContent(24));
+    for (const width of widthsOf(lines)) expect(width).toBeLessThanOrEqual(atContent(24));
+    expect(cells(body(visible(lines[1] ?? "")))).toBe(22);
   });
 
   it("T3.6: a ZWJ emoji counts as one cluster and truncation never splits it", () => {
@@ -118,15 +155,15 @@ describe("C11 tier 3 — edges", () => {
 
   it("T3.7: a cell longer than its planned width truncates with the capability-correct marker", () => {
     // At 120 every column survives and `owner` is at its declared minimum of 8,
-    // which `malachy@fmx.io` exceeds — so the marker is forced by the surface's own
+    // which `someone@example.com` exceeds — so the marker is forced by the surface's own
     // declaration rather than by a width chosen to make the test work. At 60 the
     // flex columns absorb the residual and nothing truncates at all, which is why
     // the width matters here.
     const block = psTable({ rows: 1 });
     const unicode = visible(r.renderToLines(block, 120)[1] ?? "");
     const plain = visible(ascii.renderToLines(block, 120)[1] ?? "");
-    expect(unicode).toContain("malachy…");
-    expect(plain).toContain("malachy~");
+    expect(unicode).toContain("someone…");
+    expect(plain).toContain("someone~");
     expect(plain).not.toContain("...");
     // And measurement is unaffected by either.
     expect(r.measure(block, 120)).toBe(ascii.measure(block, 120));
@@ -247,7 +284,9 @@ describe("C11 tier 3 — edges", () => {
     // The rendered rows are the table's width, not the terminal's — which is what
     // "renders narrower than the terminal" means, and it is C07's fallback shape.
     const block: Table = { kind: "table", id: "t", columns, rows: [{ id: "r1", cells: { a: { text: "x" }, b: { text: "y" } } }] };
-    expect(cells(visible(r.renderToLines(block, 120)[1] ?? ""))).toBe(12);
+    // **The gutter is part of the block's answer** (C11 I15): it is drawn on
+    // every row, so a width that left it out would be narrower than the frame.
+    expect(cells(visible(r.renderToLines(block, 120)[1] ?? ""))).toBe(atContent(12));
   });
 
   it("T3.16: 10,000 rows plan sub-millisecond and measure linearly", () => {
@@ -282,7 +321,7 @@ describe("C11 tier 3 — edges", () => {
     };
     const line = visible(r.renderToLines(block, 40)[1] ?? "");
     expect(line).toContain("yes");
-    expect(line).not.toContain("▸");
+    expect(line).not.toContain("▹");
   });
 
   /**
@@ -320,6 +359,8 @@ describe("C11 tier 3 — edges", () => {
       { id: "r1", cells: { name: { text: "alpha" }, dt: { text: "12" }, rate: { text: "20" }, note: { text: "ok" } } },
       { id: "r2", cells: { name: { text: "beta" }, dt: { text: "13" }, rate: { text: "21" }, note: { text: "no" } } },
     ];
+    // The columns are planned at `WIDTH`; the block is rendered two cells wider
+    // and read past the reserved gutter (C11 I15, §5b).
     const WIDTH = 44;
 
     /**
@@ -368,7 +409,7 @@ describe("C11 tier 3 — edges", () => {
           definitions: [tableDefinition],
           capabilities: { ...FULL_CAPS, ambiguousWidth: amb },
         });
-        const lines = reg.renderToLines(block, WIDTH).map(visible);
+        const lines = reg.renderToLines(block, atContent(WIDTH)).map((l) => body(visible(l)));
         expect(lines.length, `${arm} at ${amb}: header and two rows`).toBe(3); // cells-ok
 
         // **As one set, not a row at a time.** A header compared against the

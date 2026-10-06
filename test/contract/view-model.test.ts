@@ -51,6 +51,9 @@ import type { Block as AnyBlock } from "../../src/data/viewmodel/index.js";
  * validator entry stops compiling in `KIND_CHECKS` (T2.10).
  */
 const EXPECTED_KINDS = [
+  // §018's two focus shapes (C09 I105, I106).
+  "choice",
+  "control",
   "rule",
   "notice",
   "keyValue",
@@ -64,6 +67,8 @@ const EXPECTED_KINDS = [
   "comparison",
   "patch",
   "pills",
+  "tape",
+  "tree",
   "tip",
   "panel",
   "group",
@@ -71,10 +76,12 @@ const EXPECTED_KINDS = [
   "mosaic",
   "image",
   "scroll",
+  "split",
+  "form",
   "status",
   "terminal",
 ] as const;
-const _exhaustive: readonly BlockKind[] & { length: 22 } = EXPECTED_KINDS;
+const _exhaustive: readonly BlockKind[] & { length: 28 } = EXPECTED_KINDS;
 void _exhaustive;
 
 /**
@@ -98,7 +105,7 @@ describe("C04 contract", () => {
     // compile. This test asserts the half a type cannot: that the check runs at
     // all. Until it existed, actions were never validated — an adapter could
     // emit any object at all and every check passed.
-    expect([...ACTION_KINDS].sort()).toEqual(["exec", "expand", "fill", "open", "view"]);
+    expect([...ACTION_KINDS].sort()).toEqual(["exec", "expand", "fill", "open"]);
 
     const patchWith = (actions: readonly unknown[]): unknown => ({
       kind: "patch",
@@ -109,7 +116,7 @@ describe("C04 contract", () => {
       actions,
     });
 
-    const good: Action = { kind: "view", label: "fullscreen", target: "p1" };
+    const good: Action = { kind: "expand", label: "expand", target: "p1" };
     expect(validateBlock(patchWith([good])).ok).toBe(true);
 
     // The failing directions, one per way an action can be wrong. Asserted
@@ -123,26 +130,37 @@ describe("C04 contract", () => {
     expect(unknownKind.ok).toBe(false);
     expect(unknownKind.ok ? [] : unknownKind.error.join(" ")).toMatch(/"kind" must be one of/);
 
-    const noTarget = validateBlock(patchWith([{ kind: "view", label: "fullscreen" }]));
+    const noTarget = validateBlock(patchWith([{ kind: "expand", label: "expand" }]));
     expect(noTarget.ok).toBe(false);
     expect(noTarget.ok ? [] : noTarget.error.join(" ")).toMatch(/"target" is required and absent — supply a string/u);
 
-    const noLabel = validateBlock(patchWith([{ kind: "view", target: "p1" }]));
+    const noLabel = validateBlock(patchWith([{ kind: "expand", target: "p1" }]));
     expect(noLabel.ok).toBe(false);
     expect(noLabel.ok ? [] : noLabel.error.join(" ")).toMatch(/"label" is required and absent — supply a string/u);
 
     // `open` carries `url` and not `target` — the row that shows the field is
-    // the kind's rather than one name shared by all five.
+    // the kind's rather than one name shared by all four.
     const openWrongField = validateBlock(patchWith([{ kind: "open", label: "docs", target: "p1" }]));
     expect(openWrongField.ok).toBe(false);
     expect(openWrongField.ok ? [] : openWrongField.error.join(" ")).toMatch(/"url" is required and absent — supply a string/u);
+
+    // **T2.13 (C04 I34, C23 I31) — the retired kind, refused where a far side
+    // could reintroduce it.** `view` filled the screen with one block until the
+    // design deleted that surface (C25 §3b, R-EXA-082); `ACTION_KINDS` is four
+    // now. The union type is erased at runtime, so this validator is the only
+    // thing between an adapter and a kind nothing dispatches — and an action
+    // admitted but never dispatched is the key that does nothing and says
+    // nothing C04 § rules out.
+    const retired = validateBlock(patchWith([{ kind: "view", label: "fullscreen", target: "p1" }]));
+    expect(retired.ok, "the retired kind is refused").toBe(false);
+    expect(retired.ok ? [] : retired.error.join(" ")).toMatch(/"kind" must be one of/);
 
     // Absent is legal, which is the control: without it every assertion above
     // passes for a validator that rejects any patch carrying the field.
     expect(validateBlock({ kind: "patch", id: "p2", path: "a", language: "", hunks: [] }).ok).toBe(true);
   });
 
-  it("T2.10: every member of the Block union is validated, and the corpus covers all 22", () => {
+  it("T2.10: every member of the Block union is validated, and the corpus covers all 28", () => {
     // The kinds ship (commitment 2; the union is 21 at HEAD, nineteen when this
     // was written). The corpus is what C09's T2.1 runs over (C09 is built; this
     // said *once C09 exists* until 2026-09-03), so a kind missing from it is a kind the headline
@@ -627,7 +645,7 @@ describe("C04 §7 — the update model and the view state, checked rather than c
      * arriving somewhere else, and a fifth arriving somewhere else is the only
      * way this invariant can be false.
      */
-    const MOVES: readonly [string, AnyBlock, AnyBlock, number, number][] = [
+    const MOVES: readonly [string, AnyBlock, AnyBlock, number, number, number?][] = [
       ["TableRow.expanded", tableWith({ expanded: false }), tableWith({ expanded: true }), 3, 4],
       [
         "Scroll.collapsed",
@@ -659,16 +677,36 @@ describe("C04 §7 — the update model and the view state, checked rather than c
         { kind: "tip", id: "x", text: "a", padding: { t: 1, b: 2 } } as never,
         1, 4,
       ],
+      // **The sixth and seventh, from ruling 42 and C25 I14** (review batch 3).
+      // A patch's `expanded` moves nothing without a `cap` that drops a hunk, and
+      // a shedding kind's moves nothing at a width that sheds nothing — so each
+      // is measured where it bites, which is the width the tuple carries.
+      [
+        "Patch.expanded",
+        { kind: "patch", id: "p", path: "f", language: "ts", cap: 4, hunks: [{ header: "@@ -1 +1 @@", lines: [{ kind: "add", text: "x" }] }, { header: "@@ -9 +9 @@", lines: [{ kind: "add", text: "y" }] }] } as never,
+        { kind: "patch", id: "p", path: "f", language: "ts", cap: 4, expanded: true, hunks: [{ header: "@@ -1 +1 @@", lines: [{ kind: "add", text: "x" }] }, { header: "@@ -9 +9 @@", lines: [{ kind: "add", text: "y" }] }] } as never,
+        4, 5,
+      ],
+      [
+        "KeyValue.expanded",
+        { kind: "keyValue", id: "k", rows: [{ label: "endpoint", value: "https://api.internal.example/v2" }] } as never,
+        { kind: "keyValue", id: "k", expanded: true, rows: [{ label: "endpoint", value: "https://api.internal.example/v2" }] } as never,
+        1, 2, 9,
+      ],
     ];
 
     const moved: string[] = [];
-    for (const [name, before, after, wasRows, isRows] of MOVES) {
-      expect(kit.measure(before, 60), `${name}: off`).toBe(wasRows);
-      expect(kit.measure(after, 60), `${name}: on`).toBe(isRows);
+    for (const [name, before, after, wasRows, isRows, width = 60] of MOVES) {
+      expect(kit.measure(before, width), `${name}: off`).toBe(wasRows);
+      expect(kit.measure(after, width), `${name}: on`).toBe(isRows);
       moved.push(name);
     }
-    expect(moved, "the whole set, so a sixth fails here").toEqual([
+    // `KeyValue.expanded` stands for the four shedding kinds' one field (C09
+    // I124): one flag, one fold, measured through one kind here and through all
+    // four by C09 T2.191.
+    expect(moved, "the whole set, so an eighth fails here").toEqual([
       "TableRow.expanded", "Scroll.collapsed", "Floor.minHeight", "Patch.collapsedAfter", "Padded.padding",
+      "Patch.expanded", "KeyValue.expanded",
     ]);
 
     // **The counter-example that remains, and it is a different kind of field.**
@@ -857,12 +895,22 @@ describe("C04 §7 — the update model and the view state, checked rather than c
     for (const [why, over, field] of [
       ["an empty message", { message: "" }, /"message"/u],
       ["a non-positive height", { height: 0 }, /"height"/u],
-      ["an absent height", { height: undefined }, /"height"/u],
+      ["a negative height", { height: -2 }, /"height"/u],
+      ["a fractional height", { height: 1.5 }, /"height"/u],
+      ["a height that is not a number", { height: "3" }, /"height"/u],
     ] as const) {
       const bad = status(over);
       expect(bad.ok, why).toBe(false);
       expect(bad.error?.join(" "), `${why}: naming its field (I57)`).toMatch(field);
     }
+    // **An absent height is the fitted box** (C09 §3a-quater) — the row asserted
+    // the opposite until `b.status` stopped declaring one. The key is removed
+    // rather than set to `undefined`, so the row is about absence and not about
+    // how a validator reads an undefined value.
+    const { height: _declared, ...fitted } = {
+      kind: "status", id: "st", state: "error", message: "the fetch failed", height: 3,
+    };
+    expect(validateBlock(fitted as never).ok, "an absent height").toBe(true);
 
     /**
      * **Supplied rather than derived, measured rather than scanned.** `tick`
@@ -1042,5 +1090,193 @@ describe("C04 §7 — the update model and the view state, checked rather than c
     // document they draw correctly.
     expect(doc({ series: [{ values: [1, 2, 3] }], sizes: [1] }), "a short channel is not a fault").toEqual([]);
     expect(doc({ sizes: [1, null] }), "and a null is a sample with no size").toEqual([]);
+  });
+});
+
+describe("C04 I140 — a field's availability", () => {
+  it("T2.134 (C04 I140, R-STA-001): availability is one of enabled, readonly and disabled by both doors", () => {
+    const form = (availability?: string) => ({
+      kind: "form",
+      id: "f",
+      fields: [{ id: "port", label: "port", ...(availability === undefined ? {} : { availability }) }],
+    });
+    for (const a of [undefined, "enabled", "readonly", "disabled"]) {
+      expect(validateBlock(form(a)).ok, String(a)).toBe(true);
+      expect(() => blockOf(form(a) as never), String(a)).not.toThrow();
+    }
+    const bad = validateBlock(form("off"));
+    expect(bad.ok ? "" : bad.error.join("\n")).toMatch(/"availability" is "enabled", "readonly" or "disabled" \(C04 I140\)/u);
+    expect(() => blockOf(form("off") as never)).toThrow(/C04 I140/u);
+  });
+});
+
+describe("C04 I128 — a trend cell", () => {
+  it("T2.133 (C04 I128, R-COL-006): block() refuses a trend cell carrying glyph, tone, spark or bar", () => {
+    const table = (cell: Record<string, unknown>, polarity?: string) => ({
+      kind: "table",
+      id: "m",
+      columns: [{ key: "v", label: "val loss", priority: 1, minWidth: 12, sortable: false, ...(polarity === undefined ? {} : { polarity }) }],
+      rows: [{ id: "r", cells: { v: { text: "from 0.41", trend: { from: 0.41, to: 0.3 }, ...cell } } }],
+    });
+    // The trend alone is a cell, and so is every declared polarity.
+    expect(() => blockOf(table({}) as never), "a trend cell").not.toThrow();
+    for (const polarity of ["higher", "lower", "neutral"]) {
+      expect(validateBlock(table({}, polarity)).ok, polarity).toBe(true);
+    }
+    // Each second answer is refused, by both doors, and named.
+    for (const [field, value] of [["glyph", "ok"], ["tone", "ok"], ["spark", [1, 2]], ["bar", { value: 1, max: 2 }]] as const) {
+      expect(() => blockOf(table({ [field]: value }) as never), field).toThrow(new RegExp(`"${field}".*C04 I128`, "u"));
+      const r = validateBlock(table({ [field]: value }));
+      expect(r.ok ? "" : r.error.join("\n"), `${field} at the wire`).toMatch(new RegExp(`"${field}".*C04 I128`, "u"));
+    }
+    // The readings are finite numbers, and a polarity is one of three words.
+    expect(() => blockOf(table({ trend: { from: 0.41, to: Number.NaN } }) as never)).toThrow(/C04 I128/u);
+    const bad = validateBlock(table({}, "up"));
+    expect(bad.ok ? "" : bad.error.join("\n")).toMatch(/"polarity" is "higher", "lower" or "neutral" \(C04 I128\)/u);
+  });
+});
+
+describe("C04 I6 — a closed vocabulary carries its own fact (ruling 44)", () => {
+  const WORDS = ["default", "config", "env", "flag"];
+  // `null` is *declares none* — an `undefined` would take the default.
+  const table = (cells: readonly Record<string, unknown>[], vocabulary: unknown = WORDS): Record<string, unknown> => ({
+    kind: "table",
+    id: "settings",
+    columns: [{ key: "source", label: "source", priority: 1, minWidth: 7, sortable: false, ...(vocabulary === null ? {} : { vocabulary }) }],
+    rows: cells.map((cell, i) => ({ id: `r${String(i)}`, cells: { source: cell } })),
+  });
+  const wire = (b: Record<string, unknown>): string => {
+    const r = validateBlock(b);
+    return r.ok ? "" : r.error.join("\n");
+  };
+
+  it("T2.139 (C04 I6, ruling 44): a declared vocabulary lets its words carry warn and error with no glyph, and nothing else", () => {
+    // **The ladder's two loud rungs, on the word alone**, by both doors.
+    const loud = table([{ text: "env", tone: "warn" }, { text: "flag", tone: "error" }, { text: "default", tone: "muted" }]);
+    expect(() => blockOf(loud as never), "construction").not.toThrow();
+    expect(wire(loud), "the wire").toBe("");
+
+    // **Closed**: a word outside the set is refused whatever its tone — or
+    // free text would take the exemption by being put in the column.
+    for (const cell of [{ text: "envx", tone: "warn" }, { text: "envx" }]) {
+      const outside = table([cell]);
+      expect(() => blockOf(outside as never), JSON.stringify(cell)).toThrow(/"envx" is not a word of column "source"'s vocabulary \(C04 I6, ruling 44\)/u);
+      expect(wire(outside), `${JSON.stringify(cell)} at the wire`).toMatch(/"envx" is not a word of column "source"'s vocabulary \(C04 I6, ruling 44\)/u);
+    }
+
+    // **A set that cannot be checked against is refused**: empty, an empty
+    // word, a word twice.
+    for (const vocabulary of [[], ["env", ""], ["env", "env"]]) {
+      const bad = table([{ text: "env", tone: "warn" }], vocabulary);
+      expect(() => blockOf(bad as never), JSON.stringify(vocabulary)).toThrow(/"vocabulary" is a non-empty list of distinct, non-empty words \(C04 I6, ruling 44\)/u);
+      expect(wire(bad), `${JSON.stringify(vocabulary)} at the wire`).toMatch(/"vocabulary" is a non-empty list/u);
+    }
+
+    // **The controls.** The same `warn` cell in a column declaring nothing still
+    // owes its glyph, and so does a `warn` notice — the exemption is the
+    // declaration's, and I6 still fires everywhere else.
+    expect(() => blockOf(table([{ text: "env", tone: "warn" }], null) as never), "no vocabulary").toThrow(/requires a non-empty glyph \(C04 I6/u);
+    expect(() => blockOf({ kind: "notice", id: "n", tone: "warn", text: "env" } as never), "a notice").toThrow(/requires a non-empty glyph \(C04 I6/u);
+
+    // **And the same two at the wire** (ruling 77, F1284) — a document the
+    // builder refuses is not one the far side can send. Each with its glyph
+    // validates, so the refusal is the glyph's and not the fixture's.
+    for (const tone of ["warn", "error"]) {
+      expect(wire(table([{ text: "env", tone }], null)), `a ${tone} cell, no vocabulary, at the wire`).toMatch(/cell "source": tone "(warn|error)" requires a glyph \(C04 I6, D29\)/u);
+      expect(wire({ kind: "notice", id: "n", tone, text: "env" }), `a ${tone} notice at the wire`).toMatch(/tone "(warn|error)" requires a glyph \(C04 I6, D29\)/u);
+      expect(wire(table([{ text: "env", tone, glyph: tone }], null)), `a ${tone} cell with its glyph`).toBe("");
+      expect(wire({ kind: "notice", id: "n", tone, glyph: tone, text: "env" }), `a ${tone} notice with its glyph`).toBe("");
+    }
+  });
+});
+
+describe("C04 I144, I146, I148 — what a tape member, a bar and an overshoot may say (review batch 4)", () => {
+  it("T2.150 (C04 I144, §3ao.1): a tape's members are refused unless each has a unique id, a label, a string detail and a known state", () => {
+    const good = { id: "a", label: "seams", detail: "2:53", state: "succeeded" };
+    const tape = (members: readonly unknown[], extra: Record<string, unknown> = {}) =>
+      validateBlock({ kind: "tape", id: "t", members, ...extra });
+    const refused = (members: readonly unknown[], pattern: RegExp, extra: Record<string, unknown> = {}): void => {
+      const got = tape(members, extra);
+      expect(got.ok, JSON.stringify(members)).toBe(false);
+      expect(got.ok ? "" : got.error.join("\n"), JSON.stringify(members)).toMatch(pattern);
+    };
+    refused(["seams"], /member \[0\] must be an object/u);
+    refused([{ label: "x" }], /"id" must be a non-empty string/u);
+    refused([{ id: 7, label: "x" }], /"id" must be a non-empty string/u);
+    refused([{ id: "", label: "x" }], /"id" must be a non-empty string/u);
+    refused([good, { ...good }], /member id "a" appears 2 times/u);
+    refused([{ id: "a" }], /"label"/u);
+    refused([{ id: "a", label: 3 }], /"label"/u);
+    refused([{ ...good, detail: 4 }], /"detail" must be a string/u);
+    refused([{ ...good, state: "ok" }], /"state" is outside its union.*"succeeded"/u);
+    refused([good], /"current" is a member's id, a string/u, { current: 0 });
+
+    // Accepted: each fixed, a current naming no member (C5), and a bare member.
+    expect(tape([good, { id: "b", label: "arm", state: "running" }], { current: "b" }).ok).toBe(true);
+    expect(tape([good], { current: "gone" }).ok, "a current naming no member is valid (C5, T1.48)").toBe(true);
+    expect(tape([{ id: "c", label: "count" }]).ok, "no detail and no state").toBe(true);
+  });
+  it("T2.151 (C04 I146, §3as): painted, quantity, granularity and liveness are refused outside their unions, and style only when not a string", () => {
+    const bar = (extra: Record<string, unknown>) =>
+      validateBlock({ kind: "progress", id: "g", label: "x", current: 3, total: 10, ...extra });
+    const refused = (extra: Record<string, unknown>, pattern: RegExp): void => {
+      const got = bar(extra);
+      expect(got.ok, JSON.stringify(extra)).toBe(false);
+      expect(got.ok ? "" : got.error.join("\n"), JSON.stringify(extra)).toMatch(pattern);
+    };
+    refused({ painted: "yes" }, /"painted" must be a boolean/u);
+    refused({ quantity: "progres" }, /"quantity" is outside its union.*"capacity", "progress", "count"/u);
+    refused({ granularity: "stepped" }, /"granularity" is outside its union/u);
+    refused({ liveness: "moving" }, /"liveness" is outside its union/u);
+    refused({ style: 3 }, /"style" must be a string/u);
+    for (const painted of [true, false]) expect(bar({ painted }).ok, `painted ${String(painted)}`).toBe(true);
+    for (const quantity of ["capacity", "progress", "count"]) expect(bar({ quantity }).ok, quantity).toBe(true);
+    for (const granularity of ["continuous", "segmented"]) expect(bar({ granularity }).ok, granularity).toBe(true);
+    for (const liveness of ["still", "active", "stalled"]) expect(bar({ liveness }).ok, liveness).toBe(true);
+    expect(bar({ style: "no-such-style" }).ok, "an unknown style name is the default, not a refusal").toBe(true);
+  });
+  it("T2.152 (C04 I148, §5c.1): overshoot is accepted on a gradient over a slot pair and refused everywhere else and out of range", () => {
+    const stop = { lift: 1.35, share: 0.35 };
+    const onBar = (ramp: unknown) => validateBlock({ kind: "progress", id: "g", label: "x", current: 3, total: 10, ramp });
+    const onSpan = (ramp: unknown) =>
+      validateBlock({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp }] });
+    const refused = (got: ReturnType<typeof validateBlock>, why: string, pattern: RegExp = /overshoot/u): void => {
+      expect(got.ok, why).toBe(false);
+      expect(got.ok ? "" : got.error.join("\n"), why).toMatch(pattern);
+    };
+    const pair = { fill: "gradient", from: "default", to: "accent" };
+    expect(onBar({ ...pair, overshoot: stop }).ok, "a gradient over a slot pair takes it").toBe(true);
+    expect(onBar({ ...pair, overshoot: { lift: 2, share: 0.01 } }).ok, "lift 2 is inside (1, 2]").toBe(true);
+
+    refused(onBar({ fill: "gradient", colormap: "viridis", overshoot: stop }), "a colormap gradient");
+    refused(onBar({ fill: "palette", overshoot: stop }), "a palette");
+    refused(onBar({ ...pair, fill: "centred", overshoot: stop }), "a centred fill");
+    refused(onBar({ ...pair, fill: "step", bands: 3, overshoot: stop }), "a step fill");
+    refused(onSpan({ ...pair, overshoot: stop }), "on a span", /refused on a span/u);
+    expect(onSpan(pair).ok, "the control: the same pair on a span without the stop is valid").toBe(true);
+    for (const lift of [1, 2.5, Number.NaN]) refused(onBar({ ...pair, overshoot: { lift, share: 0.35 } }), `lift ${String(lift)}`, /lift/u);
+    for (const share of [0, 1, -0.1]) refused(onBar({ ...pair, overshoot: { lift: 1.35, share } }), `share ${String(share)}`, /share/u);
+    refused(onBar({ ...pair, overshoot: { ...stop, knee: 0.5 } }), "a third member", /"lift" and "share" and nothing else/u);
+    refused(onBar({ ...pair, overshoot: 1.35 }), "not a record", /"lift" and "share" and nothing else/u);
+  });
+
+  it("T2.153 (C04 I109, §5c): trailSince is accepted on a ripple trail and refused on a trail naming no one-shot and out of range", () => {
+    const on = (over: Record<string, unknown>) => validateBlock({ kind: "notice", id: "n", tone: "info", text: "abc", ...over });
+    const refused = (got: ReturnType<typeof validateBlock>, why: string, pattern: RegExp): void => {
+      expect(got.ok, why).toBe(false);
+      expect(got.ok ? "" : got.error.join("\n"), why).toMatch(pattern);
+    };
+    for (const streaming of [true, undefined]) {
+      for (const trailSince of [0, 12]) {
+        expect(on({ trail: "ripple", trailSince, ...(streaming === undefined ? {} : { streaming }) }).ok, `ripple at ${String(trailSince)}, streaming ${String(streaming)}`).toBe(true);
+      }
+    }
+    // The forms that read it are named, so a refusal says where the field belongs.
+    refused(on({ streaming: true, trailSince: 0 }), "no trail is hotEdge, which is still", /"trailSince" is a one-shot trail's stamp[^]*"ripple" read it/u);
+    refused(on({ streaming: true, trail: "hotEdge", trailSince: 0 }), "hotEdge", /trail "hotEdge" does not animate once/u);
+    refused(on({ streaming: true, trail: "weight", trailSince: 0 }), "weight", /trail "weight" does not animate once/u);
+    for (const trailSince of [-1, Number.NaN, "3"]) {
+      refused(on({ streaming: true, trail: "ripple", trailSince }), `trailSince ${String(trailSince)}`, /a finite tick at or after zero/u);
+    }
   });
 });

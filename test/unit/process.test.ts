@@ -12,6 +12,10 @@
 import { describe, expect, it } from "vitest";
 import { createProcessRunner } from "../../src/data/process/runner.js";
 import { collect, scripts } from "../support/process.js";
+import { mkdirSync, readdirSync } from "node:fs";
+import { delimiter, isAbsolute, join, relative as relativePath } from "node:path";
+import { findClipboardTool, writeClipboard } from "../../src/data/process/clipboard.js";
+import { RECORDS, recorded, removeDir, runPath, stub, toolDir } from "../support/clipboard-tools.js";
 
 const here = (): string => process.cwd();
 
@@ -147,3 +151,127 @@ async function firstChunk(source: AsyncIterable<string>): Promise<string> {
   for await (const chunk of source) return chunk;
   return "";
 }
+
+describe("C21 the clipboard tool (I20)", () => {
+  it("T1.14 (I20): found by walking PATH in code, gated by display and by SSH, never in a relative entry", () => {
+    const dir = toolDir();
+    try {
+      // The absent arm first, and constructed: an empty directory is the whole PATH.
+      expect(findClipboardTool({ PATH: dir }), "an empty PATH directory holds no tool").toBeNull();
+      expect(findClipboardTool({}), "and no PATH at all").toBeNull();
+
+      stub(dir, "pbcopy");
+      const found = findClipboardTool({ PATH: dir });
+      expect(found?.name).toBe("pbcopy");
+      expect(found?.path, "resolved to an absolute path").toBe(join(dir, "pbcopy"));
+      expect(isAbsolute(found?.path ?? "")).toBe(true);
+      expect(found?.args).toEqual([]);
+
+      // W6: found is not reachable. Over SSH this host's pasteboard is not the reader's.
+      expect(findClipboardTool({ PATH: dir, SSH_CONNECTION: "10.0.0.1 5 10.0.0.2 22" })).toBeNull();
+      expect(findClipboardTool({ PATH: dir, SSH_TTY: "/dev/pts/3" })).toBeNull();
+      expect(findClipboardTool({ PATH: dir, SSH_TTY: "" }), "an empty variable is unset").not.toBeNull();
+
+      // W8 and W7: a display-bound tool needs its display, and SSH does not refuse it —
+      // the variable names the display `ssh -X` forwarded.
+      const x = toolDir();
+      try {
+        stub(x, "xclip");
+        expect(findClipboardTool({ PATH: x }), "no DISPLAY").toBeNull();
+        expect(findClipboardTool({ PATH: x, DISPLAY: ":0" })?.name).toBe("xclip");
+        expect(findClipboardTool({ PATH: x, DISPLAY: "localhost:10.0", SSH_CONNECTION: "a" })?.name).toBe("xclip");
+        expect(findClipboardTool({ PATH: x, DISPLAY: ":0" })?.args).toEqual(["-selection", "clipboard"]);
+        // The table's order, not PATH's: xsel in an earlier directory still loses to xclip.
+        const s2 = toolDir();
+        try {
+          stub(s2, "xsel");
+          expect(findClipboardTool({ PATH: `${s2}${delimiter}${x}`, DISPLAY: ":0" })?.name).toBe("xclip");
+          expect(findClipboardTool({ PATH: s2, DISPLAY: ":0" })?.args).toEqual(["--clipboard", "--input"]);
+          // W9: wl-copy before the X tools when both displays are set.
+          stub(s2, "wl-copy");
+          expect(findClipboardTool({ PATH: `${x}${delimiter}${s2}`, DISPLAY: ":0", WAYLAND_DISPLAY: "wayland-0" })?.name)
+            .toBe("wl-copy");
+          expect(findClipboardTool({ PATH: `${x}${delimiter}${s2}`, DISPLAY: ":0" })?.name, "and not without its own")
+            .toBe("xclip");
+        } finally {
+          removeDir(s2);
+        }
+      } finally {
+        removeDir(x);
+      }
+
+      // Not a tool: a file without the execute bit, and a directory with the name.
+      const odd = toolDir();
+      try {
+        stub(odd, "pbcopy", RECORDS, 0o644);
+        expect(findClipboardTool({ PATH: odd }), "not executable").toBeNull();
+        const nested = toolDir();
+        try {
+          mkdirSync(join(nested, "pbcopy"));
+          expect(findClipboardTool({ PATH: nested }), "a directory").toBeNull();
+        } finally {
+          removeDir(nested);
+        }
+      } finally {
+        removeDir(odd);
+      }
+
+      // W13: a relative entry is never searched. The same directory, named relative to
+      // the working directory the lookup would resolve it against — so a search that
+      // took relative entries would find this stub, which is what makes the arm a control.
+      const relative = relativePath(process.cwd(), dir);
+      expect(isAbsolute(relative)).toBe(false);
+      expect(findClipboardTool({ PATH: relative }), "the stub named relatively").toBeNull();
+      expect(findClipboardTool({ PATH: `${relative}${delimiter}.${delimiter}` })).toBeNull();
+      expect(findClipboardTool({ PATH: dir }), "and the same stub named absolutely").not.toBeNull();
+    } finally {
+      removeDir(dir);
+    }
+  });
+
+  it("T1.15 (I20, I1): a fixed argv and the text on stdin, byte-identical, with no shell", async () => {
+    const dir = toolDir();
+    try {
+      stub(dir, "pbcopy");
+      const tool = findClipboardTool({ PATH: dir });
+      expect(tool).not.toBeNull();
+      const text = "a; b | c $(touch pwned) `touch pwned2` \"q\"\nline two \u001b[31mred\u001b[0m 🦀 é";
+      const env = { PATH: runPath(dir), CALCIUM_PROBE: "present" };
+      const wrote = await writeClipboard(tool!, text, { env, cwd: () => dir });
+
+      expect(wrote).toEqual({ ok: true, tool: "pbcopy" });
+      expect(recorded(dir, "pbcopy", "stdin"), "stdin carries the text, byte for byte").toEqual(Buffer.from(text, "utf8"));
+      expect(recorded(dir, "pbcopy", "argv")?.toString(), "pbcopy's argv is empty").toBe("");
+      // The environment reached the tool — and the text did not travel in it.
+      const seen = recorded(dir, "pbcopy", "env")?.toString() ?? "";
+      expect(seen).toContain("CALCIUM_PROBE=present");
+      expect(seen).not.toContain("touch pwned");
+      // Nothing expanded: no shell read `$(…)` or the backticks.
+      expect(readdirSync(dir).filter((f) => f.startsWith("pwned")), "no command ran").toEqual([]);
+
+      // xclip's literal argv, and the same bytes.
+      stub(dir, "xclip");
+      const x = findClipboardTool({ PATH: dir, DISPLAY: ":0", SSH_TTY: "/dev/pts/1" });
+      expect(x?.name).toBe("xclip");
+      expect(await writeClipboard(x!, text, { env: { PATH: runPath(dir) }, cwd: () => dir })).toEqual({ ok: true, tool: "xclip" });
+      expect(recorded(dir, "xclip", "argv")?.toString()).toBe("[-selection][clipboard]");
+      expect(recorded(dir, "xclip", "stdin")).toEqual(Buffer.from(text, "utf8"));
+
+      // clip.exe reads UTF-16LE after a byte-order mark (W17).
+      const win = toolDir();
+      try {
+        stub(win, "clip.exe");
+        const clip = findClipboardTool({ PATH: win });
+        expect(clip).toMatchObject({ name: "clip.exe", encoding: "utf-16le" });
+        await writeClipboard(clip!, "é🦀", { env: { PATH: runPath(win) }, cwd: () => win });
+        expect(recorded(win, "clip.exe", "stdin")).toEqual(
+          Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("é🦀", "utf16le")]),
+        );
+      } finally {
+        removeDir(win);
+      }
+    } finally {
+      removeDir(dir);
+    }
+  });
+});

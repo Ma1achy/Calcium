@@ -1,0 +1,59 @@
+THE PROMPT GROWS AND WRAPS. A CALL TRUNCATES.
+
+prose WRAPS because losing the end loses the fact. Code and paths
+TRUNCATE because a fragment of a path is still a path you can read.
+
+  ❯ refactor the parser so a nested quote counts a level rather
+    than flipping a flag, and check the escaping path too▌
+
+  the BOX caps against the live viewport and scrolls; the TEXT does not truncate.
+
+  ● read_file(src/inte…/ion/parser/parse.ts) · 184 lines
+  ● read_file(src/in…/rser/parse.ts) · 184
+  ● read_file(sr…/arse.ts)
+
+  and a path truncates in the MIDDLE, because the head says where and
+  the tail says what. Either end alone is the wrong half.
+
+★ A KIND SHORTENS ITSELF, given the width it got
+
+  not a set of pre-computed forms that might not fit. The engine hands
+  a box its solved width; the kind decides what goes in it. Otherwise a
+  path is middle-truncated by its form and then TAIL-truncated again by
+  the composer — which is a real defect this pass found:
+
+  wrong   src/int…/n/parse…     cut twice, and it shows
+  right   src/…/er/parse.ts      cut once, by the kind
+
+★ A CHIP IS ATOMIC — it never breaks across a wrap
+
+  ❯ look at  parse.ts  and  #1 json · 47L  then
+    compare with  construct.ts  before you change it
+
+  prose wraps at WORDS, and a chip is one word that happens to be
+  painted. A half-painted chip is not a chip with a line break in it —
+  it is TWO THINGS THAT LOOK LIKE CHIPS.
+
+★ A NUMBER ALIGNS ON ITS POINT, not its edge
+
+  inline-start aligned aligned on the point
+  val loss   0.0372 val loss     0.0372
+  accuracy   0.941  accuracy     0.941
+  lr         3e-4   lr        3e-4
+  steps      1284   steps     1284
+
+  align: r lines up the LAST character, which puts 0.0372 and 3e-4 in
+  different places. The column declares where the point sits and every
+  cell aligns to it — and AN INTEGER ALIGNS WHERE ITS POINT WOULD BE, so
+  1284 ends exactly where 0.941’s point is.
+
+★ PROSE IN A CELL WRAPS AT THE CELL WIDTH, and width feeds height
+
+  note              cause             fix
+  the parser flips  no notion of an   a depth counter
+  on every quote    escape at all     plus an escape flag
+
+  the one place the pass order could loop, and it does NOT: the cell’s
+  width is solved, the text wraps at that width, and the row’s height is
+  the tallest cell. HEIGHT NEVER FEEDS BACK INTO WIDTH, so one re-fit is
+  a fixed point rather than an iteration.

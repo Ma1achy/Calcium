@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L4 shell |
 | **Depends on** | Everything below. It is the only component that may |
 | **Consumed by** | The app's entry point · C23 (receives a subset of the graph, by interface — §3a step 10) |
@@ -675,6 +675,21 @@ type ChromeContext = Readonly<{
   session: SessionSnapshot;
   now:     number;      // C22's injected clock, sampled once per frame
   columns: number;      // handed down from C01, never read
+  // … owner, ownerArmed, ownerRefused, bufferedEntries, copy, editingField, toast,
+  //   capabilities, lastFrame — `src/shell/types.ts` carries each with its reason.
+  //   `ownerRefused` is the chord C16 I70 names once a guarded question has refused
+  //   one, with its way out — the key's release, or a pause; the owner line reads
+  //   it, and so does the linear cue
+  hints?:  OwnerHints;  // the owner line's chords and vocabularies (I133)
+}>;
+
+/** What the owner line reads its hints from — the session's keymap, and the owners' own words (I133). */
+type OwnerHints = Readonly<{
+  chord(target: FocusTarget, action: KeyAction): Binding["key"] | undefined;
+  substate?: "find" | "complete" | "preview";
+  promptUnderMenu?: boolean; // a completion menu at rest: the prompt's keys answer first (I150, C19 I20)
+  question?: Readonly<{ state: "choice" | "reply" | "inspection"; resolvesTo: string }>;
+  refused?:  boolean;   // semantic copy mode's one-shot chip (C16 I62)
 }>;
 
 // The footer's height is what its blocks measure, per frame (§6l, I82) — no budget field.
@@ -690,7 +705,7 @@ type Chrome = Readonly<{ header: ChromeFn; footer: ChromeFn }>;
 
 The default chrome renders name, binary and clock. Prism's renders cluster, identity, health and clock (`t01` §The header).
 
-The prompt is `❯ ` at `unicode: full` or `bmp`, `> ` at `ascii`, and its gutter is `{ first: 2, cont: 2 }`, passed to C17's `displayRows` (D24a, C17 §2). C22 owns that number because C22 owns the frame; C17 must not assume one.
+The prompt is `❯ ` at `unicode: full` or `bmp`, `$ ` at `ascii` — the registry's `reader` record (C09 I123); it was `> `, which is `focus`'s ASCII mark and the collision the design moved the reader to `$` to avoid — and its gutter is `{ first: 2, cont: 2 }`, passed to C17's `displayRows` (D24a, C17 §2). C22 owns that number because C22 owns the frame; C17 must not assume one.
 
 **Both forms are two cells, and that is a requirement rather than a coincidence** (I52, C09 I22). `commandRows` draws the prompt and `construct.ts` calls the same function for `chromeRows` — the height C14 virtualises against — so a prompt whose ASCII form were a different width would make the measurer and the composer describe the same row differently, with `PROMPT_GUTTER.first` right for one of them. That is C09 I1's divergence in the one place both sides are the framework's own, and it is why the prompt takes a **pair** rather than a free-form config field: a `TuiConfig` prompt would be a string an app supplies, unmeasured, on the row the reader types into (F122).
 
@@ -1170,7 +1185,7 @@ against a seam that does not exist.
 
 ### 6f.1 — the two partitions are not the same partition, and that is row 1
 
-`FOCUS_ORDER` has **seven** members: `overlay`, `copyMode`, `pushedView`,
+`FOCUS_ORDER` has **seven** members: `overlay`, `nativeSelection`, `pushedView`,
 `interaction`, `prompt`, `liveBlock`, `global`. **Two of them are layers** —
 `overlay` and `pushedView` are the two `kind`s of `overlayTop`. The other five
 have no `Placed` at all, and the prompt, which is the entry's own example of a
@@ -1217,7 +1232,7 @@ that does not blink when it was asked to.
 | 1 | focus moves mid-blink | the new target's resolved style, on the next frame; the blink phase restarts because the value changed | **A style change is a frame effect and the blink timer is not coalesced with it.** The timer decides *which of two forms*; the target decides *which shape*. Keeping them separate is what stops a focus change from being swallowed by an unexpired timer |
 | 2 | a keystroke while the blink timer is armed | the steady form, and the timer re-arms | **The key path needs no timer.** Every keystroke already composes a frame — one commit per batch (I27) — so *steady on a keystroke* is free. Only the **idle edge** needs the driver |
 | 3 | the idle edge fires | the blinking form, committed | A driver tick, never a `setInterval` in `paint.ts` — the constraint survives the expiry of its premise. **And it commits**, because an effect outside a batch has no frame (I31); this is the same shape as the completion continuation and the spinner's wake |
-| 4 | copy mode entered | the `copyMode` style, on the frame that enters it | **The existing ordering is already right and the row records why.** `#setCopyMode` commits *and flushes* before `suspend()`, precisely so the indicator's frame is on the screen before frames are gated — which is the same window this needs. Nothing new is owed |
+| 4 | native selection entered | the `nativeSelection` style, on the frame that enters it | **The existing ordering is already right and the row records why.** `#setNativeSelection` commits *and flushes* before `suspend()`, precisely so the indicator's frame is on the screen before frames are gated — which is the same window this needs. Nothing new is owed |
 | 5 | **a handoff** | on `resume()` the record is marked **unknown**, and the next resolution is emitted whatever it is — the reset included | **The precedent is exact, the mechanism turned out weaker, and the walk's first answer was then wrong twice over.** `contaminated` exists because a child writes over the screen, and the cursor style is exactly the state a child changes and does not restore — `vim` leaves a bar behind. But `cursorSequence` is emitted on **every** frame, so nothing here needs `contaminated`: the ordinary next frame repairs it. **Row 4's emit-on-change ruling is what puts that at risk**, and this row first said *`resume()` clears the record*. The mutation pass refused it: clearing to *never emitted* restores the **leave the terminal alone** arm, so a target resolving to `null` after a handoff emits nothing and the child's bar survives — and it was **dead** besides, because `suspend()` already resets and every request for a real style re-emitted either way. The record needs a third disposition, *unknown*, distinct from both |
 | 6 | resize | nothing new; `contaminated` forces a repaint and the style rides the frame | Confirms rather than finds, and the confirmation is the point: the style is not a second thing to invalidate on resize |
 
@@ -1281,10 +1296,10 @@ throw-leaves-state question asked of a cache instead of an exception.
   suspends emits nothing at all. The alternative is leaving a child's cursor on
   the screen, and the guarantee that survives is the one that matters: **an
   application that never suspends never touches the cursor.**
-- **`copyMode`'s style is emitted and then frozen for the duration.** Frames are
+- **`nativeSelection`'s style is emitted and then frozen for the duration.** Frames are
   gated, so nothing can change it until `resume()`. That is correct and it means
-  the copy-mode style cannot animate — which is a property worth stating, since a
-  blinking copy-mode cursor would simply stop blinking at an arbitrary phase.
+  the native-selection style cannot animate — which is a property worth stating, since a
+  blinking native-selection cursor would simply stop blinking at an arbitrary phase.
 
 ---
 
@@ -1607,7 +1622,7 @@ the detection nails it down by typing it.
 **Both artefacts, and this time the pair was forced rather than chosen.** The step has structure
 that holds at rest — a block declares a camera or does not, orbits or does not, is on screen or
 is not, the terminal has synchronised update or has not — and it has a loop of events: a tick, a
-key, a resize, an eviction, copy mode. §6a and §6b each carry a table and a trace; taking only
+key, a resize, an eviction, native selection. §6a and §6b each carry a table and a trace; taking only
 the trace here because a rotating camera is obviously a state machine is exactly how the
 structural half goes unexamined, and rows 4, 6 and 10 below are the ones a trace cannot reach.
 
@@ -1641,7 +1656,7 @@ re-measures rather than cites.
 |---|---|---|---|
 | 1 | orbit live, sync present | the tick fires | advance every camera in the **windowed** set by `ω · Δt`, then `commit("stream")`. The frame misses the cache by construction and draws; `#armSpinner` re-arms out of `#render`, so the loop is the existing one and not a second timer |
 | 2 | orbit live | the reader presses `]` | **both writers are the same writer.** A manual nudge is a relative delta on the same store and the next tick adds to it — no arbitration, no priority, and no *manual wins* rule to get wrong. This is what makes the second writer cheap |
-| 3 | orbit live | copy mode entered | one last frame is drawn, then `suspend()`. The next tick advances and commits, the scheduler returns to `idle` **without calling `render`**, and `#armSpinner` is never reached — so the orbit stops after **one invisible advance**. `resume()` produces exactly one `render()` (C03 T1.18) and the timer comes back. The one advance is the residue and it is named in 6i.4 |
+| 3 | orbit live | native selection entered | one last frame is drawn, then `suspend()`. The next tick advances and commits, the scheduler returns to `idle` **without calling `render`**, and `#armSpinner` is never reached — so the orbit stops after **one invisible advance**. `resume()` produces exactly one `render()` (C03 T1.18) and the timer comes back. The one advance is the residue and it is named in 6i.4 |
 | 4 | orbit live | the frame throws `FrameError` | `#render` draws the fallback and **returns before `#armSpinner`**, so every animation in the session stops until a frame succeeds — usually the next resize. Pre-existing and not the orbit's, and recorded because with an orbit *the picture stopped* is the primary symptom rather than a spinner nobody was watching |
 | 5 | orbit live | the entry is evicted | `cameras.delete` takes the camera and the flag together, because they are one store (table row 11). `#animationMs` is only written by `visibleRows` during a render, so the ticker wakes once more, finds nothing in the windowed set to advance, commits, renders and disarms. One wasted wake, exactly as a spinner's eviction already costs one |
 | 6 | orbit live | the block scrolls off screen | table row 2's rule stops the advance. **The camera does not reset**: an orbit is not a clock, so scrolling back resumes from where it stopped rather than from where it would have been had it kept running. That is the same answer `ScrollOffsets` gives and the opposite of what a reader expects from a video |
@@ -1680,7 +1695,7 @@ at `liveBlock` today.
   wrote `cursorPositions`. **I76 is that writer** — `CursorPositions`, `←`/`→` at `liveBlock`,
   the seventh axis — so the state §3al's branch guards can now be constructed from a keyboard,
   and the exclusion is a C12 edit with a subject rather than a grep. Recorded as owed there.
-- **One advance in copy mode** (trace row 3). The tick that lands after `suspend()` moves the
+- **One advance in native selection** (trace row 3). The tick that lands after `suspend()` moves the
   camera and draws nothing, so a reader stepping back and returning finds the plot one step on.
   Bounded at exactly one, because nothing re-arms until a frame renders.
 - **A fallback frame stops every animation** (trace row 4) and is pre-existing. Naming it is the
@@ -1735,7 +1750,7 @@ protocol hold at rest (the table); a wake, a scroll, an eviction and a stop are 
 | 4 | GIF on screen | the entry is evicted | `frames.delete` in the same callback as the cameras and the offsets — the fourth store on one subscription, which is the count the argument in `construct.ts` was written to survive. One wasted wake, as for a spinner |
 | 5 | GIF on screen | the session stops | `#spinner` disposed before the release, `#motionAt` reset with `#tickAt` — the shared stamp is why there is one line here and not two |
 | 6 | GIF at `kitty` | any wake another animation causes | nothing to advance: the image was not gathered and the store holds no position for it. The terminal is running the loop from the frames it was sent once |
-| 7 | GIF on screen, idle a minute (copy mode, a modal) | the next wake | the elapsed time is reduced modulo one loop before it is walked, so the store lands on the frame the clock says rather than stepping through a minute of frames; no catching up, no burst |
+| 7 | GIF on screen, idle a minute (native selection, a modal) | the next wake | the elapsed time is reduced modulo one loop before it is walked, so the store lands on the frame the clock says rather than stepping through a minute of frames; no catching up, no burst |
 | 8 | two GIFs with different delays in one entry | the tick fires | one key, two indices, sorted; each advances by the same `Δt` against its own delays and the timer is armed for whichever is due first. A store keyed on the entry alone would give them one frame |
 
 ### 6j.3 — the rulings
@@ -1760,7 +1775,7 @@ protocol hold at rest (the table); a wake, a scroll, an eviction and a stop are 
 - **The refusal-path still** (table row 7) is closed on both axes, and what it leaves behind is a
   **width disagreement between the seam and the renderer**, which is F380's family one place along.
   `transmitFrame` is handed `graph.lifecycle.size().columns` for every image in the document, while
-  a card's body renders four cells in (§6l.4 D) — so an image inside a card whose natural width
+  a card's body renders `BODY_INDENT` cells in (§6l.4 D) — five since the branch reserved two (C09 I5, R-GLY-003) — so an image inside a card whose natural width
   exceeds the run's has its `c=`/`r=` computed at one width and its placeholders at another. The
   gather takes the run's width and is right; the seam takes the frame's and is not.
 
@@ -1782,7 +1797,7 @@ protocol hold at rest (the table); a wake, a scroll, an eviction and a stop are 
   | 302 | 302, 298 | 302×8 · no | 298×7 · no |
 
   So the box disagrees at **80 columns**, which is the ordinary width, and the picture is drawn
-  into a placement four cells wider than anything addresses it — the right 5% of the image is
+  into a placement `BODY_INDENT` cells wider than anything addresses it — the right 5% of the image is
   never drawn, a wrong picture rather than none. The refusal disagrees only in the four-column
   window `298–301`, and there the renderer draws placeholders for a transmission that never
   happened, which is this file's own warning arriving through the box. A bound stated without the
@@ -1909,11 +1924,11 @@ nothing to switch on.
 | 8 | the first frame, before any `ChromeFn` has run | `initialRegionHeight` | the footer is its content | the guess uses `DEFAULT_FOOTER_ROWS = 1` and the rules; `compose` corrects by the difference on the first frame (I34), which is §6k.2 row 5 with the guess named |
 | 9 | a click on a rule row | C16 §4a trace 8 | the rule is chrome | chrome — `chromeClick` reads *no entry here*, and a rule row has no entry |
 | 10 | a layer's box against a rule | I28 | the rule is chrome | `overlayRegion.height` is the region's; a layer cannot cover a rule |
-| 11 | an entry whose first block is a `step` notice, body block `k ≥ 1` | the document's blocks render in order at `width` | §9c's body is indented under the hook | **rendered at `width − 4` under the hook**: two blanks then `⎿ ` on the body's first row — the hook at column 2, the header's text column — and four blanks on every row after, the hook in the muted tone (I83, I84; two cells and the hook at column 0 until §6l.6). The header is block 0 and renders at full width as it does today |
-| 12 | the same entry, measured by C14 | `measureSequence(blocks, width)` | row 11 | `measure(header, width) + measureSequence(body, width − 4)` — through the **same** function the render uses (`entryLayout`, I83), so a body that wraps one more row at the narrower width wraps it in both |
+| 11 | an entry whose first block is a `step` notice, body block `k ≥ 1` | the document's blocks render in order at `width` | §9c's body is indented under the hook | **rendered at `width − BODY_INDENT` under the hook**: two blanks, `⎿` padded to its two-cell reservation, and a blank on the body's first row — the hook at column 2, the header's text column — and five blanks on every row after, the hook in the muted tone (I83, I84; two cells and the hook at column 0 until §6l.6). The header is block 0 and renders at full width as it does today |
+| 12 | the same entry, measured by C14 | `measureSequence(blocks, width)` | row 11 | `measure(header, width) + measureSequence(body, width − BODY_INDENT)` — through the **same** function the render uses (`entryLayout`, I83), so a body that wraps one more row at the narrower width wraps it in both |
 | 13 | an entry whose first block is not a `step` notice | row 11 | — | unchanged: the greeting, a notice, an error with no card. The indent is the card's, and a document without a card has no body to hang |
 | 14 | a `step` header with **no** body | row 11 | the hook marks a body | no hook row is drawn — a hook over nothing is the empty-block class as chrome |
-| 15 | the card's body contains a `scroll` (the stream route) | row 11 | the scroll's residue row *⋯ N above, M below* | the scroll renders at `width − 4` like any body block and its residue row sits under the indent; §9c's *"+392 more" is the residue row* is unchanged in mechanism and moved four cells right |
+| 15 | the card's body contains a `scroll` (the stream route) | row 11 | the scroll's residue row *⋯ N above, M below* | the scroll renders at `width − BODY_INDENT` like any body block and its residue row sits under the indent; §9c's *"+392 more" is the residue row* is unchanged in mechanism and moved `BODY_INDENT` cells right |
 
 Rows 3, 7 and 12 are the cells a reader checking one rule at a time cannot see: a frame edge that
 follows content, a gate whose number is right and a maximum whose number is right and together
@@ -1947,7 +1962,7 @@ correct while disagreeing.
   bottom edge with the lower rule directly above it.
 - **D. The body under the hook, through one function** (I83). `entryLayout(blocks, width)` in the
   shell answers, for a document whose first block is a `step` notice, the header at `width` and the
-  remaining blocks at `width − 4` with a four-cell gutter — two blanks and `⎿ ` on the body's first
+  remaining blocks at `width − BODY_INDENT` with a five-cell gutter — two blanks, `⎿` padded to two cells and a blank on the body's first
   row, so the hook sits at the header's text column (§6l.6 G), blanks on the rest, hook in the
   muted tone — and both C14's measurer (`measureSequence`, through the
   wrapper `construct.ts` injects) and `visibleRows`' `windowSequence` call it. A document whose
@@ -1957,10 +1972,21 @@ correct while disagreeing.
 - **E. The default footer has one row.** `makeDefaultChrome`'s footer returns one row — a `group`
   of two muted `pills` clusters since §6l.6 J: `/help` and `stopping` while the snapshot says so at
   the left, the session's `cwd` with the home directory as `~` at the right — every one a field
-  `SessionSnapshot` already carries, so the footer adds no writer. Verbs and facts, never key names — a key named in chrome is C16 I19's second keymap.
-  An app that wants no footer returns `[]` and gets none.
-- **F. The rows above are not configuration.** No `TuiConfig` field turns a rule off or fixes
-  the footer's height. The one thing an app decides is what its footer returns.
+  `SessionSnapshot` already carries, so the footer adds no writer.
+
+**Amended in M5 (R-KEY-004, R-OWN-001, §103).** This read *verbs and facts, never key names — a key named in chrome is C16 I19's second keymap*, and it was right about the hazard and wrong about the remedy. The hazard is a framework footer of **bindings**, which is wrong the moment an app rebinds one; R-KEY-007 says the same from the design's side — *footer hints in retained specimens are examples, not binding projections*. But the conclusion closed a rung rather than the hazard, and §103 requires the rung: *EVERY OWNER SAYS SO, in the footer’s last line. AN OWNER YOU CANNOT SEE IS AN OWNER YOU WILL FIGHT.*
+
+So the footer carries a **second row, last**, naming the owner and its routes — and the distinction that keeps I19 intact is that an *owner* is Calcium’s own. A question, native selection, an attached child and a block’s interior are rungs the framework raises; they are not actions an application rebinds, so naming their exits is not a second keymap. The `scope` rung’s line is the one made of ordinary editing verbs, and it is the one an application replaces by supplying its own chrome (I82).
+
+**How much each rung shows is §103’s split and is not uniform**: *every rung retains owner plus its highest-ranked reachable safe action; **ordinary** rungs also show primary action, safe exit and help.* A question is not an ordinary rung — its actions are its own and the shell does not hold them — so its line is the owner and the safe path. `ownerLine(null)` is the empty line: no owner raised is no row, not an empty one.
+
+**Amended in M7 (C16 I44, R-BLK-786, R-BLK-788, R-INT-008): the line says when a question is *guarded*.** A newly presented question requires a fresh, deliberate activation — so a key already in flight when it arrived is refused, and R-BLK-788 says the refusal *names why*. The naming is here rather than in a notice, because the owner line is already the row that answers *who has your keys*, and *and not from that keystroke* is the same question one moment earlier. The mark is drawn while the guard is live and gone when the guard ends, so the refused key **changes the frame** — which is the whole difference between a key refused and a key swallowed, and the only part of it a frame-read can see. A **cancelled pointer arm draws nothing**: R-INT-008's other half is that passive untargeted pointer events may stay silent, and a press taken back is not a command.
+
+**Amended in review batch 2 (C16 M5 items 2 and 5, ruling 63): the hints come from the keymap, and a question's from its own vocabulary** (I133). §103 draws the scope rung as `⏎ run · ⇧⏎ newline · ⇥ complete · ⇧⇥ transcript` and the line spelled those four chords itself — so an application that rebound `insertNewline` kept a footer naming the old chord, which is C16 I19's second keymap in the one row this section said was safe from it. Every chip now names an action and asks `hints.chord(target, action)`; an action with no binding draws no chip. Two actions were missing for that to hold — `⏎` at the prompt ran a hard-coded branch, and `⏎` at a held field another — so `submit` and `keepField` are keymap rows now. A question is not an ordinary rung and its actions are its own, so its line reads `hints.question`: `←→ move · ⏎ answer · esc → <default>`, where the old line's *esc safe path* was a phrase and not the label. The substate names itself — `find`, `complete`, `preview` — from the layer's declared owner (C15 I29), where it was always `find`. And semantic copy mode's refused `⌃c` draws a one-shot `warn` chip after the owner (C16 I62).
+
+**Amended 2026-09-24 (C14 I55, questions 4 and 35): the copy rung's line is read by mode.** Both copy modes raise one rung, so the rung cannot say which — `ChromeContext.copy` does. Semantic mode's line carries the selection's size and says whether the next `esc` clears or leaves; native mode's names the terminal as the mouse's owner. The header's `COPY` becomes `NATIVE` in the handoff by the same field.
+
+**Amended 2026-09-30 (ruling 96, F1486): the completion substate's line is read by who has the keys** (I150). The line was built from the menu's own rows whatever the menu held, so a menu that opened as you type drew `↑↓ move · ⏎ accept` over a prompt that still answered first (C19 I20): measured, `⏎` submitted `/c` and printed `unknown verb: /c` beneath a footer offering to accept. At rest the line is `complete · ⏎ run · ⇥ complete · esc close` — the prompt's `submit` chord, which at rest runs the line, the prompt's `complete` chord, which the registry labels *complete in the prompt* (`binding.004`), and the panel's `dismiss`, which the prompt does not bind. **`⏎ run` is ruling 99's amendment to ruling 96**: §029's panel footer draws it, and C19 I20 makes it true. Once `⇥` has made a selection it is the menu's line as it was. **`↓` does not make one**: at rest it is the prompt's (C19 §6a), and a menu only comes to hold a selection through `⇥`. The hint is `promptUnderMenu`, the router's own predicate (I51, I145), so the line cannot disagree with dispatch about where a key goes. **It is also now the one visible difference between the two states**: ruling 89 marks the current candidate at rest and after `⇥` alike (C19 I29), and the two frames were otherwise byte-identical.
 
 ### 6l.5 — what this moves, counted before it is regenerated
 
@@ -1997,7 +2023,7 @@ the reference surface draws them the same way.
 
 | # | the cell | rule A | rule B | ruling |
 |---|---|---|---|---|
-| 16 | a card's hook and a muted notice's `continuation` mark on one screen | I83 as ruled in §6l.4 — the hook at column 0 | C09 §4's lead for `continuation` — column 2, held to the prompt gutter by T2.99 | **one column, 2** (I84). The hook is the same mark, so it sits where the mark sits; the body's rows are one unit in from it, column 4, and `entryLayout`'s body run is `width − 4`. The two forms are asserted against each other by a frame that holds both |
+| 16 | a card's hook and a muted notice's `continuation` mark on one screen | I83 as ruled in §6l.4 — the hook at column 0 | C09 §4's lead for `continuation` — column 2, held to the prompt gutter by T2.99 | **one column, 2** (I84). The hook is the same mark, so it sits where the mark sits; the body's text starts at column 5 — the hook's two-cell reservation and a blank past it (C09 I5) — and `entryLayout`'s body run is `width − BODY_INDENT`. The two forms are asserted against each other by a frame that holds both |
 | 17 | the body's first block declares `gapBefore` — a `table` by C24 §4's default | C04 §3a: a leading gap is a blank row | the hook marks the body's first row | the hook would mark a blank. **`entryLayout` drops the leading gap from the body run** (C23 I57) — a per-frame copy read by the measurer and the renderer, never the stored document — so C04's rule holds of the document as stored and the hook marks the table's header. It was ruled *on the document, in `cardOver`* first, and that copy dropped the live part declared by the block's identity (F821) |
 | 18 | the row after an entry's last row | the next entry's command row | the entry's own rows | **one blank row, the entry's** (I85). `entryLayout` ends every entry with a blank run, so C14 measures it through the wrapper and `visibleRows` draws it through the same function; `entryAtRow` maps it to the entry above |
 | 19 | the last entry's blank row | the upper rule | I85 | the blank sits above the rule, which is the design's frame idle and in flight. A one-row region scrolled to an entry's end shows the blank — the tail anchor's own behaviour, and the size gate makes it the reader's choice |
@@ -2010,7 +2036,7 @@ this component has held one figure in two places (T2.99's is the first), so the 
 frame with both forms on it rather than two constants compared.
 
 - **G. One unit, and the child's mark under the parent's text** (I84). The hook at column 2, the
-  body at column 4; `entryLayout`'s body run is `width − 4` with a four-cell gutter, and the
+  body at column 5; `entryLayout`'s body run is `width − BODY_INDENT` with a five-cell gutter, and the
   `continuation` mark C09 draws in a notice and the one the shell draws as a card's gutter are one
   column on one screen.
 - **H. The body's leading gap is the hook's** (C23 I57). Dropped by `entryLayout` in the body run
@@ -2116,6 +2142,1148 @@ I22): one value, computed in `compose`, read by everything that draws content. A
 `initialRegionHeight`'s own comment names on the other axis.
 
 ---
+
+### 6l.11 — a chip in the prompt is a ground (C17 §5c, `R-STA-002`)
+
+C17 composes the label and says which cells it covers; C22 paints them. The
+style is `tone.meta` on `surface.bgDeep` — `R-BLK-628` calls `bgDeep` *a well: a
+plot, a chip*, and `R-BLK-116` gives a paste chip the `meta` tone — resolved
+through `inkOn` against the ground it lands on rather than measured flat (C10
+I48).
+
+**The precedence is `R-STA-002`'s and it costs one test rather than a
+subtraction.** A copy selection outranks a structural surface and one ground
+goes on one cell, so a chip the wash reaches gives up its ground before either
+is drawn.
+
+**It gives it up entirely, and the first draft did not think so.** That draft
+subtracted the wash from the chip and emitted the pieces either side, on the
+reading that a chip could be half selected — and the row written to exercise it
+**could not construct the input**. A chip is one grapheme (C17 I25), so a region
+endpoint falls before it or after it and never inside; `selectionSpans` can only
+ever produce a wash covering the whole label or none of it. The two-piece branch
+was a rule with nothing to be wrong about, found by a row that failed asking for
+a case the model forbids. T1.68 asserts the property instead, over every region
+endpoint in the buffer, because the painter rests on it and cannot check it.
+
+**`washed` became `styled` and the reason is arithmetic, not tidiness.**
+`sliceCells` counts cells of a row, and a row that has been painted carries SGR
+bytes that are not cells. One span could be applied by slicing and re-joining; a
+second could not, and the failure is a range landing in the wrong place with a
+frame-read the only thing that would show it. So the row is cut once, at every
+boundary, from ranges the caller has already resolved.
+
+### 6l.12 — where a chip previews, and why it needs no chord (§101, `R-BLK-823`, `R-BLK-824`, `R-BLK-774`)
+
+*A CHIP PREVIEWS IN TWO PLACES, and FOCUS decides which* — a peek beside the
+element with focus in the transcript, a menu panel above the prompt with focus
+in the prompt, *where completion and find already are*. The design's argument
+for the second place is the one that also settles the mechanism: *a chip is
+INLINE in a wrapping editor, so anchoring beside it puts the preview somewhere
+different on every keystroke. While composing, every transient panel belongs in
+ONE PLACE.*
+
+**The transcript half is built and is not a chip's.** §6l's peek (C15 §2a, C26
+§5) already anchors beside the focused element whenever it declares a `detail`,
+reconciled after every delivered input and on every viewport change. Nothing
+about it is specific to a chip, and nothing should be: the rule is about *where
+a preview goes*, stated over the two places focus can be, and the transcript arm
+is the general peek arriving at a chip the day an element carries one. A second
+mechanism keyed on the kind would be the same rule written twice.
+
+**The prompt half is a projection of the caret, not a chord.** The registry
+names forty actions and forty-one bindings and **not one of them opens a
+preview**, which would be a gap if the design had not already answered it:
+*FOCUS decides which*. So the panel is derived the way the peek is derived —
+recomputed from the caret after every edit — and needs no key, no mode and no
+state of its own. That is the reading that costs nothing the design has not
+specified, and the alternative costs a chord the registry does not have.
+
+**`prefer: "above"`, the prompt's anchor, the whole region's width** — the
+completion menu's placement exactly, because *where completion and find already
+are* is a statement about a place and the place is one object. `kind: "panel"`,
+non-blocking, `dismissal: "escape"`: the triple C15 §2c gives a prompt substate,
+and `R-BLK-774`'s *the completion menu, find, a chip preview: these are MENUS,
+and a menu draws OVER what is behind it. NOTHING ABOVE MOVES.*
+
+**The chip before the caret, and after it only when there is none before.**
+`insertChip` leaves the caret past the chip it just inserted, so *the thing you
+just pasted* is what a reader expects to see, and taking the following chip
+first would preview the next one instead. §101's specimen draws the caret past
+`#2` with `#1` in the panel, which is `R-SEC-101`'s *specimen values and sample
+content remain examples* — the prescription is the place, and the pairing in a
+worked panel is not a rule about which chip.
+
+**Nothing is pushed while another layer is on the stack**, and this is the one
+clause a projection cannot do without. A question, a completion menu and a
+search are all things a reader is in the middle of, and a preview that pushed
+itself over one would be a panel arriving because the caret happened to be
+somewhere — C15's manager dismisses a panel when another opens (C15 §2c), so a
+projection with no such guard would fight it once per frame rather than lose to
+it once.
+
+**The prompt keeps its keys, and the projection would not work otherwise.**
+The preview raises C16's `panel` rung the way every layer does, and a rung that
+answers first is a rung that swallows typing — measured, before this clause
+existed: two characters typed with a preview up reached no handler, and the next
+arrow key dismissed the panel instead of moving the caret. `promptUnderMenu`'s
+precedence (I51) is the mechanism and C19 I20 is the argument — *a display of
+what is available rather than a choice being made* — and it holds here without
+the menu's condition, because a preview has no selection to hold. **A projection
+driven by the caret cannot own the keys that move the caret**: it would be
+closed by nothing, because the only thing that closes it is the motion it took.
+
+~~**Two of the specimen's three key legends are owed elsewhere and the footer
+draws neither until they are.**~~ *Superseded by §6q (review batch 4, ruling 53)*: the box,
+its keys and its bar are built, and `open in the editor` is `⌥o` (I143, I144). `↑↓ scroll` is the scrollbar's, which is §021
+and does not exist in `src/` yet; `⏎ open in the editor` is `R-BLK-355`'s
+paste-chip edit view, which needs the second line-editor buffer `R-BLK-792`
+asks for and the typed reply builds. A footer naming a key that does nothing is
+worse than a footer without it, so the legend lands with its mechanism. `←→
+other chips` needs nothing: they are the caret's own motion, and a caret moving
+between chips moves the preview with it, which is the legend satisfied by the
+projection rather than by a binding. *The last sentence is amended by §6s ruling 4*: the
+legend is drawn, from the prompt's bindings, while there is another chip to reach.
+
+### 6l.9b — the classification table: where a printable key goes, and whether the prompt is drawn under
+
+**Three sites ask *who owns the keystroke* by comparing a layer id**, and a
+comment on one of them has said so for some time: *named rather than derived
+because no field distinguishes them from a search — which is a gap worth
+closing and not a rule to guess at.* The sites are `promptUnderMenu`, the
+menu's forward (`construct.ts:3328`) and the search's own arm (`:3336`).
+
+**The walk is a table and not a trace**, because the interaction is
+structural: these rules meet at rest, with nothing happening between them
+(C18 §8a's shape, and C19's own lesson that a trace indexed by events cannot
+reach a structural cell however many rows it has).
+
+| layer on top | a printable key goes to | the prompt drawn under it | why |
+|---|---|---|---|
+| chip preview | the editor | **yes** | a projection of the caret; it has no selection to hold, and a projection that owned the caret's keys would be closed by nothing (I51) |
+| completion menu, no selection | the editor | **yes** | *a display of what is available rather than a choice being made* (C19 I20) |
+| **completion menu, holding a selection** | **the editor** | **no** | **the one cell where the two disagree** |
+| reverse search | **the search** (`searchTyped`) | yes | it is composing its **own** query (C20 §7), so the keystrokes are its |
+| question, replacing | the question | no | there is no prompt underneath a question that replaced it (C23 I73, I74) |
+| question, typed reply floating | the editor | yes | it is the **one** editor — §101's whole point — so this is the prompt, not a second one |
+
+**The one cell is the finding, and it is what refutes the obvious fix.** A
+single declared `composes` — the shape an earlier reading reached for — would
+merge the two columns, and they differ exactly once: a menu holding a
+selection still forwards printable keys to the editor, and the prompt is
+**not** drawn under it. Merging them draws the prompt under a menu the reader
+is choosing from, or drops the keystroke that would narrow it. Either is a
+defect no assertion about *the menu is up* can see, because both readings are
+true of every other row.
+
+**So the axis is two properties and not one**, and that is why three id
+comparisons read as one rule while resisting every attempt to write the rule
+down. They agree in five cells of six, which is precisely the condition under
+which two facts get mistaken for one — and the sixth is not an edge case but
+the ordinary act of choosing a completion.
+
+**Neither column is derivable from the layer's kind**, which is the other half
+of why the ids are still there: `panel` carries the chip preview, the menu and
+the search alike. The declaration belongs to the layer, and it is two fields
+rather than one — *where its printable keys go*, and *whether it leaves the
+prompt composing*. Naming that is this section; landing it is a change to
+C15's `Layer` and to the three sites, and it is deliberately not bundled with
+the walk that found it.
+
+**Landed in review batch 4 (ruling 23, I145).** Ruling 61 had already moved two of the three
+sites off ids and onto the declared owner. The remaining property — *whether the prompt is drawn
+under* — is C15 I34's `promptLive`, which the menu's owner updates with its selection;
+`promptUnderMenu` reads the top layer's field and no longer reads `keys.selected`.
+
+### 6l.10 — the label on the prompt's rule (§069, `R-COL-003`)
+
+**The rules already exist, so a label in one costs no rows.** That is the
+design's whole argument for the slot and it is the reason this is a change to
+`rule()` rather than a row anywhere: the prompt's upper rule is drawn on every
+frame, full width, and its glyphs are the least load-bearing cells on the
+screen.
+
+**What it carries and what it is.** The content is the application's identity —
+the fixture's ladder is *the app*, *the app and the branch*, *and the dirty
+count*, *or a warning you cannot miss* — and it is **identity**, so it does not
+change during a turn. That is what earns it a permanent slot rather than a
+region. The framework owns the placement and the drop; the string is the
+application's, and nothing here parses it.
+
+| the decision | the ruling | where it comes from |
+|---|---|---|
+| which rule | the **prompt's upper** rule alone | *one label per prompt — two rules with two labels is a header, and the header already exists* |
+| the header's rule, and the prompt's lower one | **bare**, unchanged | the same sentence |
+| alignment | inline-end, **one trailing glyph** of rule after it | *inline-end aligned with one trailing dash* |
+| painted as | a **ground**, not a tone | `R-COL-003` — *a ground is for an extent; a tone is for a mark. Things take a ground* |
+| which ground | `bgElev` | the design's rest-ground for a thing (`R-BLK-490`, *at rest it is bgElev, like every other button*). The fixture does not name a token for this element; this is the pattern it names for the class |
+| when it drops | **first**, below 60 columns | *at 60 columns the label drops before anything else, because it is the least load-bearing thing on the screen* — and `R-BLK-175` ranks it 1 of 4 in the frame's whole degradation order |
+| when it drops for width | when it cannot fit leaving at least one rule glyph | derived rather than chosen: a label that filled the row would have stopped being a label |
+
+**`I81`'s *never configurable* is amended rather than exempted.** It was right
+about the geometry and is being read as covering the content: *two rule rows
+bound the prompt on every frame* is untouched — same rows, same count, same
+width, same tone for the rule's own glyphs — and what becomes configurable is a
+span inside the upper one. A frame with no label is the frame that shipped,
+glyph for glyph, which is the test that says the amendment is a widening and not
+a change.
+
+**The drop is a property of the frame, not of the caller.** An application that
+supplies a label gets no say in whether it is drawn: at 59 columns it is gone,
+and the frame still works. That is the design's sentence read as a mechanism —
+*the least load-bearing thing* is a statement about what the frame sheds first,
+and a slot the caller could pin would not be sheddable.
+
+### 6l.13 — the toast: transient status, never an owner (§105, §012, `R-PRI-001`)
+
+**§105's fifth primitive, and §012 already said where it lives.** §105 draws
+`✓ saved to disk  3s` and states its rule — *transient, and it takes NO KEYS; what
+a toast announces is also in the record* — and §012 is the fuller specification of
+the same thing: *IN THE FOOTER, for something with no place on screen — it replaces
+the footer's own tail for ~2s, then the tail returns*, with the lifetime table
+*nothing changed → the footer, briefly; a selection changed → on the thing; the
+document changed → an entry, forever*. §011 refused a **floating, recordless**
+toast and §105 agrees; this one is neither.
+
+**What it is here.** The session holds one string, `ChromeContext.toast`, for
+`TOAST_MS` (2000, §012's *~2s*), and the default footer draws it — `✓` and the
+text, `ok` tone — **in place of** its tail, the working directory, which returns
+when it expires. It takes no keys, raises no layer and is no rung of the ladder,
+so it can never be what a key reaches. **Its lifetime is a timer, not a clock
+read**: the session schedules the expiry through its injected `schedule` and holds
+only the text, so nothing here reads time (A02).
+
+**§105's `3s` is not drawn.** It is either the toast's age or its lifetime and
+§105 does not say which; §012 draws the same toast — `copied 47 lines` — with no
+figure. Tie-break 2: one consistent picture over one figure.
+
+**The first consumer is `y`** (C26 I17): an element copy changes nothing, so §012's
+table puts its confirmation in the footer, briefly — `copied 3 lines`, `copied 1
+line`. Until now it confirmed nothing, which §012's opening question is about: *you
+pressed a key and something happened. What says so?*
+
+**The record rule is the table's, and it is the caller's to keep.** A toast is for
+the first row — *nothing changed*. A fact that changes the document is an entry, as
+it already is everywhere a document changes; the toast never replaces one and the
+session's toast takes text alone, with no way to append, so it cannot become the
+only record by accident.
+
+**The classification table — where two rules hold at rest.**
+
+| # | the state | rules meeting | the ruling |
+|---|---|---|---|
+| K1 | a toast and the working directory | *the toast replaces the tail* × *the tail is the cwd* | the toast, for its lifetime; the cwd returns unchanged |
+| K2 | an application supplies its own footer | *the toast is drawn by the footer* × *the footer is the application's* | `ctx.toast` is handed to it, as `copy` and `owner` are; a footer that ignores it draws none. Acceptable **because** a toast is only ever for *nothing changed* — the table's first row is the one fact a reader can lose |
+| K3 | 1-bit, or ASCII | *tone carries success* × *tone is gone* | `✓` is `glyphFor("ok")` and carries it at every rung (`+` at ASCII) |
+| K4 | a toast while the owner line is drawn | *the toast is the tail of row one* × *the owner line is row two* | separate rows; neither displaces the other |
+
+**The sequence trace — something happens while a toast is live.**
+
+| # | what happens | ruling |
+|---|---|---|
+| E1 | the toast expires | the text clears and one frame is committed; the tail returns |
+| E2 | a second toast before the first expires | **the first timer is disposed** and the second runs its full lifetime. Without the disposal the first timer clears the second toast early — two correct statements (*a toast lasts 2 s*, *a newer toast replaces an older*) meeting once |
+| E3 | the session stops while a toast is live | the timer is disposed with the spinner's, before the release: a timer left armed holds the process open and commits a frame to a released terminal |
+| E4 | a resize while a toast is live | nothing of the toast's: it is a string in the context, re-laid at the new width like the tail it replaces |
+
+---
+
+## 6m. Linear rendering, walked by hand — §107's second rendering (ruling 29, `R-ACC-001`)
+
+*The cell grid is a projection. It is not the interface.* §107 gives the semantic tree two
+renderings — **rich**, the cursor-addressed interface the rest of this document describes, and
+**linear**, *an append-only stream of semantic events* — and says what linear refuses: no
+alternate screen, no mouse tracking, no cursor-addressed repaint, no animation, and never a
+rewrite of an emitted event; **only the active input line edits in place.** Ruling 29 fixed the
+two things §107 leaves open, the role vocabulary (C09 §7h) and the text of an event: *the
+node's own fields in a fixed order, no glyph and no colour.* This section is the renderer.
+
+### 6m.1 — measured before ruling
+
+- **Three things rule a linear mode out today, and none of them is about linear.** A missing
+  alternate screen is fatal at acquire (C01), `isUsable` is `caps.altScreen` (C02 I7), and the
+  60 × 16 size gate draws the fallback screen. Each is true of a cursor-addressed frame and
+  false of a stream, so each is amended for the linear route rather than bypassed. A stdout
+  that is not a TTY still prints usage: linear edits its input line in place, which is a
+  terminal's, and a pipe has none.
+- **A node's name is the kind's label and is empty where it has none** (C09 §7h), so names
+  cannot carry content. **The content is the copy source** — §057's *what copy takes*, and
+  §107's *the source value, not the painted string*. Every kind but `rule` and `progress`
+  declares one (`copyOf`, measured over `ONE_PER_KIND`); `rule` has its label and `progress`
+  its `valueText`. *Amended*: this bullet first read *three copy sources are the block's JSON —
+  `table`, `plot`, `patch`*. That was the instrument's: the probe built its registry with
+  `defaults` alone, which registers neither C11's table nor C12's plot nor C25's patch, so each
+  degraded to `raw` and `raw` copies the document. Through the registry a session builds, a
+  table copies its header and rows and a patch its unified diff; only the `figure` kinds have
+  no text source (§6m.5).
+- **A change carries ids and nothing else** (C13 §2): `append`, `patch`, `settle`, `evict`,
+  `clear`. The persist subscriber's filter — `append` or `settle`, and not `streaming` — is
+  already *this entry will not move again*.
+- **A question has no event of its own.** It is an overlay layer with id `confirm`, raised by
+  `push` and resolved by its removal.
+- **The call's state is resolved already** — `running`, `succeeded`, `failed`, `cancelled` —
+  by the head (C23 I59), so a completion line reads a state and never parses painted text.
+  **And where the head's word is one the shell wrote, the line names that word instead of a code**
+  (ruling 103 b, I152). `denied`, `expired` and `cancelled` are three words over one `cancelled`
+  state, and 126 and 130 are codes the shell chose, which a child can also return on its own (C23 §8a
+  A6.9 row 16) — so neither the state nor the code can say which ending it was, and the head's word
+  can. It is read from the head's `text`, the model's field and not a painted row: the last part after
+  the slot's separator, and only when it is one of C23's `FAILURE_WORDS`, the closed set `finishCard`
+  writes. **Its blind spot, stated**: a head the far side composed, in a stated state, whose own text
+  happens to end with one of those words after a separator, is read as saying it. The structured answer
+  is §110's *resolution* axis on the head, which no block carries yet.
+
+### 6m.2 — the classification table: which change writes which line
+
+| change | the entry | what is written | level |
+|---|---|---|---|
+| `append` | streaming | the **start**: `entry 7 of 7: pytest tests/unit — running` | polite |
+| `append` | settled | the start and the completion as one event, then the body | by outcome |
+| `patch` | streaming | nothing — the batch closes at `settle` | — |
+| `patch` | settled, a block **appended** | `entry 7:` and the appended block's body | assertive when it is an error or warning `notice`, else polite |
+| `patch` | settled, a block **replaced** or merged | nothing — never a rewrite, and a rich view's own state | — |
+| `settle` | — | the **completion**: `entry 7: pytest tests/unit — failed, exit 1, 4s`, then the body | assertive when failed, else polite |
+| `evict` | — | nothing — the scrollback holds it | — |
+| `clear` | — | `transcript cleared` | polite |
+| a question raised | — | its detail's body, then `question: which branch? 1 feat/c26, 2 main, 3 reply…` | assertive |
+| a question resolved | — | `answer: main` | polite |
+
+**Two rules meet in row 4, and the table is what found it.** *A patch writes nothing* is right
+for a stream, and *a refusal states its reason* (`R-INT-009`) arrives as a patch — C22 I118's
+refused paste is a notice appended to a settled entry. With row 3's rule alone, every refusal
+after settle is silent in linear. A **replaced** block stays silent: its first body was
+written, and writing its successor would be the rewrite §107 forbids, told as news.
+
+**And two rules meet in the body.** A `notice`'s name is its text and so is its copy source —
+*a repaint of the same fact does not say it twice*, so a source line equal to the name is not
+written again.
+
+### 6m.3 — the sequence trace: what happens when two things meet
+
+| # | sequence | what is written |
+|---|---|---|
+| 1 | the reader has typed `abc`; an entry settles | the input line is erased, the event written, `❯ abc` redrawn with the caret where it was |
+| 2 | entry 7 starts; `/clear`; 7 settles | `entry 7 … running`, `transcript cleared`, and nothing for 7 — its id is gone and nothing can be said about it |
+| 3 | entries 7 and 8 both run; 8 settles, then 7 | two starts, then `entry 8:` and `entry 7:` — each completion names its own start |
+| 4 | the transcript evicts entries 1–3 while 7 runs | nothing; 7's completion still reads `entry 7:` |
+| 5 | a question arrives while the reader has typed `abc` | the question's lines, then the input line reads `answer 1 to 3:` — `abc` is held, and comes back when the question resolves |
+| 6 | `2` while the question is open | `answer: main`, and the input line is `❯ abc` again |
+| 7 | the question's `reply…` is chosen | the input line reads `which branch?:` and the typed reply; `⏎` answers it |
+| 8 | a resize | nothing written; the input line is redrawn at the new width |
+| 9 | the same entry settles twice | one completion — the fact is the entry's settlement, keyed by its id |
+
+**Row 4 is the trace's finding.** *`entry 3 of 18`* reads as a position, and a position moves:
+evicting three entries between a start and its completion makes the number that announced the
+call name another one, so the reader hears `entry 4: … failed` about a call they were told was
+`entry 7`. §107's *id — the same stable id used by focus, patches and pointer arms* is the
+remedy: **the number is the entry's `seq`**, which never moves and is never reused, and *of M*
+is the highest `seq` so far. It reads as a position until something is evicted and as an
+identity afterwards, which is the property a reader needs.
+
+**Row 5 is the other.** A question is a new owner of the keys, and the in-place line is the one
+thing linear may edit — so the line is the question's while it is open, and the reader's draft
+is held under it exactly as C17 I29 holds it under a field.
+
+### 6m.4 — the rulings
+
+1. **Selected by `CALCIUM_RENDER_MODE`, read by C02** (C02 I15), where A02 allows the
+   environment; a `capabilities.renderMode` in `TuiConfig` overrides it, as every capability
+   field is overridden. `--linear` and persistent config wait on question 28's producers, and
+   so does `accessibility.screenReader=auto`: *auto falls back to linear when no bridge exists*,
+   and a config key the tree cannot read has nothing to fall back from.
+2. **The lifecycle's linear profile** (C01 I22): raw mode, bracketed paste and the keyboard
+   protocol are taken; the alternate screen, mouse tracking and the hidden cursor are not — a
+   screen reader follows the cursor.
+3. **No frame is composed** (I119): no size gate, no spinner, no ramp, no composition. The
+   scheduler's commits redraw the input line and nothing else.
+4. **The line forms are ruling 29's**: the start `entry N of M: <command> — running`; the
+   completion `entry N: <command> — <state>[, <outcome>][, <duration>]`, the state being the
+   head's word; a block `<role>[: <name>][ — <valueText>]`, then its source lines (I121).
+5. **A block's source lines are its own copy source** — C09 §7a's *a row's copy and the
+   block's are one source at two sizes*, and the block's size carries what the elements drop: a
+   table's header row, a tree's indentation. The element copies were the first ruling here, and
+   reading the stream over `ONE_PER_KIND` overturned it: a `choice`'s option copies carry the
+   radio glyph its block copy does not. **A `figure` reads its name and nothing else** — §107's
+   *a figure owes a summary and a data view* has no field to carry either yet (§6m.5). A
+   container reads its children's bodies in order.
+6. **Never a glyph, never an SGR sequence, never a raw control or bidi format character** in an
+   event (I149). Every string linear writes is in C09 I128's **shown** form: `^[` for an escape,
+   `<U+202E>` for an override. That covers the name, the value, the source, the command, a question
+   and its choices, and the input line. The copy source arrives in that form from the registry's
+   resolve. Everything else is put into it here. *Amended by F1470:* this row used to say
+   *control-stripped (C09 I18)*. `clean` deleted C0 and C1 and passed every bidi format character
+   whole, so a far-side notice named `invoice`, U+202E, `fdp.exe` was written with the override
+   raw, on the one surface C09 T4.107's site set never read. Its copy line was neutralised, so the
+   two stopped comparing equal and the name/source dedupe wrote the fact twice. **The cost is
+   ruling 71's, carried into speech:** a screen reader speaks the form, and legitimate
+   right-to-left text reads its marks.
+7. **A question is numbered** (I122). `1`–`9` answer it, a choice's own key still answers it,
+   and `reply…` turns the input line into §107's *labelled line editor*. **The cue's range is
+   words, `answer 1 to N:`, as `entry N of M` is** — row 6 holds for the input line too, and
+   an en dash is a mark C09 I22 would have to substitute on an ASCII terminal and speech reads
+   as punctuation rather than as a range. **While C16 I44's
+   guard is armed the cue says so, in the rich footer's own words** — `answer 1 to N (ready in a
+   moment): ` — and the key the guard refuses redraws it without them. In rich mode the
+   refusal is the footer's armed chip; linear has no footer, and a key refused with nothing
+   written is the silent refusal `R-OWN-002` and `R-INT-008` forbid. The redraw is the
+   statement: it happens exactly when the guard stands down, and never otherwise.
+8. **Levels are declared, per event** (I124): `assertive` for a failure, a question and an
+   appended error or warning; `polite` for the rest; ARIA's own reading of `alert` and `status`.
+   Linear stdout is the one transport that exists, and it writes both — the level is carried on
+   the event for the bridge §107 names, and **no event claims a bridge that does not exist.**
+9. **Deduplication is by fact** (I120): a start, a completion, an appended block and a question
+   are each written once per id.
+10. **`/capabilities` is where the route appears** (I125, §107): the route first, then every
+    capability field with its value and its source.
+
+### 6m.5 — what the rulings leave behind, named so it is not read as coverage
+
+- **Milestones.** §107's *useful elapsed milestones* need an interval, which is a visible
+  timing value the design does not give — parked as **48**. Until it is answered a long call is
+  silent between its start and its completion.
+- **Rate limits.** Deduplication is built; a numeric limit is the same kind of value — **49**.
+- **Batches finer than settlement.** *Streaming prose arrives in coherent batches*, and the
+  batch here is the settled document. A finer boundary needs a block that can no longer
+  change, and `replace` can reach any block of a streaming entry.
+- **A figure's summary and data view** (R-BLK-895) — design-settled and owed; they need a field
+  on `plot` and `mosaic`, which is C04's.
+- **Panels, peeks, completion and find** are rich placement. In linear they draw nothing, and
+  `⇥` completes nothing a reader can hear.
+- **A form in linear** — *mixed forms add an explicit text arm* — and **the toast**, which is
+  transient status and in linear is a line.
+
+## 6n. Notifications, walked by hand — reaching a reader who left (ruling 27, `R-NTF-001`)
+
+*A four-minute turn means you left. Something has to reach you* (§014). `R-NTF-001` is the rule —
+*a watched run that completes while it is not visible emits the declared completion notification
+without moving the reader* — and everything that gives it a subject is `example` prose, which
+ruling 27 settled: **§088 §3's five earning rows plus §014's *the model failed***, because a row
+dropped in silence is not a decision; **§014's three rungs as drawn** — the bell, a system
+notification, the title; and **the watch built as a declaration that producers fill.** §014 adds
+the two properties every rung has: *detected, not assumed*, and *opt-in, because a tool that
+beeps at you unasked is a tool people mute forever.*
+
+### 6n.1 — measured before ruling
+
+- **Nothing emits any of the three rungs.** `git grep` over `src/` for `\x07`, `]2;`, `]9;`,
+  `1004` and a title write finds the one `BEL` constant in `presentation/rows.ts`, which is the
+  sanitiser's name for a byte it strips. There is no bell, no title and no focus reporting.
+- **A focus report is swallowed today, whole.** Through `createDecoder` with an advancing
+  clock, `ESC [ I` and `ESC [ O` each yield `[]` from `push` and from `poll`, and a following
+  `a` yields its key. So no report has ever leaked as a key — and none has ever been heard.
+- **Which terminal takes which system notification is in each terminal's own documentation**,
+  read 2026-09-25: iTerm2's escape-code page defines `OSC 9 ; message ST` and never mentions
+  777; WezTerm's lists OSC 9 and OSC 777's `notify` extension; kitty's says *kitty also
+  supports the legacy OSC 9 protocol developed by iTerm2*; Ghostty's defines OSC 9 and warns
+  that ConEmu also uses OSC 9, so *the title should not begin with a number and then a
+  semicolon*; foot's `foot-ctlseqs(7)` lists OSC 9, 99 and 777, mode 1004 and the title stack
+  `CSI 22 ; 2 t` / `CSI 23 ; 2 t`. **All five take OSC 9, and none needs 777.**
+- **A settled document carries its duration** (`meta.durationMs`) and its state is the head's
+  (C23 I59) — the ~30 s row needs no clock of the notifier's own.
+- **The residue §014 draws for *when you come back* does not ship.** `● 3 entries settled while
+  you were away · ⌘↓ to the bottom` has no counterpart: the owner line's `N waiting` chip
+  (`bufferedEntries`) counts entries a **frozen** view holds back (C14 I34), not entries that
+  arrived while the reader was elsewhere, and `git grep` finds no new-entries-below indicator.
+  *First drafted as "already ships", from the chip's field name* — checked before committing.
+
+### 6n.2 — the classification table: which facts earn, and which one when two do
+
+**One settle is one fact, and it earns at most one notification** (I126). The rows are the cells
+where two earning rules could both claim a settle — a row governed by one rule restates it.
+
+| watched | failed | ran ≥ 30 s | earns | its word |
+|---|---|---|---|---|
+| no | no | no | nothing — §014's *a tool call ended, never* is the short case | — |
+| no | no | yes | *a turn ended* | `done` |
+| no | yes | no | *the model failed*, always | `failed` |
+| no | yes | yes | **one**, the failure — the more specific row | `failed` |
+| yes | no | no | *a watched run ended*, always | `done` |
+| yes | no | yes | **one**, the watched row — the ≥ 30 s row adds nothing | `done` |
+| yes | yes | either | *a watched run failed*, **one** | `failed` |
+
+A question arriving is its own fact — *a question is waiting, always* — and its word is
+`waiting`. `failed` is C23 I59's state; `cancelled` and `succeeded` are both *ended*.
+
+### 6n.3 — the sequence trace: what happens when two things meet
+
+| # | sequence | what is written | the rule it forced |
+|---|---|---|---|
+| 1 | `CALCIUM_NOTIFY` absent; a 45 s entry settles | nothing, and `?1004h` was never taken | opt-in is the default, and not a byte changes (C01 I23) |
+| 2 | opted in; **no focus report has ever arrived**; a 45 s entry settles | nothing | *detected, not assumed*: a terminal that never said it lost focus is one the reader may be looking at (I127) |
+| 3 | opted in `bell`; `ESC [ O`; a 45 s entry settles; a 2 s one settles | `BEL` once | the table's short row, across a gap in focus |
+| 4 | opted in `title`; `ESC [ O`; two long entries settle; `ESC [ I` | `CSI 22;2t`, `OSC 2 • prism · done` twice, then `CSI 23;2t` | **pushed once per absence**, popped on return — two pushes and one pop would leave the stack a level deep (C01 I24) |
+| 5 | `title`; `ESC [ O`; a long entry settles; the session exits while away | push, title, and **pop at release** | release restores what acquire did not take — the title is a mode taken late (C01 I24) |
+| 6 | `system` opted, `notification: "none"` | nothing for that rung; the others fire | the rung is detected; opting in cannot make a terminal take OSC 9 (I128) |
+| 7 | `ESC [ O`; a question arrives | every opted rung, word `waiting` | *always — the turn is BLOCKED* |
+| 8 | a question arrives while focused; then `ESC [ O` | nothing | the fact arose while the reader could see it; leaving is not a new fact |
+| 9 | a question's guard is armed (C16 I44); `ESC [ I` arrives; then `2` | the guard still refuses `2` | **a focus report is not a key and not an activation** — decoded, never routed (C16 I61) |
+| 10 | `ESC [ O`; `/clear`; an entry cleared before settling settles | nothing | an entry the transcript no longer holds has no fact to report — §6m.3 row 2's shape |
+| 11 | an entry watched while streaming; it settles in 2 s, away | every opted rung, `done`, and the watch is gone | *it drops itself when the run ends* (I130) — and a second settle earning nothing is I126's once-per-id, not the drop: the mutation pass found the drop unobservable until a watch row exists (50) |
+| 12 | `watch` on a settled entry, or an id that is not one | refused, `false` | a watch on a run that has ended is a declaration with no future to watch |
+| 13 | `ESC [ O`; a long entry settles while the reader is scrolled away | the rungs; the viewport, focus and transcript unchanged | *without moving the reader* (I129) |
+| 14 | the linear route (§6m), `ESC [ O`, a long settle | the rungs, beside the stream | a rung is not an event of the stream, so the stream's rules neither add nor forbid it |
+
+### 6n.4 — the rulings
+
+1. **The earning table is §6n.2**, and a settle's duration is its document's `meta.durationMs`
+   against **30 000 ms** — §014's *~30s* with the tilde read as the design's, not a range.
+2. **The focus gate is the terminal's own report.** Focus reporting (`CSI ? 1004 h`) is taken
+   when any rung is opted in; *unfocused* is the last report being `ESC [ O`, and never having
+   had one is focused.
+3. **The rungs fire together, per fact, in a fixed order — bell, system, title** — each only if
+   opted in and, for `system`, only if `notification` is `osc9`. **The rate is 49's**: a numeric
+   limit on a stream of facts is the question parked for linear announcements, and until it is
+   answered each fact rings once.
+4. **The words are linear's** — a consistent picture beats a single rule. The system body is the
+   binary's name, then §6m.2's completion line (`prism: entry 3: pytest — failed, 4s`) or the
+   question line (`prism: question: which branch? 1 feat/c26, 2 main`); in §6m.4 row 6's shown form (I149), and
+   never opening with a number and a semicolon, which Ghostty reserves for ConEmu. The title is
+   §014's as drawn: `• <binary> · <word>`.
+5. **The watch is a declaration, and its producers arrive later** (ruling 27's first sentence). *Built by ruling 50 in §6p: the set is the session's (I135), `/watch` and `/unwatch` fill it (I136) and the footer's row shows it (I137).*
+   A streaming entry can be watched; the watch drops at settle and its completion earns always.
+   **Nothing in the tree fills it today**: `/watch` is a ninth framework verb, which C05 §3 makes
+   a breaking change, and the footer's watch row (§085) is `example` display — both parked as
+   **50**.
+
+### 6n.5 — what the rulings leave behind, named so it is not read as coverage
+
+- **OSC 777.** §014 names it beside OSC 9, and every terminal the table identifies takes OSC 9.
+  The one that takes 777 alone is urxvt, through a Perl extension whose presence nothing in the
+  environment reports — an arm no detection could select, so it is not built.
+- **Windows Terminal is `none`**: its OSC 9 is ConEmu's family of sub-commands, unmeasured here.
+- ~~**The watch's producers and its footer row** — **50**.~~ — **built by ruling 50** (§6p, I135–I140).
+- **The rate of repeated rungs** — **49**.
+- ~~**The return line** — §014's *the transcript says what you missed*. The transcript holds
+  entries, and a line appended to it is either an entry the reader never ran or a second kind of
+  row §6m's stream would have to read; the placement is a visible choice the design leaves open —
+  **51**.~~ — **answered by ruling 51**: it is a notice entry, and R-BLK-314's detach summary is
+  the same form. C23 I85–I87 are the ledger: a focus-out and a child's attach each open a mark,
+  and its close says what settled.
+
+## 6o. One-shots, walked by hand — who stamps an event, and when it stops asking (review batch 1, item 3)
+
+C04 I109 admitted the five one-shots — `sweep pop wipe typewriter ripple` — on the argument that
+a render with an injected clock can time an event **if something records when it began**, and
+named `Ramp.since` as the record. The record was admitted and **nothing writes it**. A far side
+cannot: it has no tick, because the tick is this session's counter and never leaves it. So an
+adapter's `{ animate: "pop" }` is the first frame of a flash held for the life of the session,
+and it asks C03 for a tick every 80 ms to draw that same frame.
+
+### 6o.1 — measured before ruling
+
+Each against a control on the same carrier; probe in the session scratchpad, `shotprobe.ts`.
+
+- **Nothing in `src/` writes `since`.** `git grep 'since:' -- src` finds `shotProgress`'s
+  parameter and the paste decoder, and nothing that builds a ramp.
+- **The bar never reads it.** A `progress` with `{ animate: "wipe", since: 0 }` draws the same
+  frame at tick 1 and tick 200, while a `shimmer` on the same bar differs between ticks 1 and 2:
+  `simple.ts`'s call to `animateT` passes no `since`, so the bar is always frame 0. The span
+  carrier (`paint.ts`) passes it, and its stamped `wipe` does differ.
+- **A finished one-shot keeps the ticker.** `tickIntervalOf` over a `pop` stamped at 0 answers
+  **80 ms** on both carriers — `rampMoves` is `animate !== "none"`, blind to completion — and
+  `none` answers `null`.
+- **The tick is animation time, not wall time.** `#tick` advances only while something is armed,
+  and `#tickAt` is reset when nothing is (`#armSpinner`), so a stamp taken at the current tick is
+  the tick the effect's first frame is drawn on, however long the session was idle before.
+- **A cadence is gathered in one place.** `animationIntervalOf` is called from `visibleRows` and
+  `withoutAnimating` and nowhere else; an overlay or a replacing question never ticks. The
+  transcript entry is therefore the whole surface a one-shot can play on.
+
+### 6o.2 — the sequence trace: what happens when two things meet
+
+Every row is an event arriving while a one-shot is in some state. A row governed by one rule
+restates it; these are the cells where two could both apply.
+
+| # | sequence | what is drawn, and what is asked | the rule it forced |
+|---|---|---|---|
+| 1 | an adapter's document with a `pop` span arrives in a quiet transcript at tick *T* | stamped *T* on the frame that draws it; 80 ms asked; six ticks later the resting frame, and **nothing asked** | the shell stamps (I131), and completion disarms (I132) |
+| 2 | row 1, and the adapter re-emits the same document at *T* + 3 | the flash continues from *T* + 3 — not restarted | the stamp is keyed by **identity**, never by the block object or the entry's `rev`: a re-emission is the same event (I131) |
+| 3 | row 1, and a `b.live` part re-renders the same block every poll, long after *T* + 6 | the resting frame; **no tick is asked** by any poll | a completed identity never re-arms — the poll is the source the review named |
+| 4 | the re-emission changes `pop` to `sweep` on the same span | the sweep plays, stamped at the tick it is first drawn | the effect is part of the identity: a different effect is a different event |
+| 5 | a span is inserted **before** the ramped one | the ramped span replays | the address is positional (`spans.1` becomes `spans.2`); named so it is not read as a guarantee — a producer that wants a stable one-shot appends |
+| 6 | the entry is off screen when it arrives, and is scrolled to later | stamped when the entry is first drawn, and plays then | observation is the frame that draws the entry (I131). *The retired deferral named `RenderContext.since`, one value per frame — which is exactly two one-shots begun at different moments getting one stamp* |
+| 7 | a producer sets `since` itself | honoured; the shell writes nothing over it, and completion is read from it | the stamp fills an absence and never replaces a value (I131) |
+| 8 | the reader enters semantic selection mid-flash | the flash holds where it is and resumes on exit | the freeze drops the wake whole (C14 I35), so the tick does not move and neither does the effect |
+| 9 | the entry is evicted, or `/clear` runs, and the same command is re-run | the new entry's one-shot plays | the stamps leave with the entry on the subscription the five sibling stores share; a new entry is a new id |
+| 10 | depth 4 | frame 0 held, and the ticker **stops** after the duration | I132 reads the session's tick, not the effective one; *which still a one-shot shows below 8-bit* is §6o.4's residue |
+| 11 | a bar's one-shot at width 40, then the terminal is resized to 120 mid-effect | the effect runs over the new bar; the ticker stops by *since* + 123 | completion is decided **before** rendering, against a bound on the extent — for a bar the region width, for a span its `to − from` — and every duration grows with the extent, so done at the bound is done at the drawn length |
+
+### 6o.3 — the rulings
+
+1. **The shell stamps, at first observation, per identity** (I131). *First observation* is the
+   first frame that draws the entry — `visibleRows`, over the entry's document before it is
+   laid out, because that is where the tick and the entry id meet and nowhere below L4 has either.
+   The identity is `(entry id, block id, the ramp's address in the block, effect)`; the address is
+   `ramp` on a bar, `spans.i` on a span, and `rows.<row id>.<column>.spans.i` in a table cell.
+2. **The stamp is written into the ramp** the renderer receives, as `since`, and the stamped
+   document is memoised on the producer's array — so a still document is stamped once and the
+   height memo's key is stable from its second frame. `measure` never reads `since` (C04 I109),
+   so the rows C14 counted are the rows drawn.
+3. **A completed one-shot asks for no tick** (I132, C09 I120). `tickIntervalOf` takes the tick
+   and the width; a one-shot is complete when `tick − ⌊since⌋ ≥ oneShotTicks(effect, n̂)`,
+   `n̂` the bound in row 11. `oneShotTicks` is `ramp.ts`'s, and `animateT` reads its durations
+   from it — one table, so the painter's *held* and the ticker's *done* cannot disagree.
+4. **Every paint site passes `since`.** The bar's did not; that is the second half of the
+   review's *an adapter's pop does not play* and it is fixed with the first.
+
+### 6o.4 — what the rulings leave behind, named so it is not read as coverage
+
+- **Below 8-bit a one-shot holds frame 0** — for `pop`, the flash. `effectiveTick` freezes the
+  tick at 0 for every colour effect (C09 I99's rung), and frame 0 of a one-shot is its start
+  rather than its rest, where frame 0 of a periodic effect is merely a phase. Unchanged here:
+  it is C09 I99's question about what a still is, and it predates the stamp.
+- **A position-sensitive identity** (row 5).
+- ~~**The streaming trail's `ripple` form** is minted at render with no `since` (`simple.ts`'s
+  trail), and plays frame 0 for as long as the notice streams. It has no identity in the
+  document — it is derived from `streaming` — so it is outside I131 by construction.~~
+  *Closed by ruling 81 (review batch 4, round 2)*: the notice carries the stamp as `trailSince`,
+  keyed by the arrival (I131). **The residue it leaves**: the arrival is the text's length, so a
+  producer that replaces the text with a different text of the same length reads as the same
+  arrival and does not replay — the band follows the end of the text, and a same-length rewrite
+  moves no end.
+
+## 6p. Watches, walked by hand — who fills one, and where it is shown (ruling 50, §085, `R-NTF-001`, `R-TAB-001`)
+
+*A watch is not a tab and not a push — it is a pointer INTO the transcript. Selecting one scrolls
+to its entry and expands it* (§085). Ruling 27 built the watch as a declaration that producers
+fill (I130) and parked both producers and the display as 50; ruling 50 (the person, 2026-09-27)
+made `/watch` a reserved framework verb and said *watches get built*. **Owed, and built here**:
+`/watch` and `/unwatch`, the footer's watch row, and `watch.jump[n]`. The registry's state-table
+record for A WATCH (`R-TAB-001`) is the structured half of §085 and is read before its prose:
+*entry* — a long-running job you started, or `/watch`; *carriers* — the footer row, a bar, the
+entry it points at; *actions* — `←→` along the row, `⏎` scrolls to its entry and opens it;
+*escape* — nothing, the footer is not a scope; *motion-off* — the bar stops shimmering, the
+percentage stays; *one-bit* — the bar is `##` against `..`, the name carries identity;
+*residue* — it drops itself, and the completion earns a notification.
+
+### 6p.1 — measured before ruling
+
+- **The verbs are the tenth and eleventh, not the ninth and tenth.** Ruling 50 counted from eight;
+  `/config` (ruling 43) was built after the entry was written and is the ninth (C05 §3).
+- **The grep, run again at the build** (C05 §3's process): no manifest in the tree declares
+  `watch` or `unwatch` as a tool. `test/support/manifest.fixture.json`'s `watch` is `ps`'s
+  **flag**; the one tool so named is C05 T6.18's own probe.
+- **The watch set cannot stay in the notifier.** `createNotifier` is built only when a rung is
+  opted in (`construct.ts`: *with nothing opted in there is no notifier*), so a session that never
+  set `CALCIUM_NOTIFY` — every session by default (C01 I23) — would have nowhere to hold a watch
+  the footer must show. The set moves to the session and the notifier reads it.
+- **A streaming entry is never evicted** (C13 I6: `sweep` skips `live` and `streaming`), and a
+  watch lives only on a streaming entry and drops at its settle (I130). **Eviction of a watched
+  entry is therefore unreachable**; `clear` is the one change that removes a streaming entry
+  (§6n.3 row 10), and it is where a watch can lose its subject.
+- **A subscription releases the guard and an invoke does not** (C23 I6, `execution.ts`: *a
+  subscription does not hold the guard*). While an invoke runs, every submitted line queues —
+  *everything queues, strictly* (C23 I5) — so `/watch` typed during a long invoke runs after it
+  settles. §6p.3 row 6 is what that leaves.
+- **Who owns an entry is its document's `meta.origin`** — `user`, `agent`, `action`, `refresh`
+  or `defect` (C04). §085's *pin one that is not yours* names the use the verb exists for.
+- **A progress fact already has a shape**: C04's `progress` block, `current` and `total`, drawn
+  by C09 with `barStyle` — `█`/`░` and `#`/`.` at ASCII, which is the one-bit form the record
+  names.
+- **The queued line's entry is `streaming` and `transport: "local"`** (`documents.ts`'s
+  `noticeDoc`, C23 roadmap 33), as is the handler route's before it settles — so *the newest
+  streaming entry* would name `/watch`'s own queued line when it drains.
+
+### 6p.2 — the classification table: verb × entry state × who owns it
+
+The rows are the cells where two rules could both claim an answer. *Default* is the verb with no
+argument; *named* is `/watch <back>`, counted from the end as `/debug` counts (C23 §2).
+
+| verb | entry | owner | answer | the rules that meet |
+|---|---|---|---|---|
+| `/watch` default | a stream running | `user` | watched; `watching <name>` | the default target × I130's streaming gate |
+| `/watch` default | a stream running | `agent`, `action`, `refresh` | watched, the same words | *pin one that is not yours* names a use, not a gate — **origin never refuses** |
+| `/watch` default | only a queued line is streaming | any | refused: `nothing is running to watch` | the default skips `transport: "local"` × a queued line is `streaming` — a queued line is not a run, and the one the verb would find first is its own (§6p.1) |
+| `/watch` named | a queued line | any | watched | a named target is the reader's choice, and §085 draws `f410d99 queued` as a watch; the queued line keeps its id when it runs (C23 I54), so the watch carries into the run |
+| `/watch` named | settled | any | refused: `<name> has settled — nothing left to watch` | I130's `false` × a refusal states its reason (`R-HON-004`) |
+| `/watch` named | past the transcript | — | refused: `no entry <n> back — the transcript holds <m>` | `/debug`'s words, one counting for both verbs |
+| `/watch` either | already watched | any | kept; `already watching <name>`, order unchanged | idempotent × the row's order is when each was watched |
+| `/unwatch` default | at least one watch | any | the **newest** released; `stopped watching <name>` | a verb with no argument acts on the thing it would most recently have affected |
+| `/unwatch` default | no watch | — | refused: `nothing is watched` | |
+| `/unwatch` named | not watched | any | refused: `<name> is not watched` | a release of nothing is not silently a success |
+| `/unwatch` named | watched | any | released | the settle then earns by the unwatched rows of §6n.2 — releasing withdraws the *always* |
+| either | a local verb's entry | `user` | default skips it; named refuses it as settled | a local verb's entry settles in the call that appends it (C23 §2) — only its queued line is ever `streaming`, and that row is above |
+
+### 6p.3 — the sequence trace: what happens when two things meet
+
+| # | sequence | what is on screen | the rule it forced |
+|---|---|---|---|
+| 1 | `ps --watch` streaming (guard released, C23 I6); `/watch` | a settled `/watch` entry reading `watching ps --watch`; the footer gains one row above the owner line, `⋯ ps --watch`; the transcript region is one row shorter; focus stays at the prompt and the owner line reads `⇧⇥ watches` | the row is the footer's content (I82) and is measured like it; the prompt's `⇧⇥` now names where it goes (I139, C16 I76) |
+| 2 | row 1, and the stream patches a `progress` block to 43 / 100 | the chip reads `ps --watch ███░░░ 43%` on the next frame | the chip reads the entry **as the transcript holds it now**, per frame — no copy of the progress is taken at `/watch` (I137) |
+| 3 | row 2; the reader is here; the entry settles | the chip and the row are gone; no rung fires (I127) | *it drops itself* (I130) |
+| 4 | row 2; `ESC [ O`; the entry settles after 2 s | every opted rung, `done` — the watched row of §6n.2 — and the row is gone | **the notifier reads the watch before the drop.** Two subscribers on one change is an order nothing states; one subscription calls the notifier, then the store (I135) |
+| 5 | row 2; `/unwatch`; later the entry settles after 2 s, away | `stopped watching ps --watch`; the row goes at once; the settle earns **nothing** — a short, unwatched end | releasing a watch withdraws §6n.2's *always*, and nothing else remembers it |
+| 6 | `train` (an invoke, holding the guard) running; `/watch` | `/watch` shows `queued behind train`; at the settle it drains and answers `nothing is running to watch` | **C23 I5 stands, and the verb cannot pin the one run most worth pinning** — a long invoke. Recorded in §6p.5; the keys are not submissions, so the row itself is unaffected |
+| 7 | `/watch 3` naming an entry that settled a minute ago | `ps has settled — nothing left to watch`, `warn` | §6n.3 row 12's `false`, now with words |
+| 8 | the watch row focused; a question arrives | the question takes the keys (`overlay` is above `scope`, C16 `FOCUS_ORDER`); the row stays drawn **without** its `›`; the owner line is the question's | the selection mark is the row's focus, and focus is not the row's while a question owns the keys (I137) |
+| 9 | row 8; the question is answered | the `›` returns on the watch it was on; `←→` move it again | stored focus was never moved — a question is a layer, not a focus change (C16 I1) |
+| 10 | the watch row focused on the only watch; it settles | the row stays, reading `⋯ nothing watched`; the keys stay the row's; `esc` or `⇥` returns to the prompt and the row goes | **a content arrival never moves keyboard ownership** (`R-COR-002`, C16 §3a W1) — the row is kept rather than focus moved (C16 I76) |
+| 11 | the row focused on the second of three; the second settles | the `›` is on what is now second — the old third | stored by id with its index; a missing id resolves to the index, clamped — `resolveFocus`'s *nearest survivor forward* (C26 I10) on a row |
+| 12 | three watches at 80, 60, 40 and 20 columns | 80: every chip whole; 60: bars shed, names and percentages kept; 40: watches shed from the right behind `+2`; 20: the kept name truncated | one row at every width — the footer never wraps (I138) |
+| 13 | `/clear` with a watch standing | the row goes with the entry | `clear` removes a streaming entry (§6p.1), so the store drops every watch on it (I135) |
+| 14 | a watched entry and the transcript at its block cap | the entry is not evicted — nothing to trace | C13 I6: the eviction row is unreachable, and no arm is written for it (§6p.5) |
+| 15 | the row focused; `⏎` | focus lands on the watched entry (C16 `enterLiveBlock`), the viewport pulls it in by the minimum (C26 I24); the watch stands | *opening is not releasing* — the row stays, and `⇧⇥` from the prompt returns to it (I140) |
+| 16 | the row focused, two watches; `2`, then `5` | `2` opens the second as `⏎` would; `5` is consumed and nothing moves | `watch.jump[n]` (C16 I77); a digit past the count names no watch, and passing it would reach no row either |
+
+### 6p.4 — the rulings
+
+1. **Scope: the verbs, the row and the jump; no `watch(id)` on `TuiInstance`.** Ruling 50's
+   answers were (a) the verbs, (b) an application producer on C24, (c) both with the row; the
+   person's ruled blockquote lists what is owed — *`/watch` and `/unwatch` themselves, the footer
+   watch row and `watch.jump[n]`* — and that list is the structured half of *watches get built*.
+   **Structured data beats prose.** §085's second producer, *a long-running job you started*, is
+   (b)'s shape — the application knows what a job is and Calcium does not — and stays parked.
+2. **The set is the session's** (I135). One ordered set per session, oldest first, held whether or
+   not any rung is opted in; the notifier asks it, and one subscription calls the notifier and then
+   the store, so a watched settle is read as watched before it drops.
+3. **The verbs are local framework verbs** (I136, C05 §3). Each takes one optional `int`,
+   `back`, counted as `/debug` counts. The default `/watch` is the newest `streaming` entry whose
+   document is not `transport: "local"`; the default `/unwatch` is the newest watch. Every answer
+   is a notice naming the entry by its command line; refusals are `warn`. **Origin never gates.**
+   **C23 I5 is not reopened**: the queue is the repo's shipped answer, and row 6 is a finding,
+   not a ruling.
+4. **The row is a footer row above the owner line** (I137). §085's specimen puts it last and
+   §103 puts the owner line last; `R-OWN-001` is a current rule and the specimen is `example`,
+   so **the rule decides**. The lead is the residue mark (`⋯`, `...` at ASCII); each watch is one
+   chip — its name, then a six-cell bar and a percentage when its entry holds a `progress` block
+   (the first, depth first); the watch the row is on is marked `›` (`*` at ASCII, the `current`
+   glyph) and toned `accent` **only while the row has the keys**. The bar does not animate: the
+   chip is text, the record's motion-off form is the only form, and the percentage carries it.
+5. **One row at every width** (I138). Bars shed first, then watches from the right behind a `+N`
+   chip — the one the row is on is never shed — then the kept name truncates. The footer's height
+   is its content (I82), and a wrap would spend a transcript row twice.
+6. **Opening is focus** (I140). `⏎` and `watch.jump[n]` put focus on the entry, as `⇧⇥` from
+   the prompt does for the live one (`focusTranscript`), and the pull brings it into view. There
+   is no *expand* of an entry to perform — C13 has none, and `op: "expand"` is a row's — so *and
+   opens it* is the focus landing on it. The watch stands.
+7. **`esc` at the row returns to the prompt.** The record's *escape: nothing — the footer is not a
+   scope* is right that the row raises no owner rung; `R-KEY-003` — *escape backs out* — is a
+   current rule and the row is a position of the `scope` rung, as `liveBlock` is, whose `esc` is
+   `focusPrompt`. **A consistent picture beats a lone rule**: the row's `esc` is `liveBlock`'s.
+8. **`ChromeContext.watches` is handed to an application's own chrome** (I139), as `copy` and
+   `toast` are: a footer an application supplies draws the row or does not, and the fact is not
+   the default footer's alone.
+
+### 6p.5 — what the rulings leave behind, named so it is not read as coverage
+
+- **`/watch` during an invoke** (a finding for the ledger). Row 6: the verb queues behind the run it would watch and
+  answers when there is nothing left to watch. The remedy is the *who is writing* axis C23 I5
+  leaves open, and a third case of it is the moment to stop and ask rather than add an arm.
+- **The eviction row has no arm.** C13 I6 makes it unreachable; R-BLK-879's *a watch retains a
+  stable event id … ⏎ rehydrates the watched event* is `example` prose about a durable record
+  Calcium does not keep. A watch never outlives its streaming entry here.
+- **§085's second producer** — *a long-running job you started* — is (b), parked with ruling 50's
+  unchosen answer.
+- **The status line's `⋯ 2 watching`** is not drawn; the row itself is the count.
+- **A pointer on the row** does nothing: C16 §4's mouse table reaches chrome last and has no
+  chrome target, and the keys are the route the record names.
+- **A submission settling takes focus off the row** — C23's submit row ends in `resetFocus()`
+  (C16 I2), so a verb typed before `⇧⇥` returns the reader to the prompt when it settles. That is
+  `liveBlock`'s behaviour one position over, and a consistent picture decides it (C16 I76); the
+  build found it, not the walk, because §6p.3 traced the watched entry's changes and not a second
+  submission's.
+- **An entry with no `progress` block shows its name alone** — §036's elapsed carrier is the
+  entry's own card head, which the row does not repeat.
+
+## 6q. Scrolling inside a layer, the transcript's bar and the chip preview's keys — walked by hand (review batch 4, F1302, M14.4, M13.2, M15.5; ruling 53)
+
+*A 200-line patch does not fit above a prompt, and the payload is REPLACED rather than marked — so
+without inspection a reader approves a change they cannot see* (§051). The inspection was built
+(C23 I75) and the reader still could not see the change: its box never moved. That is F1302, and
+it is one cause behind three items — the inspection (M15.5), the chip preview's unreachable tail
+(M13.2, F1307) and *more bars* (M14.4). **Built here**: the layer's offsets, the transcript's bar,
+the preview's box and keys, and the inspection's keys.
+
+### 6q.1 — measured before ruling (at f06f762d)
+
+- **F1302 holds, at two painters rather than one.** `composite.ts`' `layerRows` renders a layer's
+  content through `renderSequenceToLines` with no `scrollOffsets`, so every `scroll` box inside a
+  layer is pinned at 0; and `session.ts`' `#questionRows`, which draws a **replacing** question in
+  the prompt's slot (C23 I74), does the same. The inspection is drawn by the second: an approval's
+  question replaces the prompt, and suspending it (`confirm.ts`' `suspend`) keeps the consumer, so
+  the inspection is in the prompt's rows, not in a layer box. The plan's `session.ts:2337` has
+  drifted.
+- **C16 I74's layer offset is not F1302's subject.** It moves where a *truncated* layer's cut
+  starts. The inspection sizes its box to the region (`height − 6`), so its layer is never
+  truncated and the wheel over it answers `false`. **True of the layer and not of the slot it is
+  drawn in** — found building group A: a replacing question is drawn in the prompt's rows, which
+  S01 §3 caps at `floor(rows / 2)`, and a box sized to the region made a panel taller than that
+  slot. At 80×30 the slot's cut took the panel's key row and bottom border and drew `⋯` — at
+  f06f762d as well, measured in a base worktree, so it is not this lane's regression. The box is
+  now sized to the slot (6q.4 ruling 11, C23 I88). F1443.
+- **The pointer hit-tests a replacing question where it is never drawn.** `construct.ts`' pointer
+  `placed` is `overlays.layout()` filtered by gesture, and the paint's is the same list **less** the
+  replacing question (`session.ts`, `overlays`). So a wheel over the prompt's rows, where the
+  inspection is, reaches no layer and meets C16 I8's modal consumption; a wheel over the middle of
+  the region, where nothing of the question is drawn, reaches the question. The same defect
+  C16 T4.1's comment names for the router — *hit-testing against boxes the screen never drew* —
+  one filter away. F1440.
+- **The inspection's keys**: `classify` answers `leave` for `esc` and `none` for everything else
+  while suspended, consumed silently (ruling 60). `⌥↑`/`⌥↓` are C16's `page-scroll` intercept, read
+  before the ladder and sent to the transcript (C16 I40); `PgUp`/`PgDn` resolve through the ladder
+  and reach the question's handler first.
+- **The intercept is wider than C16 I40 says** — found building group A, not measured before
+  ruling. `intercepts.ts` read the route as `key.meta && (up || down)`, so `⌥⇧↑`/`⌥⇧↓` (`CSI 1;4A`,
+  `{ up, shift, meta }`) were `page-scroll` too: the preview's scroll chords paged the transcript
+  and never reached the panel, and the row above that calls the chords *free* checked the registry
+  and the keymap and not the intercept, which is read before both. I40 already says *`⌥↑`/`⌥↓`
+  alone*; the predicate now says it too (`isPageScroll`: meta, the arrow, no shift, no ctrl),
+  C16 T1.200. F1442.
+- **The chip preview has no box** (`construct.ts`' `chipPreviewContent`), and its comment says the
+  box, its keys and its bar *arrive with the scrollbar* — whose `scrollbarColumn` has shipped since
+  M14 (F1307).
+- **No transcript bar exists.** `scrollbarColumn`'s callers are `containers.ts` and `split.ts`.
+  `R-BLK-164` draws one for *the transcript, whenever it overflows*. The margin column
+  (`CONTENT_MARGIN_R`, I109) is blank on every row, so a bar there reflows nothing. *Another agent's
+  tab* has no subject in `src/` and its row is dropped; *two bars for one document is a layout
+  error* is ruling 22's *one bar per box*.
+- **The chords are free and deliverable.** `⌥o`, `⌥⇧↑` and `⌥⇧↓` have no binding in
+  `calcium-registry.json` (82 bindings at 0.20), no row in `keymap.ts` and no entry in
+  `docs/KEYS.md`; `⌥⇧←`/`⌥⇧→` are the prompt's word-extends and the vertical pair is not. `ESC o`
+  decodes to `{ o, meta }` and `CSI 1;4A` to `{ up, shift, meta }` (modifier 4 is shift plus alt,
+  `modifiersOf`). **Checked by hand against the platforms' defaults, as ruling 53's amendment
+  asks**: macOS and the common Linux desktops bind neither; **Windows Terminal's default keymap
+  binds `alt+shift+arrow` to `resizePane`** (its documentation, unmeasured here). F1441; the chord is the person's pick and is not reopened.
+- **"The editor" has two readings in the tree.** §6l.12 read `R-BLK-825`'s *open in the editor* as
+  `R-BLK-355`'s paste-chip edit view — an in-app borrow of the one line editor. `Chip.target`
+  (`layout.ts`) is *what the preview opens when that is not the content*, a field C17 never reads,
+  and a borrowed line editor cannot open a path. The ruling is 6q.4's sixth.
+
+### 6q.2 — the classification table: which scroller an input reaches
+
+The interaction is structural — a key, a layer and what the layer holds meet at rest — so the walk
+is a table (C18 §8a's shape). The rows are the cells where two rules could both claim the input.
+
+| input | on top | the layer holds | reaches | the rules that meet |
+|---|---|---|---|---|
+| wheel over a layer | completion menu | — | its window | C16 I74 × C19 I20 — unchanged |
+| wheel over a layer | any other layer | a `scroll` box that overflows | **the box**, `WHEEL_ROWS` a notch, clamped to its ceiling | C16 I74's scroller × C04 I48's box offset × F1302 |
+| wheel over a layer | any other layer | no such box; the layer truncated | the layer's row offset | C16 I74 — unchanged |
+| wheel over a layer | any other layer | neither | a keyed layer consumes it; a peek declines it | C16 I74 — unchanged |
+| wheel over the prompt's rows | a replacing question | the inspection's box | the box | the pointer's placed set × the paint's (6q.1) |
+| wheel over the region's middle | a replacing question | — | nothing of the question; the transcript beneath, because the wheel is carved out of modality (C16 I40, §103) — the row read *I8's modal consumption* until T4.115 measured it | the same, from the other side |
+| `↑`/`↓` | an inspection | its box | one row | C23 I75 × `R-BLK-840`'s *declared inspection viewport* |
+| `PgUp`/`PgDn` | an inspection | its box | a page, the interior less one | the ladder reaches the question first |
+| `⌥↑`/`⌥↓` | an inspection | its box | **the transcript** | C16 I40's intercept is read before the ladder (`R-BLK-112`) |
+| `⌥⇧↑`/`⌥⇧↓` | the chip preview | its box | one row | ruling 53, amended |
+| `⌥⇧↑`/`⌥⇧↓` | a menu or a search | — | consumed, nothing moves | a `panel` row resolves for every panel; the effect asks the owner |
+| `↑`/`↓`, printable, `⏎` | the chip preview | — | **the prompt** | I51: the prompt answers first; *`⏎` always sends* (ruling 53) |
+| `⌥o` | the chip preview | — | the chip's editor (I144) | ruling 53 × C23's guard |
+| a press on the margin column, a region row | the transcript overflows | — | a jump; focus stays | `R-BLK-363` × C14 I5 |
+| a press on the margin column | the transcript fits | — | an ordinary press | *a bar that cannot move is decoration* — none is drawn |
+
+### 6q.3 — the sequence trace: what happens when two things meet
+
+| # | sequence | what is on screen | the rule it forced |
+|---|---|---|---|
+| 1 | a 47-line paste at a 20-row region | the preview: title, a box of `floor(20 / 2) − 3 = 7` rows with a bar, and `⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor` | the box's height is C15's own fraction less the panel's chrome, so the layer is never cut (I143) |
+| 2 | row 1, then `⌥⇧↓` three times | lines 4–10; the thumb moved | the offset is `layer:chip-preview`'s, and the chrome cache keys on it (I141) — keyed by content alone, the frame would not move |
+| 3 | row 2, the caret moves to chip `#2` | `#2` from its top | a new chip is a new document: the namespace goes with the old one (I143) |
+| 4 | row 2, the caret leaves the chips | no preview; back on `#1`, it opens at its top | dismissal deletes the namespace (I141) |
+| 5 | row 2, `⏎` | the prompt is sent, the chip resolved to its content | `⏎` is the prompt's (ruling 53) |
+| 6 | row 2, `⌥o`, no `$VISUAL` or `$EDITOR` | `no editor — set $VISUAL or $EDITOR`, `warn`; nothing else | a refusal says so (`R-HON-004`) and runs nothing |
+| 7 | row 2, `⌥o`, `$EDITOR=vi`; the reader deletes a line and quits | the frame returns; the chip reads `#1 pasted · 46L`; `⌃_` brings back 47 | re-minted in place, one undo unit (C17 I35) |
+| 8 | row 7, but the reader quits without writing | nothing changed | an unchanged file changes nothing |
+| 9 | `⌥o` while a verb holds the guard | refused, `warn`, naming the verb | a suspended terminal would take the running verb's frames |
+| 10 | an approval whose payload overflows; *show full diff* | the inspection, its box at 0, `↑↓ scroll  esc back to the question` | C23 I88 |
+| 11 | row 10, `↓`, `PgDn` | one row, then a page | C23 I88 |
+| 12 | row 10, `⌥↓` | the transcript pages; the box does not move | C16 I40, read before the ladder |
+| 13 | row 11, `esc`, *show full diff* again | the inspection at its top | entering is an arrival: the namespace is dropped (C23 I88) |
+| 14 | row 10, a wheel over the prompt's rows | the box moves | I142 |
+| 15 | row 10, the question answered | the layer goes, and its namespace with it | I141 |
+| 16 | the transcript overflows; a press on the margin column's first row, last row, middle row | the top, detached; the bottom, following; the middle, detached | C14 I63, I64 |
+| 17 | row 16 with a blocking question open | consumed, nothing moves | C16 I8's modal gate is ahead of every press |
+
+### 6q.4 — the rulings
+
+1. **One store, a namespace per layer** (I141). `ScrollOffsets` holds a layer's boxes under
+   `layer:<id>`, which no transcript entry id can be; push, pop and dismiss delete it, a content
+   update keeps it, and each consumer that replaces its content for a new subject drops it itself.
+   *One store for three consumers* — a second store is a second clamp, and `ScrollOffsets` is
+   where the clamp's rule is written.
+2. **The layer's scroller is its first overflowing box, then its row offset** (I141, C16 I74). A
+   layer holding a box is a layer whose owner has already bounded the payload; the row offset is
+   the fallback for one that has not.
+3. **The pointer sees the layers the paint drew** (I142). *The repo is right about what ships*: the
+   screen is the paint's, so the replacing question is placed for the pointer over the prompt's
+   rows.
+4. **The transcript's bar is in the margin column** (C14 I62–I64). No reflow, no row taken; the
+   thumb takes `accent` while focus is in the transcript, `R-BLK-160`'s *you are IN it*.
+5. **The chip preview is a bounded box with three chords of its own** (I143, ruling 53 amended).
+   The key row is generated from the keymap, and names scrolling only while there is something to
+   scroll.
+6. **`⌥o` hands the chip to the reader's editor** (I144, C02 I19). **Structured data beats prose**:
+   `Chip.target` is a field saying the preview opens something that is not the content, and only an
+   editor outside the process can open a path; §6l.12's reading of `R-BLK-355` is prose. *The repo
+   is right about what ships* says the same thing a second way — `runHandoff`'s four calls are how
+   this tree already hands the terminal to a program. A paste comes back as one edit; a target does
+   not come back.
+7. **An inspection owns its payload's scrolling and nothing else** (C23 I88). `R-BLK-840`: *wheel
+   and page scroll need a declared question or inspection viewport*. `⌥↑`/`⌥↓` stay the transcript's,
+   because C16 I40 is a current rule and the intercept is read before any owner.
+
+Taken while building group A, each against something the tree already does:
+
+8. **`⌥o`'s refusal is a `warn` notice on the transcript** (I144). A toast is `ok`-toned and says
+   *a fact that changed nothing* (I116); a refusal is a thing the reader asked for that did not
+   happen, and `R-HON-004` wants it said where the reader reads results. The busy text is
+   `<verb> is still running, and <chord> waits for it`, the chord spelled at the terminal's rung.
+9. **An editor's added final newline is dropped** (I144). `vi` and most editors end a file with
+   one, so a paste without one came back a line longer and never *unchanged* — row 8 of the trace
+   could not happen. One newline the content did not have is the file's, not the paste's.
+10. **A pair's chord keeps both spellings: `⌥⇧↑⌥⇧↓`** (I143). A collapsed `⌥⇧↑↓` was tried and
+    broke `⇧↑⇧↓ extend` in the shipped key rows (C22 T1.50, T1.80, T1.171, T1.46b); *the repo is
+    right about what ships*, so the pair rule stays `chordText`'s and 6q.3 row 1 is respelled.
+11. **An inspection's box is sized to the prompt's slot** (C23 I88). A replacing question is drawn
+    there (C23 I74, I142), and S01 §3 caps the slot at half the terminal; the region is the height
+    of a place the question is not drawn. `promptCap` is the frame's function, read by both.
+
+### 6q.5 — what the rulings leave behind, named so it is not read as coverage
+
+- **`R-BLK-792`'s in-app paste-chip editor is not built.** The external editor is the route; a
+  buffer that borrows the line editor for a chip is the design's other shape and would need a key
+  vocabulary where `⏎` keeps rather than sends.
+- **A chip opened by its `target` does not come back.** No producer in `src/` mints one; a file
+  changed in the editor leaves the chip's `content` as it was attached.
+- **Windows Terminal's `alt+shift+arrow`** (6q.1, F1441): the collision gate cannot see an emulator's own
+  keymap, which is ruling 53's amendment's point.
+- **A layer holding two overflowing boxes** is scrolled by the first; no layer in `src/` holds two.
+- **`⌥↑`/`⌥↓` page the transcript under an inspection** — `R-BLK-840` read as the wheel and
+  `PgUp`/`PgDn`, not the intercept.
+
+## 6r. The label at 1-bit, walked by hand (review batch 4, M13.6; I147)
+
+**What moves.** I111 shed the label at 1-bit because *there is no ground to paint with, and plain
+text would put the application's identity in the rule's own voice* (`R-COL-003`). The second half
+is true and the conclusion does not follow from it: the design already has an answer for a
+painted word that has lost its ground, and it ships twice. A chip is ` name ` on a ground with
+colour and `[name]` without (C17 I25), and a button is drawn in brackets when the ground is gone
+(C09 I102). The bracket is the **unpainted rung**. It separates the name from the dashes, which
+is what the ground did, so `R-COL-003`'s separation holds with the ground gone. Shedding the
+label at 1-bit leaves a monochrome terminal with no identity in the frame, when that is the
+terminal where the frame's glyphs are all it has.
+
+**The form is `[name]`, not `[ name ]`.** The plan drew `[ name ]`. The built precedent is
+`[name]`: the spaces either side belong to the ground, and C17's `chipLabel` says so in its own
+comment (*a bracketed label padded as well would be a chip inside a chip*). `[name]` also costs
+the same two frame cells as ` name `, so **every shedding threshold is unchanged**. That is the
+property the table below rests on.
+
+### 6r.1 — the classification table: width × depth × label
+
+Each row is a cell where two rules could both claim the label. A row governed by one rule
+restates it and is left out.
+
+| # | width | depth | label | rules that meet | answer |
+|---|---|---|---|---|---|
+| 1 | 61 | 1 | `Calcium` | the 1-bit rung × `MIN_COLUMNS` | `[Calcium]` drawn. 61 is the first width that draws at any depth |
+| 2 | 60 | 1 | `Calcium` | the 1-bit rung × `MIN_COLUMNS` | shed. Width sheds first at every depth, and 1-bit does not move the threshold |
+| 3 | 100 | 1 | 96 cells, then 97 | the 1-bit rung × *leave one rule glyph* | 96 drawn, 97 shed: the painted rung's boundary (T1.66), because both frames are two cells |
+| 4 | 80 | 1 | `Calcium`, hue `blue` | the 1-bit rung × I114's hue | `[Calcium]`, byte for byte the no-hue frame. A hue paints; it never decides whether or how the word is drawn, and at 1-bit it has nothing to paint with |
+| 5 | 80 | 1 | `"  "` | the 1-bit rung × T1.65d's blank narrowing | no label. The narrowing happens before any rung, so `[]` is never drawn |
+| 6 | 80 | 4 | `Calcium` | I111's ground × the new rung | ` Calcium ` on `bgElev`, unchanged. The rung applies only where `colourDepth === 1` |
+| 7 | 80 | 1 | `Calcium` | the 1-bit rung × `R-COL-003` (no colour carrier) | the bracket spans carry **no style**, and neither do the rule's dashes: at 1-bit `muted` is nothing, so the brackets are the only carrier and they are glyphs |
+| 8 | 80 | 1, ASCII | `Calcium` | the 1-bit rung × the ASCII glyph tier | `-----[Calcium]-`. The brackets are ASCII already, so no tier chooses them |
+
+**Row 8's neighbour is not ruled here: a label containing `]`.** `a]b` draws as `[a]b]`. The chip
+has the same property and nothing ruled it there either. The label comes from the application,
+not from a typist, so it is recorded rather than escaped.
+
+### 6r.2 — the ruling
+
+**At 1-bit the label is drawn as `[name]` with no style, in the cells ` name ` would take, and
+shed by width alone.** I111's last clause is amended to match and I147 carries it. The shed
+frame at 1-bit is still the one that shipped, so the no-label control (T1.65) is unchanged.
+
+## 6s. The transient panels, walked by hand — ground, edges, width and the chip preview's form (lane b4-panels; F1501, F1502, F1503; §097, §101)
+
+*The completion menu, find, a chip preview: these are MENUS* — one shape, three owners, and three
+different pictures in the tree. Each owner had built its own half of §097, so the rules that
+meet are the panel's and the owner's, and the walk takes both artefact shapes: a table for the
+ground, which holds at rest, and a trace for the preview and the search, which change under keys.
+
+### 6s.1 — measured before ruling (at ae00b6dd, 80 × 24, `/help` in the transcript)
+
+- **The completion menu** (`/c`): its upper rule on row 16 at the region's 79 columns, three
+  candidates, the prompt's rule below. The current row is on `pick` (bg 216); every other row is
+  fg 188 on **no ground**. The rows that differ from the frame before it opened are 16–19, the
+  prompt and the footer: nothing above moves.
+- **Find** (`⌃r h`): one row, `` (reverse-i-search) `h': /h… ``, drawn straight over the
+  transcript's row 19 with **no rule above it**. Its width is `cells(line) + 4` **taken at the
+  push**, from the empty query — 27 cells — and never again, because the narrowing update carries
+  `content` and `cursor` and not `width`. So `h` over `/help` drew `/h…`, and `his` over
+  `/history` drew `…` alone. Nothing above moved.
+- **The chip preview** (a six-line paste): a `panel` block — `┌  #1 pasted · 6L ──┐`, the box's
+  five rows and its bar, the residue row `⋯ 0 above, 1 below`, the key row — **and no bottom
+  border, because the layer was cut.** I143's `floor(17 / 2) − 3 = 5` counted two borders and the
+  key row and not the box's residue row (C04 I49), so nine rows of content met a placement of
+  eight. F1503's missing corner is that cut, not a style. No ground anywhere.
+- **Focus in the transcript**: no chip reaches it. A submitted line echoes its resolved text
+  (C17's `resolved`), so there is no element for §101's peek to stand beside. The peek is §6l's
+  general one and draws for any element that declares a `detail`.
+- **T1.175's row and its test had drifted apart**: the row says *a 20-row region, 7 rows*; the
+  test drives a 24-row region and asserts 9. Both agree with the formula, about different regions.
+
+### 6s.2 — the classification table: which ground a cell takes (structural)
+
+| # | the cell | rule A | rule B | ruling |
+|---|---|---|---|---|
+| 1 | a panel's leading `rule` line | *a panel takes bgElev* (`R-BLK-569`) | the rule is the panel's edge, and §097 and §101 both draw it muted on no ground | **no ground.** The rule says where the panel ends; grounded, the edge would be inside it |
+| 2 | the menu's current row | the panel's `bgElev` | C11's `pick` across the row (C04 I150) | **`pick`, cell by cell.** `based` re-opens the ground after every reset, and a span that sets its own background wins its cells |
+| 3 | a cell of the box no block drew a glyph in | the base painted it | the layer writes every cell of its box (I29) | **`bgElev`.** The padding is the panel's |
+| 4 | the margin column beside a panel | the panel spans the region | the margin is the transcript's bar (C14 I62), outside the region | **the base.** The margin is not in the box |
+| 5 | a panel at 1 bit, or on a theme whose `bgElev` inherits | the panel takes a ground | no ground resolves (C10 I25) | **nothing is written.** `groundSequence` is `""` and `based` returns the rows unchanged, byte for byte |
+| 6 | a peek, or an overlay | `contrast.ts` calls `bgElev` *every panel, overlay and confirm* | §097 names three shapes and the registry's rule is about a *panel* | **`kind: "panel"` only.** The comment says which surface C10 measures inks against, not which layers paint it; 6s.5 lists the other two |
+| 7 | a panel row-scrolled so its rule has left the box (C16 I74) | the ground follows the placed row | the edge is a line of the content | **the line.** The exemption is by content line, so a scrolled-off rule takes nothing with it and the row now at the top is grounded |
+| 8 | the preview box's residue row and bar | the box's own chrome, `dim` | inside the panel | **`bgElev`**, as the rows beside them |
+
+### 6s.3 — the sequence trace: the preview and the search, one event at a time
+
+| # | sequence | rules that meet | ruling |
+|---|---|---|---|
+| 1 | six lines pasted at a 17-row region | I143's cap × the box's residue row | a box that fits is capped at `floor(h / 2) − 3`; one that overflows at `floor(h / 2) − 4`, because its residue row is one more. 6 > 5, so the box is 4, the residue 1, the edge, header and key row 3: **8, the placement, uncut** |
+| 2 | exactly `floor(h / 2) − 3` lines | *fits* × the residue | no residue, and the box is its rows: `3 + (floor(h / 2) − 3) = floor(h / 2)`. One line more is row 1, at the same total |
+| 3 | overflowing where `floor(h / 2) < 5` | the box floored at 1 × the placement | **cut from the end, the key row first** (C15 §4, I29's split). Stated rather than prevented: five rows of chrome and content have nowhere else to go |
+| 4 | a second chip, then `←` back to the first | the projection follows the caret × the key row names what moves | the key row carries `←→ other chips` while the prompt holds another chip, read from the prompt's own `left` and `acceptGhostOrForward` bindings; with one chip it is not offered — *a chord that moves nothing is not offered*, the scroll pair's rule |
+| 5 | `⌃r`, `h`, then `is` | the narrowing updates content × the width was fixed at the push | **no width is declared**, so C15 resolves the region's at every layout and the hit grows with the query |
+| 6 | the search's caret | C15 I19's cursor is relative to the layer's origin × the rule is row 0 | row 1 |
+| 7 | `⌃r` with a preview up | I113 dismisses the preview × the search pushes | unchanged: one panel, the search's, with its own edge |
+| 8 | a resize with the preview up | a new region height rebuilds (I143) | unchanged: the cap is re-derived from the new height |
+| 9 | two chips at ASCII, 60 columns | the legend is offered × the row is 64 cells in a 59-cell region | **the row sheds whole entries from its end**: `Left/Right other chips` goes first, and then `open`. Read from the frame after the build, where the `raw` row had cut it to `oth~`. And a width-only resize rebuilds, as a height change does, since the row and the box's wrap both depend on it |
+
+### 6s.4 — the rulings
+
+1. **A panel's rows take `surface.bgElev`, and its leading rules do not** (I151). The compositor
+   paints it, from the layer's `kind`: every panel passes through `layerRows`, and the owners
+   declare nothing new.
+2. **The chip preview is §101's menu panel** (I113, I143): the upper rule, a header naming the
+   chip as `chipLabel` spells it, the box with its bar, and the key row — no `panel` block. The
+   name is bold and the size muted. §101's `pick` ground on the name is not drawn: no block kind
+   carries a ground on a span (6s.5). *Amended by §6t ruling 6: the name takes `pick` (I155).*
+3. **The box's cap counts its residue row** (I143): `floor(h / 2) − 3` where the content fits,
+   `floor(h / 2) − 4` where it overflows, floored at 1.
+4. **The key row names `←→ other chips` while there is another chip** (I143). §101 draws it, and
+   §6l.12's superseded paragraph left it out because the motion needs no binding of the preview's.
+   *A consistent picture beats a lone rule*: the binding exists — it is the prompt's — and the
+   legend names it. The three chords stay as `R-KEY-010` and the `preview.*` bindings spell them,
+   `⌥⇧↑⌥⇧↓` and `⌥o`, not the specimen's `↑↓` and `⏎`: *structured data beats prose*, and
+   `⏎` sends (I51).
+5. **Find is C20 I30's**: the upper rule, no `width`, the caret on row 1.
+6. **The transcript half is unchanged** (§6l.12): the general peek, which draws for any element
+   carrying a `detail`. No chip reaches the transcript, which is 6s.5's first item. *Answered by
+   §6t: the echo keeps its chips as elements (I153, I154).*
+
+### 6s.5 — what the rulings leave behind, named so it is not read as coverage
+
+- **No chip reaches the transcript**, so §101's *focus in the TRANSCRIPT — a PEEK beside the
+  element* has no element to stand beside. Whether a submitted line's echo keeps its chips — the
+  label drawn, the content as the element's `detail` — is a ruling the registry does not make.
+  *Ruled by 104(c) and built by §6t.*
+- **The header's `pick` ground.** `Raw` spans carry a tone and no ground (C04 I89). Drawing §101's
+  header exactly needs a ground on a span, or a kind that draws a chip as the prompt does.
+  *Ruled and built by §6t ruling 6: a ground on a span.*
+- **A peek and an overlay take no ground** (6s.2 row 6).
+- **The residue row stays** (C04 I49). §101 draws none; the scroll kind draws one whenever it
+  overflows, and the bar alone does not say how many rows are hidden.
+
+## 6t. The echo's chips and the header's ground, walked by hand (lane b5-chips; F1521, F1522; §099, §101, ruling 104 c)
+
+Ruling 104(c) keeps a submitted line's chips in its echo — *drawn as the prompt draws them, with
+the content as the peek* — and F1522 owes §101's header its `pick` ground. Both are a chip drawn
+somewhere other than the prompt, so the rules that meet are the prompt's walk, the echo's wrap,
+the element list and the two layers that read it. The echo holds still once drawn, so the table
+carries most of the weight; the trace takes what happens to an entry between its first append and
+its settle, which is where a record kept beside the document goes stale.
+
+### 6t.1 — measured before ruling (at a83b1b30, the built session's 100 × 30, `echo hi ` then a six-line paste)
+
+- **The prompt** reads `❯ echo hi  #1 pasted · 6L ` on one row, the chip's cells `meta` on
+  `bgDeep` (I62's `chipRanges`).
+- **The echo**, after `⏎`, reads `❯ echo hi alpha 0` and five continuation rows `alpha 1` …
+  `alpha 5`: six rows for the one row the reader saw, and no element in them — the entry's list
+  is its blocks' and the echo is chrome (I33). A 200-line paste echoes 200 rows.
+- **The preview's header** reads `#1 pasted · 6L` from column 0, the name bold and the size
+  `muted`, both on the panel's `bgElev`. §101 draws ` #1 package.json ` in `pickInk`, bold, on
+  `pick` — the ground's own space either side — and ` 47L ` muted beside it.
+
+### 6t.2 — the classification table: what a chip in the echo is (structural)
+
+| # | the cell | rule A | rule B | ruling |
+|---|---|---|---|---|
+| 1 | a chip whose label does not fit the rest of its row | I33 wraps the echo through `hardWrapCells`, which cuts at the cell | a chip is one wrap unit (C17 I26) | **C17's walk**, the prompt's own, wherever the echo holds a chip; the chip moves whole. A command with none keeps `hardWrapCells` byte for byte |
+| 2 | a chip wider than the whole row | the echo overflows nothing (I33) | C17 I32 elides a label to the row | **elided in the middle**, by the walk, as the prompt did at that width |
+| 3 | a chip whose content holds `\n` | I33 draws a command's lines as rows | the chip is one cluster | **one cluster**: the content never reaches the walk, so its breaks are not rows. The six-line paste is one row |
+| 4 | `\r\n` or `\r` in the text between chips | I33 splits on all three | the walk splits on `\n` alone | **normalised to `\n` segment by segment** before the walk; the ranges index `command`, so the normalising cannot shift a chip |
+| 5 | a bidi format character between chips | I33's form can break across two rows | C17 I36 moves the form whole | **whole**, the walk's picture: the echo of a chip line is the prompt's rows (rule 1), not a block's |
+| 6 | a private-use character typed in the line | the walk substitutes a sentinel cluster | the reader's character is text | **sentinels are drawn from private-use code points the command does not hold**, so a typed one is text |
+| 7 | the chip's cells at rest | the echo is chrome, unstyled | the prompt grounds a chip `meta` on `bgDeep` (`R-BLK-628`, `R-BLK-116`) | **the prompt's painter** — `chipRanges` and its style — over the walk's spans; at 1 bit the bracketed rung and no ground (C17 I25) |
+| 8 | a focused chip | its own ground, `bgDeep` | a chip is a BOX (§017 `R-COL-005`), and a box takes `focusShapeStyle` (C09 I137) | **`meta` over `focusGround`**, and whole-shape inversion where no ground resolves. The resting ground does not outlive focus |
+| 9 | an adapter's document stating its own command (C07 I16) | the echo is drawn from `command` | the ranges index the line | **no chips**: C23 writes them only onto a document whose `command` is the line (C23 I104), so the entry draws the adapter's command as text |
+| 10 | an app line holding a chip | I15 displays `/argv` joined | the ranges index the line, and the joined argv is another string | **the line as typed** when it holds a chip and no `$_` (C23 I104). With `$_` as well, the argv form and the chips drawn as their content (6t.5) |
+| 11 | the chip as an element | elements come from blocks (C26 §5) | §101: *a PEEK, anchored BESIDE the element* | **an element of the entry, ahead of the blocks'** (C26 I33): `cell` level, under a reserved block id holding U+0000, its rows the echo row less the echo's height — negative in block space, so `chromeRows + rows.from` places it as it places every other |
+| 12 | the element's `detail` | the general peek wants a `Block` | the content is a paste, line breaks its own | **a `code` block of the content**, as the preview's box holds it (I143). A long one is C15's to cut and C16 I74's to scroll, as any detail is |
+| 13 | `y` on the chip, and `⌃a y` | a chip copies its content, not its label (`R-SEL-004`) | the card's head copies the command (I90), which holds the content | **`y` copies the content; `⌃a` selects the document's elements**, so the content is not copied twice. `⇧↓` from a chip into the body takes both, because the reader chose both |
+| 14 | an entry whose document declares no element | `↓` does not enter an entry with nothing focusable (C16 I22) | the echo's chips are elements | **it enters on the chip**. A shell route's terminal is such an entry, and was the measured case |
+| 15 | the header's name in the chip preview | `Raw` spans carry no ground (C04 I89) | §101 grounds the name in `pick` | **a ground on a span** (C04 I151, C09 I139), ruled in 6t.4 item 6 |
+
+### 6t.3 — the sequence trace: one submission, from the keystroke to the settle (event-mediated)
+
+| # | sequence | rules that meet | ruling |
+|---|---|---|---|
+| 1 | `echo hi `, a six-line paste, `⏎` (shell route) | C14 caches an entry's height on `(id, rev, width)` × the route appends after an `await` | **the chips ride on the document**, `meta.echo`, written before the append. A record kept beside the entry and keyed by its id is written after C14 has measured the resolved six rows, and the index is self-consistent about a document the frame is not showing (I33) |
+| 2 | the shell route settles into its pending entry | the settle is `{ line, into: pendingId }`, built fresh × the chips are the submission's | **the settle carries them**: `Settle.echo`, spread with `into` rather than rebuilt |
+| 3 | `⏎` while a verb runs, then the drain | the queued notice is appended at the keystroke × the route settles into it later | **both write them**: the notice states the line, and the route's documents state it again |
+| 4 | the same, then `⌃c` | `clearQueue` settles a cancelled document × the queue item's chips | **the item carries them**, as it carries the line |
+| 5 | `⇧⇥` to the transcript | `enterLiveBlock(id, null)` resolves to the first element × the echo's chips lead the list | **the chip**, and the peek opens beside it on the next reconcile (§6l.12) |
+| 6 | `↓` from the chip | C26 I30: `↓` leaves the row | **the body's first element**; the peek moves to it, or closes when it declares no `detail` |
+| 7 | two chips on one row, `→` | C26 I30 | **the second chip**, and the peek follows |
+| 8 | a resize narrower | the chip's row moves × the element list is a pull at the region's width (C26 I11) | **re-derived**: C14 re-measures on the width, `elementsOf` re-lays the walk, and the peek's row is reconciled on the viewport change |
+| 9 | re-run of the entry (`rerunEntry`) | `submit(entry.doc.command)` × the chips are on the document | **`submit(command, meta.echo)`**: the new entry keeps them |
+| 10 | the settle's document states a command the line is not | row 9 of the table × focus is on a chip | the chips go with the document; **focus falls forward** to the next element (C26 I10) and the peek follows it |
+| 11 | `↑` recalls the line | C20 records the line as a string (C23 I29) | **unchanged**: the recall is the content, as it was before this ruling (6t.5) |
+
+**The rejection path.** Writing the chips is a spread on a value and cannot throw, so no step
+leaves half a record. C13 refusing a settle into a slot `/clear` removed appends the document
+instead (C22 I99), and the document is the stamped one.
+
+### 6t.4 — the rulings
+
+1. **The echo of a line that held chips is the prompt's rows** (I153): C17's walk over the
+   command with each chip's range as one cluster drawn as its label, and the prompt's chip style
+   over the walk's spans. The measurer and the composer call one function (I33).
+2. **The chips are document data, written by C23** (C04 I152, C23 I104), because the height is
+   cached on the document's revision (trace row 1). C17 answers where they are in the line it
+   resolves (C17 I37), from the one loop that resolves it.
+3. **A chip in the echo is an element ahead of the document's** (I154, C26 I33), with the content
+   as its `detail` and its `copy`. §101's transcript half is the general peek arriving at it, as
+   §6l.12 said it would.
+4. **A focused chip takes the box's treatment** (C09 I137), `meta` over `focusGround`.
+5. **`⌃a` is the document's elements** (table row 13).
+6. **F1522: a ground on a span, `pick` and nothing else** (I155, C04 I151, C09 I139). The other
+   remedy F1522 names — a kind that draws a chip as the prompt does — draws a different picture:
+   the prompt's chip is `meta` on `bgDeep` with its size inside the well (§099), §101's header is
+   the name alone on `pick` with the size outside it, and *the picture decides*. **The premise
+   that the echo would want the same drawing is corrected**: ruling 104(c) says *as the prompt
+   draws them*, the echo is chrome the frame paints, and the prompt's own painter serves it with
+   neither mechanism.
+7. **An app line holding a chip displays as typed** (C23 I104), where no `$_` is in it.
+
+### 6t.5 — what the rulings leave behind, named so it is not read as coverage
+
+- **A click on an echo chip** reaches `elementAt`'s `blockRow < 0` and resolves nothing: the
+  pointer resolves elements to blocks, and the echo has none. The keyboard reaches every chip.
+- **An app line holding a chip and `$_`** displays the argv form, and its chips draw as their
+  content (table row 10). The owed piece is C18 token offsets, so the display can resolve `$_` in
+  the text between chips.
+- **History recalls the content** (trace row 11). C20 records strings, so `↑` over a line that
+  held a 200-line chip puts 200 lines in the prompt.
+- **The card's head draws the resolved argv**, so a chip's content is in the head flattened onto
+  one row — `note(look at alpha 0 …5 beta 36 …)` — elided by the head's fitter (C09 I46). The head
+  is *what ran* (I90) and this section rules on the echo alone; whether a head's args draw the
+  chip's label is §099/§030's question and is owed.
+- **The header's leading space** is the ground's padding, so the name stands one cell in from the
+  preview's box; §101 draws the box's content one cell further in to match. The box's column is
+  §6s's and unchanged here.
 
 ## 7. Health and identity
 
@@ -2292,12 +3460,12 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I25** — A suspension is bracketed by `suspend()` before the handoff and `resume()` then `decoder.reset()` after it. The listener's removal is C01's, in the transition; the reset is C22's, because only this file knows both that the terminal came back and that a decoder is holding a sequence the child interrupted (C01 I18, C16 I18).
 - **I26** — Step 11 registers a handler for every focus target that has bindings, and the effect table in `keys.ts` is total over C16's `KeyAction` union. A binding `/help` renders is therefore one dispatch executes, by construction rather than by agreement (C16 I19).
 - **I27** — Exactly one `commit("input")` per decoded batch, issued by the read loop; no handler commits. Two committers is one frame too many for a scroll and none for whichever handler forgets, and only the second is invisible (C16 I11).
-- **I28** — The layer region is the viewport region, and it is the same `{ width, height }` the frame computed for the transcript. A drawer adds `region.top` to every `Placed.top` and the router subtracts it from every mouse row (C16 I20), so one number is translated in one direction in each direction of travel. Widening it to the whole terminal costs nothing that any check can see — §3's sum holds at every width with every layer misplaced — and puts a pushed view over the header, the prompt and the footer (C15 T4.4, S01 §3a).
+- **I28** — The layer region is the viewport region: its `height` is the transcript's, and its `width` is the region's content width — the transcript's plus the rail's reserved column (C14 I57), since a layer floats over the whole region and the rail is the transcript's alone. A drawer adds `region.top` to every `Placed.top` and the router subtracts it from every mouse row (C16 I20), so one number is translated in one direction in each direction of travel. Widening it to the whole terminal costs nothing that any check can see — §3's sum holds at every width with every layer misplaced — and puts a pushed view over the header, the prompt and the footer (C15 T4.4, S01 §3a).
 - **I29** — Layers are composited **onto the accumulated rows**, bottom-first in the order `layout()` returned them, and each writes every cell of its own box including the ones its blocks produced no glyph for. Compositing each layer onto the base rows instead is correct for one layer and discards the one beneath it for two; writing only the glyphs leaves the prompt showing through the gaps in a menu. Neither is visible until two layers overlap or a layer is narrower than its content, and both read as defects in the component that produced the content (§6a).
 - **I30** — A box that escapes the region refuses the frame rather than being clipped into it. C15's clamp is what makes this unreachable, which is why it is asserted rather than assumed: a clip repairs the symptom and leaves a placement defect drawing something plausible, and one row past the last row scrolls the alternate screen (S01 §3, `heightsSum`'s shape).
 - **I31** — **A state change that happens outside a decoded batch commits when it happens.** I27's rule covers the synchronous effects of a keystroke and nothing else: an asynchronous continuation has no batch to be counted in, so a completion menu pushed when its source settles, or an identity refreshed on its five-minute cadence, changes state that no frame is composed from. The symptom is the one the read loop's `arm()` already names for the decoder's own deadlines — *a key that appears to do nothing until you press another one* — arriving one layer up, where the trigger is not a key at all and the next keystroke is what reveals it. Every such producer takes an injected commit and calls it; the reason is `"completion"`, whose window is zero because the screen is already wrong by the time it fires (C03 I2).
 - **I32** — The read loop re-arms its deadline on **every** chunk, including one that decodes to no events. An empty batch is not an absence of work: a lone `Esc` is held for C16's 50 ms disambiguation window and emits nothing at all, so it is precisely the state that needs a wake. Guarding the loop with an early return on `events.length === 0` puts that guard above the arming and reproduces the symptom the arming was written to prevent — a key that appears to do nothing until you press another one. The commit stays inside the non-empty branch, because nothing changed and nothing needs drawing.
-- **I33** — **The transcript draws each entry with the command that produced it**, as frame chrome above the entry's blocks. It is *the displayed command* — `entry.doc.command`, the line the user typed — and never `meta.argv`, which is the spawned form (`widget ps --json`) and is `/debug`'s to show. It is **not a block**: an adapter did not produce it, `--json` must not contain it, and it must not count toward C13's cap. Its rows are supplied to C14 through `chromeRows` (C14 I20) so that the height the index virtualises against is the height the composer draws; computing it in one place and not the other is a viewport that is arithmetically self-consistent about a document it is not showing. **Without this the transcript is results with no record of what produced them** — three tables and no way to tell which command made which — and C23 I15's *displayed command* had nothing to constrain, which is A03 §2's vacuity class arriving at the level of an invariant.
+- **I33** — **The transcript draws each entry with the command that produced it**, as frame chrome above the entry's blocks. It is *the displayed command* — `entry.doc.command`, the line the user typed — and never `meta.argv`, which is the spawned form (`widget ps --json`) and is `/debug`'s to show. It is **not a block**: an adapter did not produce it, `--json` must not contain it, and it must not count toward C13's cap. Its rows are supplied to C14 through `chromeRows` (C14 I20) so that the height the index virtualises against is the height the composer draws; computing it in one place and not the other is a viewport that is arithmetically self-consistent about a document it is not showing. **Without this the transcript is results with no record of what produced them** — three tables and no way to tell which command made which — and C23 I15's *displayed command* had nothing to constrain, which is A03 §2's vacuity class arriving at the level of an invariant. **Amended (review batch 4, found reading C17 T5.2's frame under M11 item 1): a command of several lines is drawn as its lines, each wrapped under the continuation gutter, and no row carries a line break.** The command is what the editor held, and a bracketed paste — or a chip resolving on submission (C17 I25) — puts `\n` in it, which the input decoder's C0 filter never sees. `hardWrapCells` measured the break as nothing, so the echo wrote it raw inside one frame row: the terminal moved down a line mid-row, and near the bottom it **scrolled the alternate screen**, the one failure that corrupts state the frame can no longer see. A 200-line paste wrote 127 bare line feeds in one submission. Split rather than neutralised, for a consistent picture: the prompt draws the same buffer as rows, and the echo is the record of that buffer. Both the measurer and the composer read `commandRows`, so the height stays one number. **Amended (review batch 4, F1401): each line is neutralised before it is wrapped** (C09 I128), so a bidi format character in the typed command is drawn as its `<U+XXXX>` form. The echo and the prompt were the two rows of the frame that wrote the reader's own line raw, and neither is a block, so C09 I127 never reached them (C17 §5g). `entry.doc.command` keeps the character — only the row is neutralised — and because the measurer calls the same function, the eight cells each form takes are in the height C14 virtualises against. At a row's end the form can break across two rows where the prompt moves it whole; the echo wraps as a block would (C17 §5g). **Amended (lane b5-chips, ruling 104 c): an echo holding chips is I153's** — the prompt's walk, so a chip is one row's label rather than its content's lines. → T1.179, T6.150
 - **I34** — **The viewport's height is the composed frame's region height, set from the frame and nowhere else.** C14 is told what to be as tall as (C14 I22), and only the compose step knows the answer: the region is `rows − header − footer − promptRows` (S01 §3), and the prompt's height changes with what is typed rather than with the terminal. So the value is pushed in `#render`, from the frame just composed and before the visible rows are read — one owner, and the one that has the number.
   - **The resize handler must not also set it.** Two writers with different ideas of the same quantity is the defect this replaces, not a redundancy: `onResize` had the terminal's height and ran on SIGWINCH, so the viewport was three rows too tall from the first frame and stayed that way. The handler keeps the width — that is what invalidates the cache (C14 I8) — and issues its commit; the height comes from the frame.
   - **Setting it per frame is safe because C14 refuses a resize to the size it holds** (C14 I21). Without that guard this is a `Change` per frame arriving back at the thing that composed the frame. The guard is C14's and is argued there on its own terms; this invariant depends on it rather than justifying it.
@@ -2308,14 +3476,14 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I38** — **The completion spinner is read at paint time and armed at request time, and both halves are needed.** C19 answers `spinning` — the earliest source call still in flight is older than 500 ms — and until now no file under `src/shell` read it, so C19 §7's spinner had an implementation on one side of the seam and none on the other. Two separate mechanisms, because the wrong implementations fail differently and both look right: the frame composes the indicator from a **fresh read on every paint**, so a value cached at request time can never become true; and the request **arms a wake** at the threshold, so the frame that first shows it is one nothing else would have drawn. Without the wake the spinner appears only when the user next types — the *key that appears to do nothing until you press another one*, which is C22 I32's symptom arriving through a different timer. It is **appearance and never geometry**: the glyph is painted into the prompt's last row over padding it does not lengthen, so `measure` never sees it and the prompt's height is the same whether a request is in flight or not.
 - **I39** — **A keystroke cancels a pending completion**, and until now nothing did. C19 §7 commits that a keystroke during a pending request supersedes it — the old sequence abandoned, the spinner cleared, nothing arriving late to overwrite the buffer — and C19 holds the whole mechanism: `cancel()` invalidates the token, and a superseded request already resolves with no candidates (C19 I13). What was missing is the caller. No file under `src/shell` called `cancel()`, so typing after a `Tab` on a slow source left the request live, and a menu opened a second and a half later for a prefix the user had moved past. The same shape as I38 and found by the row I38 unblocked: a component complete on its own side of a seam, with nothing on the other. The printable and paste paths cancel; the guard in the effect table does not cover it, because that one compares the shell's own sequence and a printable keystroke does not advance it.
 - **I40** — **The theme variant is persisted by C22 and repaired on read.** `/theme <variant>` writes it to `${stateDir}/theme` at the moment of the change rather than at exit, because a session killed by `SIGKILL` runs no shutdown path and a preference that survives a clean exit and not a crash is one people stop trusting. On construction the file is read; anything **the set does not hold as a name** is treated as absent, the base theme is retained, and **a notice is committed** — C20's precedent, where history repairs a corrupt file at open rather than failing. The notice is the half that matters: without it "absent" and "corrupt" look identical to a user who chose light and got dark. It is C22's and not C10's because C10 is a pure function over tokens and this is session state with a filesystem behind it; a store reaching a disk from L1 is MG23's neighbourhood. **The file holds a name, not a variant**, and this invariant said *variant* until C22 §6h needed the two to be different things: C10 I27 keyed the set by name and the guard here has read `names.includes` ever since, so the word was one fork out of date in four places including the notice the reader sees (F215). *Absent* now reaches I68's polarity rule rather than only the base theme — the two arms are one sentence there and neither displaces this one.
-- **I41** — **A pushed view holds one piece of state: its row offset.** `n` and `p` compute a hunk's first row from the offset; `g` and `G` set it. A view holding an offset *and* a hunk index has two cursors for one position — `G` leaves the index pointing at the hunk the reader scrolled away from, so `p` jumps upward from a place nothing on screen explains — and no test that drives one motion at a time can see it (C25 §3c A4). **Beside the offset the view holds one derived value, and it is a cache and not a cursor**: the window plan (C25 I22) of the live block at the region's width, keyed on the block's identity and the width, dropped and re-derived when the entry is patched or the region resizes, its misses reported as `absent`, `rev` and `width` through the profiler's probe (F1187: a motion re-derived the plan about thirty times over, and the plan is a property of the block and the width alone). A motion over an unchanged block at an unchanged width walks no line of the patch.
-- **I42** — **A pushed view rewindows from the live block on every motion, and is dismissed with `anchorEvicted` when its entry goes.** A snapshot taken at push time shows a diff the entry no longer holds, and `expand` produces exactly such a patch one keystroke earlier. C15 supplies the reason code and cannot detect the condition — it subscribes to nothing and holds no entry ids (C15 I10) — so the owner watches the transcript, and `Esc` never meets a dangling view because the view is gone before it (C25 §3c A6).
+- **I41** — **Retired with the last view that held an offset** (F1253). (§13a.) It read *a pushed view holds one piece of state: its row offset*, and it was right twice over: a view holding an offset **and** a cursor has two records of one position, and `G` leaving the cursor behind is invisible to any test driving one motion at a time (C25 §3c A4). **The finding is about a caller holding a position into something it is windowing**, and there is no such caller — the patch view went with M9b (F1251) and the document view with M9c. C14 holds the transcript's offset, one of it, and that is A01 D3's decision kept by there being one scroll model rather than by placing a second carefully.
+- **I42** — **Retired with I41 and for its reason** (F1253). (§13a.) It read *a pushed view rewindows from the live block on every motion, and is dismissed with `anchorEvicted` when its entry goes* — a snapshot taken at push time showing a diff the entry no longer holds, with `expand` producing exactly such a patch one keystroke earlier. **The hazard survives the invariant and is C13's**: a reader of an entry's blocks reads them live, and C14 drops a window when its entry is evicted. What retires is the *owner* that had to be told, because there is no owner and no push to dangle after.
 - **I43** — The identity source is `config.identity`, defaulting to a fetcher that returns `null`, and **C22 signals the notice rather than writing it** — the loop hands its text to C23, which appends (C23 I19). Both halves are the invariant: a seam with no default is a wire only the tests hold together (I22), and a signal delivered to a discarding callback is a mechanism that passes every test of its own and reaches nobody.
 - **I44** — §4 step 7 fires `config.greeting` and does not await it, and C23 appends what it returns through the ordinary append path. A rejection or a hang leaves the prompt usable and **draws nothing**; nothing about startup waits on it. *Produces no entry* is what this sentence said until I99, and it stopped being true when the slot was reserved: a rejection now leaves an entry that is empty, settled, invisible and evictable, and a hang leaves one that is empty and still streaming. Neither reaches the screen — the reservation carries `command: ""`, which `commandRows` answers with no rows at all, and no blocks, which I85 already rules reserves no blank. The step existed in the list, in T3.10 and T3.11, and in S02's `Source` row, and **no code fired anything** — step 12's shape a second time in the same list, and the reason S02's welcome could be specified in detail by three documents and reachable by none. Appending through C23 rather than rendering here is A02 Seam 4: C22 produces a fact, C23 is the only component that appends, and a live part in the greeting is driven because it took the same route every other document takes (C23 I33a).
-- **I45** — **A verb's result is a view when its declaration says so; the decision is taken before step 3, and the view is pushed where the pending entry would have been.** Pushed before the transport is invoked and filled after it, so the ordering C23 I3 protects is unchanged and a slow verb is not a blank screen; a failure renders into the view rather than into a transcript that has nothing to show. Read from the manifest at step 2, never from the document the adapter returns: C23 I3 appends the pending entry before the transport runs and C13 has no delete, so an adapter-side decision could only produce a view *and* the entry B03 §2 says a push does not leave. The party is the one `ToolDef.interactive` already names — the app author — because a view is a handoff of input ownership and detection is not available for either.
-- **I46** — **A pushed view is owned by a shell-side component holding one offset, and C15 holds none.** The owner windows at **block boundaries** and hands C15 a smaller sequence, which is C25 I18's shape generalised: C15 measures the result through the same registry as everything else, so there is no second height codepath and `Placed` gains no scroll offset. A plot is atomic within that window and always will be — C12 I1 puts its series out of the height's reach, so *granular where the kind divides, atomic where it does not* is the ceiling, and row-granular scroll is not on the path. C15 §183 moved this duty to the owner deliberately, to avoid a second scroll model beside C14's (A01 D3). I41 and I42 were written for the patch view and are the general shape: one piece of state, rewindowed from what the host holds rather than snapshotted at push time. A view whose parts tick releases them **at the pop**, not when a later fetch discovers the layer has gone.
-- **I47** — **A pushed view whose content C15 truncated says so on screen.** I46's window falls on block boundaries and the projection emits at least one block whatever its height, so a block taller than the region is shown cut and cannot be scrolled — the offset indexes blocks, and with one block there is no second offset to move to. The owner's remedy is to split, and splitting has a floor: a leaf with no children to split by has no smaller form that is still that leaf, so a producer can promise zero unreachable rows for every document whose leaves fit and not in general. **The two are one ruling and neither half is sufficient** — split alone leaves a silent residue, and the indicator alone leaves a document nothing can cross. `Placed.truncated` carries the fact already and C19's menu reads it (C19 §5); the duty here is to read it for a view. Content stopping mid-object with no indicator is indistinguishable from content ending, which is why this is not decoration.
-- **I48** — **A verb declared both `view` and `streams` runs into the view, and its patches are applied through the owner.** The owner gains `patch(view: ViewPatch)` over C04's `applyPatch` — the same function C13 calls, so there is no second answer to what a patch means — and keeps `putBlock` for the refresh driver, whose contract is total where this one reports C13's three arms. **All three address a block by id at any depth, and the resolution is one walk rather than three that agree**: `putBlock` rewrites through the same `applyPatch`, and `blockAt` reads through C04's `descendants`, so both resolve an id through `childBlocks` — the compiler-checked question `tree.ts` owns. The contracts differ and the addressing must not: `patch` descended and the driver's two seams scanned the top level, so a live panel inside a `group` — which `liveDeclarations` already recurses to declare — was declared, patched by the stream, and unreachable to the read and the write. **A read and a write that disagree are worse here than a missed write**, because C23 I70 reads `putBlock`'s `false` as `hostGone` and releases the *host*: one part the walk could not reach stopped every sibling on it (T4.87). The route releases the submission guard **before** its loop and registers its canceller in the live-stream set **before** awaiting it, exactly as the entry route does (C23 I6, C16 §5); omitting the second here loses the session rather than a cancellation, because the view's loop is the only thing on screen. **A view has no settlement**: `end`, a malformed patch and a failure each append a notice and leave the view open, because the stream ending is not the reader having finished with it and B03 §2 makes the pop the reader's. A **cancelled** view pops; a finished one does not. **An append holds the window at the bottom if it was at the bottom**, and leaves it alone otherwise — a follow whose window never moves shows its first screen for ever, and a window that moves under a reader who scrolled up is the same fault reversed.
+- **I45** — **Retired with the declaration it read** (F1253). (§13a.) It read *a verb's result is a view when its declaration says so; the decision is taken before step 3, and the view is pushed where the pending entry would have been.* The argument was sound and every premise of it still holds — C23 I3 appends before the transport, C13 has no delete, B03 §2 says a push leaves the transcript untouched — which is why the conclusion had to be *decide before step 3*. `R-EXA-082` removes the push instead: a verb's result has no prompt and no context of its own, so it is an entry, and there is nothing for a declaration to select. `ToolDef.view` and `FlagDef.view` retire with their only reader, and C05 I20's refusals retire with them.
+- **I46** — **Retired with the pushed view whose offset it placed** (F1253). (§13a.) It read *a pushed view is owned by a shell-side component holding one offset, and C15 holds none*, windowing at block boundaries so that there was no second height codepath. The subject is a **caller holding an offset over a document**, and the design leaves no such caller: C14 scrolls the transcript by row, through the same registry, and A01 D3's *one scroll model* is kept by there being one rather than by placing the second carefully. The block-boundary rule, the `measureSequence` correction it carried (a projection that added `measure(block)` one at a time packed nearly twice what the region held) and the plot's atomicity all retire with the projection; C12 I1 is unaffected and is stated where it belongs.
+- **I47** — **Retired with the window that cut** (F1253). (§13a.) It read *a pushed view whose content C15 truncated says so on screen*, and it was a pair on purpose — split what you can, report what you could not — because I46's projection emitted at least one block whatever its height, so a block taller than the region was shown cut with no second offset to move to. An entry is as tall as it is and C14 scrolls past it by row, so nothing truncates and there is nothing to report. **The finding survives where it can still be violated**: content stopping mid-object with no indicator is indistinguishable from content ending, which is C04 I49's residue row and is asserted there. The `/inspect --raw` case that forced this — 245 rows against a 37-row region — is now an ordinary long entry.
+- **I48** — **Retired with the fourth route** (F1253). (§13a.) It read *a verb declared both `view` and `streams` runs into the view, and its patches are applied through the owner* — the owner gaining `patch`, keeping `putBlock`, and all three seams addressing a block at any depth. **Every clause of it is the entry route's and was already true there**: `streamInto` patches through `transcript.patch`, C13 resolves an id at depth through `applyPatch`, the guard is released before the loop and the canceller registered before it is awaited (C23 I6, C16 §5), and the tail follow is `followTail`, which `ScrollOffsets` already shares (C04 I97). A route whose distinguishing rule is implemented by a function the other route already calls is not distinguished, and that is the tell the overturn was available before `R-EXA-082` named it. The depth-addressing ruling and its measurement (T4.87: `{cpu: 1, mem: 1}` nested against a flat control's `{3, 3}`) survive as C13's, where the read and the write ask `childBlocks` one question.
 - **I49** — **C02's capability overrides have a producer, and it is `TuiConfig.capabilities`.** The parameter, its validation, its precedence rule (C02 I4) and its e2e row all existed while nothing an application could call supplied it; `construct.ts` passed one argument and the only other caller was a test fixture reaching in by deep import. A parameter with no producer passes every test written about it, which is why this survived: A03 §2's vacuity class reached through an argument, where C24 I16 is written about exports and MG25 scans functions and constants. **The measured consequence is that `colourDepth: 1` was unreachable by any application** — the only rule producing it is the `dumb` gate, which also clears `altScreen`, and C02 I7 makes that the one refusal that stops the shell. Overrides are still C02's to validate; C22's duty is to hand them over and to surface the warnings where it surfaces C02's others.
 - **I50** — **Ghost text is composited into the prompt, and it is appearance rather than geometry.** T4.7 has claimed this since C22 was written and nothing implemented it: `ghost()` had exactly one caller in the tree — the accept path in `keys.ts`, which *inserts* it — so the suggestion existed, was computed on every keystroke, and was invisible until the key that consumed it. `test/contract/editor.test.ts` recorded the other half as deferred *"when C22 lands"*; C22 landed and the row was never written, which is a deferral expressed as a comment and therefore one that could not expire.
 - **I51** — **An overlay that is chrome for the prompt forwards what it does not bind to the `prompt` handler.** C19's menu is the case: `activeTarget` answers `overlay` for anything on the stack (C16 §3), the overlay handler consumes only its six actions, and step 3's `global` binds no printable key — so a character typed while the menu is up is dropped, measured against a control with no layer open. A menu that opens by itself (C19 I19) cannot live with that, because it would stop typing at the moment it appeared — and a menu the user requested must not either, since C19 §8's keystroke cell narrows it in place and that cell is unreachable while the character never arrives. So the forward is the menu's, whichever opened it, and **while it holds no selection the prompt's bindings resolve first** (C19 I20). **The decision is C22's rather than C16's**: the ladder is right, and which layers are an extension of the prompt is a fact about this shell's composition — L4 is where the menu's and the search's identities are both known. C20's reverse search is the same shape and is not wired here: its `type()` has no caller in `src/`, so a query typed after `⌃R` is dropped exactly as the character was, and the rules for narrowing to a hit are C20 §5's.
@@ -2330,18 +3498,18 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I55** — **The frame is written as a difference against the last frame this session put on this screen, and whole whenever no record describes it.** Four things leave no record: the first frame, a `contaminated` write, a refused frame that drew the fallback, and a record whose size differs from the frame's. `contaminated` is a claim about the *screen* rather than about the frame, so a repaint happens even when the composed rows are identical to the last (§6b table row 3) — and until this invariant existed `render` and `repaint` were the same function, so C03's whole invalidation mechanism reached nothing.
 - **I56** — **The record is dropped before the bytes go out and restored only when they have all gone.** Setting it after the write returns is the obvious rule and leaves the fault case wrong: a write that throws puts a *prefix* of a frame on the screen, and a record surviving the throw describes the frame *before* it — so the next diff compares against a screen that never existed and skips exactly the rows the partial write got wrong. Clearing first makes a throw a full repaint by construction rather than by a handler someone must remember to add (§6b trace row 10).
 - **I57** — **Every row the diff writes carries a leading reset, and the rule rests on asymmetry rather than on a live defect.** Measured at the time of writing, **0 of 50 composed rows end with a live SGR attribute** — every renderer closes its own styling and `fitStyled` pads with plain spaces — so a rule justified as *otherwise colour bleeds* would forbid nothing and read exactly like a rule that holds (A03 §2, in a remedy rather than in a check). What keeps it: four bytes per changed row, against a colour bleeding down every row below it and surviving the frame, on the day a renderer stops closing its own. A diff writes rows out of order, so a row can inherit a state that was never above it; nothing else asserts the property that would make the prefix unnecessary (§6b table row 7).
-- **I58** — **An entry's rendered lines are cached on `(entryId, rev, width, focus, theme identity)`, one slot per entry.** The first three are C14's and the last two are the difference between caching *appearance* and caching *geometry*: `HeightCache` records that theme and capabilities are deliberately absent from it because C09 §4 and C10 T4.1 make height theme-invariant, and neither argument reaches colour. Focus enters because C11 draws the focused row in another tone (C11 I14) and `visibleRows` passes it in — **and the focus axis carries the selection's extent** (C26 I16), because `⌃a` at the tail moves the anchor and not the head, so it is the one keystroke that changes what is painted while `(blockId, rowId)` stands still; a key holding the head alone serves the frame from before the selection (T4.61). Every `⇧↓` moves the head, so every `⇧↓` moved the key by coincidence, which is why the axis was owed and unreported; the theme enters as `ResolvedTheme.name`, which already moves on a variant switch and on an override and which C10 I11 already relies on for the same purpose — carried in the key rather than through an invalidation call, because a hook at a fourth call site is the shape this tree keeps finding unwired. One slot per entry makes the cache bounded by the entry count by construction rather than by an eviction rule, which is the argument C14 §4 makes for the same shape.
+- **I58** — **An entry's rendered lines are cached on `(entryId, rev, width, focus, theme identity)`, one slot per entry.** The first three are C14's and the last two are the difference between caching *appearance* and caching *geometry*: `HeightCache` records that theme and capabilities are deliberately absent from it because C09 §4 and C10 T4.1 make height theme-invariant, and neither argument reaches colour. Focus enters because C11 draws the focused row in another tone (C11 I14) and `visibleRows` passes it in — **and the focus axis carries the selection's extent** (C26 I16), because `⌃a` at the tail moves the anchor and not the head, so it is the one keystroke that changes what is painted while `(blockId, rowId)` stands still; a key holding the head alone serves the frame from before the selection (T4.61). Every `⇧↓` moves the head, so every `⇧↓` moved the key by coincidence, which is why the axis was owed and unreported — **and it carries a form field's draft** (I118, C09 I119), because a keystroke in a field changes what the field draws and moves none of the other axes, so a key without it served the frame from before the keystroke, measured on T4.99's frame before the axis landed; the theme enters as `ResolvedTheme.name`, which already moves on a variant switch and on an override and which C10 I11 already relies on for the same purpose — carried in the key rather than through an invalidation call, because a hook at a fourth call site is the shape this tree keeps finding unwired. One slot per entry makes the cache bounded by the entry count by construction rather than by an eviction rule, which is the argument C14 §4 makes for the same shape.
 - **I59** — **The cache makes the second frame free and the first no cheaper, and that is why it is not the fix.** A 5,000-line block still renders every line the first time it is drawn at a width, so this stage on its own converts continuous lag into one long stall. It is recorded as an invariant rather than as a note because the failure mode is *reporting the problem solved* — §6d is what bounds the first frame, and the ordering is the finding (F90).
 - **I60** — **`ctx.tick` is in the key, per kind, and every transcript render receives one.** The invariant is the *pair*, and it is why: for the life of the project the axis was absent **and** the value was constant, so the day one was threaded the other was owed — either the key gains it or live entries stop being cached (§6c trace row 10, A03 §2). **This sentence stated the defect until F233**, with the resolution eleven lines below it under *Resolved by the first arm of its own ruling* — and an invariant is read by its lead sentence, so appending a repair does not change what it says. **The pairing is right and its tense was wrong.** This read *a `steps` block would serve its first frame for the life of the session*, and `steps` ships: it serves it now, measured at one distinct glyph across ten frames against the harness's ten (F227). The conditional was true of the **cache**, which cannot fail while tick is constant, and false of the **reader**, who is looking at a spinner that does not turn — and the same clause named both. The invariant is unchanged; what moved is that its second half is a present defect and not a future one, and the third link — that nothing in `src/` raises C03's `spinner` commit — is why this component could not see that from inside. **Resolved by the first arm of its own ruling**: the key gains the axis, **per kind**, so an entry holding nothing animated keys exactly as it did and only the entries that move pay for moving. Adding `tick` to every slot would bust the whole cache on every spinner commit, which is the opposite of what the cache is for.
 - **I60a** — **The spinner ticker is armed from what the frame drew, and a transcript with nothing animating in it schedules nothing.** `visibleRows` reports the fastest cadence among the blocks it rendered *after windowing*, and `#render` disposes and re-arms on that answer — so a spinner scrolled off the screen stops the timer and one scrolled back on starts it, which is `anyoneLooking`'s rule for a refresh source arriving at the frame (C23 I46). The interval comes from the block's own spinner set, and **C03's `spinner` window is a floor under it, and I105 says how**: the braille default declares 80 ms and C03's window is 80 — set at the fastest shipped set so a glyph is never skipped — so it is observed at 80. Measured (F1197): armed for the interval after the paint under a 100 ms window it was observed at 180, and armed for its due time under the same window at 100, where two of ten glyphs were never drawn. The floor under a spinner beside a stream is C03 §3's asymmetry, stated there for that case; it applies unconditionally and is written here because nothing else says so. **The ticker commits through the scheduler rather than calling `#render`**, so a spinner behind a stream coalesces exactly as specified. Disposed before the terminal is released, because it re-arms out of `#render` and a session stopping between two frames would otherwise hold a timer open (F227).
 - **I61** — **A resolved capability record that cannot open the terminal refuses at gate 3b, and the refusal names the cause rather than the consequence.** `isUsable` is the test (C02 I7), read from the **resolved** record so that a valid `capabilities` override still opens (C02 I4) — which is what forces the gate after construction and makes it accept I36's cost knowingly. It throws rather than returning, because `start()` rejecting is the only channel this path has: §8 step 3 is reached from `stop()`, and a session that never ran never calls it, so a warning into C02's collection would be **unread by construction**. The message names `env` when the record is empty or carries no `TERM`, because the cause is a config field and C01 — which raised the only prior refusal — is entitled to the capability record alone and can only name the consequence (F8) **And it stops what construction built before it throws, because the refusal is after step 3 and a throw leaves everything step 3 made** (F140). A history file is open, the transport's stores are live and §3b's timers are armed; `start()` rejects, so `stop()` is never reached from the ordinary path and an author who catches the rejection and carries on has a process that does not exit — measured under a PTY at **6 s and counting**, against **744 ms** once the gate stops first. **The uncaught path is what hid it**: node prints the named message and exits 1 with the handles still held, so the defect is invisible on the path everyone takes and total on the one that matters. It stops with `fault`, whose exit code is the 1 the uncaught path already gives, and nothing is emitted on the way out because nothing was acquired — `held` is empty and the shape's reset is `""` (C01 I8, I20), which is what keeps T3.20's *nothing was acquired* true.
 - **I62** — **The prompt's window contains the cursor's row, and every range test against it is in editor coordinates.** The two halves are one invariant because either alone is a defect and the second is what the first was missing. A window anchored on the buffer's end is correct until a mid-buffer edit and then puts the cursor outside itself; testing membership on the *painted* index is what made that silent, because a marker row and a content row are the same kind of number there — `within = row − first + offset` is `0` both for the first content row of an unmarked window and for the row immediately above a marked one, so the cursor was drawn **on the elision marker** and a selection span **washed** it. Both were measured in a frame and neither is visible to an assertion: the arithmetic is self-consistent and every number agrees with every other (§6e table rows 1 and 2). So `promptWindow` returns its content range, membership is `first ≤ row < first + count`, and elision is marked at **both** ends — the bottom marker is not decoration but what makes dropping the rows outside the window honest, since a wash clipped at the edge is otherwise indistinguishable from one that ends there (§6e table rows 3, 4).
-- **I63** — **A cursor style is keyed on the focus target, resolved in two flat levels, and emitted only when it changes.** The key is `FocusTarget` and not `Layer`, because the two are different partitions with two members in common: `FOCUS_ORDER` has seven members and exactly two — `overlay` and `pushedView` — are layers, so a style on `Layer` covers two-sevenths of its subject while reading as total, and the prompt, which is the entry's own example, is not a layer at all. `activeTarget` answers on every dispatch and a layer does not, so the target is the key that is always defined. **Position is untouched**: a box's geometry is the box's, a style is a property of what kind of interaction is happening, and `Placed.cursor` stays exactly as C15 wrote it. Resolution is the target's style, then the session's, and it ends at `0` — the terminal's *configured* default, which is the user's own setting — because **nothing can un-write a `DECSCUSR`**: *emit nothing* is reachable only before the first emission, so the rule is about a transition rather than a value, and a third inheritance link would need a parent that a priority list does not have. **Emitted only on change**, because the cursor sequence goes out with every frame and a style re-asserted sixty times a second is at best wasted bytes and at worst a cursor that never blinks — which makes C01's record of the last emitted value load-bearing, and `resume()` clearing it the counterpart of a child that changed it underneath (§6f, C01 I20).
+- **I63** — **A cursor style is keyed on the focus target, resolved in two flat levels, and emitted only when it changes.** The key is `FocusTarget` and not `Layer`, because the two are different partitions with two members in common: `FOCUS_ORDER` had seven members when this was ruled and exactly two — `overlay` and `pushedView` — were layers, so a style on `Layer` covered two-sevenths of its subject while reading as total; it has ten now (`watchRow`, C16 I76, is the tenth) and `pushedView` retired with the kind (R-EXA-082), so the share is one in ten and the argument is stronger, and the prompt, which is the entry's own example, is not a layer at all. `activeTarget` answers on every dispatch and a layer does not, so the target is the key that is always defined. **Position is untouched**: a box's geometry is the box's, a style is a property of what kind of interaction is happening, and `Placed.cursor` stays exactly as C15 wrote it. Resolution is the target's style, then the session's, and it ends at `0` — the terminal's *configured* default, which is the user's own setting — because **nothing can un-write a `DECSCUSR`**: *emit nothing* is reachable only before the first emission, so the rule is about a transition rather than a value, and a third inheritance link would need a parent that a priority list does not have. **Emitted only on change**, because the cursor sequence goes out with every frame and a style re-asserted sixty times a second is at best wasted bytes and at worst a cursor that never blinks — which makes C01's record of the last emitted value load-bearing, and `resume()` clearing it the counterpart of a child that changed it underneath (§6f, C01 I20).
 - **I64** — **The cursor blinks by subtraction, on the driver's wake, and only where a declared style asks to.** *Steady on a keystroke, blinking after N ms* is a state machine no terminal offers, and it is expressed as a refinement of the declaration rather than as a second opinion about it: the machine only ever **removes** blink, so a style declared steady is never made to blink and a `null` style is returned untouched. That last clause is the shape half's boundary reached a second way — a target that declares nothing must emit nothing, and nothing here may invent a shape in order to have something to make steady, because shape and blink are one wire parameter and *steady* is unsayable without choosing a shape (I63, §6f table row 3). **Steady is free and idle is not**: a keystroke already composes a frame (I27), so only the idle edge needs a timer, and it is a wake on the composition root's own scheduler — never a `setInterval` in `paint.ts`, which is the constraint that survived the expiry of its premise. It is **armed only where a declared style blinks**, which is where it differs from the spinner's unconditional arm: the spinner's wake follows a request and this one would follow every keystroke, so an application declaring no cursor would pay a composed frame per typing pause for a resolution that emits nothing. **And emit-on-change is load-bearing a second time here** — a machine that re-resolved per tick would put the shape on the wire at frame cadence, which is I63's defect one ruling along. The threshold is `CURSOR_BLINK_MS`, **600 ms and unmeasured**, recorded as unmeasured with the reasoning that a re-measurement would test (§6f.5).
 - **I65** — **A theme's background is a base style re-established after every reset, and never a span.** A sequence that returns a channel to the terminal's default is what a base has to survive, and that set is **`\x1b[0m` and `\x1b[49m`** — not `SGR_RESET` alone, which is what the walk counted. L1's rendered rows carry no full reset: Ink closes a foreground run with `39`, which a base survives untouched, and a background run with `49`, which returns the *background* to the terminal's own and is what a patch row ends with. Every such sequence inside a finished row is repaired in one pass by the painter, and `render-frame`'s per-row prefix is answered by the row's leading base (§6g.2). The blind spot is stated: a compound sequence carrying `0` or `49` among other parameters is not repaired, and nothing in the tree emits one — a measurement, not a guarantee. It is **not** merged into a span the way a diff row's background is, because a span is rendered inside a cached entry and a base is a fact about the screen: merging it would put a screen-level decision into C22 I58's cached bytes and oblige that key a new axis. The padding this was said to share with the selection wash is **already built and belongs to neither** — `exact()` squares every row and predates both, and `washed` consumes it (§6g.1). What the two share is the reset, one layer below where the note pointed. **Every painted row closes itself with a reset**, which makes the escaping attribute unreachable rather than repaired: no lifecycle path is touched, and a handoff, an exit, a fault and a signal are covered by one rule instead of four call sites. The cursor's shape needed C01's record because a shape *is* terminal state; a base is bytes inside a row, and that is where the two problems part (I63, C01 I20, §6g.3 rows 5 and 6).
 - **I66** — **A per-invocation presentation flag is read where the invocation is parsed and invalidates on its own account.** `--no-bg` is `shellOnly`, so `validation.transmitted` strips it and a local handler's positional argv stays correct — the safety belongs to the declaration and not to the handler, and declared otherwise a valid `/theme --no-bg light` answers with a usage error. Its reader is `LocalContext`'s validated `args`, because the only other surface a handler has is the line as typed and re-parsing that is the second parser `transmitted` exists to prevent; `--help`'s precedent does not extend, since `--help` *replaces* a result and this one modifies it. **Clearing the flag reaches a frame, and what discharges that is already built**: every `/theme` appends a notice through `appendAndCommit` and invalidates on the verb unconditionally, so the frame does not depend on `setVariant` — whose no-op guard is about the variant and is blind to the flag as a second axis on the same command. The obligation is stated here because it is the one a future refactor can silently drop: the day a `/theme` that changes nothing stops appending a document, the flag stops reaching the screen (§6g.3 row 2, §6g.5). The warning fires only where the flag suppresses an actual paint, names the consequence, and complies (→ C10 I25).
 - **I67** — **The state directory is created ignoring itself.** `stateDir` defaults to `.calcium` in the project directory, so anything written there — the theme preference, the history, and a persisted transcript once a verb declares one (C13 I20) — is a file that can be committed. The directory is created with a `.gitignore` containing `*`, which ignores the directory's contents **regardless of the project's own ignore rules** and does not depend on the app author having thought of it. It goes in beside the `mkdir` that already warns and continues, on the same ground: an unwritable state directory costs persistence and not the session, and an unwritten `.gitignore` costs the same.
-- **I68** — **A detected terminal polarity chooses the opening theme only where the reader has not usably stated one, and is never persisted.** The persisted name is read first and wins where the set holds it; absent, empty and not-in-the-set all fall through to the polarity, and the corrupt case keeps its notice — *a preference that cannot be honoured is not a preference*, and the alternative leaves a reader told their choice was ignored beside a theme neither they nor their terminal picked (§6h.2 row 6). The choice itself is **a search of the set for the first theme in declaration order whose `variant` matches**, read from `config.theme` rather than through a new C10 accessor, and a set with no such theme keeps its own opening key **silently**: the set is the app author's and the notice would be the framework reporting on it. `unknown` chooses nothing, which is the whole reason C02 I10 is three-valued rather than two. **Nothing writes the detected choice to `${stateDir}/theme`** — one writer, and it is `/theme`'s handler (I40) — because a written inference is indistinguishable from a statement on the next read, and that distinction is what the first clause runs on. This is the first reader of `variant` outside `store.ts`, which is the use C10 I27 published it for and the measurement it rests on going stale as predicted (→ C02 I10, C10 I25, I27).
+- **I68** — **A detected terminal polarity chooses the opening theme only where the reader has not usably stated one, and is never persisted.** The persisted name is read first and wins where the set holds it — held meaning *resolves*, through C10 I63, so a persisted `high-contrast` opens `hcDark`; absent, empty and not-in-the-set all fall through to the polarity, and the corrupt case keeps its notice — *a preference that cannot be honoured is not a preference*, and the alternative leaves a reader told their choice was ignored beside a theme neither they nor their terminal picked (§6h.2 row 6). The choice itself is **a search of the set for the first theme in declaration order whose `variant` matches**, read from `config.theme` rather than through a new C10 accessor, and a set with no such theme keeps its own opening key **silently**: the set is the app author's and the notice would be the framework reporting on it. `unknown` chooses nothing, which is the whole reason C02 I10 is three-valued rather than two. **Nothing writes the detected choice to `${stateDir}/theme`** — one writer, and it is `/theme`'s handler (I40) — because a written inference is indistinguishable from a statement on the next read, and that distinction is what the first clause runs on. This is the first reader of `variant` outside `store.ts`, which is the use C10 I27 published it for and the measurement it rests on going stale as predicted (→ C02 I10, C10 I25, I27).
 
 - **I69** — **The shell raises C04's floor after the frame, never inside it, and only when the block does not already hold one.** The fault is discovered during `visibleRows`; the request is issued where `#armSpinner` is, after the composition has returned, because patching the transcript during a read of it is a write inside the frame it would change. **The guard is `block.minHeight ?? 0` against what is wanted**, and it is the whole of termination: the second frame finds the field already set, raises nothing, and `rev` does not move. A request carries the `rev` it was observed at and is **discarded if `rev` moved**, so a far-side patch arriving in between cannot make the shell floor a block that never threw — which is the row a sequence trace produces and a classification table cannot (→ C04 I67, I68). **The number is the fault's and not this component's** (→ C09 I34): it is computed where the containment happens, because that is the only place holding both the text about to be drawn and the width it will be drawn at — this layer drains the request after the frame, by which time the width is gone. So `BlockFault` carries `rows` and the shell stopped importing a constant it had no way to compute.
 
@@ -2350,22 +3518,22 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I71** — **The render key's sixth axis is the camera, and the axis and a writer for it land together.** The key discriminates `(entryId, rev, width)` plus focus, the theme's identity, the window range, the scroll offset and `ctx.tick`; a camera changes what is rendered and moves none of them, so without the axis an orbit is served the frame it started from. **Its symptom is what distinguishes it from the other five and is why it is added before a report rather than after one**: those produce a *wrong* frame and this produces a *correct stale* one, thirty times a second, which is indistinguishable from a stopped process — so the report names the scheduler or the runner and not the cache (§6c). **The pair is the invariant.** `cursorPositions` is the counter-example already in the tree: read in one place, written by nothing in `src/`, and in no key — correct and unobservable together (C12 §3s). A camera field with no writer is that again, so either the context gains the camera *and* something can move it, or neither lands. I60's ruling one component along, paid on the day it is taken rather than the day it is noticed (→ C12 I83, C04 I75).
 - **I72** — **Auto-orbit is view state held beside the camera, it is off until a reader turns it on, and it is not in the render key.** A block cannot declare that it orbits (C04 I75), so *which plot is turning* is L4's exactly as *whether a spinner turns* is (I60) — and it lives in `Cameras` rather than in a store of its own, because a third store is a third callback for a future eviction path to reach two of and miss one (§6i table row 11). **Off is the default and it is a cost ruling**: a static 3D plot is one render held until the width or the theme moves, and an orbiting one is a full-frame redraw for as long as it is on screen — measured at **12.97 ms a frame** over 3,200 triangles at 80×24, so 30fps is 39% of a core, and at 69,192 triangles a frame costs 124 ms and no rate the scheduler offers can hold it. **The flag is not a key axis**, because the key discriminates what is *drawn*: a toggle that moves no camera moves no cell, and keying it would miss on the frame a reader stops the rotation to look at (`focusKey`'s warning, §6c). The corollary is that a fact about the session cannot be announced inside an entry's cached lines, which is where §12's P21 would have to go and does not (→ C12 I85, C04 I75).
 - **I73** — **The orbit advances the windowed set, and one switch chooses both its cadence and its commit reason.** The ticker is armed from what the frame drew after windowing (I60a) and the advance obeys the same set rather than the timer's firing — otherwise an unrelated spinner turns a camera nobody is looking at, and fifty settled entries each holding an orbiting plot advance fifty cameras a tick while one is on screen (§6i table row 2). **The commit reason is the frame rate.** `commit("spinner")` draws at the window's rate however fast the timer fires, because C03's `spinner` window is a floor under the ticker (I60a; I105 is why a floor and not an addend) — so the design note's *the stream window is 33 ms, so 30fps is free* named a window this component had never used. A live orbit commits **`stream`**, whose rationale in C03 §3 is a rate ceiling and says nothing about the source; everything else keeps `spinner`, whose rationale — *a faster tick conveys nothing* — is true of a ten-frame glyph cycle and false of a rotation. **`synchronisedUpdate` throws the same switch**: absent, the orbit ticks at 100 ms and commits `spinner`, which is a full-frame rewrite at 10fps instead of 60 on a terminal that would tear sixty times a second. The orbit's cadence is `stream`'s window and moves with it — 16 ms since F1199. One switch, two effects, and no constant invented — the capped rate is the one §11 already calls acceptable at full quality (→ C03 I3, C02).
-- **I74** — **The spinner's counter and the orbit's angle are both functions of elapsed time, and the shared timer is a wake-up rather than a cadence.** One timer armed at the fastest cadence on screen cannot serve two animations, and it fails in both directions: an orbit at 100 ms beside an 80 ms spinner turns **25% fast**, and an orbit at 33 ms beside the same spinner advances `ctx.tick` **three times too often** so the glyph spins at 30fps. Both are one cause — a step per firing rather than a step per interval — so the azimuth is `ω · Δt` and the counter advances only when the spinner's own interval has passed. The clock is `config.clock`, which `session.ts` is the one file SS1 allows to name. **`ω` is one revolution in 12 seconds**: at 60fps that is 0.5° a frame and at 30fps 1°, at and between the `π/256` and `π/64` steps measured at 22% and 30% of cells changing, and at the capped 10fps it is 3°, just past `π/64` — so every rate reads as motion rather than as a jump, and the number comes from the measurement rather than from taste (→ I60a).
-- **I75** — **The manual scheme is the bracket family; the distance control is multiplicative and the elevation control has no clamp.** The design note's `← → ↑ ↓ + − r` does not survive the keymap: `↑` and `↓` at `liveBlock` are `rowUp` and `rowDown` and a duplicate is refused at construction, and `←` `→` were unbound at `liveBlock` (dropped, not passed to the prompt — C16 I28 measured it: `dispatch` runs the target's handlers and then `global`, never `prompt`) and are now the horizontal pair (I76), so claiming them would take two keys from **every** focused block for a feature one kind has — the argument `[` and `]` were already chosen on (I71). So `[` `]` turn, `{` `}` tilt, `+` `−` dolly, `r` restores the block's declared view and `o` toggles the orbit. **Distance scales rather than steps**, because a multiplicative control cannot reach the one degenerate value: measured, `distance: 0` inks nothing and is the only such value — `0.01` inks 1776 cells, `−1` inks 1742, and `−6` inks the same 297 as `+6` because it is the antipodal view. The hazard is passing *through* a blank frame, not landing on a wrong one. **Elevation needs no clamp**, because the pole is unreachable: `cos(π/2)` is `6.123e-17`, so `cross(forward, ẑ)` is tiny rather than zero and elevation exactly `π/2` draws a plan view of 289 inked cells — F464's figure and F464's mechanism, one function along, and `basisOf`'s comment claiming the figure collapses to a line describes a case its own arithmetic cannot produce (F467). The store still clamps nothing and normalises nothing; the effect computes the step and the store records it, which is `pageBlock`'s seam (→ C12 I85, C26 I2).
-- **I76** — **The crosshair is view state in `CursorPositions`, its writer is the `←`/`→` pair at `liveBlock`, and it is the render key's seventh axis — landed together, on I71's own rule.** `RenderContext.cursorPositions` was I71's counter-example: read in one place (C12's `positionalForm`), written by nothing in `src/`, in no key — correct and unobservable, for as long as the plot-interaction suite supplied the field itself. The store is `Cameras`' shape keyed `(entryId, blockId)`, dropped on `rendered`'s subscription with the other two, threaded into the context by `visibleRows`. **The value is an index into the data, not a column** (C12 I37), so a resize keeps the cursor on its sample; **absent is not zero** — no entry is no crosshair and `0` is the first sample — so unlike `ScrollOffsets` the key omits nothing. **The ceiling is the sample count and the effect holds it**, not the store: `cursorBlock` clamps to `[0, n)` and the store records, which is `dollyBlock`'s seam (I75); a first `→` lands on the first sample and a first `←` on the last. **The writer gates on C12's `cursorable`** (C12 I85) — the predicate `elements()` declares the focus stop on — so a form that draws no crosshair stores no cursor; the residue this sentence used to name (*a cursor set on a form that draws none is stored and unread*) closed when the writer asked the renderer the question the renderer answers, rather than keeping a second list of forms here, which is the two-copies hazard (→ C12 §3s, I37; C16 I28).
+- **I74** — **The spinner's counter and the orbit's angle are both functions of elapsed time, and the shared timer is a wake-up rather than a cadence.** One timer armed at the fastest cadence on screen cannot serve two animations, and it fails in both directions: an orbit at 100 ms beside an 80 ms spinner turns **25% fast**, and an orbit at 33 ms beside the same spinner advances `ctx.tick` **three times too often** so the glyph spins at 30fps. Both are one cause — a step per firing rather than a step per interval — so the azimuth is `ω · Δt` and the counter advances **once per `TICK_MS` (80 ms) of elapsed time** — the unit C09 I112 reads it in — and never once per wake or once per the fastest interval on screen. *(Amended 2026-09-25: it read* the counter advances only when the spinner's own interval has passed*, where* the spinner *was the fastest set on screen — so a counter shared by two sets ran at the faster one's rate and the slower set stepped too fast. The wake is still armed at the fastest interval; what it advances is time.)* The clock is `config.clock`, which `session.ts` is the one file SS1 allows to name. **`ω` is one revolution in 12 seconds**: at 60fps that is 0.5° a frame and at 30fps 1°, at and between the `π/256` and `π/64` steps measured at 22% and 30% of cells changing, and at the capped 10fps it is 3°, just past `π/64` — so every rate reads as motion rather than as a jump, and the number comes from the measurement rather than from taste (→ I60a).
+- **I75** — **The manual scheme is the bracket family; the distance control is multiplicative and the elevation control has no clamp.** The design note's `← → ↑ ↓ + − r` does not survive the keymap: `↑` and `↓` at `liveBlock` are `rowUp` and `rowDown` and a duplicate is refused at construction, and `←` `→` were unbound at `liveBlock` (dropped, not passed to the prompt — C16 I28 measured it: `dispatch` runs the target's handlers and then `global`, never `prompt`) and are now the horizontal pair (I76), so claiming them would take two keys from **every** focused block for a feature one kind has — the argument `[` and `]` were already chosen on (I71). **Amended — the design note's scheme was right and the target was wrong** (§102, C16 I28, C26 I26, I27, `R-INT-005`). Every sentence above is about **`liveBlock`**, where the arrows step elements and taking them would cost every focused block two keys; §102 puts the camera at `interaction`, where nothing steps, and draws the scheme it drew: `←→ orbit   ↑↓ tilt   o auto   r reset   esc out`. So the arrows turn and tilt, `[` `]` `{` `}` retire, `+` `=` `−` keep the dolly — the control row sheds descriptions before it disappears, so its not naming a dolly key says nothing about whether one exists — `r` restores the block's declared view and `o` toggles the orbit. **Distance scales rather than steps**, because a multiplicative control cannot reach the one degenerate value: measured, `distance: 0` inks nothing and is the only such value — `0.01` inks 1776 cells, `−1` inks 1742, and `−6` inks the same 297 as `+6` because it is the antipodal view. The hazard is passing *through* a blank frame, not landing on a wrong one. **Elevation needs no clamp**, because the pole is unreachable: `cos(π/2)` is `6.123e-17`, so `cross(forward, ẑ)` is tiny rather than zero and elevation exactly `π/2` draws a plan view of 289 inked cells — F464's figure and F464's mechanism, one function along, and `basisOf`'s comment claiming the figure collapses to a line describes a case its own arithmetic cannot produce (F467). The store still clamps nothing and normalises nothing; the effect computes the step and the store records it, which is `pageBlock`'s seam (→ C12 I85, C26 I2).
+- **I76** — **The crosshair is view state in `CursorPositions`, its writer is the `←`/`→` pair at `interaction`** *(amended from `liveBlock` — §102, C16 I28, C26 I27: a crosshair moved from outside the plot is a domain value committed from outside)*, **and it is the render key's seventh axis — landed together, on I71's own rule.** `RenderContext.cursorPositions` was I71's counter-example: read in one place (C12's `positionalForm`), written by nothing in `src/`, in no key — correct and unobservable, for as long as the plot-interaction suite supplied the field itself. The store is `Cameras`' shape keyed `(entryId, blockId)`, dropped on `rendered`'s subscription with the other two, threaded into the context by `visibleRows`. **The value is an index into the data, not a column** (C12 I37), so a resize keeps the cursor on its sample; **absent is not zero** — no entry is no crosshair and `0` is the first sample — so unlike `ScrollOffsets` the key omits nothing. **The ceiling is the sample count and the effect holds it**, not the store: `cursorBlock` clamps to `[0, n)` and the store records, which is `dollyBlock`'s seam (I75); a first `→` lands on the first sample and a first `←` on the last. **The writer gates on C12's `cursorable`** (C12 I85) — the predicate `elements()` declares the focus stop on — so a form that draws no crosshair stores no cursor; the residue this sentence used to name (*a cursor set on a form that draws none is stored and unread*) closed when the writer asked the renderer the question the renderer answers, rather than keeping a second list of forms here, which is the two-copies hazard (→ C12 §3s, I37; C16 I28).
 - **I77** — **An animated image's frame is view state in `Frames`, advanced on the orbit's wake by elapsed time, keyed as the render key's eighth axis with zero omitted, and gathered only on the arms that rasterise.** A GIF declares its cadence where the orbit has none, so the ticker is armed for the earliest frame change on screen (`Frames.due`) and floored at the orbit's rate — a 100/200 ms GIF wakes six times in 990 ms, a still arms nothing — and one stamp (`#motionAt`) serves both motions because both are `f(Δt)` from one wake and a second stamp is a second place for the reset on stop to miss (I74). **The index is walked by whole delays with the remainder kept**, so a spinner's wake beside it moves nothing and a minute idle lands where the clock says; **zero is omitted from the key** on `ScrollOffsets`' rule and not `Cameras`', because frame 0 after a loop draws what frame 0 drew and the absent state is exactly zero. **Not gathered where the terminal is animating it**, which is `kitty` **and an addressable placement** and not the capability alone: the arm is `placesAtProtocol` (C09 I67), asked per image at the width the run rendered it at, because a placement past the diacritic encoding falls to the half block and a session gating on `imageProtocol` served that reader frame 0 for ever (F624, F1026). Where the terminal does hold the frames, an animation costs the session what a still does (C09 I39). The store joins `rendered`'s eviction subscription as the fourth entry, which is the count the argument was written to survive (→ C04 I93, C09 I39, I67, I71, I74).
 - **I78** — **A series' visibility is view state in `SeriesVisibility`, overriding `Series.hidden` per entry and block; its writer is the plot's own `BlockKeymap` of digits, merged at `liveBlock` when focus lands on the plot and withdrawn when it leaves; and it is the render key's ninth axis with every override in it — landed together, on I71's rule.** The store is `CursorPositions`' shape keyed `(entryId, blockId)`, holding an explicit boolean per series index rather than a set of hidden indices, because the override has to be able to say *shown* over a producer's *hidden* (C04 I99); `forEntry` carries the entry's record into the context and `key` carries every override sorted, because absent is the block's own default and `false` is not absent. `toggleSeriesBlock` reads the effective state — override, else the member, else shown — and writes its negation; it clamps nothing beyond *the index exists*, which is `dollyBlock`'s seam (I75). The keymap is the plot's (`plotDefinition.keymap(block)`, C12 I116): `syncBlockKeymap` compares the focused block to the last merged one before every key is resolved and merges or withdraws through `Keymap.mergeBlock` (C16 I27) — a pull, because focus has none of its own to subscribe to. **This is `mergeBlock`'s first production caller and `BlockKeymap`'s first producer** (C26 T2.6a, inverted). An override for an index the block no longer has is kept and inert (C23 I47), and named as the residue. The store joins `rendered`'s eviction subscription as the fifth entry (→ C04 I99, C12 I116, C16 I27, I71, I76).
 - **I79** — *Retired 2026-09-05 (§6l).* It read: the footer's row budget is declared once per session and never returned by a `ChromeFn`. The footer's height is now what its blocks measure (I82); the reasoning that produced I79 is kept in §6k.
 - **I80** — **`heightsSum` asserts `HEADER_ROWS + HEADER_RULE_ROWS + region.height + RULE_ROWS + promptRows + footerRows === rows` with the footer height the frame was composed with, and the footer occupies exactly that many rows above the bottom edge, the lower rule directly above it.** `MAX_FOOTER_ROWS = MIN_ROWS − HEADER_ROWS − HEADER_RULE_ROWS − RULE_ROWS − ⌊MIN_ROWS/2⌋ − 1` — 3 today, 4 before the header's rule (§6l.7) — is derived, not chosen, and T1.35 asserts the derivation (→ §6l.2 row 7, §6l.4 C).
-- **I81** — **Two rule rows bound the prompt on every frame the gate accepts** — one directly above the prompt's first row, one directly below its last — full width, the glyph table's `horizontal` at the terminal's unicode tier, muted tone, plain at 1-bit; drawn whether the footer has rows or none, and never configurable (→ §6l.2 rows 1–3, §6l.4 A, F).
+- **I81** — **Two rule rows bound the prompt on every frame the gate accepts** — one directly above the prompt's first row, one directly below its last — full width, the glyph table's `horizontal` at the terminal's unicode tier, muted tone, plain at 1-bit; drawn whether the footer has rows or none, and **their geometry is never configurable** (→ §6l.2 rows 1–3, §6l.4 A, F). **The clause used to read *never configurable* and it was about the rows** (§6l.10, `R-COL-003`): the upper rule carries an inline-end label when the application supplies one, which changes no row, no width and no tone of the rule's own glyphs. The header's rule and the prompt's lower rule stay bare, because two rules with two labels is a header and the header already exists.
 - **I82** — **The footer's height is the measured height of the blocks its `ChromeFn` returns, clamped to `[0, MAX_FOOTER_ROWS]`, measured per frame through the same `measureSequence` that renders it.** `[]` is zero rows; content past the cap is truncated top-down. No config field sets it (→ §6l.2 rows 4–6, 8; §6l.3 rows 1–3; §6l.4 B).
-- **I83** — **A document whose first block is a `step` notice lays out its remaining blocks four cells narrower under a hook, and the viewport's measurer and the frame's renderer reach that layout through one function.** `entryLayout(blocks, width)`: block 0 at `width`, blocks 1… at `width − 4` prefixed two blanks and `⎿ ` on the body's first row and four blanks after, the hook muted; a `step` header with no body draws no hook; any other first block leaves the document as it was. Two cells and the hook at column 0 until §6l.6 (→ §6l.2 rows 11–15, §6l.3 row 4, §6l.4 D, §6l.6 row 16).
+- **I83** — **A document whose first block is a call head (a notice carrying a `state`, C04 I141) lays out its remaining blocks `BODY_INDENT` cells narrower under a hook, and the viewport's measurer and the frame's renderer reach that layout through one function.** `entryLayout(blocks, width)`: block 0 at `width`, blocks 1… at `width − BODY_INDENT` prefixed two blanks, the hook padded to its reservation and one blank on the body's first row — `  ⎿  `, `` `- `` in ASCII — and `BODY_INDENT` blanks after, the hook muted. **`BODY_INDENT` is `HOOK_INDENT` + the hook's reservation + 1, five cells**, derived from C09's `glyphCells` rather than written: it was 4 while the ASCII hook was one character, and the registry's is two (C09 I5, R-GLY-003). A call head with no body draws no hook; any other first block leaves the document as it was. Two cells and the hook at column 0 until §6l.6 (→ §6l.2 rows 11–15, §6l.3 row 4, §6l.4 D, §6l.6 row 16).
 - **I84** — **One indentation unit, two cells, and a subordinate mark sits at its parent row's text column.** A level-0 mark is at column 0 and its text at column 2 (`PROMPT_GUTTER.first`); a mark under a row sits at that row's text column and its own text one unit further in. So the card's hook is at column 2 and its body at column 4, and the `continuation` mark drawn by C09 in a notice and drawn by the shell as a card's gutter are the same column on one screen (→ §6l.6 rows 16–17, G).
 - **I85** — **Every entry ends with one blank row, and it is the entry's.** `entryLayout` ends every layout with a blank run; C14 measures it through the wrapper `construct.ts` injects, `visibleRows` draws it, `entryAtRow` maps it to the entry above, and no composer adds spacing of its own (→ §6l.6 rows 18–19, I).
 - **I86** — **Default chrome is two clusters: the left takes the remainder, the right its content width, and the last cell of the right cluster is the frame's last column.** The header and footer `makeDefaultChrome` returns are each one `group` row, `flex: [1, { cells: right }]`, with no `align` — the cell's width is the whole mechanism, and `right` equals C09's measured width of that `pills` block, so the cluster fills its cell and the cell ends the row (→ §6l.6 row 20, J; F822 for the `align` that was there).
 - **I87** — **A rule row separates the header from the region on every frame the gate accepts.** Row `HEADER_ROWS` is the glyph table's `horizontal` at the terminal's unicode tier, full width, muted, plain at 1-bit — the same row the prompt's two rules are; `region.top` is `HEADER_ROWS + HEADER_RULE_ROWS`, the region is one row shorter for it, and `MAX_FOOTER_ROWS` is derived with it. Never configurable (→ §6l.7 row 21, K).
 - **I88** — **A card's body rows after the first carry a left rule in the hook's column, and it costs no geometry.** `bodyGutter` draws `glyphForMask(LINE_UP | LINE_DOWN, "sharp", caps)` muted at column `HOOK_INDENT` on every body row whose run-local index is not 0, padded to `BODY_INDENT`; row 0 keeps the hook. The bar fills cells I84 reserved, so `measureEntry` is unchanged and I83 holds by construction (§6l.8 row 22).
-- **I89** — **A `group` column whose first block is a `step` notice, inside a card's body, lays out as a card one unit further in, and the layout recurses exactly once.** A single child hangs under `⎿`; with siblings the gutter draws `├─` for every child but the last, `└─` for the last **when nothing in the body follows it**, and `│` past a child's body, every glyph from `glyphForMask` with corners fixed `"sharp"`; the last child's body has no bar above it. A last child followed by body text takes `├─` and the bar runs past it, because `└─` says *nothing continues below* and the parent's rule (I88) would then draw through it — the frame said so before the first row did. A `step` at depth 3 is laid out as body text. `GUTTER_UNIT === BODY_INDENT` (§6l.8 rows 23–25).
+- **I89** — **A `group` column whose first block is a call head, inside a card's body, lays out as a card one unit further in, and the layout recurses exactly once.** A single child hangs under `⎿`; with siblings the gutter draws `├─` for every child but the last, `└─` for the last **when nothing in the body follows it**, and `│` past a child's body, every glyph from `glyphForMask` with corners fixed `"sharp"`; the last child's body has no bar above it. A last child followed by body text takes `├─` and the bar runs past it, because `└─` says *nothing continues below* and the parent's rule (I88) would then draw through it — the frame said so before the first row did. A `step` at depth 3 is laid out as body text. `GUTTER_UNIT === BODY_INDENT` (§6l.8 rows 23–25).
 - **I90** — **A card head's `copy` is the entry's command.** `elementsOfEntry` receives `command` and overrides the `step` element's `copy` with it; every other element's `copy` is the block's own, so `⌃a y` over a card yields the invocation followed by the body's sources through C26 I16's aggregator and no second one (§6l.8 row 26).
 - **I91** — **`TuiConfig.pty` is passed through to C21's deps unchanged and read nowhere else.** The composition root's whole job for it: the framework depends on no PTY package (C21 I15), so the only way one reaches a child is a consumer handing it in, and a root that inspected or wrapped it would be a second place the port's shape is known.
 - **I92** — **`profile` absent means no profiler exists.** The constructed graph is identical to one built from a config without the field: nothing is allocated, `elapsed` and the probe are never called, no timer is scheduled and no `FinalizationRegistry` is registered. Every decorated seam costs one `undefined` check (→ C28 I1).
@@ -2396,8 +3564,70 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I106** — **The visibility gate's set of ids is built once per range object.** `VisibleIds.of(range)` returns the set of `range.entries`' ids; while the range object it is handed is the one it last saw, the same set — by identity — and when it is a different object, a set built from that object. One slot: the previous range is unreachable the moment C14 I30 hands back a new one, so nothing is kept for it. The `visible` dependency handed to C23 is `host.kind === "view" || visibleIds.of(viewport.visible()).has(host.id)`, and its answer is the `.some` it replaces on every host (F1201).
 - **I107** — **The card body is derived once per blocks array, and every call of the layout over the same array hands out the same body objects.** `entryLayout` holds the body `cardBody` derives — for the top card keyed on the document's `blocks`, for a nested card on the group's `children` — in a `WeakMap`, and reads it back while the array it was derived from is the one it is handed; a replaced document is a new array and a new body. Sound for I100's reason: a blocks array is deep-frozen (C04 I1) and replaced with its document (C23 I34), so the same array is the same body. F821's constraint is kept whole — the document's own objects are never copied over and the live driver never reads the layout. The observable is I100's, extended to cards: on a still card whose body opens with a gapped block, `measure` misses on the first frame and none after; before this every frame missed once there, because a copy that lives one frame is a new key each frame, and C09 I76's form hold and C25 I22's plan missed with it (F1203).
 - **I108** — **The schedule C22 hands C03 dates a window from the last slot's own firing, and no window is shorter than one sixtieth of a second.** `pacedSchedule(sampleClock, schedule)` wraps the ambient timer and holds the deadline of the slot now firing: an arm made **inside that firing** — the write that opens the next window (C03 I17) — is dated from the slot's deadline, so the delay is `deadline + window − now` and the lateness of the firing is taken off the next; every other arm is dated from now. **Only a window of the same length chains.** The slot now firing and the arm made inside it are the same cadence only when they ask for the same period, and a session runs several at once — C03's 16 ms stream window, its 80 ms spinner window, the ticker's own interval — so an arm of one length dated from the deadline of another is a frame placed on a cadence it does not belong to, which reads as a rate halved rather than as a phase error. A lone commit's latency is therefore unchanged, and so is the one after a slot that fired with nothing in it and lapsed: it armed nothing inside its own firing, so the chain does not run through it and the next commit is a fresh window rather than a frame a window after a deadline nothing drew at. A positive window under `1000 / 60` ms is armed at `1000 / 60` — a zero window is C03's next turn (C03 I10), neither floored nor chained nor remembered — because C03's windows are integer ceilings on each gap (C03 I15) and a 16 ms window dated end to end would draw 62.5 frames a second where A02 §7 budgets sixty. The clock is the **untapped** `sampleClock` C28 I53 gave the sampler, not the recording's tapped `elapsed`: these reads date timers and enter no frame, a replay's timers are not the recording's, and a read per arm on the positional channel is one the replay consumes at a position it never reaches (C28 I14, T5.1c). **And a replay is not paced at all.** Taking the reads off the positional channel keeps the replay's clock intact and does not make the cadence reproducible: how many times the schedule arms is itself a function of when timers fired, so a paced replay composes a different number of frames than the recording it is checked against and exhausts the recorded clock (C28 I14, T5.1). A session built with `profile.replay` is handed the ambient schedule the recording was driven by; the pacer corrects real-time lateness and a replay has no real time to be late against. C03 reads no clock (C03 I11) and is not changed; its I17 period — the window and not the window plus the frame — was true of the arms and false of the wall clock, because the timer fires about a millisecond late and the next window was dated from that firing. **Measured twice, and the first reading was of a tree with a second defect in it** (F1206, F1207): with the live poll dating itself from each fetch, 695 of 706 slots were cancelled before they closed and this invariant moved nothing while its floor widened every coalescing window; with C23 I72 in place the slot closes a fifth to a half of all frames and the three live cases sit at 60.0 to a tenth.
-- **I109** — **The region has a width, and it is the terminal's less the content margin.** `compose` answers `region.width = max(1, size.columns - CONTENT_MARGIN_R)` with `CONTENT_MARGIN_R = 1`, and it is the width the transcript is resized to, the width the prompt's body is laid out in and the width an overlay's box is placed against — `APPEARANCE.md` §15 rule 8, *content stops one column before the right edge*. **Three composers keep the terminal's width and each exemption is an invariant already written**: the three rule rows by I81 and I87 (*full width … never configurable*), the header's and footer's clusters by I86 (*the clock at the right edge*), and the too-small fallback, which is drawn where no region exists. So the gutter a rule crosses is the declared shape rather than a ragged edge (§6l.9 rows 1–2, 6). Never configurable, for I81's reason: a margin an app can switch off is a second frame shape to specify. The paint still pads every row to `size.columns` — the frame is the terminal's width and the *document* is narrower, which is the one distinction a composer can read the wrong side of, and why the value is computed once here rather than spelled `size.columns - 1` at each site (→ §6l.9, C14 I22, F1227).
+- **I109** — **The region has a width, and it is the terminal's less the content margin.** `regionWidth(columns) = max(1, columns - CONTENT_MARGIN_R)` with `CONTENT_MARGIN_R = 1`, and it is the width the prompt's body is laid out in and the width an overlay's box is placed against. **The transcript takes one column less** (C14 I57, ruling 68): `compose` answers `region = { left: 1, width: transcriptWidth(columns) }`, the content width less the rail's reserved column 0, and the transcript is resized to that — `APPEARANCE.md` §15 rule 8, *content stops one column before the right edge*. **Three composers keep the terminal's width and each exemption is an invariant already written**: the three rule rows by I81 and I87 (*full width … never configurable*), the header's and footer's clusters by I86 (*the clock at the right edge*), and the too-small fallback, which is drawn where no region exists. So the gutter a rule crosses is the declared shape rather than a ragged edge (§6l.9 rows 1–2, 6). *Amended (review batch 4, §6q)*: the margin column carries the transcript's bar on the region's rows while the transcript overflows (C14 I62), and nothing else. Never configurable, for I81's reason: a margin an app can switch off is a second frame shape to specify. The paint still pads every row to `size.columns` — the frame is the terminal's width and the *document* is narrower, which is the one distinction a composer can read the wrong side of, and why the value is computed once here rather than spelled `size.columns - 1` at each site (→ §6l.9, C14 I22, F1227).
 
+- **I110** — **A child surface is an entry the host keeps writing, not a layer it pushes** (C16 I49, C24 §, R-BLK-645, R-BLK-711, R-BLK-312, R-BLK-314). `openSurface` appends the surface's blocks as an ordinary transcript entry and replaces its document on every invalidation and resize; it pushes no layer and takes no region. *A CAPTURED CHILD OWNER over its block. The border says your keys go to the child; the transcript stays* — so the three things a pushed view cost are all returned at once: the reader can scroll, what settled while the child was attached is in the record (R-BLK-314), and the entry is still there after the detach rather than being a hole where the work was. **What settled while it was attached is also said, once, on the detach** — one notice entry by C23 I85–I87's ledger, R-BLK-314's *what changed while you were away* — and the entry is **sized to the room it has** (C24 I41) and **kept whole** while attached (C14 I56), so a full-size child is on screen from its command row to its bottom border for as long as it holds the keyboard. **The detach's frame is composed after ownership returns**: the frame the close commits reads `attached` false, so the footer's owner line stops saying `keys → child` on the frame that ends the capture rather than on whichever frame comes next.
+- **I111** — *(§6l.10, §069, `R-COL-003`, `R-BLK-175`)* **The prompt's upper rule carries the application's label inline-end, painted as a ground, and it is the first thing the frame sheds.** One trailing rule glyph after it; `bgElev`, because a name is a thing and things take a ground; the header's rule and the prompt's lower rule stay bare. **Dropped at `MIN_COLUMNS` and whenever it cannot fit leaving at least one rule glyph**, and the drop is the frame's rather than the caller's — an application supplies the string and has no say in whether it is drawn, which is what *the least load-bearing thing on the screen* means as a mechanism. With no label supplied — or a string that strips to nothing, which is the same thing said by a caller that computes it — the frame is the one that shipped, glyph for glyph. **The ground is a HUE where the application names one** (I114, §070, C10 I55). `bgElev` was written into `labelSpansOf` as a literal and §070's whole subject is that it is not one: *one terminal is not one project — four windows on four checkouts look identical, and the cost of typing into the wrong one is a bad afternoon*, answered by *a painted label: zero rows, one glance, and it sits where your eye already is when you type*. So the label carries a ground and an ink, and both come from the hue: `hues[name].ground` and `hues[name].on`, which is what the third tier is for — the ink on a band is a property of the band, and a label whose ink is guessed is the failure `R-THM-005` exists to prevent. **No new resolution**: C10 I55 made a hue reachable and this is its first consumer, so the value travels values → resolver → painted surface with nothing invented in between. **`bgElev` remains the answer when no hue is named**, which is §070's `/colour off` and is the frame that shipped, glyph for glyph — so the row that guards the no-label frame guards the no-hue frame too. And the shedding is unchanged: a hue changes what the label is painted with and never whether it is drawn. **At 1-bit the label is drawn unpainted as `[name]`** (I147, §6r). It is not shed. *(This clause said until review batch 4 that the label is shed at 1-bit. That dropped the application's identity on exactly the terminal where glyphs are all the frame has, and the design's unpainted rung already answered it.)*
+- **I112** — *(§6l.11, C17 §5c, `R-STA-002`, `R-BLK-628`, `R-BLK-116`)* **A chip in the prompt is painted as a ground, and the selection outranks it.** `promptChips` is C17's cell ranges mapped through the prompt's window as the selection's are; the style is `tone.meta` resolved on `surface.bgDeep` — *a well* — and where a region reaches a chip the chip's ground gives way **entirely**, which is a property rather than a simplification: a chip is one grapheme (C17 I25), so a region endpoint is either before it or after it and a wash can only cover the whole label or none of it. **One pass over the row**: `styled` replaces `washed` and cuts at every boundary, because `sliceCells` cannot read a row that has already been painted and applying the second ground by a second call would measure SGR bytes as cells.
+- **I113** — *(§6l.12, §101, `R-BLK-823`, `R-BLK-824`, `R-BLK-774`)* **A chip previews as a panel above the prompt, derived from the caret and pushed only onto an empty stack.** The chip is the one before the caret, or the one after it when there is none before; the placement is the completion menu's — anchored at the prompt, `prefer: "above"`, the region's width — and the layer is `kind: "panel"`, non-blocking, `dismissal: "escape"`. **Recomputed after every edit and every motion**, as the transcript's peek is recomputed after every delivered input, because *focus decides which* and focus is a pull with no change stream (C16 I11). **No binding opens it**: the registry names none, and a projection is what the design's own sentence asks for rather than a chord it never gave. The panel is not pushed while any other layer is on the stack, so a question, a menu or a search is never covered by something that arrived because the caret moved. **And the prompt goes on answering underneath it** (I51, C19 I20): a preview is a display of what a chip holds and never a choice being made, so every key belongs to the prompt while it is up — unconditionally, where the completion menu's version of the same rule is conditioned on holding no selection. A preview that took the keys would stop the caret moving, which is the one thing that closes it. *Amended (review batch 4, ruling 53)*: the preview owns three chords the prompt does not bind, and they are I143's; every other key is still the prompt's. *Amended (lane b4-panels, F1503, §6s ruling 2)*: the preview is §101's menu panel — an upper `rule`, a header naming the chip as `chipLabel` spells it, the box, the key row — and not a `panel` block, which drew a titled box the other two panels do not.
+- **I114** — *(§070, C10 I55, `R-COL-003`, I111's ground)* **The label's ground is a hue the application NAMES, resolved per theme, and `bgElev` is what it means to name none.** §070's first line is the rule: */colour takes a COLOUR NAME — not a tone. The tones mean something; this is you choosing what your terminal looks like.* So what crosses the seam is a name, and C10 answers it — `hues[name].ground` for the band and `hues[name].on` for the ink, which is what the third tier exists for: the ink on a band is a property of the band, and a label whose ink is guessed is the failure `R-THM-005` prevents. **Nothing is resolved twice.** C10 I55 made `hue.<name>` reachable through the one resolver and this is its first consumer, so the value runs registry → projection → resolver → painted surface with nothing invented between. **An unknown name falls back to `bgElev`, not to nothing.** The name arrives from `.calcium/config.toml` where a person typed it, so the reachable wrong input is a misspelling, and a label that disappears is a worse answer to a typo than one that is simply not tinted — the identity is the *word*, and the tint is what makes it catch the eye. **What is NOT built here, named so it is not discovered later.** §070 draws four more fills on the same slot — a gradient between two hues, any colormap the plot system has, an animated ramp, and a literal hex. Each is a **fill** where this is a colour, so the label's ground wants to become a fill before any of them lands, and the design already rules two of their hard parts: the animation is *an explicit PERSONALIZATION/DECORATION exception: default off, never semantic, and suppressed in REDUCED and OFF*, and the hex is gated behind a **choice-only** contrast question, which is M15's work and needs M15's replace/float axis before it can be asked. The colormap half is the only one with no owner named. **Traced 2026-09-24, so the next pass starts from the symbols rather than from this sentence.** Three of the four need no new vocabulary: §070's `wave · drift · breathe · shimmer` are **all four already `RampAnimation` members** (`types.ts:429`, twenty-four of them), its `blue..pink` is the registry's `gradient-linear` over two hue grounds, and *any colormap the plot system has* is `src/data/colormaps/`. **The per-cell machinery is built too**: `paintRuns` splits a ramped run into one span per cluster with the position carried through `at`/`of` so a wrapped span continues rather than restarts (`paint.ts:118`, C09 I51), and `rampStyle(ramp, t, index, theme, caps)` is the sampler. **What is missing is one thing and it is a channel, not a mechanism**: `rampStyle` returns `{ colour }` — the foreground — and a label's fill is a **ground**, so a ramped background has no expression anywhere in the tree. That is the symbol to grep when this is picked up, and it is why `Label.hue` is a name rather than a fill today: widening it before the channel exists would be a field with no renderer, which is the shape C10 I53 and I55 were both written about. **And the shedding is untouched**, which is the property a ground could quietly break: a hue changes what the label is painted with and never whether it is drawn. At 1-bit there is no ground to paint with, so the label is drawn unpainted as `[name]` (I147), byte for byte whether a hue is named or not, and the hue reaches no rung the ground did not.
+- **I115** — *(§075, `R-HON-008`, parked 28)* **`resolveConfig` records where each reader-facing value came from.** `settings` is `motion`, `hover`, `maxBlockRows` and `stateDir`, in that order, each as `{ key, value, source }` — the key as `TuiConfig` spells it, the value as text, the source one of `default`, `config`, `env`, `flag`. **Every source is `default` today, and that is the ruling's premise taken rather than a gap**: a `TuiConfig` value is the reader's default whether the framework supplied it or the application did, because the reader chose neither — §075's ladder reads *default — nobody chose it* from the reader's side. `config`, `env` and `flag` are the reader's own choices and their producers — a config file, the environment, flags — do not exist; the union holds them so a producer declares a source rather than widening a type. The `??` that resolved each value kept neither side, which is why the record is taken here, at the one site that knows which side won. **Its reader is `/config`** (C23 I80, ruling 43), which draws it through `PipelineDeps.settings` — the resolved record, handed down as `capabilitySources` is, and never re-derived.
+- **I116** — *(§6l.13, §105, §012)* **A toast is one string the session holds for `TOAST_MS`, drawn by the default footer in place of its tail, and it takes no keys.** It raises no layer and is no rung, so no key reaches it. A newer toast replaces an older and **disposes its timer**, so the older's expiry cannot clear the newer; stopping disposes it before the release. The lifetime is a scheduled expiry through the injected `schedule`, never a clock read. A toast is for a fact that changed nothing (§012's table) — the session's toast takes text and appends nothing, so it is never the only record of one that did. **Its mark is `ok`'s `✓` in `ok`, except a question's expiry** (C23 I92, `R-BLK-881`): `queued`'s hollow `○` in `muted`, carried to a chrome as `ChromeContext.toastMark: "expired"` — the question resolved itself, which went neither well nor badly.
+- **I117** — *(C04 §3aq, C04 I134, C26 I28, §105, §021)* **The shell keeps a split's panes as it keeps a scroll box.** Each pane's offset is held under the pane's own key in the offset store. The pull moves the focused pane by the minimum (C26 I24). `PgUp`/`PgDn` page the pane focus is in. The wheel pages the pane under the pointer. The divider is written by a shell-origin `replace`, from `⌥←`/`⌥→` one cell at a time and from a pointer drag. A press on the divider's column arms the drag on that split, motion with the button held moves it, and the release ends it. Neither moves focus. **The split's width is asked of the block library** (C09 I126): `blockWidthInEntry` descends through `childWidthsOf`, so a split inside a box with a bar, or in a right pane with one, is clamped and paged at the width it is drawn at and not at C04's division of the region.
+- **I118** — *(C04 §3ar F1–F10, C04 I137, C17 I29, C16 I60)* **The shell lends a form field the prompt's editor, and every path out of the field gives it back.** Entering a field holds the reader's line (C17 I29) and loads the field's value with the caret at its end. While it is held the prompt row draws the held line, the field draws the editor, and `RenderContext.focus.draft` carries the editor's text and caret (C09 I119). `⏎` writes the value by a shell-origin `replace` and enters the next field, keeping the line held; from the last field focus goes to the default button in navigate mode and the line is given back. `esc` and `⌃c` give the line back and write nothing. **After every event, a held line whose field is no longer focused in the inside mode is given back** — written first where focus is on another element and the field still exists, discarded where focus is still on the field. **And no action dispatches while a field holds the line** (C04 §3ar F7): the dispatcher's one path activates the focused element, a field is entered rather than activated, and a pointer focuses on its press, so the rule above has written the field before a release can activate anything — which is what makes a submit read what was typed and keeps a `fill` from being overwritten by the restore. A second path to the dispatcher ends the borrow, writing, before it dispatches. **While a field holds the line the owner line names it**: `field`, `⏎ keep`, `esc discard` (§6's owner line, `R-KEY-004`), not the inside rung's plot keys, which name an owner the reader is not in. The prompt row draws the held line through C17's own walk (`layout`, `cursorCell`, the editor's `drawAs`), so its chips resolve as they did before it was held.
+- **I119** — *(§6m, §107, `R-ACC-001`, → C01 I22, C02 I15)* **When `capabilities.renderMode` is `linear` the session composes no frame.** No size gate, no spinner, no ramp and no composition runs, and the scheduler's commits redraw the input line and nothing else; the terminal is acquired under C01's linear profile. **The only output edited in place is the input line** — every other byte is appended and never rewritten.
+- **I120** — *(§6m.2, §6m.3)* **Linear events come from transcript changes by §6m.2's table, once per fact.** A start on a streaming `append`; a start and a completion together on a settled `append`; a completion on `settle`; an appended block's body on a `patch` that appends to a settled entry; `transcript cleared` on `clear`; nothing on a streaming `patch`, a replace or merge, or an `evict`. **A start, a completion and an appended block are each written once per id.** An entry's number is its `seq` and *of M* is the highest `seq` so far, so eviction never renumbers a call between its start and its completion.
+- **I121** — *(§6m.4 rulings 4–6, C09 §7h, §057)* **A block reads `<role>[: <name>][ — <valueText>]`, then its source lines** — its own copy source (C09 §7a), and nothing for a `figure` beyond its name. A container reads its children in order. A source line equal to the name is not written twice. No event carries a glyph, an SGR sequence or a control character.
+- **I122** — *(§6m.3 rows 5–7, §107)* **A question is written as its detail's body and one numbered line, and answered by its number.** `1`–`9` answer choices in order and a choice's own key still does; resolution writes `answer: <label>`. **The number is linear's**: the rich route draws each choice with its own key and no number, so a digit there answers nothing — a binding the reader cannot see is one they press by accident. While it is open the input line reads `answer 1 to N:` — `answer 1 to N (ready in a moment):` while C16 I44's guard is armed, redrawn without the clause when the guard refuses a key — or the question and the typed reply when `reply…` is chosen, and the reader's draft is held and given back.
+- **I123** — *(§6m.3 row 1, row 8)* **An event is written with the input line erased first and redrawn after**, caret where it was, and the line is windowed to the width round its caret, so a long draft never wraps a row the next erase cannot reach.
+- **I124** — *(§6m.4 ruling 8, §107)* **Every event carries an announcement level**: `assertive` for a failed completion, a question and an appended error or warning notice; `polite` otherwise. Linear stdout writes both, and no event names a transport that does not exist.
+- **I125** — *(§6m.4 ruling 10, §107)* **`/capabilities` shows the route first, then every capability field with its value and its source** — `declared`, `stated`, `inferred`, `assumed` or `unreachable`, as C02 resolved it.
+- **I126** — *(§6n.2, ruling 27, `R-NTF-001`)* **A settle earns at most one notification, by §6n.2's table**: failed always (*the model failed*, *a watched run failed*); a watched entry's end always; any other end only when its document's `meta.durationMs` is at least 30 000 ms. A question arriving earns one, word `waiting`. Each fact earns once, by id — a second settle says nothing.
+- **I127** — *(§6n.4 ruling 2, §014 *detected, not assumed*)* **Nothing earns while the reader may be looking.** *Unfocused* is the terminal's last focus report being `ESC [ O` (C16 I61); a session that has never had one is focused, and a fact that arose while focused earns nothing when the reader later leaves.
+- **I128** — *(§6n.4 rulings 3–4, §014)* **An earning fact fires every opted rung, in the order bell, system, title**: `BEL`; `OSC 9 ; <binary>: <line> ST` only while `capabilities.notification` is `osc9`; the title `• <binary> · <word>` through C01 I24. The line is §6m.2's completion line or §6m.3's question line, with its controls shown in caret form and its bidi format characters as `<U+XXXX>` (C01 I26, ruling 86), and never opens with a number and a semicolon.
+- **I129** — *(`R-NTF-001` *without moving the reader*)* **A notification writes only its rungs' bytes.** No entry is appended, no focus moves, no viewport scrolls and no frame is scheduled for it. **The return is not a notification**: the reader coming back closes C23 I85's away mark, and the notice that appends is the ledger's (C23 I86), on `ESC [ I` and never on a settle — so row 13 of §6n.3 holds as written.
+- **I130** — *(§6n.4 ruling 5, §085, §091)* **A watch is a declaration on a streaming entry, and it drops at settle.** `watch(id)` is `true` for a streaming entry the transcript holds and `false` otherwise; the entry's settle earns by I126's watched rows and ends the watch. **Ending it is not what stops a second earning** — I126's once-per-id already does, and the mutation pass showed a watch left standing after its settle fails nothing (§6n.3 row 11 attributed the effect to the wrong mechanism). The drop has no observable until something shows the watches — **the footer's row is that observable now** (I137, §6p.3 row 3). **Amended by ruling 50**: the set is the session's rather than the notifier's (I135), because a notifier exists only while a rung is opted in; `watch(id)` is `WatchStore.watch` and answers as it did. Its producers — `/watch` and the row — are I136 and I137.
+- **I131** — *(§6o, C04 I109)* **The shell stamps every unstamped one-shot at the first frame that draws its entry, once per identity.** The identity is the entry id, the block id, the ramp's address in the block — `ramp` on a bar, `spans.i` on a span, `rows.<row id>.<column>.spans.i` in a table cell — and the effect; the stamp is the session's tick on that frame, written into the ramp as `since`. A producer's own `since` is never overwritten. A re-emitted document with the same identities does not replay; a changed effect does. **A streaming notice whose `trail` names a one-shot is stamped as `trailSince`** (C04 I109, C09 I133; ruling 81, *amended — review batch 4, round 2*), because the trail's ramp is derived at render and has no address: its identity is the entry id, the block id and the effect, and its stamp is re-taken whenever the **arrival** — the text's length — differs from the one it was taken at, so each arrival plays once and a re-emission of the same text does not replay. The stamps are dropped with the entry, on the subscription the other per-entry stores share.
+- **I132** — *(§6o, C09 I120)* **A one-shot whose duration is past asks for no tick.** `visibleRows` asks `animationIntervalOf` with the session's tick and the region's width, so an entry whose only moving ramps are completed one-shots contributes no cadence, and a transcript holding nothing else disarms the ticker on the frame that draws the resting state.
+
+  **The composition root owns both halves and they are separate.** *Where the blocks go* is this invariant; *who has the keyboard* is C16 I49, and the root wires the second by answering `attachedChild` from the attachment as well as from `inFlight() === "shell"`. Keeping them apart is what makes the child's ownership independent of where its output landed — which is the distinction the single `kind: "view"` flag could not hold, since a layer that filled the region carried both claims in one field and neither was declared.
+
+  **Two things say so on screen, and neither is optional** (R-BLK-312, R-BLK-844). The entry's block is framed and its border carries `⌃] host escape · ⌥esc enhanced detach · ⌃c interrupts child`; the footer's owner line reads `attached · keys → child · ⌃] host escape`. *AN OWNER YOU CANNOT SEE IS AN OWNER YOU WILL FIGHT*, and the one key that still works is the one a reader has no other way to learn: a `/command` cannot reach the host while capture is active, so the chord on screen is the whole of the affordance.
+
+- **I133** — *(§103, `R-KEY-004`, `R-OWN-001`, C16 I19, ruling 63)* **The owner line names no chord the session's keymap does not bind.** Every chip on it is an action looked up through `ChromeContext.hints.chord(target, action)` — the session keymap's first row for that action — or a question's own declared vocabulary; an action with no binding draws no chip, and nothing on the line spells a chord of its own. `ownerLine` called without hints reads the default keymap, which is the same answer for a session that rebinds nothing. The substate's name is the layer's declared owner (C15 I29), and the question's default label is the question's. → T1.77, C16 T1.171
+
+- **I134** — *(C16 §6c tables A and the trace, C16 I38 superseded, ruling 64)* **`bound()` resolves a reserved row to its handler, then its fallback, then nothing — and every reader of a row reads that answer.** A reserved action's handler is the one `TuiConfig.keyActions` registers under its registry id; it is asked inside `bound`, after the row resolves and before anything is mutated, because whether it handled the key decides whether the rung consumes it, and every caller runs a non-null answer at once. A handler returning `false` is the no-handler answer. With no handler the row's `fallback` runs — `⌥⌫`'s is `killWordLeft` — and a row with none resolves as though absent, so the rung passes. **The same effective action feeds the typed reply's `REPLY_ACTIONS` and the field's `FIELD_ACTIONS`**, so a borrowed editor word-kills on `⌥⌫` with no handler and refuses a registered `queue.drop` (C16 I54's *the queue* is the prompt's), **and `/help keys`**, which lists a reserved row's fallback, or omits it when it has none and no handler is registered. **A handler that throws is contained at `bound`**: the key is spent, nothing else acts, and one notice names the action — the read loop has no `catch`, so an application's hook would otherwise take the session down. **The notice reports a failure, so it is an `error` document in `error` tone with ✗** (ruling 93, F1481): its text says *failed*. *As it stood:* ~~one `warn` notice~~ — a warning with ▲ on an `ok` document, which agreed with itself and disagreed with what it said. → C16 T1.38, T1.38c, T4.88.
+
+- **I135** — *(§6p.4 ruling 2, I130, §085)* **The watch set is the session's, and a watched settle is read as watched before it drops.** `createWatches` holds one ordered set per session, oldest first, whether or not any rung is opted in. `watch(id)` adds a streaming entry the transcript holds and answers `true`; for one already watched it answers `true` and changes nothing, order included; for anything else it answers `false`. `unwatch(id)` answers whether it removed one. **One transcript subscription carries both readers**: on an `append` or `settle` whose entry is no longer streaming it calls the notifier — which asks the set — and then drops the id; on `clear` it drops every watch. `evict` has no arm, because a streaming entry is never evicted (C13 I6). → T1.79, T4.111
+
+- **I136** — *(§6p.2, §6p.4 ruling 3, C05 §3, C23 §2)* **`/watch` and `/unwatch` are local framework verbs, and every answer names the entry.** Each takes one optional `int`, `back`, counted from the transcript's end as `/debug` counts. With no argument `/watch` takes the newest `streaming` entry whose document is not `transport: "local"`, and `/unwatch` the newest watch. The answer is one notice — `watching <name>`, `already watching <name>` and `stopped watching <name>` muted; `nothing is running to watch`, `<name> has settled — nothing left to watch`, `nothing is watched`, `<name> is not watched` and `no entry <n> back — the transcript holds <m>` as `warn` — where `<name>` is the entry's command line. **`meta.origin` decides nothing.** Both are submissions and queue as every line does (C23 I5), which §6p.5 records. → T1.80, T4.110, T4.112
+
+- **I137** — *(§6p.4 ruling 4, §085, `R-TAB-001`, `R-OWN-001`)* **The default footer draws the watch row above the owner line while a watch stands or the row has focus.** One `pills` block, `chrome.watches`: the residue mark (`⋯`, `...` at ASCII), then one chip per watch, oldest first — its name, and, where its entry holds a `progress` block (the first, depth first), a six-cell bar in `barStyle`'s glyphs and the percentage C09 prints for it. The watch the row is on leads with the `current` glyph (`›`, `*` at ASCII) and is `accent` **only while the row is the active target**; every other chip is `muted`. With focus on the row and no watch it reads `nothing watched`. **The chip reads the entry as the transcript holds it on this frame**, so a patch is on the next frame and nothing is copied at `/watch`. → T1.78, T4.110, T4.113
+
+- **I138** — *(§6p.4 ruling 5, I82, §103's narrow ladder)* **The watch row is one row at every width.** It is measured as the owner line is — the session's ambiguous-width convention and C09's chip gap — and sheds in order: every bar at once; then watches from the right, never the one the row is on, behind a `+N` chip counting what went; then the kept name truncates to what is left. → T1.78
+
+- **I139** — *(§6p.4 ruling 8, I133, C16 I76)* **`ChromeContext.watches` carries the set and the row's selection to any chrome, and the owner line names the row's keys.** Present while a watch stands or the row has focus: the watches in order, each `{ id, name, progress? }`, and `selected` — the row's index while `watchRow` is the active target, else `null`. `OwnerHints.watchRow` says which of `present` or `focused` holds. The scope rung's line names `focusPrevious` as `watches` while a watch stands and `transcript` otherwise; at the row it names `watchPrev`/`watchNext` `move`, `watchOpen` `open` and `focusPrompt` `prompt` — each through `hints.chord` (I133). → T1.78, T4.110
+
+- **I140** — *(§6p.4 ruling 6, §085, C26 I24, C16 I76, C16 I77)* **Opening a watch is focus landing on its entry.** `watchOpen` at the row, and `watchJump<n>` for the *n*th watch, call `enterLiveBlock(id, null)`; the pull brings the entry into view by the minimum, and the watch stands. A jump past the count is consumed and changes nothing. → T4.110
+
+- **I141** — *(§6q.4 rulings 1–2, F1302, C04 I48, C16 I74, → C23 I88)* **A `scroll` box inside a layer scrolls, and its offset is in the one store.** `ScrollOffsets` holds a layer's boxes under the entry key `layer:<id>`, and **both** of a layer's painters — the compositor and the prompt slot a replacing question is drawn in (C23 I74) — render its content with that record and key the chrome cache (I102) on its `key`, so a scrolled box is a different frame and an unscrolled one is the frame it always was. The namespace is deleted when the layer is pushed, popped or dismissed, and kept across a content update. **A layer's scroller** (C16 I74) is its first `scroll` box, in document order, that overflows at the width it is drawn at: a notch moves it `WHEEL_ROWS`, clamped against that box's ceiling (`barOf` at the width `blockWidthInEntry` gives it). A layer holding none keeps C16 I74's row offset. → T1.174, T4.114, T6.142
+
+- **I142** — *(§6q.4 ruling 3, C16 I74, C23 I74)* **The pointer hit-tests the layers the paint drew, where it drew them.** A replacing question is placed for the pointer over the prompt's rows — one row below the region, the prompt's height, the region's width — and never at the C15 placement it is not drawn at; every other layer keeps its C15 placement. → T4.115, T6.143
+
+- **I143** — *(§6q.4 ruling 5, §6l.12, I113, ruling 53, `R-BLK-825`)* **The chip preview is a bounded box with keys of its own, and `⏎` is never one of them.** The preview's content is a `scroll` box whose height is the content's rows where they fit in `floor(region.height / 2) − 3`, and `floor(region.height / 2) − 4` where they do not, floored at 1 — C15's default fraction less the upper rule, the header and the key row, and less the box's residue row when it overflows (C04 I49) — so the layer is never cut while `floor(region.height / 2)` is at least 5 (§6s.3 rows 1–3). *It read `− 3` in both cases, counting two borders and not the residue row, and at 80 × 24 the layer was cut by one row (F1503).* A new chip or a new region height or width rebuilds it at its top. `⌥⇧↑`/`⌥⇧↓` move the box one row (`previewScrollUp`/`previewScrollDown`, registry `preview.scroll.up`/`preview.scroll.down`), `⌥o` opens the chip (I144, `preview.open`), and every other key is the prompt's first (I51) — so `⏎` sends. **The panel's last row names the chords from the session keymap** (C16 I58): scrolling only while the box overflows, opening always; the owner line names the same. The row also names `←→ other chips` from the prompt's own `left` and `acceptGhostOrForward` bindings while the prompt holds another chip, and not otherwise (§6s ruling 4); it is drawn `muted`, and where it does not fit the region's width it sheds whole entries from its end — never a legend cut mid-word (§6s.3 row 9). → T1.175, T1.185, T4.116, T6.144, T6.155, T6.156
+
+- **I144** — *(§6q.4 ruling 6, ruling 53, C02 I19, C17 I35, C21 I6, C23 §4)* **`⌥o` opens a chip in the reader's editor, and an edited paste comes back as one edit.** The editor is C02's `editor` — `$VISUAL`, else `$EDITOR`. A chip carrying a `target` opens it and nothing comes back. Any other chip's content is written to a file in a fresh private temporary directory, the editor runs through the handoff sequence (C23 §4: suspend, C21 `handoff`, resume, reset the decoder, invalidate), and the file is read back: a changed content re-mints the chip in place with its `lines` recounted (C17 I35), and an unchanged one changes nothing. The directory is removed on every path. The command is `sh -c '<editor> "$1"' sh <path>`, so the path is an argument and never text in the command. **Refused visibly, with nothing run**: with no editor (`no editor — set $VISUAL or $EDITOR`), and while a verb holds C23's guard (`<verb> is still running, and <chord> waits for it`) — each a `warn` notice on the transcript, never a toast (§6q.4 ruling 8). **One final newline the editor added is dropped** before the comparison, so a file written back unchanged by `vi` is unchanged (ruling 9). → T1.176, T4.117, T6.145
+- **I145** — *(ruling 23, §6l.9b, C15 I34, I51)* **`promptUnderMenu` reads the top layer's `promptLive`.** A replacing question still answers `false` first (C23 I73). The chip preview pushes `promptLive: true`; the completion menu pushes and updates it as `selection === null` on every change to its selection, so the field is never a state behind the menu. → T1.177, T6.146
+- **I146** — *(C26 §8c.4, `R-BLK-363`, C09 §7f, C14 I63; review batch 4 M14.3)* **A primary press on a scroll box's bar jumps that box, and focus does not move.** The bar is the column beside the interior at the box's content width, drawn only while the content overflows. It is resolved before the element under the pointer, because a child's element covers the box's whole width, and at most one box's bar is at a given column, so the innermost box whose bar is drawn there answers. Row *r* of an *h*-row bar sets the offset to `round(r × ceiling / (h − 1))`: the transcript's arithmetic (C14 I63), and one function for both. The jump latches the box (C26 I32). → T4.118, T6.147
+- **I147** — *(§6r, I111, C17 I25, C09 I102, `R-COL-003`; review batch 4 M13.6)* **At 1-bit the prompt rule's label is drawn as `[name]`, the unpainted rung, and shed by width alone.** The brackets take the two cells the ground's padding takes, so every threshold is the painted rung's: shed at `MIN_COLUMNS`, and shed whenever it would leave no rule glyph. No span of the rule carries a style at 1-bit, and a named hue changes nothing there. The bracket is the design's answer for a painted word with no ground, already shipped by the chip (C17 I25) and the button (C09 I102), and the separation `R-COL-003` asks for is carried by the glyphs. → T1.178, T6.148
+- **I148** — *(I118, C04 §3ar F9, C17 §5f `loadField`, C17 I33, I34; F1395)* **A field's written value is the editor's `resolved`, never its `text`, and a value holding a line break is refused, not written.** Both paths that write a borrowed field go through this: `⏎` (`commitField`), and the write that ends a borrow when focus has moved on (`endField`). Writing `text` put a chip's private-use sentinel into C04 form data, where no reader resolves it, so a submit sent one unprintable character where the reader saw a paste. `yank` is the only way a chip enters a field, because a field refuses a multi-line paste, and it adopts a foreign chip (C17 §5f). **Walked before ruling: `resolved` alone is F9's defect by another door.** A chip is minted for a paste of five lines or more (`CHIP_LINES`) or for a file, so its content usually holds line breaks, and writing it would put five lines into a one-line field. F9's rule is *a field is one line*, and it is applied at the write in F9's words: the value is refused whole and the refusal says why. On `⏎` the borrow stays open, so the reader can delete the chip, which is one grapheme. On a blur nothing is written and the field keeps its value. A chip whose content is one line (a one-line file) writes that line. **Not at the yank**, because the editor exposes no way to see what the kill buffer holds before it inserts, and that seam would be C17's. → T4.119, T6.149
+- **I149** — *(§6m.4 row 6, C09 I128, ruling 71, `R-TRU-001`, C23 I90; F1470)* **Every string linear writes is in the shown form, never raw and never deleted.** `clean` is `neutraliseControl` followed by tab expansion and trimming. The name, the value, the source, the command, a question and its choices, and the answer all pass through it, and so does the notification body that repeats them (§6n.4 row 4). `windowLine` draws each grapheme of the draft in that form and measures the form, so the caret stands on the cell the reader sees. C23 I90's `drawn` already arrives in the form, and `clean` is idempotent on it. The buffer is untouched: the answer's `text` and the command a verb is handed keep the character as typed (C17 I36).
+- **I150** — *(ruling 96, ruling 99, F1486, I51, I133, I145, C19 I20, C19 I29, `binding.004`)* **The completion substate's owner line names what each key does in the state the frame shows.** While the menu holds no selection the prompt's keys resolve first (C19 I20), so `⏎` submits and `↑` walks history, and the line is `complete · ⏎ run · ⇥ complete · esc close`: `⏎` is the chord the session keymap binds to the prompt's `submit`, named for what it does to the line at rest (ruling 99, §029), `⇥` is the chord the session keymap binds to the prompt's `complete` (the registry's `binding.004`, *complete in the prompt*), and `esc` is the panel's `dismiss`, which the prompt does not bind. Once `⇥` has made a selection the menu owns its keys and the line is `complete · ↑↓ move · ⏎ accept · esc close`. `↓` at rest is the prompt's and selects nothing (C19 §6a). **The line reads the router's answer, not the menu's state**: `OwnerHints.promptUnderMenu` is `promptUnderMenu()`, the top layer's `promptLive` (I145), so the footer, the cursor and the dispatch read one predicate and a footer cannot name a key that goes somewhere else. **It is the one visible difference between rest and a selection**: ruling 89 marks the current candidate in both (C19 I29), and the two frames were otherwise identical. Absent is *the menu owns its keys*, which is every line drawn with no session behind it. → T1.182, T4.120, T6.152
+- **I151** — *(§097, `R-BLK-569`, `R-BLK-628`, `R-BLK-775`, F1501; §6s ruling 1)* **A panel's rows between its edges take `surface.bgElev`.** The compositor paints `surface.bgElev` behind every line of a `kind: "panel"` layer except the lines of its leading `rule` blocks — the upper edge; the lower edge is the prompt's rule (I81) and is not in the layer — through `based`, so a span that sets its own background keeps its cells (the menu's `pick` row), and the padding to the box's width is grounded (I29). The exemption is by content line, so a row-scrolled panel keeps it (§6s.2 row 7). Where no ground resolves — 1 bit, a theme whose `bgElev` inherits — the rows are byte for byte what they were. A `peek` and an `overlay` take none. → T1.184, T4.121, T6.153, T6.154
+- **I152** — *(§6m.2, ruling 103 b, F1517, C23 I101, C23 §8a A6.9)* **A completion line says `exit N` only of a child's own ending.** Where the settled head's word is one the shell writes — `denied`, `expired`, `cancelled`, `truncated`, `failed` — the verdict names it and appends no code, because the code beside it is the shell's: 126 for a denial and an expiry, 130 for a cancel, 1 for a malformed patch and a throw (C23 I101). A `cancelled` head's word is the verdict's first part — `/ps — denied`, `/ps — expired`, `/ps — cancelled` — and a `failed` head's follows its state, `failed, truncated`. A head whose word is `exit N` keeps it, so a child that ended 130 on its own still reads `failed, exit 130`. C20 records every one of these codes as before (C23 I29). *As it stood:* ~~`exit N` for any non-zero code on a document that is not the shell's own~~ — a denial read `/ps — failed, exit 126` and a cancel `cancelled, exit 130` (F1517). → T1.186, T6.157
+- **I153** — *(§6t rulings 1, 2, §099, §101, ruling 104 c, F1521, I33, C17 I26, C17 I32, C17 I36, C04 I152)* **The echo of a line that held chips draws them as the prompt drew them.** Where `meta.echo` holds chips whose ranges lie in `command`, `commandRows` walks the command through C17's walk with each chip's range standing as one cluster drawn as its label (C17 I25): a chip is one wrap unit, a label wider than its row is elided (C17 I32), and the content's line breaks never reach the frame — `echo hi ` and a six-line paste echo as `❯ echo hi  #1 pasted · 6L `, one row, as the prompt showed it. The text between chips is normalised to `\n` line breaks segment by segment, and the sentinels are private-use code points the command does not hold (§6t.2 rows 4, 6). The measurer and the composer call the one function (I33). Each chip's cells take the prompt's chip style through the prompt's painter — `tone.meta` on `surface.bgDeep` — and at 1 bit the bracketed rung with no ground. Where `meta.echo` is absent, or a range does not lie in `command` in order, the rows are `hardWrapCells`' byte for byte. → T1.187, T4.123, T6.158
+- **I154** — *(§6t rulings 3–5, §101, ruling 104 c, F1521, §6l.12, C26 I33, C09 I137, C15 §2a, I90)* **A chip in the echo is an element, and focusing it peeks its content.** The entry's element list leads with one element per drawn chip (C26 I33), so `⇧⇥` and `↓` from the prompt land on the first, `→` and `←` walk the chips of one row (C26 I30), and the general peek anchors beside the focused one with the content as a `code` block — §101's *focus in the TRANSCRIPT — a PEEK beside the element*, through no mechanism of its own. A focused chip takes the box shape's treatment (C09 I137): `tone.meta` over `surface.focusGround`, whole-shape inversion where no ground resolves. `y` copies the chip's content; `⌃a` selects the document's elements and not the echo's, whose content the head's copy already holds (I90). A re-run submits the entry's chips with its command (C23 I104). → T4.123, T6.159
+- **I155** — *(§6t ruling 6, §101, F1522, C04 I151, C09 I139, I143, §6s ruling 2)* **The chip preview's header draws the chip's name on `pick`.** The header is `raw` text — the painted label with its trailing space dropped, ` #1 pasted · 6L` — whose name, frame space either side, carries `ground: "pick"` and `bold`, and whose size, `· 6L`, is `muted` on the panel's ground. A chip with no size grounds its whole label. At 1 bit the bracketed label as before, the name bold and the size muted, with no ground to carry. → T1.188, T6.160
 
 ## 11. Commitments
 
@@ -2437,10 +3667,10 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 18. C22 owns the pushed view: one piece of state, rewindowed from the live block, dismissed on eviction with the reason C15 declares and cannot detect (I41, I42).
 16a. A keystroke during a pending completion cancels it, so nothing arrives late to a prompt that has moved on. C19 holds the mechanism; L4 is the caller that was missing (I39).
 16. The completion spinner is composed from a fresh read of C19's `spinning` on every paint, and a request arms a wake at the threshold so a frame exists to show it. Appearance, never geometry (I38).
-19. A verb's result is a view when its tool or one of its flags declares it, decided before the pending entry exists — so `Esc` finds no entry to touch and selection survives because nothing appended (I45, §13a).
-20. A pushed view's offset belongs to its owner and never to C15, and its parts are released at the pop (I46, §13a).
-21. A view whose content C15 truncated reports it on screen, because a block taller than the region is shown cut and cannot be scrolled — and splitting, the owner's half of the remedy, has a floor at a leaf with no children (I47, §13a).
-22. A verb that is both a view and a stream patches through the view's owner, releases the guard before its loop and registers its canceller before awaiting it; its stream ending appends a notice rather than closing the view, and only a cancellation pops one (I48, §13a).
+19. ~~A verb's result is a view when its tool or one of its flags declares it~~ — **retired; a verb's result is an entry** (I45, §13a, R-EXA-082).
+20. ~~A pushed view's offset belongs to its owner and never to C15~~ — **retired; the transcript's offset is C14's** (I46, §13a).
+21. ~~A view whose content C15 truncated reports it on screen~~ — **retired; an entry is as tall as it is, and the residue row is C04 I49's** (I47, §13a).
+22. ~~A verb that is both a view and a stream patches through the view's owner~~ — **retired; it streams into its entry, as every stream does** (I48, §13a).
 23. C02's capability overrides reach C02, because a parameter no application can supply is tested and unreachable at once (I49, §2).
 24. **Ghost text reaches the frame**, composited into the prompt as appearance and never as geometry: the spinner wins the row, a suggestion that does not fit is dropped rather than truncated, and `measure` never sees it (I50, C19 I7).
 25. A layer that is chrome for the prompt does not stop typing. What the overlay handler does not bind is forwarded to the prompt's, because the alternative is measured and is not "the menu takes the key" but "nobody does" (I51, C19 I20).
@@ -2475,7 +3705,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 51. **A `ChromeFn` returns content, and the footer's height is that content's** (I82). The per-frame height §6k.3 walked and refused is the ruling now, with the reversal and its reason in §6l; `chrome.footerRows` is gone and nothing replaces it.
 52. **Two rules bound the prompt, on every frame, for every app** (I81). Not a config field; the frame's look is Calcium's.
 53. **`heightsSum` carries the two rule rows, and the footer's maximum is derived from them** (I80). Four today, and T1.35 asserts the derivation rather than the figure.
-54. **A card's body hangs under its hook, four cells in with the hook at the header's text column, and the measurer and the renderer share the layout** (I83). `entryLayout` is the one function; a document without a `step` header is untouched.
+54. **A card's body hangs under its hook, `BODY_INDENT` cells in — five, the hook's column, its two-cell reservation and a blank — with the hook at the header's text column, and the measurer and the renderer share the layout** (I83). `entryLayout` is the one function; a document without a call head is untouched.
 55. **One unit, and a child's mark under its parent's text** (I84). The hook at column 2, the body at column 4; the notice's `continuation` and the card's are one column, asserted by a frame that holds both.
 56. **An entry closes with one blank row** (I85). Through `entryLayout`, so what C14 measured and what the frame drew are one number.
 57. **Chrome is two clusters** (I86). Default header and footer as `group` rows; the right cluster's width is its content's, measured rather than assumed.
@@ -2505,6 +3735,21 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 78. **The card body is derived once per blocks array** (I107, F1203). The layout's cleared copy of the body's first block was made on every call, twice a frame, and everything keyed on block identity downstream — the measure memo, the cap-form hold, the patch plan — missed every frame for every card that opens with a gapped block. It is held per array now, which is frozen and replaced with its document; F821's constraint stands, since the document's objects are untouched.
 79. **Windows lie end to end on the clock** (I108, F1207). C03 arms each window when the last timer fires and Node fires about a millisecond late, so a 16 ms window drew 58 to 59 frames a second and nothing in C03 could recover it without a clock. The composed schedule dates the next window from the deadline the firing belongs to and floors it at the budget, which pins the rate at sixty rather than leaving it a second under with an occasional second over.
 80. **The region owns the width the way it owns the height** (I109, F1227). One value from `compose` — the terminal's less one column — read by the transcript's resize, the prompt's body and the overlay placement; the three rule rows, the chrome's clusters and the fallback keep the terminal's, each by an invariant already written (I81, I86, I87).
+81. **A child surface is an entry, not a layer** (I110, R-BLK-645). Its blocks are appended and replaced in place, the transcript stays scrollable beneath the capture, and what settled while it was attached survives the detach — and is said once when it does (C23 I86). The keyboard half is C16 I49's and is wired separately, which is what the one `kind: "view"` flag could not express.
+82. **A label in a rule costs no rows** (I111, §6l.10, §069). The prompt's rules are drawn on every frame and their glyphs are the least load-bearing cells on the screen, so the design puts the application's identity in one rather than spending a region on it. Painted as a ground and not as text (`R-COL-003`), inline-end with one trailing glyph, on the upper rule alone, and shed first — `R-BLK-175` ranks it 1 of 4 in the frame's whole degradation order. I81's *never configurable* is amended to name the geometry it was always about.
+83. **A chip in the prompt is a ground and the selection outranks it** (I112, §6l.11). C17 says where the cells are and C22 paints them; where a region reaches a chip the region wins whole, because one cell takes one ground (`R-STA-002`) and a chip is one grapheme, so no region can cover part of one. The row is painted in one pass — a second pass would measure the first pass's escapes as cells.
+84. **A preview is a projection, not a mode** (I113, §6l.12, §101). The design puts a chip's preview in two places and names focus as what chooses between them, so both are derived rather than opened: the transcript's peek already is, and the prompt's panel becomes its sibling. The registry has no action and no binding for it, and that is the answer rather than the gap — a chord invented here would be a visible choice the design did not make. The two legends the specimen draws that the tree cannot yet honour land with the scrollbar and with the paste-chip editor, because a footer naming a dead key is worse than one that does not name it. *Built in review batch 4 (§6q, I143, I144)*, with the legends read from the keymap.
+85. **The label's ground is the application's, and it is a hue rather than a colour** (I114, §070, C10 I55, `R-COL-003`). `/colour` takes a **colour NAME, not a tone** — §070's own first line — so what crosses the seam is a name C10 resolves per theme, never a hex the application chose. A literal would be the one thing this repository refuses everywhere else, and §070 says why it is refused: *a hex cannot follow a theme change*. Where the design does take a literal it is on its own terms and behind a contrast question, which is M15's work and is named as a remainder rather than built here.
+86. **A toast's lifetime is a timer, and two timers are the interaction** (I116, §6l.13 E2). *A toast lasts two seconds* and *a newer toast replaces an older* are both true and meet once: the older timer, left armed, clears the newer early. The disposal is the ruling, and it is why the session holds the handle rather than firing and forgetting.
+87. **A reserved key resolves once, to the handler, the fallback or nothing, and every owner reads that answer** (I134, C16 §6c). A borrowed editor cannot disagree with the prompt about what `⌥⌫` is, and an application's hook cannot end the session by throwing.
+88. **A watch is the session's, and its settle is read before it goes** (I135). The notifier exists only for a reader who opted in; the footer's row exists for every reader, so the set cannot be the notifier's.
+89. **`/watch` and `/unwatch` answer in words, and whose the entry is decides nothing** (I136). *Pin one that is not yours* names the use the verb was drawn for; a reader's own run is as watchable.
+90. **The watch row is one footer row above the owner line, and it sheds rather than wraps** (I137, I138). The owner line keeps §103's *last line*, which is a current rule where §085's placement is a specimen.
+91. **Opening a watch moves focus to it and nothing else** (I139, I140). The row stays, and the keys it names are the keymap's.
+92. **A layer's box scrolls from the one offset store, and the pointer finds layers where they are drawn** (I141, I142, §6q). The inspection, the chip preview and any `scroll` box an application puts in a layer are one mechanism; a replacing question is hit where the reader sees it.
+93. **The chip preview has a box and three chords, and `⌥o` hands the chip to the reader's editor** (I143, I144, ruling 53). `⏎` stays the prompt's; an edited paste returns as one undo unit.
+94. **The transient panels are §097's: region-wide, between two rules, on `bgElev`** (I151, I113, I143; C20 I30). The chip preview is §101's menu panel, and its box counts its residue row.
+95. **A completion line says how the entry ended, and a code only where the child gave one** (I152, ruling 103 b, F1517). A denial reads `denied`, not `failed, exit 126`.
 
 ---
 
@@ -2514,6 +3759,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 
 ### Tier 1 — unit
 
+- *(I134 — its rows are C16's, because the subject is a key reaching an owner: C16 **T1.38** — `⌥⌫` word-kills with no handler, calls a registered one once, falls back on `false`, drops `⌥1`; **T1.38c** — a throwing handler is contained and noticed; **T4.88** — the reply and the field read the effective action.)*
 - **T1.1**: `start` with valid config → running; every component constructed once.
 - **T1.2** (I1): construction order is asserted on an event log — stores and runner before lifecycle.
 - **T1.3** (I2): the lifecycle's handler registration precedes the first acquire.
@@ -2558,9 +3804,9 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.4j** (I3a): a manifest declaring a local verb constructs when `localHandlers` supplies it, and fails naming the verb when it does not. Both halves: the failure alone is what shipped, and it read as the check working rather than as a route that did not exist.
 - **T1.4p** (I23): a hand-built `Manifest` fails construction naming all six missing verbs; the parsed one is accepted. The second half is the control — without it the check is indistinguishable from refusing every manifest.
 - **T1.4q** (I24, commitment 14a): a byte written to the fake stdin after `start()` reaches the router as the decoded event, and the same byte written before `acquire()` reaches nothing. The test is the whole path — stream to `onInput` to `push` to `dispatch` — because each half of it existed and passed its own tests while the two were never joined.
-- **T1.4h** (I26): every `defaultKeymap` binding, pressed through a real decoder into a constructed graph, produces its documented effect — fourteen cases, driven from the table rather than listed. A hand-written list is the shape that let fourteen bindings go unexecuted while every test passed.
+- **T1.4h** (I26, ruling 88): every `defaultKeymap` binding, pressed through a real decoder into a constructed graph **at the target the binding names**, is consumed there. The router's target is asserted before the press and the `target:` stage after it, driven from the table rather than listed. The effects are T1.4h2's. A hand-written list is the shape that let fourteen bindings go unexecuted while every test passed. *Amended by F1457:* each row used to be pressed from wherever the previous row left focus, so eight rows were consumed at the wrong target and passed. Two were F1457's; the other six were the four `global` scroll chords and `⌥C`/`⌥V`, pressed at `liveBlock`.
 - **T1.4i** (I27): a paste of two hundred lines → exactly one `commit("input")`; a scroll key → exactly one, issued by the loop and not by the handler. Both halves, because a handler that also commits passes the first.
-- **T1.4m** (I23, I23a): a session constructed from **the public entry point only** — `import { createTui } from "@fmx/calcium"`, a `ManifestDocument` literal of the app's own verbs, no deep import anywhere in the test — starts, and `/help` lists the framework's verbs alongside it. The constraint is the test: every existing construction harness reaches through the package boundary for `parseManifest`, so each tests a route no consumer has, and that is why both arms of `config.manifest` could be broken with the suite green. The row fails if either the `JSON.parse` or the object-arm parse is removed.
+- **T1.4m** (I23, I23a): a session constructed from **the public entry point only** — `import { createTui } from "calcium-tui"`, a `ManifestDocument` literal of the app's own verbs, no deep import anywhere in the test — starts, and `/help` lists the framework's verbs alongside it. The constraint is the test: every existing construction harness reaches through the package boundary for `parseManifest`, so each tests a route no consumer has, and that is why both arms of `config.manifest` could be broken with the suite green. The row fails if either the `JSON.parse` or the object-arm parse is removed.
 - **T1.4n** (I23): the path arm — a `manifest.json` on the fake filesystem — constructs, and a file containing malformed JSON produces a `ManifestError` naming the file rather than a `SyntaxError` escaping `start()`.
 - **T1.4o** (I23b): a **type-level** row — `const m: TuiConfig["manifest"] = parseManifest(doc).value` does not compile, asserted with an `@ts-expect-error` that fails if the assignment ever becomes legal again. It is the only shape that can hold I23b: the defect it guards is a call that type-checks, so no runtime assertion can be written against it, and the previous type passed every runtime test of the refusal while permitting the call.
 - **T1.4l** (I23): an already-parsed `Manifest` handed back to `createTui` fails on I6's duplicate-name check, naming a framework verb. The refusal that used to be C22's is C05's now, and this is the row that says it still happens.
@@ -2674,31 +3920,10 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T4.16** (I58): one entry, drawn twice with nothing changed → the entry's **block definition's `render`** is called **once**. Asserted with a counting definition rather than by timing, because a timing assertion under contention is a flake and the claim is *it did not render again*, not *it was faster*. **The row has always counted the definition and this sentence named the registry's `renderSequence`**, a member no frame path called; the name is gone with F1209's deletion, and the correction is to what the row does rather than to what it was described as doing — the definition's count is also the stronger observable, since a cache serving a stale element would leave a registry call intact.
 - **T4.17** (I58): one entry, a width change and then focus entering the block and moving between two rows → a render for each. Three sub-cases and not one, because a key missing any single axis passes every assertion about the others; **two rows and not one**, because with a single row *focused* and *unfocused* are the only states and a key that merely knew whether anything is focused would pass. **`rev` is named as not driven** — it needs a stream or a `settle(id, doc)`, neither reachable from a local handler, and a second invocation makes a new entry rather than a new revision. It is C14's axis and not one this cache had to decide; the row says so rather than letting its title imply coverage.
 - **T4.61** (I58, C26 I16): `↓ ↓ ↓ ↓` puts the head on the last row and draws nothing washed; `⌃a` then washes every row above it **in the next frame**. The head does not move, so this is the row about the extent's axis and no other: with the extent out of the key the slot is served and the frame after `⌃a` is byte-identical to the one before it. Read from the screen, per row (`styled-screen.ts`), because the render count agrees with the defect — the frame path runs and paints from the cache.
-- **T4.62** (I83, §6l.2 row 12; C23 I55): a local verb answering one notice of `columns − 1` cells → the frame shows `⏺ verb · ok`, then two blanks, `⎿ ` and the first `columns − 4` cells, then four blanks and the remaining three, then the entry's blank row and the upper rule — the body wrapped once more at `width − 4` and the frame holds every row of it. The wiring row: T1.41 and T1.42 call `entryLayout` directly, and a `visibleRows` that never called it would pass both.
+- **T4.62** (I83, §6l.2 row 12; C23 I55): a local verb answering one notice of `columns − 1` cells → the frame shows `⏺ verb · ok`, then two blanks, `⎿`, two blanks and the first `columns − 5` cells, then five blanks and the remaining four, then the entry's blank row and the upper rule — the body wrapped once more at `width − BODY_INDENT` and the frame holds every row of it. The wiring row: T1.41 and T1.42 call `entryLayout` directly, and a `visibleRows` that never called it would pass both.
 - **T4.63** (I84, I85; C23 I57; §6l.6 rows 16–19): **frame read.** A session holding a muted `continuation` notice and a settled card whose body is a `table` with a default gap → both `⎿` at column 2; the card's hook row carries the table's header and not a blank; exactly one blank row between the two entries and one above the upper rule.
 - **T4.64** (C09 I61, I86; C28 I31): **the wiring row.** A real session at tier `spans` → `pills#chrome.header.left` and `.right` at **`measures` of `frames` and `renders` of `frames`**, so `calls` is `2 × frames`; the header `group` at **0 measures** and `frames` renders; the footer `group` at one of each; and the footer's pills at **`2 × frames` measures** against one render, so `calls` is `3 × frames` — one measure more each, and the one is `compose`'s `measureSequence` (I82), a registry call of its own and therefore a memo of its own. **Each seam is asserted apart from the other and the sum beside them** (C28 I31): the header pair and the footer pair both sat above a marker reading the sum, because that sum's floor is 2 for any block that is drawn, and the footer's genuine second measure was one step of a floor the table never stated (F1098). Asserted as exactly one more rather than as a ceiling, so the row says where the extra ask lives instead of tolerating it. Before C09 I61 the header pills read 3.0 and the footer's 4.0 (F940). C09's own rows count definition calls and cannot see the property C28 wraps, so the memo read at the child seam removed alone fails here and nowhere else.
-- **T4.65** (C15 I25, §13a): a real `createOverlayManager` and `createDocumentView`, `open("/watch api")`, then the manager's `pop()` — the ladder's call, not the owner's — → `openFor` is `null` before `pop()` returns, `move("down")` is `false`, the owner's own `pop()` returns `false` having nothing to dismiss, and `open("/watch db")` is accepted with exactly one layer on the stack. F944 measured every one of those the other way round.
-- **T4.66** (I45): the fixture measures what `document-view.test.ts` assumes it measures — a block is three rows, two fill an eight-row region as a sequence, and a third does not.
-- **T4.67** (I45): open pushes a view before the document exists, and fill replaces it.
-- **T4.68** (C15 I1): a second open is refused, and the refusal names the command.
-- **T4.69** (I46): the window falls on block boundaries and move walks it.
-- **T4.70** (I46): `putBlock` is total — an unknown id is false, never a throw.
-- **T4.71** (§13a): a block scrolled out of the window is still there to be patched.
-- **T4.72** (I45): pop closes the view and leaves nothing behind.
-- **T4.73** (C24 I12, gap 7): a live part in a pushed view ticks, and the frame shows it.
-- **T4.74** (I46): release at the pop stops the parts, before any later fetch would.
-- **T4.75** (§13a): a part scrolled out of the window keeps ticking.
-- **T4.76** (I47): a block taller than the region is unscrollable, and says so.
-- **T4.77** (I47): the count is what the reader cannot reach, wrap included.
-- **T4.78** (I47): more blocks below is not truncation, and gets no indicator.
-- **T4.79** (I48): a `ViewPatch` appends, which `putBlock` cannot do.
-- **T4.80** (I48): it goes through C04's `applyPatch`, so C04 I14 is enforced here too.
-- **T4.81** (I48): a patch after the pop is refused, never thrown.
-- **T4.82** (I48): a replace reaches a block the window is not showing.
-- **T4.83** (I48): an append holds the bottom, so a follow follows.
-- **T4.84** (I48): a reader who scrolled up is left alone.
-- **T4.86** (I48, §13a): the read, the write and the patch all reach a block inside a `group` — the patch arm is the control, because it descended while the other two did not.
-- **T4.87** (I48, C23 I70, §13a): a live part inside a container keeps ticking and its top-level sibling is not torn down with it. **The reference is a run rather than a figure** — the same two parts flat, so a cadence change moves both arms together and the claim stays *nesting changes nothing*. Measured at HEAD: `{cpu: 1, mem: 1}` nested against `{cpu: 3, mem: 3}` flat, over three sweeps, with the container still showing `loading`. **It carries `gapBefore` as well as the two counters, and that figure is the only one here a working write cannot supply**: `livePanel` sets no gap, so `put` carries one only from the block `blockAt` hands back. Without it the row was green against a reverted read (T6.110).
+- ~~**T4.65**–**T4.84**, **T4.86**, **T4.87**, **T6.110**~~ — **struck with the pushed view they exercised** (F1253, §13a). Twenty-three rows over `document-view.ts`: the push, the projection, the block-boundary window, the truncation indicator, the patch seam and its mutation. **Two claims outlive the file and are asserted where they can still be violated** — the depth-addressing pair (T4.86, T4.87) is C13's, where `applyPatch` and `descendants` ask `childBlocks` one question, and the tail follow (T4.83, T4.84) is `followTail`'s, which C04 I97 already owns and `ScrollOffsets` already exercises.
 - **T4.85** (§2c, C28 I1): `profile: {}` builds a recorder at `counters` and `tier: "off"` builds none — the recorder's `DEFAULT_TIER`, read by the root rather than restated (F967).
 - **T4.17d** (I58, C10 I11): `/theme light` → a render. **Its own session, because focus is stateful**: written as a fourth step of T4.17 it failed against working code, since after two `↓` the keys are going to the live block and the command never reached the prompt. `light` and not `dark` because the session starts dark and `setVariant` is correctly a no-op for the active variant (C10 T3.6) — the first draft failed on that too. Both are the fixture not responding to the thing under test, and the number each produced was indistinguishable from a key that omits the theme.
 - **T4.17e** (I71): the **key axis alone** — the camera store is nudged directly and the entry renders twice, and both renders happen. It goes deliberately **around** the binding, so the row can only be about the key.
@@ -2706,6 +3931,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T4.17g** (I71): **the pair, end to end** — keystroke, frame, keystroke, frame, and the two frames differ. This is the row that matches what a reader does, and it is the one that **cannot discriminate**: it dies to either half being removed. Kept for what it asserts and named here for what it cannot, because a suite holding only this row would report *the pair is wired* and never say which half is not (T6.81, T6.82).
 - **T4.18a** (I58): `delete` drops one slot and leaves its neighbours. **The class, not the wiring**, and the row says so.
 - **T4.18b** (I58): `/clear` through the real graph drops every slot, asserted on **`size`** rather than on a render count. The first version of this row was inert and removing the arm left it green: an evicted or cleared entry is gone from the transcript and `visibleRows` never asks for it again, so a render count cannot see an eviction at all. The claim is about memory, and `Viewport.stats` is the precedent for making a cache's size observable (C14 T2.3b).
+- **T4.18h** (I58, C04 I48; F1489): the scroll offsets drop on `rendered`'s own subscription — one entry holding a rendered slot and an offset, `transcript.clear()` → `rendered.size` and `scrollOffsets.size` are both 0, so a future eviction path cannot drop one and keep the other (C04's arm table, row 5). *It was titled T4.18f, citing C04 I48 first, where C04 declares no T4.18f and C22's T4.18f is I76's cursor store* (A03 SP16).
 - **The `evict` arm's wiring is not drivable and the gap is named rather than papered over.** C13's cap is 100,000 blocks (C13 I17) and `construct.ts` passes no cap — `createTranscriptStore` accepts one and only `retainPayloads` is threaded through — so reaching an eviction through the real graph would take 100,001 appends. `clear` exercises the same subscription in the same wiring; the `evict` branch inside it is covered by reading. A citation reads as coverage, and this is where that would have happened.
 - **T4.21** (I8, I9, with C01, tier 5): the real shell in a real PTY at **100x12**, **100x15** and **30x16** — F67's own table — draws the fallback, and resized to 100x30 it opens. **A tier-5 row, because both halves failed only outside a unit test**: the unit rows pass their own spy sink, so a fallback written into C01's `debug` sink renders perfectly to them, and a fake lifecycle delivers a resize C01 would have dropped. The width axis is swept by the golden frames at 60/80/120/160; the height axis had no equivalent sweep, which is F67's closing sentence and the reason it took someone wanting a smaller picture.
 - **T4.22** (C11 I17, I9, entry 23): the wash changes no row count and no row width. **The invariant at every step rather than a note about this one** — a row of chrome is forbidden by the same rule that makes the wash free.
@@ -2713,13 +3939,13 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T4.24** (entry 23): the row holding the head stops at the head. T4.23's control, and it cannot be folded in — "every row to the edge" satisfies T4.23 exactly.
 - **T4.25** (entry 23, C10 §4b): at 1-bit the wash is reverse video. `resolveBackground` answers nothing without colour, so without this rung the ladder falls from a background straight to a glyph.
 - **T4.26** (entry 23, S01 §3): the span is mapped through the prompt's window. **Demanded by the mutation pass** — an editor row and a painted row are the same number until the prompt exceeds its cap, so dropping the mapping failed nothing until a row put the elision marker up.
-- **T4.30** (C16 §5b B1, with C01, C03): `⌥v` at a real session enters copy mode — the header carries `COPY`, and `1002l` reaches the stream. The control is the header **before** the key, so the row is about the key and not about the header always saying so. **The order is part of the assertion**: the indicator's frame is on screen before the hold takes effect, or the reader is told nothing and simply finds the mouse dead.
-- **T4.31** (C16 §5b B1): `⌃c` leaves it — the indicator goes and `1002h` comes back. **Asserted as a pair with T4.30 because the two ship as a pair.** The `⌃c` rung and both stubs were in the tree for the length of C26; a producer landing alone gives a mode that consumes the key and does nothing, which is worse than one nothing can reach.
-- **T4.32** (C03 I13): with copy mode up, typing writes **nothing** to the terminal, and `⌃c` writes the catching-up frame. The control is the same typing with copy mode down, which does repaint — without it the row passes for a session that had stopped rendering at all. **The catching-up frame is asserted as a frame — the indicator gone — and not as a longer output**: the exit's tracking bytes lengthen the output on their own, and the length passed with `resume()` deleted (T6.92).
-- **T4.31b** (C16 §5b B1, C01 I10): **the order inside the exit.** After `⌃c`, `1002h 1006h` reaches the stream **before** the first byte of the catching-up frame. The reader has finished selecting, and the app takes the mouse back before it takes the screen; the reverse order paints a frame into a terminal whose selection is still the terminal's. T4.31 asserts that both happen and could not see which came first.
-- **T4.32b** (C03 I13, C16 §5b B4): **the far side is not frozen, the screen is.** A local verb submitted before entry settles *during* copy mode — the store moves and **nothing** is written; on exit the one catching-up frame carries the settled text. T4.32's subject was typing, which is a commit the reader caused; this is one they did not.
-- **T4.32c** (C16 §5c C5): `⌥v` a second time while in copy mode writes nothing and emits no second `1002l` — two guards, the target and `#setCopyMode`'s own, and the row would pass with either alone.
-- **T4.33** (C19 I23, C15 I14, entry 16): a resize moves the open menu with the region, **read from the screen**. An anchored layer stores the row it was placed against and every writer of that row was a keystroke path, so a resize left the menu anchored to the previous region height until the next character. C15 clamps, so nothing faults and no number disagrees with any other — a row asserting `placement.row` passes on the stale value as readily as on the fresh one. **Growing and not shrinking**: on a shrink the clamp pushes a stale anchor to the bottom of the region, which is where the menu belongs anyway, so the defect is invisible in that direction. Measured before the fix: the menu at row 21 with the prompt at 37.
+- **T4.30** (C16 §5b B1, with C01, C03): `⌥⇧C` at a real session enters native selection — the header carries `NATIVE` (C14 I55; it read `COPY` until question 4 gave the handoff its own word), and `1002l` reaches the stream. The control is the header **before** the key, so the row is about the key and not about the header always saying so. **The order is part of the assertion**: the indicator's frame is on screen before the hold takes effect, or the reader is told nothing and simply finds the mouse dead.
+- **T4.31** (C16 §5b B1): `esc` leaves it — the indicator goes and `1002h` comes back. *It read `⌃c`; native selection refuses the interrupt (C16 I62, ruling 59), and `esc` is the exit (C16 §5c).* **Asserted as a pair with T4.30 because the two ship as a pair.** The `⌃c` rung and both stubs were in the tree for the length of C26; a producer landing alone gives a mode that consumes the key and does nothing, which is worse than one nothing can reach.
+- **T4.32** (C03 I13): with native selection up, typing writes **nothing** to the terminal, and `esc` writes the catching-up frame (it read `⌃c` — C16 I62). The control is the same typing with native selection down, which does repaint — without it the row passes for a session that had stopped rendering at all. **The catching-up frame is asserted as a frame — the indicator gone — and not as a longer output**: the exit's tracking bytes lengthen the output on their own, and the length passed with `resume()` deleted (T6.92).
+- **T4.31b** (C16 §5b B1, C01 I10): **the order inside the exit.** After `esc` (it read `⌃c` — C16 I62), `1002h 1006h` reaches the stream **before** the first byte of the catching-up frame. The reader has finished selecting, and the app takes the mouse back before it takes the screen; the reverse order paints a frame into a terminal whose selection is still the terminal's. T4.31 asserts that both happen and could not see which came first.
+- **T4.32b** (C03 I13, C16 §5b B4): **the far side is not frozen, the screen is.** A local verb submitted before entry settles *during* native selection — the store moves and **nothing** is written; on exit the one catching-up frame carries the settled text. T4.32's subject was typing, which is a commit the reader caused; this is one they did not.
+- **T4.32c** (C16 §5c C5): `⌥⇧C` a second time while in native selection writes nothing and emits no second `1002l` — two guards, the target and `#setNativeSelection`'s own, and the row would pass with either alone.
+- **T4.33** (C19 I23, C15 I14, entry 16): a resize moves the open menu with the region, **read from the screen**. An anchored layer stores the row it was placed against and every writer of that row was a keystroke path, so a resize left the menu anchored to the previous region height until the next character. C15 clamps, so nothing faults and no number disagrees with any other — a row asserting `placement.row` passes on the stale value as readily as on the fresh one. **Growing and not shrinking**: on a shrink the clamp pushes a stale anchor to the bottom of the region, which is where the menu belongs anyway, so the defect is invisible in that direction. Measured before the fix: the menu at row 21 with the prompt at 37. **The assertion is the menu's offset from the prompt, and never the row adjacent to it**: I81 put a rule directly above the prompt, so "the last non-blank row above `❯` is the one above it" is satisfied by that rule whether the menu moved or not — the row passed with the anchor refresh deleted, the menu stranded at rows 11–18 over sixteen blank rows. The menu's rows keep the distance from the prompt they had before the resize, and the row above I81's rule is the menu's bottom edge, not a blank one.
 - **T4.20** (I6a, with C20, C23): a session whose history file is unwritable and whose pipeline swallowed an append → `stop()` writes **both** reasons to stdout, after the release. Two sources in one row because a drain over one collection satisfies a row that reads only the other, and the release ordering is asserted on the call order for the same reason C23 T4.7b asserts `resetFocus`'s.
 - **T4.19** (I59): a 2,000-line block drawn for the first time renders every line, and the second frame renders none — **the stall stated as a test**, so a later reader who finds this stage and stops has an executable statement of what it did not do.
 - **T4.13** (I55): a keystroke into a settled session writes **fewer bytes than the frame it produced**, and the screen folded from every write equals the frame `paint` composed. Two assertions and neither is sufficient alone: the byte count alone is satisfied by a diff that drops rows, and the screen equality alone is satisfied by writing everything. The screen comes from `test/support/screen.ts`, which is verified against its own control before anything is read through it.
@@ -2739,7 +3965,8 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T4.17m** (I72, F468): one orbit step changes a **measured fraction** of the frame's cells and not all of them — compared row against row and index against index, never by string position. The row records the fraction; §11's *every cell changes* is what it replaces.
 - **T4.17n** (I75, F470): a plot **inside a `panel`** is focused and turned. `elementsIn` walks into a container declaring no elements of its own, so focus reaches a nested block, and every effect here resolved it with a top-level `find` — a key consumed, nothing drawn, no error. `b.live` builds a panel, so the arrangement the framework itself produces is the failing one and every hand-written fixture put the block at the top level.
 - **T4.17u** (I105, F1197): a spinner alone and an orbit alone, each under sixty-two 16 ms wakes of the fake clock with `synchronisedUpdate` pinned — **at least 11 frames** are written for the spinner and **at least 55** for the orbit, against 5 and 15 over the same 992 ms on the arming F1197 replaced. Sixty-two and not sixty because the spinner's first frame lands at 160 and its eleventh at 960, on the boundary a span of 960 excludes. Frames are counted as writes to the fake terminal outside the synchronised-update brackets, not as renders of a bystander kind: I103 keeps a non-animating block out of a tick's render, so a render count on it reads one. The bound is the rate the invariant states less one frame for the window's phase.
-- **T4.17o** (I77): a still PNG arms **no** wake — thirty wakes' worth of clock and zero renders; a 100/200 ms GIF renders **six** times in 990 ms and not thirty, the renders seeing frames `1 0 1 0 1 0` and the last at 900 ms being frame 0; the same GIF at `kitty` renders zero times. In `test/edge/image-frames.test.ts`, gated on the validator accepting a GIF (lane V F619) and measured with the gate patched.
+- **T4.17o** (I77): a still PNG arms **no** wake — thirty wakes' worth of clock and zero renders; a 100/200 ms GIF renders **six** times in 990 ms, the renders seeing frames `1 0 1 0 1 0` and the last at 900 ms being frame 0 — **and wakes six times, read as the delays its timers were armed with** (`200 100 168 100 168 100`). Renders alone cannot see the floor: since I103 took the tick out of the slot, a wake that changes no frame is a cache hit and draws nothing, so a ticker armed at the harness's 100 ms floor (no synchronised update) wakes **eight** times and still renders six, and that mutation survived the render count. *Not thirty* was written at a 33 ms floor and was never this harness's number; the same GIF at `kitty` renders zero times. In `test/edge/image-frames.test.ts`, gated on the validator accepting a GIF (lane V F619) and measured with the gate patched.
+- **T4.17v** (I74, C09 I112): an `agent`-only screen, whose wake is armed at 120 ms — after 1200 ms of clock the counter is 15, the elapsed time over 80 ms, and not 10, the wakes. The control is a braille spinner beside it, whose wake is 80 ms and whose counter after the same 1200 ms is the same 15. **And the wake is the rung's** (C09 I112, question 40): a `toggle` status — 400 ms at the Unicode rung, 120 at ASCII — writes at most three frames over the same 1200 ms at full capabilities and at least nine at `unicode: "ascii"`, so the cadence the session asks for is given the capabilities; asked without them it is 400 at both and the ASCII rung is sampled at a third of its rate.
 - **T4.17q** (I77, I74): a GIF beside an 80 ms spinner — the spinner's wake at 80 does not move the frame; the store's own wake, armed from the 113 ms render, lands at 146 and its frame is read at 179; the frame holds through 280 and is back at 0 by 400 (wake 333, render 366). **Synchronised update pinned on**, for T4.17j's reason: without it the floor is 100 and the row would measure the cap rather than the cadence. This is the row a step-per-wake store fails.
 - **T4.17t** (I77, C09 I67): the refusal path at `kitty`, read from the session's own frame in colour — a 16×400 GIF at `height: 400` on an 80-column terminal, whose box is `{cols: 32, rows: 400}` and whose placement `placementRows` refuses on the **rows** axis, animates: the picture's foreground ink over 990 ms is `{38;5;196, 38;5;46}` and not one colour. The **control** is the same document at `imageProtocol: "none"`, which must show the same two — a row asserting only the kitty arm cannot tell a fixed gather from a fixture that never animated. And the frame the session writes carries **no APC escape at all** for that block, where it wrote four and 317 B before. In `test/edge/image-frames.test.ts`.
 
@@ -2788,7 +4015,6 @@ PTY harness.
 - **T6.20** (I4a): making the signal or fault path asynchronous — an `await` anywhere between release and exit → T2.1b fails. Nothing else objects, and `session.stopping` is not set on those paths, so a submission could interleave where today none can.
 - **T6.21** (I9): giving the fallback renderer its own writer instead of taking one → T3.15b fails, and the launch-time fallback either writes into an alternate screen that was never entered or the mid-session one is overwritten by the next frame.
 - **T6.22** (I7a): constructing steps 2–11 in `createTui` → T1.9 fails, because `stop` from `created` now has a lifecycle to release; and a manifest given as a path cannot be read at all, since a constructor cannot await.
-- **T6.110** (I48): returning `blockAt` or `putBlock` to a top-level scan of `state.blocks` — `.find`/`.some` and `.map` over the held sequence, which is what both were — → **T4.86 and T4.87 both fail, on either half alone**. The halves fail *differently*, which is why T4.87 carries two kinds of figure: reverting the **write** leaves the counters at `{cpu: 1, mem: 1}` against the flat control's `{3, 3}`, which is the host teardown; reverting the **read** leaves the counters and the frame correct and drops `gapBefore`, because `put` writes without reading and `currentPanel` is the gap's only carrier on this arm. **The gap figure exists because the first pass measured the read reverting to nothing at all** — a mutation that fails nothing is a finding about the row, and the row was blind to every read-side consumer F408 names (I35's re-title, I52's elapsed counter and its countdown), none of which has a view-arm row even now. Restored by copy and compared by digest after each, green at 22 of 22. `test/contract/refresh.test.ts` imports nothing from this file, so its intermittent reds under load — three runs, three different sets, and the same rows red at HEAD without the change — are not the mutation's.
 - **T6.23** (I13a): reading the clock once per chrome function instead of once per frame → T4.11 fails. **Structural guard as well** (A02 17a): `ChromeContext` carries `now` as a value, so a second read has nothing to read from — the shape is what prevents it, and T4.11 is what stops the shape being widened back to a function.
 - **T6.25** (I28): widening the layer region back to the whole terminal → T1.12 and T1.12d fail, and a pushed view covers the header, the prompt and the footer. Nothing in §3's arithmetic can see it.
 - **T6.29** (I32): moving the empty-batch guard back above `arm()` → T1.14 fails, and `Esc` does nothing until the next key. Every unit test of C16's decoder passes throughout: it reports the deadline correctly and nobody polls it.
@@ -2843,16 +4069,16 @@ PTY harness.
 - **T1.38** (I81): `compose` at 24 rows with a one-row prompt and a one-row footer gives a region of 19, and `paint` puts the `horizontal` glyph across the full width on rows `rows − footer − prompt − 2` and `rows − footer − 1`, in the muted tone at 24-bit and with no SGR at 1-bit; under `unicode: "ascii"` both rows are `-` repeated.
 - **T1.39** (I81, §6l.2 row 3): a footer returning `[]` composes to zero footer rows and the lower rule is the frame's last row.
 - **T1.40** (I82): footers of 0, 1, 3 and 9 rows compose to 0, 1, 3 and `MAX_FOOTER_ROWS` footer rows respectively, each frame's `heightsSum` true, and the 9-row footer paints its first `MAX_FOOTER_ROWS` rows.
-- **T1.41** (I83): `entryLayout` on `[step, notice]` at width 40 returns the header's rows unchanged and the notice's rows as rendered at 36 with two blanks and `⎿ ` before the first and four blanks before each other; on `[step]` alone, the header only; on `[notice, notice]`, the sequence as `renderSequenceToLines` gives it.
-- **T1.42** (I83, §6l.2 row 12): for a body whose prose wraps once more at `width − 4` than at `width`, `measureSequence` through the injected wrapper and `entryLayout`'s row count agree, and both exceed the flush-left count by one.
-- **T1.44** (I84, §6l.6 row 16): a card `[step, notice]` at 40 draws its hook row as two blanks, `⎿`, a blank and the body's first row at 36; and a muted notice carrying `continuation`, rendered by C09 alone at 40, has `⎿` at the same string index as the card's hook row — the two forms compared, not two constants.
+- **T1.41** (I83): `entryLayout` on `[step, notice]` at width 40 returns the header's rows unchanged and the notice's rows as rendered at 35 with `  ⎿  ` before the first and five blanks before each other; on `[step]` alone, the header only; on `[notice, notice]`, the sequence as `renderSequenceToLines` gives it.
+- **T1.42** (I83, §6l.2 row 12): for a body whose prose wraps once more at `width − BODY_INDENT` than at `width`, `measureSequence` through the injected wrapper and `entryLayout`'s row count agree, and both exceed the flush-left count by one.
+- **T1.44** (I84, §6l.6 row 16): a card `[step, notice]` at 40 draws its hook row as two blanks, `⎿`, two blanks and the body's first row at 35; and a muted notice carrying `continuation`, rendered by C09 alone at 40, has `⎿` at the same string index as the card's hook row — the two forms compared, not two constants.
 - **T1.45** (I85, §6l.6 rows 18–19): `measureEntry` on `[notice]` is `measureSequence([notice]) + 1`; `renderEntryPieces` over the whole entry ends with one empty row; a window that stops before the blank draws no empty row and a window of the blank alone draws exactly one; `elementsOfEntry` puts no element on the blank.
 - **T1.46** (I86, §6l.6 row 20): `makeDefaultChrome`'s header rendered at 80 and at 100 columns ends with the clock, whose last cell is the last column; the footer's `cwd` ends at the last column and `/help` begins at column 0; the right cluster's `cells` equals the registry's `width` of that `pills` block at every width tried.
-- **T1.46b** (I86, I97, §6l.6 J): the blocks `makeDefaultChrome` returns with `copyMode`, `stopping` and `lastFrame` all up — the quiet session is three chips short, two of them the only two whose tone is not the default — → eight chips in the listed order, **every one** of which defines a tone; and `name`'s resolved ink is not `binary`'s, in dark and in light, with the clock and the `cwd` shown still to share one so the row is about those two chips rather than about any two differing. The label list is asserted before the walk, because a walk that found nothing satisfies every loop below it. At 1-bit the two tones collapse and the row does not run there (F1072).
+- **T1.46b** (I86, I97, §6l.6 J): the blocks `makeDefaultChrome` returns with `nativeSelection`, `stopping` and `lastFrame` all up — the quiet session is three chips short, two of them the only two whose tone is not the default — → eight chips in the listed order, **every one** of which defines a tone; and `name`'s resolved ink is not `binary`'s, in dark and in light, with the clock and the `cwd` shown still to share one so the row is about those two chips rather than about any two differing. The label list is asserted before the walk, because a walk that found nothing satisfies every loop below it. At 1-bit the two tones collapse and the row does not run there (F1072).
 - **T1.47** (I87, §6l.7 row 21): a default frame at 24×80 painted → row `HEADER_ROWS` is byte-identical to the rule above the prompt, `region.top` is `HEADER_ROWS + HEADER_RULE_ROWS`, `heightsSum` holds, and `MAX_FOOTER_ROWS` is `MIN_ROWS − HEADER_ROWS − HEADER_RULE_ROWS − RULE_ROWS − ⌊MIN_ROWS / 2⌋ − 1` — three.
-- **T1.48** (I88, §6l.8 row 22): a card `[step, notice]` whose body wraps to three rows at 40 renders row 0 as `  ⎿ ` and rows 1–2 as `  │ ` before the body's text in unicode, `  | ` in ASCII and at `WIDE_CAPS`; `measureEntry` is the same number as before the bar; a body of one row draws no bar.
-- **T1.49** (I89, §6l.8 rows 23–25): a card whose body is three `group` columns each headed by a `step` renders `  ⎿ ` then `├─`, `├─`, `└─` at column `BODY_INDENT` with a `│` on the rows of the first child's body and none under the last; one child renders `⎿` alone; a `step` column at depth 3 renders as text with no gutter; at ASCII the branches are `+-`; `GUTTER_UNIT === BODY_INDENT` by equality.
-- **T1.60** (I98, §6j.4): a card `[step, image]` holding a 2000×100 picture, transmitted through `transmitFrame` at a frame width of 80 → the emitted APC carries `c=76`, the body run's width, and not `c=80`; at a frame width of **300** the same document transmits, where the frame's number is past `MAX_PLACEHOLDER_SPAN` and the run's is not, and the renderer's placeholder span and the declared `c` are the same number; the group list the seam receives is one entry per non-blank run, the head's width and the body's differing by the card's indent; and a document that is not a card transmits exactly as it did.
+- **T1.48** (I88, §6l.8 row 22): a card `[step, notice]` whose body wraps to three rows at 40 renders row 0 as `  ⎿  ` (`` `- `` in ASCII and at `WIDE_CAPS`) and rows 1–2 as `  │  ` before the body's text in unicode, `  |  ` in ASCII and at `WIDE_CAPS`; `measureEntry` is the same number as before the bar; a body of one row draws no bar.
+- **T1.49** (I89, §6l.8 rows 23–25): a card whose body is three `group` columns each headed by a call head renders `  ⎿  ` then `├─`, `├─`, `└─` at column `BODY_INDENT` with a `│` on the rows of the first child's body and none under the last; one child renders `⎿` alone; a `step` column at depth 3 renders as text with no gutter; at ASCII the branches are `+-`; `GUTTER_UNIT === BODY_INDENT` by equality.
+- **T1.60** (I98, §6j.4): a card `[step, image]` holding a 2000×100 picture, transmitted through `transmitFrame` at a frame width of 80 → the emitted APC carries `c=75`, the body run's width (`80 − BODY_INDENT`), and not `c=80`; at a frame width of **300** the same document transmits, where the frame's number is past `MAX_PLACEHOLDER_SPAN` and the run's is not, and the renderer's placeholder span and the declared `c` are the same number; the group list the seam receives is one entry per non-blank run, the head's width and the body's differing by the card's indent; and a document that is not a card transmits exactly as it did.
 - **T1.61** (I106, F1201): `VisibleIds.of(range)` over a range of three entries → a set holding exactly their three ids and no other; called again with the same range object → **the same set**, by identity; called with a second range object holding a different entry → a new set holding that id and not the first's; the gate `host.kind === "view" || ids.has(host.id)` answers `true` for a `view` host absent from every range.
 - **T1.62** (I107, F1203): `entryLayout` twice over one card array → the body run's first block is **the same object** both times, its `gapBefore` cleared, and the document's own first body block untouched and still gapped (C23 I57); an equal card in a fresh array → a different body object, derived from that array's block; a nested card (a `group` column headed by a `step` notice) the same, keyed on its `children`.
 - **T1.63** (I108, F1207): `pacedSchedule` under a fake clock and a recording timer, with each slot's callback arming the next inside itself as C03's write does — a first arm at 16 is armed at `1000 / 60`; its firing reported 3 ms late and the arm made inside that firing is armed at `1000 / 60 − 3`; ten consecutive firings each 1 to 3 ms late leave the tenth deadline exactly ten sixtieths after the first; a slot whose callback arms nothing lapses, and an arm 2 ms later is a fresh `1000 / 60` from now; an arm outside any firing is a fresh window; a slot disposed unfired seeds nothing; an 80 ms window is armed at 80 and chains from its own deadline; 100 is not floored; a 16 ms arm made inside an 80 ms firing is a fresh `1000 / 60` from now and not 80; and a zero window is armed at 0, chains from nothing and is not remembered.
@@ -2860,6 +4086,28 @@ PTY harness.
 - **T1.50** (I90, §6l.8 row 26): `elementsOfEntry` with `command: "/ps --all"` yields a head element whose `copy` is `/ps --all` and body elements whose `copy` is each block's own; `copyElement` over the whole card yields the command first.
 - **T1.43** (§6l.4 E): the default footer is one `pills` row naming `/help` and the snapshot's `cwd` with `$HOME` folded to `~`, gaining `stopping` when the snapshot says so and carrying no key name.
 - **T2.40** (SS56): the source scan finds no hand-composed `kind: "notice"` under `src/` outside the sixteen files the rule excuses by name — two are the family (`documents.ts`, `builders/`), two the kind's declaration and definition, eight below L4 where the family is unreachable (A02), four L4 surfaces **owed** a migration and allowed so SS53 retires each entry when its last literal goes. The rule is imported from the enforcement tool, not restated (C01 T2.10's shape), and its fabricated violation is a notice literal in `src/shell/keys.ts`.
+- **T1.65** (I111, §6l.10): the label sits inline-end on the **upper** rule with one trailing glyph, painted as a ground; the header's rule and the lower rule are byte-identical to the no-label frame. The control is that frame: with no label supplied every row matches what shipped, glyph for glyph, so the row cannot pass by drawing nothing anywhere.
+- **T1.65b** (I111, §6l.10, `R-COL-003`): the label sets a **background** and the no-label frame sets none anywhere — read off the emitted bytes rather than off the folded screen, and as a difference rather than as a literal code, so the row is about the channel and not about the theme's value.
+- **T1.71** (I114, §070, C10 I55, `R-COL-003`): a label naming a hue is painted with **that hue's ground and that hue's `on` ink**, over all ten hues in all ten themes, read off the emitted bytes; a label naming no hue is byte-identical to the frame that shipped, which is the control and is what stops the row passing by painting something everywhere. A hue name no theme carries falls back to `bgElev` rather than to nothing, because an unknown name is a typo in a config file and a label that vanishes is a worse answer than one that is not tinted. **The ink is asserted as the BAND's and not the hue's, and the first draft was not**: a mutation taking the label's ink from the hue's own colour **survived** — ten runs still distinct, a ground still painted, an ink still in the run, every one of them true of a hue drawn on itself. What separates them is the shape of the tier rather than any value: because `on` is the higher-contrast of black and white (C10 I54, 100 of 100), across ten hues the **grounds take ten values and the inks at most two**, where a hue drawn on itself gives ten. The row asserts that count, so it fails on the `R-THM-005` failure it was written for rather than on a value it copied.
+- **T1.72** (I115, `R-HON-008`): `resolveConfig` over the minimal config records the four settings in order, each `default`, with the framework's values as text; the same config with `motion: "reduced"` records `reduced` and **still `default`** — the premise asserted, so a reading that called a caller's value `config` fails here.
+- **T1.73** (I116, §6l.13 K1, K3): the default footer given `toast: "copied 3 lines"` draws `✓ copied 3 lines` where the working directory was, and the cwd is absent from that row; given none, the cwd is drawn — asserted at Unicode and at ASCII, where the mark is `glyphFor("ok")`.
+- **T1.74** (I120, I121, I124): §6m.2's table, row by row, through the event function alone — each change kind against a streaming and a settled entry, an appended refusal after settle, a replace after settle writing nothing, a second settle writing nothing, and the number reading `seq` after an eviction.
+- **T1.75** (I121): every kind of `ONE_PER_KIND` through the body function — role, name and value text, a table's header before its rows, a choice without its radio glyph, nothing for a figure but its name, a notice's text once, and no SGR or glyph in any line — through the registry a session builds, with C11's, C12's and C25's kinds registered.
+- **T1.77** (I133, C16 I19): a session keymap binding `insertNewline` to `⌃j` alone draws `⌃j newline` on the scope rung's line and not `⇧⏎`; a keymap with `complete` unbound draws no `complete` chip; the substate line says `complete` for a completion panel and `find` for a search; a question's line ends with its default's label.
+- **T1.78** (I137, I138, I139): the default footer given `watches` holding three, the second a `progress` block at 43 / 100, at 80, 60, 40 and 20 columns — one `chrome.watches` row every time, directly above `chrome.owner`; at 80 the second chip is `ps --watch ███░░░ 43%`; at 60 no bar glyph is drawn and every percentage is; at 40 a `+N` chip stands and the selected watch is kept; at 20 the kept name is truncated and the row still measures one. At ASCII the lead is `...`, the bar `###---` — C09's `barStyle` at ASCII, not a spelling of this row's — and the selected mark `*`. `selected: null` draws no `›` and no `accent` chip; the row focused on no watch reads `nothing watched`. The scope line names `⇧⇥ watches` with one watch and `⇧⇥ transcript` with none. **Measured under `wide` as well**, where C09's glyph table answers its ASCII set (`glyphs.ts`'s wide rung), so the row reads `...` and `*` there too.
+- **T1.79** (I135): the store alone over a real transcript — a streaming entry is watched (`true`), a settled one and an unknown id are not (`false`); watching the first again answers `true` and leaves the order; `unwatch` answers whether it removed one; a `clear` drops every watch and a settle drops that one alone.
+- **T1.80** (I136): the two handlers over a real transcript and store, one row per line of §6p.2 — the notice's text and tone for each, a default `/watch` skipping a `transport: "local"` streaming entry (a queued line) for the stream beneath it, and an `agent`-origin stream watched with the same words as a `user` one.
+- **T1.173** (I131, C04 I109, C09 I133; ruling 81): `OneShots.stamp` over a streaming `ripple` notice with no `trailSince` writes the tick of the first frame that draws it; a later frame over a **new array with the same text** keeps that stamp; a frame over **longer text** — the next arrival — takes the new tick; a producer's own `trailSince` is kept through a new arrival; and a `hotEdge` notice, a settled `ripple` notice and a `ripple` notice whose text has not changed since a stamp taken on an earlier array are each returned as they came or with the first stamp — the first two unstamped.
+- **T1.76** (I126, I127, I130): §6n.2's seven rows through the earning function alone — watched × failed × a duration either side of 30 000 ms — each giving exactly its row's word or nothing; a **long** entry settled twice fires once — a short one earns nothing either way, so repeating one proves nothing about the dedup; a watch on a settled or unknown id is `false`.
+- **T1.65c** (I111, §6l.10): the ground reader sees a background that is not the sequence's first parameter, and does not read a 256-colour or rgb *foreground* whose index spells `4x` or `10x` as one. The reader's own fabricated violation, and it earned its place: the first draft matched only at the head of the sequence, so a rule that was painting `38;5;188;48;5;235` was reported as painting nothing — a defect of the instrument that reads exactly like a defect of the code.
+- **T1.65d** (I111, §6l.10): a supplied string that strips to nothing — `""`, spaces, a tab — leaves the frame that shipped, and a padded name still draws. The narrowing belongs to the frame because an application computing its label may return a blank on some frames, and a one-cell ground floating in the rule is not a name.
+- **T1.67** (I112, §6l.11, C17 §5c): a prompt holding a chip paints a background over exactly the chip's cells and nothing else, and a prompt holding the same text without a chip paints none. Read off the emitted bytes, since the screen model folds SGR away.
+- **T1.68** (I112, §6l.11, `R-STA-002`): a selection over a chip leaves one ground on the row and it is the selection's; a region stopping short of the chip leaves two, which is the control — without it *one ground* is satisfied by a painter that has stopped drawing chips. Counted rather than named, so the row says *one ground per cell* rather than pinning a theme. Then the property the painter rests on and cannot check: **over every region endpoint in the buffer, no wash covers part of a chip.**
+- **T1.66** (I111, §6l.10, `R-BLK-175`): at 60 columns the frame draws its three rules **and** the label is gone; one column wider it is drawn. Gone too whenever it would leave no rule glyph, asserted at the measured boundary — 96 cells draw at a width of 100 and 97 shed — and the frame composes to the same height throughout, since a label costs no rows.
+- **T1.69** (I113, §6l.12, §101): a prompt holding a chip puts one panel above the prompt carrying that chip's label and its content, and the same prompt with the caret away from every chip has no layer at all. The caret moved from one chip to another moves the panel's content to the second, which is `←→ other chips` with no binding behind it. The control is the chipless prompt: without it, *a panel is present* is satisfied by a projection that pushes one for every buffer.
+- **T1.70** (I113, §6l.12, C15 §2c): the preview is not pushed onto a stack that already holds a layer, and a layer arriving over a live preview leaves one panel rather than two. Asserted as the stack's contents rather than as the top, because a preview pushed **under** something reads as absent from every assertion about the top and is still a layer the manager has to place.
+- **T1.172** (I33): `commandRows` over a command holding `\n` and `\r\n` → one row per line, the first after the prompt and the rest under the continuation gutter, a long line wrapped within its own rows, and **no row containing a line feed or a carriage return**, asserted over every row. Through a session, a bracketed paste of six lines submitted writes no bare `\n` into the frame's bytes. The control: a one-line command is one row, unchanged.
+  **The first draft of this row was vacuous and a mutation said so.** It asserted 40 and 59 columns, where `fallback.ts` has replaced the whole frame with the *Needs 60x24* notice: two notices agree with each other whatever the label does. The floor could be set to zero and nothing failed. §069's sentence is *at* 60, not below it, and 60 is `MIN_COLUMNS` — the narrowest width the frame draws at at all, which is what *and the frame still works* is naming.
 - **T2.100** (I91): a `TuiConfig.pty` reaches `createProcessRunner`'s deps identically — asserted by object identity across `resolveConfig`, and by the consumer's own `spawn` being the one the graph's runner calls — and a source scan finds `config.pty` read at **two** sites in `src/shell/`, each of them the same spread with nothing between.
   The row said *exactly one site* and the scan gives two: `config.ts` copies the consumer's field onto the resolved config, `construct.ts` hands the resolved one to the runner. Both comments say *the one site* and both are right about their own `config` object; the number is only wrong read as a grep, which is what a scan is (F923). What C22 I91 forbids is a read that is **not** a forward, so the row asserts that instead of a count.
 - **T3.38** (I80, §6k.4 F): **frame read.** At 24 rows with `footerRows: 2` and a footer returning three one-row blocks, rows 22 and 23 carry the first two blocks and the third is on no row; the region is 20 and the prompt is on row 21. With one block, row 23 is blank. And the default — `footerRows` omitted — paints byte-for-byte the frame that `footerRows: 1` paints, which is the frame HEAD painted: the golden claim, asserted here rather than by regenerating anything.
@@ -2887,7 +4135,7 @@ PTY harness.
 - **T1.32, T3.36** (I78): `SeriesVisibility` — absent is an empty record and `""`; `false` is in the key; two blocks key sorted; `delete` drops one entry and `clear` all. In `test/unit/series-visibility.test.ts`.
 - **T4.17r** (I78, C16 I27): the **writer alone** — `↓` onto a two-series plot then `2` writes `{1: true}`; `2` again writes `{1: false}` and not an absence; `2` on a one-series plot writes nothing because the plot declared no `2`; `1` from the prompt writes nothing because the keymap is withdrawn with focus; `→` after a toggle still moves the crosshair.
 - **T4.17s** (I78, C12 I116): the **pair, through a frame** — `↓` then `2` on a two-series plot removes the second series' ink and puts `hollow` in the legend's second row while the gutter labels stay where they were; `2` again restores the first frame byte for byte. Read from the screen.
-- **T4.18g** (I78): `clear` empties the store through the same subscription that drops the rendered rows.
+- **T4.18g** (I78): a series toggled by `2` leaves one entry in `SeriesVisibility`, and `transcript.clear()` leaves none — the visibility store joins the subscription that drops the rendered rows. *Its title was T4.18f's word for word* (F1499), which SP15 cannot see because the ids differ.
 - **T4.88** (I100): a session drawing a column of forty measured children twice with nothing changed reports every `measure` miss on the first frame and none on the second; a patch that rebuilds one child misses that child's blocks and no other; and the C14 height and the window agree on the same memo. In `test/integration/render-cache.test.ts`.
 - **T4.89a** (I101): a column group of twelve counting children taller than the region, scrolled twice: the first scroll is a `range` miss that renders and holds the children it kept — the first frame rendered the sequence and held nothing — and the second renders the entering children alone; the rows are the fresh render's. In `test/integration/render-cache.test.ts`.
 - **T4.89b** (I101, C09 I69, C14 I25): the assembly is the sequence render — over a column group with `gapBefore` children and a right-aligned child, and over a sequence of whole blocks, every window position from the first row to the last yields rows equal to a fresh full render's, byte for byte. In `test/integration/render-cache.test.ts`.
@@ -2902,6 +4150,28 @@ PTY harness.
 - **T4.91** (I107, I100, F1203): T4.88's shape over a card — a `step` notice head, then forty measured children of which the first declares `gapBefore` — drawn, then two further frames on a still document → every `measure` miss is the first frame's and none follows; before I107 each frame missed once, on the body's first block, because its cleared copy was a new object each frame.
 - **T4.92** (I108, F1207): the wiring — a session built over a spy on the ambient timer and an `elapsed` the row advances, which is the untapped clock when nothing records: the first frame's write arms a slot of `1000 / 60`; a resize inside the slot is pending in it; the row sets the clock 2 ms past the deadline and fires the slot, C03 writes and opens the next window inside the firing, and that window is `1000 / 60 − 2` — the composed schedule and not C03's own arithmetic.
 - **T4.93** (I109, C14 I22): a real session resized between two widths → C14 is handed `region.width` on every resize and never `size.columns`, asserted by the measurer's recorded widths rather than by the call, so a caller that computes the margin a second time at the call site is caught by the number the blocks were measured at. An overlay pushed at each width sits centred in the narrowed region (§6l.9 row 5).
+- **T4.94** (I110, R-BLK-645, R-BLK-314): `openSurface` appends an entry and pushes **no layer** — `overlays.stack` is empty across attach, two invalidations and the detach — and the entry it wrote is still in the transcript afterwards, holding the last blocks the surface rendered. A command that settles **while the child is attached** is in the record too, which is R-BLK-314's *what changed while you were away* asserted as the thing rather than as a notice about it.
+- **T4.94b** (I110, C16 I49): while attached, `router.target` is `child` and the footer's owner line carries `attached` and the host escape's chord; the entry's block is framed and its border names `⌃]`. Both carriers, because R-BLK-908 asks for the escape to be *visible and reachable* and either one alone leaves a reader who is not looking at the other with no way out.
+- **T4.94c** (I110, C24 I41, C14 I56): a full-size child through a real session at 60×20 — it renders exactly `SurfaceContext.height` rows, each exactly `SurfaceContext.width` cells, numbered — and the frame shows the entry's command row, the top border, **every** numbered body row untruncated, the bottom border with the legend, and the closing blank: `measure` of the entry equals the rows drawn and equals the region. Before C24 I41 the same child drew rows 2–12 of 13, each cut with `…`. After `surface.close()` by the application the footer's owner line no longer reads `attached` on the next frame read, with no key pressed.
+- **T4.95** (I116, §6l.13 E1–E3, C26 I17): a session with a focused table row — `y` copies and the footer reads `copied 1 line`; the scheduled expiry fires and the tail returns; two copies in a row leave one live timer, so firing the first-scheduled expiry does not clear the second toast; and stopping with a toast live disposes its timer. Through a fake `schedule` that records and fires by hand, so the lifetime is the expiry rather than a wall-clock wait.
+- **T4.96** (I117, C26 I28, C04 §3aq E1–E3): a session whose entry holds a paragraph, §105's split (a tree on the left, a `code` block on the right) and a paragraph after it. `↓` walks the tree and, from its last row, steps to the paragraph after the split and never into the right pane. `→` from a tree row lands on the right pane's element and `←` comes back to the tree. `↑` from the paragraph after the split lands on the tree's last row. A tree taller than the split pulls the left pane's offset by the minimum as focus walks it, and the divider's thumb moves with it on the frame.
+- **T4.97** (I117, C16 I59, C04 §3aq E4, E7): `⌥→` with focus in the split moves the divider one cell to the right on the frame, `⌥←` moves it back, and focus stays on its element through both. At the prompt, `⌥←` is still word-left: the caret moves and the split does not.
+- **T4.99** (I118, C16 I60, C26 I29, C04 §3ar F1–F5): bytes through stdin on a session holding §105's form. `↓` to `port`, `⏎`, backspace twice, `8080`: the field draws `8080▌` and the prompt row draws the reader's held line; `⌥←` moves the caret a word and the form's split, where it sits in one, does not move; `⏎` writes `8080` into the block and enters `replicas`; `esc` there leaves `3` unchanged and gives the held line back exactly, text and caret.
+- **T4.100** (I118, C04 §3ar F6, F7): a field being edited and a click on `save` — the click focuses `save` and presses nothing, the typed value is written and the line given back; a second click presses it, and the submitted command carries the typed value, not the one before the edit.
+- **T4.101** (I118, C04 §3ar F9, F3, C16 I60): a multi-line paste into a field is refused with its reason and the field is unchanged; `↓` inside a field is dropped and focus stays on the field; and `F1` inside a field puts the keymap in the transcript with the field still being edited — the one key that tells a pass from a reject, since a reject withholds the `global` fallback and every other key the row presses draws the same frame either way.
+- **T4.102** (I119, I120, I123, C01 I22): bytes through stdin on a session with `renderMode: "linear"` — no `?1049h`, `?1002h` or `?25l` is written; a local verb writes its start and completion as ruling 29's lines and its body; a typed draft is erased and redrawn round an event with the caret where it was; a resize writes nothing but the input line; and a linear session **opened** below the rich route's 60 × 16 floor opens rather than drawing the fallback — the gate at open and the gate at resize are two sites, and a row resizing an open session reaches only the second.
+- **T4.103** (I122, I124, C16 I70): a question in linear — its numbered line, the cue carrying `(ready in a moment)` while C16 I44's guard is armed, the first `2` refused and the cue redrawn naming it — `(2 refused: pause, then press 2)` — and a `2` after the grace and a quiet gap answering the second choice, `answer: <label>`, the input line reading `answer 1 to 3:` while open; the same question on the rich route, where `2` answers nothing and the draft given back after; the question's level `assertive`.
+- **T4.104** (I125, C02 I15): `/capabilities` under `CALCIUM_RENDER_MODE=linear` — the route row first, reading `linear` and `stated`, and every capability field after it.
+- **T4.105** (I126–I129, C01 I23, C01 I24, C16 I61, C02 I16, C02 I17): bytes through stdin with `CALCIUM_NOTIFY=bell,system,title` and `TERM_PROGRAM=WezTerm` — `?1004h` taken at open; a 45 s settle before any focus report writes no rung; after `ESC [ O` it writes `BEL`, `OSC 9` naming the entry and `CSI 22;2t` then the title, a 2 s settle writes nothing, and a second long settle writes a title with no second push; `ESC [ I` writes `CSI 23;2t`; a question arriving while away writes `waiting`. The same session with `CALCIUM_NOTIFY` absent writes none of those bytes and takes no `?1004h`, and **its screen while the reader is away is the opted-in one's, cell for cell** — the rungs moved nothing (I129). **The return is where they part**: `ESC [ I` closes C23 I85's away mark and appends C23 I86's notice naming the three entries that settled, which the quiet session, with no away mark, does not. This row compared the two sessions' final screens until the ledger landed, and that comparison straddled the return.
+- **T4.106** (I131, I132, C04 I109): a local handler — the far side's own route through C04's gate — emits a notice whose span carries `{ animate: "pop" }` and no `since`; the head is rewritten while the flash runs and not after, and **the session's pending timers fall to the `animate: "none"` control's** once it has — the ticker is disarmed, not merely redrawing an identical frame, which the writes cannot tell apart. Controls: `shimmer` on the same carrier keeps writing and holds more timers than `none`; a producer's `since` of 1 000 000 is honoured — the effect has not begun, so it still holds the shimmer's count.
+- **T4.107** (I131): a `b.live` part polls every 500 ms and renders its span with a counter beside it, so every poll really re-emits the document; the span's `wipe` (sixteen clusters, sixteen ticks) rewrites the text after its first draw, **no poll after it has finished rewrites the text**, and when a later poll changes the effect to `sweep` on the same span **the sweep starts from the inline-start edge** — a frame with the accent on the text's first cell and not its last. *Rewritten again* was the first wording and the mutation pass showed it too weak: the tick advances only while something animates, so by the switch it stood at 16 of the sweep's 19, and a sweep inheriting the wipe's stamp still drew its last frames — the band at the end — and satisfied it. The polls are slower than the effect on purpose: a restamp at a 20 ms poll pins the effect at frame 0, which draws nothing new and passes a *no replay* assertion exactly as the fix does — the mutation pass found it. *The ticker is not this row's*: a live part animates by nature — its title's poll spinner — so it holds the same timers under `none`, `wipe` and `shimmer`, measured; the disarm is T4.106's.
+- **T4.108** (I131, §6o.3 ruling 2): the stamps join the eviction subscription — a stamped entry leaves `oneShots.size` at 1, **an append past C13's cap that evicts it** takes it to 0 while a stamped neighbour survives, and `clear` takes the rest; *the evict branch was the mutation pass's last survivor, and T4.18g drives `clear` alone for the five sibling stores, so their evict branch is unrowed too*; stamping one array twice returns **the same array**, at the first stamp's tick, and a document with no one-shot is returned as it came — the memo's claim, which no behaviour shows, because a stamp remembered by the store draws the same frame with or without it.
+- **T4.110** (I135, I136, I137, I139, I140, C16 I76): through a built session with a streaming fixture verb — `/watch` appends `watching …` and the footer gains `chrome.watches` above the owner line, which reads `⇧⇥ watches`; the stream patches its `progress` block and the chip's percentage follows on the next frame; `⇧⇥` puts `›` on the chip and the owner line names `move`, `open` and `prompt`; `⏎` puts focus on the watched entry and the row stays; the settle removes the row.
+- **T4.111** (I135, I126, C01 I23): `CALCIUM_NOTIFY=bell`, `ESC [ O`, a watched entry settling after 2 s — `BEL` once; the same with no `/watch` — nothing (**the control**: the watched row, not the duration, rang). A session with nothing opted in still draws the row after `/watch`: the set is the session's.
+- **T4.112** (I136, C23 I5, §6p.5): an invoke holding the guard; `/watch` shows `queued behind`; after the invoke settles it answers `nothing is running to watch` and the footer never drew a row.
+- **T4.113** (I137, C16 I76, `R-COR-002`): the row focused on its only watch; the entry settles — the active target is still `watchRow`, the row reads `nothing watched`, `esc` returns to the prompt and the row goes. A question raised over the focused row takes the keys and the row draws no `›` until it is answered, and has it again after — **and the asking verb's own settle then returns focus to the prompt**, C23's submit-row reset (C16 I2, I76), as it would from `liveBlock`.
+- **T4.109** (C16 I68): through a built graph, `> notes` `⏎` submits nothing — no entry is appended for it and the runner is never called — appends one `warn` notice and keeps the line; `ls > notes` `⏎` is submitted. **The control is the second half**: a guard that refused every line containing `>` passes the first alone.
+- **T4.98** (I117, C04 §3aq E5): a press on the divider's column, a motion report with button 0 held five columns to the right, then the release — the divider is five cells right on the frame and focus is where it was. A motion report after the release moves nothing.
 - **T6.113** (I101): the range split dropped from the slot → T4.89a renders every kept child; the gap row dropped from the assembly → T4.89b fails on the first `gapBefore` child.
 - **T6.114** (I100, C09 I70): the memo dropped from the window's closures in `session.ts`, or from C14's measurer in `construct.ts`, or from the profiler's wrapper round `measureSequence` → T4.88 fails; the registry ignoring a handed memo, or keeping it past the call → C09 T1.44 fails.
 - **T6.115** (I102): the structural key replaced by identity → T4.90a renders every frame; the width dropped from the key → T4.90b's resize arm paints the old lines; the layer keyed by its id rather than its content → T4.90c's re-render paints the old layer.
@@ -2924,13 +4194,74 @@ PTY harness.
 - **T6.86** (I73): the advance takes every entry rather than the windowed set → **T3.34** fails, and an off-screen plot turns while a spinner elsewhere keeps the timer alive.
 - **T6.87** (I75): the distance control steps additively → **T1.30**'s zero-crossing arm fails, and twelve presses put the reader on a blank frame with a working control.
 - **T6.88** (I75, F470): the focused block is resolved with a top-level `find` again → **T4.17n** fails and every other row passes, because every other fixture puts the plot at the top level. The mutation is the shipped code, which is what makes the row worth having.
-- **T6.91** (C16 §5b B1): the two exit steps swapped — `resume()` before `setMouseTracking(true)` → **T4.31b** fails; T4.31 passes, because it asks whether both bytes arrived and not in which order. Anchor in `tools/mutate/runs/c22-copy-mode.mjs`.
+- **T6.91** (C16 §5b B1): the two exit steps swapped — `resume()` before `setMouseTracking(true)` → **T4.31b** fails; T4.31 passes, because it asks whether both bytes arrived and not in which order. Anchor in `tools/mutate/runs/c22-native-selection.mjs`.
 - **T6.92** (C03 I14): `resume()` dropped from the exit → **T4.31, T4.31b, T4.32 and T4.32b** fail: tracking comes back and the screen never does, which from the reader's chair is a session that has hung with a live mouse. **Measured 2026-09-05, and the first measurement disagreed with the row as planned**: T4.32 *survived*, because its tail asserted `output.length > held.length` and the tracking pair grows the length with no frame behind it — a proxy satisfied by the wrong write. Its tail now reads the frame (the indicator is gone), and the set above is the re-measured one. Same run file.
 - **T6.120** (I105, F1197): arming the wake for the interval from the paint again — `schedule(…, ms)` in place of the stamps' due time — → **T4.17u** fails on both arms (6 and 15), and T4.17j still passes, because its bound is a ratio the defect satisfies. Restoring C03's spinner window to 100 → **T4.35** fails at nine glyphs of ten, the two on ticks 4 and 9 of every ten never drawn. That is why T4.17u asserts the rates and not their ratio. Anchor in `tools/mutate/runs/c22-ticker-period.mjs`.
 - **T6.121** (I106, F1201): rebuilding the set on every call — `of(range)` ignoring the range it last saw — → **T1.61** fails on identity, two calls with one range returning two sets; keeping the first set for ever — the range compared to nothing — → **T1.61** fails on freshness, a second range's id answered from the first's members. Reverting the wrapper to its `.some` fails no row, and the run says so: the answer is the same and only the bench can see the cost.
 - **T6.122** (I107, F1203): the hold removed — `entryLayout` deriving the body on every call, which is the tree before I107 — → **T1.62** fails on identity and **T4.91** reports one `measure` miss per frame where it asserts none; the hold keyed on the head block rather than the array → **T1.62** fails on the fresh array, served the stale body; a nested card's body not held → **T1.62**'s nested arm fails.
 - **T6.123** (I108, F1207): the chain removed — every window dated from the arm, which is the tree before I108 — → **T1.63**'s late-firing rows and **T4.92** read the full window; the floor removed → **T1.63**'s first arm reads 16; a disposed slot left seeding the next → **T1.63**'s dispose row chains from a deadline nothing waited for; the chain taken by time rather than by the firing — any arm within a window of the last deadline — → **T1.63**'s lapsed-slot row is dated a window after a deadline nothing drew at. The same-length restriction removed — any firing chains any arm — → **T1.63**'s mixed-cadence row reads a 16 ms arm inside an 80 ms firing as 80. The replay gate removed — a replayed session paced like a live one — → **T5.1** exhausts the recorded clock.
 - **T6.124** (I109): handing `size.columns` to `resizeViewport` instead of `region.width` → T3.40's wider document stops wrapping and T4.93's recorded widths move by one; every height assertion in §6l.2 stays green, which is the point — the margin takes a column and no rows (§6l.9 row 8).
+- **T6.125** (I131): the session lays out `entry.doc.blocks` rather than the stamped array → **T4.106** and **T4.107** fail — the pop and the wipe hold frame 0. `tools/mutate/runs/c22-one-shots.mjs`.
+- **T6.126** (I131): the stamp not remembered, every new array stamped at the current tick → **T4.107** fails: a poll re-stamps the wipe and pins it at frame 0, which is why the row polls slower than the effect. `tools/mutate/runs/c22-one-shots.mjs`.
+- **T6.127** (I131): the effect dropped from the identity → **T4.107** fails on where the sweep starts, and on nothing weaker (§6o.2 row 4). `tools/mutate/runs/c22-one-shots.mjs`.
+- **T6.128** (I131): a producer's `since` overwritten → **T4.106** fails on the future stamp's timers. `tools/mutate/runs/c22-one-shots.mjs`.
+- **T6.129** (I131, §6o.3 ruling 2): the memo disabled → **T4.108** fails on array identity, and no frame row does: the store still remembers the stamp. `tools/mutate/runs/c22-one-shots.mjs`.
+- **T6.130** (I131): `oneShots.delete` dropped from the evict branch → **T4.108** fails on the eviction; `clear` alone did not see it. `tools/mutate/runs/c22-one-shots.mjs`.
+- **T6.131** (I132): `animationIntervalOf` asked without `{ tick, width }` → **T4.106** fails: the finished pop keeps the shimmer's timers. `tools/mutate/runs/c22-one-shots.mjs`.
+- **T6.132** (C16 I68): the submit arm's `>` guard removed → **T4.109** fails: `> notes` reaches the pipeline. `tools/mutate/runs/c16-registry-routes.mjs`.
+- **T6.133** (I110, C24 I41): the context handed the region again — `width: region.width, height: region.height` in the surface host's `context` → **T4.94c** fails with the command row, the top border and body rows 0–1 off the screen and every body row cut by two cells; and `options.invalidate()` moved back above `current = null` in `beginClose` → T4.94c's footer still reads `attached`.
+- **T6.134** (I135): the store's drop called before the notifier's read → **T4.111** fails: the watched short settle rings nothing.
+- **T6.135** (I138): watches shed before bars — the bar-shedding step removed **and** the shedding ladder's chips keeping their bars → **T1.78** fails at 60 columns, where a watch goes behind `+1` while every bar stands. **Removing the step alone is equivalent** and the first mutation pass showed it: the ladder below draws its chips bare, so with nothing to shed it returns exactly the bare row. The order I138 states lives in two lines, and the row names both.
+- **T6.136** (I136): the default target's `transport: "local"` filter removed → **T1.80** fails: `/watch` names the queued line.
+- **T6.137** (I33): `commandRows` wrapping the command whole rather than line by line → **T1.172** fails on the rows holding a line feed, and the session's bytes carry five bare `\n` for a six-line paste.
+- **T6.138** (I131; ruling 81): the store's trail arm removed, so no notice is stamped → **T1.173** fails at the first stamp; with it, C09's **T1.150** is unchanged, because that row stamps by hand — the two halves are separate rows on purpose. `tools/mutate/runs/c22-trail-stamp.mjs`.
+- **T6.139** (I131; ruling 81): the arrival dropped from the identity, so the first stamp is kept for the life of the stream → **T1.173** fails on the next arrival. `tools/mutate/runs/c22-trail-stamp.mjs`.
+- **T6.140** (I131; ruling 81): the stamp re-taken on every new array rather than on a new arrival → **T1.173** fails on the re-emission: a poll re-emitting the same text would restart the ring. `tools/mutate/runs/c22-trail-stamp.mjs`.
+- **T1.174** (I141, F1302): a layer whose content is a `scroll` box of twelve lines in four rows, rendered through `composite` and through the replacing prompt slot with `layer:<id>` at 3 → both draw lines 4–7; with the store at 0 both draw 1–4, and the chrome cache serves the unscrolled frame by identity and misses once on the scrolled one. `scrollLayer` on that layer moves the box and leaves the layer's row offset at 0.
+- **T4.114** (I141, C16 I74): through a built session, a chip preview over a 40-line paste; a wheel notch down over the panel → the box's offset is `WHEEL_ROWS` and the frame's first content row is line 4; the layer dismissed and pushed again → the box at its top.
+- **T4.115** (I142, C23 I74): an approval replacing the prompt, suspended into its inspection; a wheel over the prompt's rows moves the box, and a wheel over the middle of the region moves no box and answers nothing — the transcript beneath takes it (6q.2).
+- **T6.142** (I141): `layerRows` handed no `scrollOffsets` → **T1.174** fails on the scrolled arm, which draws lines 1–4 at every offset. `tools/mutate/runs/c22-layer-scroll.mjs`.
+- **T6.143** (I142): the pointer's `placed` unfiltered again → **T4.115** fails: the wheel over the prompt's rows reaches no layer.
+- **T1.175** (I143, ruling 53, §6s.3 rows 1–2): through a built graph over a 24-row region, the preview's content is `[rule, raw, scroll, raw]` — the edge, the header, the box and the key row. Over a 47-line chip the box is 8 rows and the key row reads `⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor`; over a 9-line chip the box is 9 rows and the row names `⌥o` alone; over a 10-line chip the box is 8. In all three the placed layer is not `truncated`. *It read a 20-row region and 7 rows while its test drove 24 and asserted 9, and the cap counted two borders.*
+- **T4.116** (I143, I51, ruling 53): a paste chip, `⏎` → the prompt is submitted with the chip's content, and the preview is gone; `⌥⇧↓` with the preview up moves its box one row and leaves the prompt's caret where it was.
+- **T6.144** (I143): the preview's content reverted to the bare `code` block → **T1.175** fails, and T4.116's `⌥⇧↓` moves nothing.
+- **T1.176** (I144, C02 I19): `openChipInEditor` with no editor → the refusal's words, and no handoff; with an editor and a fake runner that rewrites the file → `editChip` is called once with the new content and its line count; with a runner that leaves it → not called; the temporary directory is gone on all three paths; the argv is `sh -c '<editor> "$1"' sh <path>`.
+- **T1.177** (I145, C15 I34): a menu with no selection → the top layer's `promptLive` is `true` and a printable key reaches the editor; `Tab` → `false` on the same layer, before the next key (a menu holding no selection leaves `↓` to history, C19 I20, so `Tab` is the key that selects from it); a chip preview → `true`; a reverse search → `false`.
+- **T4.117** (I144, C23 §4): through a built session with a fake runner, `⌥o` on a chip suspends and resumes the lifecycle once each, resets the decoder and re-mints the chip; with a verb holding the guard it runs nothing and says so.
+- **T6.145** (I144): the read-back dropped, so the edit never returns → **T1.176**'s rewrite arm fails.
+- **T6.146** (I145): the menu's selection update dropping `promptLive` → **T1.177** fails at `Tab`: the layer still reads `true`.
+- **T4.118** (I146, C26 I32): through a built session, a box of 3 over 12 rows with focus on its first child: a press on the bar's last row puts the offset at the ceiling and focus stays; with a box nested in it, a press on the inner bar's column moves the inner box and not the outer; a press on the bar column of a box whose content fits focuses the child. **The jump latches** (C26 I32): with a child focused, a bar press and then a resize leave the offset where the bar put it.
+- **T6.147** (I146): the bar check removed → **T4.118** fails: the press focuses the child and the offset is unchanged.
+- **T1.178** (I147, I111, §6r rows 1–4 and 7): at 1-bit, the upper rule at 61 and at 80 columns ends `[Calcium]` and one rule glyph, and no span of the frame sets a background or a foreground. At 60 columns the label is gone. At 100 columns a 96-cell label draws and a 97-cell label sheds, which is T1.66's boundary. A named hue gives the same bytes as none. The controls are the 4-bit frame at 80 columns, which draws ` Calcium ` on a ground, and the 1-bit frame with no label, which draws no bracket.
+- **T6.148** (I147): the 1-bit check restored as a shed → **T1.178** fails at 61 columns: the rule is bare. A padded `[ name ]` → **T1.178** fails at 80 columns on the text and at 100 on the boundary.
+- **T4.119** (I148, I118, C04 §3ar F9, F1395): bytes through stdin on §105's form. A five-line paste at the prompt is a chip; `⌃U` kills it to the buffer, `↓↓` reaches `port`, `⏎` enters it and `⌃Y` yanks the chip. The control is the editor at that moment: its `text` holds the sentinel and its `resolved` holds the five lines, so the row can tell the two apart. `⏎` is then refused: the entry states *a field is one line*, the field keeps `80`, and focus stays inside `port` with the chip. Backspace removes the chip, `⏎` writes, and no stored value anywhere holds a private-use character. A second arm yanks a chip whose content is one line (inserted as a file chip) and writes it by `⏎`: the stored value is that line, not the sentinel. A third arm does the same and then moves focus off the field, so the blur path writes: the stored value is again the line. A fourth yanks the five-line chip and blurs: nothing is written and the refusal is stated.
+- **T6.149** (I148): the `⏎` write taking `stores.editor.text` → **T4.119** fails on the second arm: the value is one private-use character. The blur write taking `text` → the third arm fails the same way. The line-break refusal removed → **T4.119** fails: `port` holds five lines.
+- **T1.179** (I33, C17 I36, F1401): `commandRows` of `/show a`, U+2066, `b`, U+202E, `c` → `❯ /show a<U+2066>b<U+202E>c`, and no row holds a bidi format character. At a width where the raw line fits one row and the neutralised line needs two, it is two rows — the height counts the forms' cells. The control: a clean command's rows are unchanged.
+- **T6.150** (I33): `commandRows` wrapping the raw line → **T1.179** fails on the row and the count, and C09 **T4.107** on the echo's bytes. `tools/mutate/runs/c17-bidi-display.mjs`.
+- **T1.180** (I149, F1470): `blockLines` of a notice whose text is `invoice`, U+202E, `fdp.exe`, then ESC `[2J` → the head reads `note: invoice<U+202E>fdp.exe^[[2J`, no line holds U+202E or ESC, and the source line equal to the name is not written again. The same text as a question and a choice label, and as a document's `command`, read in the form in `questionLine` and the completion line. The notification body carries the form.
+- **T1.181** (I149): `windowLine` of `a`, U+202E, `b` with the caret after `b`, at 40 columns → the text is `a<U+202E>b` behind the label, and the caret is the label's cells plus 10. With the caret before U+202E it is the label's cells plus 1.
+- **T6.151** (I149): `clean` returned to `stripControl` → **T1.180** fails on the raw override and on the duplicated source line. `windowLine` joining the raw segments → **T1.181** fails on the text and the caret. `tools/mutate/runs/c22-linear-form.mjs`.
+- **T6.141** (I131; ruling 81): a producer's `trailSince` overwritten → **T1.173** fails on the producer's stamp. `tools/mutate/runs/c22-trail-stamp.mjs`.
+- **T1.182** (I150, ruling 96, ruling 99): `ownerLine("substate", …)` over hints naming `complete` with `promptUnderMenu: true` → `complete`, `⏎ run`, `⇥ complete`, `esc close`, and no chip says `accept` or `move`; without it → `complete`, `↑↓ move`, `⏎ accept`, `esc close`. A keymap binding the prompt's `complete` to `⌃o` alone draws `⌃o complete` at rest, and one binding its `submit` to `⌃o` alone draws `⌃o run`, so both chords are the keymap's and not literals. Through a built graph, a `complete` panel pushed with `promptLive: true` answers `promptUnderMenu: true` from `ownerHints()`, and one pushed with `promptLive: false` answers nothing.
+- **T4.120** (I150, C19 I20, C19 I29, ruling 96, ruling 99, F1486): through a built session at 80 columns, `/c` typed. The footer's last row reads `complete  ⏎ run  ⇥ complete  esc close`; after `⇥` it reads `complete  ↑↓ move  ⏎ accept  esc close`, and **the two rows differ** while the menu's rows are the same text in both, so the footer is what tells rest from a selection. After `↓` it still reads the second. The controls are the keys each line names or leaves out: `⏎` at rest runs `/c`, as the line says, and the screen reads `unknown verb`; `↓` at rest leaves the footer and the mark where they were; after `⇥`, `↓`, `⏎` the prompt reads `/clear`.
+- **T6.152** (I150): the `complete` arm reading no hint, which is F1486 → **T4.120** fails at rest on `⏎ accept`, and **T1.182** on its first arm. `ownerHints` never supplying `promptUnderMenu` → **T4.120** fails the same way, and so does T1.182's graph arm. The rest line dropping `⏎ run`, which is ruling 96 before ruling 99 amended it → **T4.120** and **T1.182** fail on the rest line. `tools/mutate/runs/c22-menu-footer.mjs`.
+- **T1.183** (C01 I13; F1489): the viewport is built against the real terminal width, observed **through the viewport**: the same forty long entries into a session at 100 columns and one at 40, and the two must disagree in rows. `lifecycle.size()` reads the terminal directly and agrees with a hardcoded 80 × 24, which is the mutation that rewrote the row. *It was titled T1.14, citing C01 I13 first, where C22's T1.14 is the lone `Esc` and C01 declares no T1.14* (A03 SP16).
+- **T1.184** (I151, I29, §6s.2 rows 1, 2, 5, 6): `composite` over a panel layer `[rule, raw]` at 256 colours on `dark` → the rule's line carries no `bgElev` background and the raw line opens with it and keeps it through a reset inside a span, to the box's last cell; the same content as a `peek` and as an `overlay` → no `bgElev`; at 1 bit → the panel's rows equal the unground rows byte for byte.
+- **T1.185** (I143, §6s.3 rows 4 and 9): two chips in the prompt with the caret on the second → the key row ends `←→ other chips`; one chip → it does not; the other chip deleted from behind the caret → the row is rebuilt without it. At ASCII over a 59-column region with the box overflowing, the row is `M-S-Up/M-S-Down scroll  M-o open in editor` — the legend shed whole, never cut to `oth~`.
+- **T4.121** (I151, I29, I113, C19 I23, C20 I30, §097): through a built session at 80 × 24 over `/help`, each panel in turn — the menu on `/c`, find on `⌃r h`, the preview on a six-line paste: the row above the panel's content is a rule and the row below it is the prompt's rule; every cell of the rows between takes `bgElev`'s background except the menu's current row, which takes `pick`; neither rule takes a background; the frame's rows above the panel's rule are the frame before it opened, byte for byte; and the panel's rows reach the region's last column.
+- **T4.122** (I60a, C09 I32, ruling 106 c; F1526): through a built session under fake timers, a local verb whose document is a settled `error` status → after it settles, three seconds of timers write nothing to the terminal. The control is the same verb answering a `loading` status: the same three seconds write frames, so the count is about the state and not about a ticker that never runs.
+- **T6.153** (I151): the ground dropped from `layerRows` → **T1.184** and **T4.121** fail.
+- **T6.154** (I151): the edge exemption dropped, so the rule is grounded → **T1.184** and **T4.121** fail on the rule.
+- **T6.155** (I143): the overflowing cap returned to `− 3` → **T1.175** fails: the 47-line layer is `truncated`.
+- **T6.156** (I143): the chip count dropped, so `←→ other chips` is offered with one chip → **T1.185** fails.
+- **T1.186** (I152, ruling 103 b, F1517): `completionLine` over a settled card whose head reads `denied`, `expired`, `cancelled`, `truncated` and `failed`, with `meta.exitCode` 126, 126, 130, 1 and 1 on a `subprocess` document → `/ps — denied`, `/ps — expired`, `/ps — cancelled`, `/ps — failed, truncated`, `/ps — failed`; a head reading `exit 130` over 130 → `/ps — failed, exit 130`; `exit 1` → `failed, exit 1`. At the ASCII separator `:` the same.
+- **T6.157** (I152): the verdict reading `outcomeOf` alone again → **T1.186** fails on each of the five shell words, and not on the two `exit N` rows.
+- **T1.187** (I153, §6t.2 rows 1–7): `commandRows` over `echo hi ` and a six-line paste with `meta.echo`'s one chip over the paste, at 80 columns and full capabilities → one row, `❯ echo hi  #1 pasted · 6L `; at 1 bit → `❯ echo hi [#1 pasted · 6L]`; the same command with no echo → the six rows it draws without one; an echo whose range runs past the command → those six rows; at 24 columns the chip moves whole to the second row; `echoRows`' chip cells cover the label exactly and, painted, carry `bgDeep`'s background and nothing else on the row does.
+- **T1.188** (I155, §6t ruling 6): the header for a six-line paste chip at 256 colours → text ` #1 pasted · 6L`, the span `[0, 11)` with `ground: "pick"` and `bold`, `[11, 15)` `muted`; rendered, the name's cells carry `pick`'s background and the size's do not; at 1 bit → `[#1 pasted · 6L]` with no `ground`.
+- **T4.123** (I153, I154, C23 I104, C26 I33, §6t.3 rows 1, 5): through a built session at 100 × 30 whose manifest has a local verb `note` taking words, `/note ` and a six-line paste, `⏎` → the echo is one row reading `❯ /note  #1 pasted · 6L `, the card's head is the next row, no row is a line of the content on its own, and the label's cells carry `bgDeep`. `⇧⇥` → the label's cells carry `focusGround`, and a peek is up holding `alpha 0` through `alpha 5`; `y` → the six lines are copied. The control is a two-line paste, which is text: its echo draws `alpha 1` as a row and `⇧⇥` opens no peek. *Amended at the code commit*: the row was written over `echo hi `, a shell line, and a running child attaches the keys (C16 I49), so `⇧⇥` is the child's; and *no row reads `alpha 1`* cannot discriminate, because the card's head draws the resolved argv — `note(alpha 0 alpha 1 …)` — on one row (6t.5).
+- **T6.158** (I153): `commandRows` ignoring `echo` → **T1.187** fails on the row count.
+- **T6.159** (I154): the echo's elements left out of `elementsOf` → **T4.123** fails: no peek opens.
+- **T6.160** (I155): the header's `ground` dropped → **T1.188** fails.
 
 ---
 
@@ -2954,321 +4285,78 @@ One value, one file: `${stateDir}/theme`, holding the **name** of the chosen the
 
 ---
 
-## 13a. A verb whose result is a view — the ruling §13 reserved
+## 13a. A verb whose result is a document — §13's ruling, and what the design overturned
 
-§13 held this open through four stretches and warned that **a partial producer is the most
-likely thing to be mistaken for a resolution**. It was right to wait: C25's fullscreen patch
-looked like a producer and answers none of the questions below, and the first attempt at
-this ruling read S3's drawing as an *affordance* and had to be withdrawn against
-`B03_drill_chain.md` §2 (FINDINGS F21b).
+**There is no fourth route.** `R-EXA-082` answers this section's subject by name — *logs →
+**A BLOCK with follow**. It was already a scroll container; it needed no frame* — and its
+test for anything that wants a frame of its own is *does it have its own **prompt** and its
+own **context**?* A verb's result has neither. So a verb's result is an **entry**, always,
+and the transcript is the scroll container it was already.
 
-The concrete case is docker-tui's S3 — `⏎` on a `ps` row `fill`s the prompt with
-`/ps <uuid> --watch`, and the next `⏎` submits it. The general rule falls out of it; it was
-not reasoned in the abstract, because S1 was drawn that way and contradicted I9.
+The section below is kept as the record of what was ruled here, because the reasoning is
+what makes the overturn legible: every question §13 reserved was answered correctly *given a
+push*, and the design removed the push rather than any of the answers.
 
-### What makes a verb's result a view
+### What the design settles, and what falls out
 
-**A01 D4's test, and the framework already has it**: *live vs pushed is decided by input
-ownership — a pushed view takes letter keys while the prompt would otherwise hold focus, so
-the prompt must go.* S3 binds `n`/`p`, `L` and `d`; S12 binds `l`, `g`, `G` and `/`. Nothing
-new is invented here. What was missing was never the test — it was **who applies it, and
-when**.
+| §13's question | the pushed-view answer | the design's |
+|---|---|---|
+| what makes a verb's result a view | a declaration, read before step 3 (I45) | **nothing does.** `ToolDef.view` and `FlagDef.view` retire with their only reader |
+| who owns the scroll offset | a shell-side owner holding one (I46) | **C14 does**, as it does for every entry. There was never a second scroll model to avoid — A01 D3's decision is kept by having one |
+| what `Esc` does to the source entry | nothing; there is no source entry | **there is one**, and `Esc` does to it what it does to every entry |
+| what is on screen while the verb runs | the view, pushed at step 3's moment | **the pending entry**, which is C23 I3 unamended and was always the mechanism this route was standing in for |
+| `view` with `streams` | the fourth route (I48) | **the third route.** `streamInto` already streams patches into an entry with tail follow |
 
-### Who decides, and why it cannot be the adapter
+**The follow is C14's and was never the owner's.** I48's *an append holds the window at the
+bottom if it was at the bottom* is exactly `followTail`, which `ScrollOffsets` already shares
+(C04 I97) — the view owner was a second caller of the shared comparison, not a second answer.
+That is the tell the overturn was available earlier: a route whose distinguishing rule is
+implemented by a function the other route already calls is not distinguished.
 
-**The manifest, read before the verb runs.** Not the adapter, and this is forced rather
-than preferred:
+**And the truncation pair retires with the thing that truncated.** I47's ruling — split what
+you can, report what you could not — was a pair because a view's window emitted **at least
+one block whatever its height** and a block taller than the region was therefore shown cut
+and unscrollable. An entry is as tall as it is; nothing cuts it, and C14 scrolls past it by
+row. The `/inspect --raw` case that forced I47 (245 rows against a 37-row region) is an
+ordinary long entry.
 
-- **C23 I3 — the pending entry is appended before the transport is invoked** (`§4` step 3
-  before step 4). By the time an adapter has seen a result and could say *this wants the
-  screen*, its entry is in the transcript.
-- **C13 has no delete, and C23 §8a A4 already ruled that it must not gain one.** So the
-  entry cannot be withdrawn.
-- **B03 §2 says a push leaves the transcript untouched.**
+**What does *not* change**, and is worth stating so this reads as a deletion rather than a
+rewrite: C23 I3's ordering, the submission guard released before a stream's loop (C23 I6),
+the canceller registered before the loop is awaited (C16 §5), `resetFocus` on append, and
+the refresh driver's parts. Each was enumerated against the view route because the route was
+written new rather than derived — and every one of them is the entry route's, which is the
+route that is left.
 
-Those three cannot hold together with an adapter-side decision. The tier must therefore be
-known **before step 3**, and the only thing known before a verb runs is its declaration.
+### The obligations enumerated against a route that no longer exists
 
-This is the same argument, and the same party, as `ToolDef.interactive`: *"the app author is
-the only party who can know this. Detection is not available."* A view is a handoff of input
-ownership exactly as a TTY handoff is, so it is declared where that one is.
+**`runIntoView` was written new rather than derived, and inherited whichever obligations its
+author noticed.** `declareLive`, `release` and `cancelInFlight` were each entry-only, each
+found one at a time, and each looked like an isolated oversight. Three samples of one cause,
+and the general finding survives the route: **a second route for a thing the first route
+already carries acquires its obligations one defect at a time.** That is the argument the
+design reaches by a shorter path — it asks whether the second route has its own prompt and
+its own context, and refuses it when the answer is no.
 
-**Both a tool and a flag may declare it, and the invocation is a view if either does.** One
-rule, two declaration sites, because the surfaces need both: `/dashboard` is a verb, while
-S12's `--logs` and S3's `--watch` are flags on `ps`, and a verb-level field alone cannot
-express a tool whose tier depends on how it was invoked. C05 I20 holds the field and its
-refusals.
+**A cancelled view popped and left no record.** B03 §2 named that as a cost and this section
+accepted it: *"a logs excursion leaves no transcript record, because the push that opened it
+left none either."* With no push, the premise is gone and so is the cost — a cancelled run
+is an entry with a cancellation in it, which is what `R-EXA-082` means by *the record is the
+product here*.
 
-### What `Esc` does to the source entry
+### What the decision left behind when it threw
 
-**Nothing, because there is no source entry.** The decision precedes step 3, so no pending
-entry is ever appended: the transcript is untouched in the strong sense B03 §2 means, and
-`↑⏎` re-runs the line from history like any other.
-
-Selection survives for a reason already in the tree rather than a new one — **C16 I2 resets
-focus only on append**, and no append happens. A01 D7 is satisfied by the absence, which is
-what B03 means by *"reversing a push touches the transcript exactly as much as making one
-did."*
-
-**The command is still recorded in history**, which is not a contradiction: history is
-C20's line store and not the transcript, and a view the reader cannot re-open from `↑` would
-be a surface reachable exactly once.
-
-**And the owner learns of the pop from C15, not from the key.** `Esc` reaches the owner's
-`pop()`, which clears its state and dismisses the layer; the ⌃c ladder answers a pushed view
-with `overlays.pop()` (C16's `pushedView` rung) and calls no owner, so the view's `openFor`
-kept naming its command over an empty stack and `keys.ts`, which reads `openFor` to decide
-whose view a key belongs to, routed to a view that was not there (F944, measured). Every
-removal now emits one change carrying the layer's id before the removing call returns (C15
-I25), and the owner subscribes at construction and tears down on the change carrying its id
-— so `Esc`, the ladder and a dismissal from anywhere end on one line, and the owner's own
-`pop()` is one more caller of it (T4.65; C25 T2.15 for the patch view, C28 I50 for the
-profiler's).
-
-### Who owns the scroll offset
-
-**The view's owner, which is a shell-side component, and C15 gains nothing.** C15 §183 is
-already explicit — *"A view's content is already the region's worth, and C15 does not scroll
-it. The owner windows it"* — and says why: an offset there is a second scroll model beside
-C14's, which A01 D3 spent a decision avoiding.
-
-What did not exist is an owner for a document that is not a patch. `patch-view.ts` owns one
-for `Patch` blocks and refuses everything else (`its `open` returns a refusal for any other
-kind`), so the ruling names its sibling: a **document view**, holding I41's one piece of
-state — a row offset — over a `ViewDocument`'s blocks.
-
-I41 and I42 were written for the patch view and are now the general shape: one offset and no
-second cursor; rewindowed from what the host holds rather than snapshotted.
-
-### What is on screen while the verb runs
-
-**The view is pushed at step 3's moment and its content is replaced when the document
-arrives.** Neither §13's three questions nor the fourth asks this, and it falls out of the
-answers: step 3 exists so that *something is on screen before the transport is invoked*
-(C23 I3), and ruling the pending entry away removes that without saying what takes its
-place. A consequence between two rulings, owned by neither — so it is ruled here rather
-than discovered when a slow verb looks like a hung terminal.
-
-The view replaces the entry **one for one**, and the ordering is unchanged: pushed before
-step 4, filled after it. C15's `update` is the mechanism and needs nothing new — it is what
-the part-refresh driver already uses on this host (C23 §3b), and §2's transition table has
-four states of which `update` changes none.
-
-Three things follow, and each closes a hole the pending entry used to cover:
-
-- **A failing verb renders its error into the view**, because the view is where the reader
-  is looking and the transcript has nothing to show them. `Esc` still pops, and still
-  appends nothing.
-- **A cancelled view pops**, which is the one case where the reader gets no record at all.
-  That is deliberate and is the cost B03 §2 already names: *"a logs excursion leaves no
-  transcript record, because the push that opened it left none either."*
-- **The push cannot be deferred until the document is in hand.** That reading is tempting
-  and wrong for the same reason step 3 precedes step 4 — feedback that waits for the work
-  is feedback the slow case never gets, and the slow case is the only one that needs it.
-
-### How a view windows what it holds
-
-**C25 I18's shape, already ruled — cited rather than invented.** *"A window is a `Patch`,
-not a list of rows. `Layer.content` is `Block[]`, so the owner of a pushed view cannot hand
-C15 a slice of rendered output — it hands back a smaller block, and C15 measures and draws
-it through the same registry as everything else."* The document view is that sentence with
-`Patch` replaced by a block sequence: the owner holds the whole document and an offset, and
-puts on the layer the blocks that fit.
-
-**The window falls on block boundaries.** A block is included or it is not, and I46's one
-piece of state indexes blocks rather than rows.
-
-**And the window is measured as a sequence, not a block at a time.** A rendered sequence
-separates its blocks, so *n* blocks occupy *n* rows more than the sum of their heights — and
-a projection that adds `measure(block)` one at a time packs nearly twice what the region
-holds, which C15 then cuts in silence. The registry has `measureSequence` for this and C14
-is already given it; the document view was handed the per-block one and nobody noticed
-until a surface arrived whose blocks were numerous enough for the error to be visible.
-
-**It was invisible for the same reason S3's granularity was**: with four blocks the
-discrepancy is four rows against a region with room to spare, and with 103 it is 103. A
-defect proportional to a count that every existing surface kept small reads as correct until
-one does not — and no arithmetic finds it, because both sides of the comparison are the
-code's own. It was found by reading a frame and seeing a blank row between every block.
-
-**The plot is atomic for windowing, permanently.** C12 I1 makes a plot's height a function
-of the block alone and puts the series deliberately out of reach — *"a 200-epoch run's block
-is the same height as a 10-epoch one"* — so reducing a plot's data changes nothing about its
-height, and reducing its `height` **rescales the curve** rather than windowing it. There is
-no version of this that yields the top half of a plot.
-
-So the upgrade path is **granular where the kind divides, atomic where it does not**, and it
-is written that way on purpose: *row-granular scroll* is a promise C12 I1 forbids for the one
-block S3 leads with, and a spec that offered it would be describing something no
-implementation can deliver.
-
-**Per-kind reducers are shape-available and unwritten.** `table`, `keyValue` and `panel`
-divide at rows and children with no mid-row slicing and no measurer change — which is why
-this is not the mid-row option, whose cost lands on the measurer, the one thing that must
-never drift. But `windowPatch` needed a dedicated file and a concept of indivisible *units*
-to get right, and each further reducer is that work again. They are deferred until a
-consumer forces one, in the same way and for the same reason as everything else here.
-
-**The deferral is measured rather than assumed.** S3 filled measures **30 rows at 120 and at
-80**, and a view fills the region (C15 §4), so at any realistic terminal height nothing is
-out of view and the granularity is invisible for this surface:
-
-```
-width 120: TOTAL 26  [keyValue#container-head=2  panel#cpu=14  panel#io=7  panel#details=3]
-width  80: TOTAL 26  [keyValue#container-head=2  panel#cpu=14  panel#io=7  panel#details=3]
-```
-
-**26 as declared, 30 once the parts fill**, and the difference is not slack: `details` is
-declared holding the framework's `loading…` placeholder and grows to four rows of key-values
-when its one-shot fetch returns. So the figure a measurer sees before anything ticks is not
-the figure the terminal shows, and for a surface near the region's height the safe one is
-the larger. Both are read from the built application — 26 through the same registry C15
-measures with, 30 counted off a replayed capture at each width.
-
-**The figure was 21 and named three blocks that were never built** (`memnet-panel`,
-`ports`). It was an estimate of the drawing, taken before S3 existed, and it survived into a
-sentence beginning *measured rather than assumed*. The built surface has four blocks, three
-of them bordered panels, and an eight-row plot. The conclusion is unchanged and the margin
-it had was half what this claimed.
-
-And the attempts before *that* returned **13**, measured against a registry holding no plot
-definition (`registry.ts` — *"`table`, `plot` and `patch` are not here"*). The same fault
-recurred while correcting this passage: a fresh probe answered **17**, because
-`createBlockRegistry()` alone still has no plot and the shell registers it separately at
-`construct.ts:297`. A probe built on the framework's defaults is measuring a different
-application than the one that runs, and the number it returns is plausible every time.
-
-### The block that does not fit, and the pair that makes it honest
-
-**S3 was the surface where the granularity was invisible, and it is not the general case.**
-docker-tui's `/inspect --raw` is the first consumer with more content than region — a real
-`docker inspect` is **245 rows against a 37-row region** — and it found that the ceiling
-above has a floor beneath it.
-
-Two rules meet here and neither is wrong on its own. The window falls on block boundaries
-(I46), and the projection emits **at least one block whatever its height**, because a block
-taller than the region would otherwise window to nothing and an empty view is
-indistinguishable from a broken one. Together they mean **a single tall block is shown, cut,
-and unscrollable**: the offset indexes blocks, so with one block there is no second offset
-to move to and the motion is *refused* rather than unhelpful. The reader presses a
-documented key and nothing happens.
-
-**The consumer's half is to split, and splitting has a floor.** An app that emits one block
-per top-level key takes the unreachable rows from 208 to 77; splitting a second level
-wherever a block still overflows takes them to 0, at 103 blocks. But the rule does not
-terminate: a leaf with no children to split by — a `Config.Env` of 300 variables, **302
-rows** — has no smaller form that is still that leaf, and one block per string is 300 blocks
-with the structure gone. So a producer can promise zero unreachable rows **for every document
-whose leaves fit**, and not in general.
-
-**So the ruling is a pair, and neither half is sufficient.** The owner splits what it can,
-and the view **reports what it could not**: when C15 places the layer truncated, the view
-says so on screen. `Placed.truncated` already carries the fact — C19's menu reads it and
-draws `N more` (C19 §5) — and until this consumer the document view cited that field as the
-mechanism reporting its overflow without ever reading it.
-
-The failure mode is why the second half is load-bearing rather than decorative: **content
-stopping mid-object with no indicator is indistinguishable from content ending.** A reader
-who is told the frame was cut goes looking; a reader who is not, stops. Stating the two as
-one ruling is deliberate — split alone leaves a silent residue, and the indicator alone
-leaves a document nothing can cross.
-
-**A comment citing a mechanism is evidence its author knew of the mechanism, not evidence
-the file uses it.** That is the general form of how this was missed, and it is worth the
-sentence: the file named `Placed.truncated`, named what it was for, and had no consumer of
-it, which reads exactly like a file that reads it.
-
-### The obligations a route carries, and the one that is not yet built
-
-**`runIntoView` was written new rather than derived, and inherited whichever
-obligations its author noticed.** That is not a remark about care: `declareLive`,
-`release` and `cancelInFlight` were each entry-only, each found one at a time, and each
-looked like an isolated oversight. Three samples of one cause. The entry route's
-obligations are therefore enumerated against the view route rather than recalled, and the
-`n/a` rows carry reasons — *"the view route does not need that"* is the assumption that
-produced the first three.
-
-Two of those reasons are worth keeping here, because both are rulings rather than notes:
-
-- **`resetFocus` is not called, and calling it would be a defect.** It exists because an
-  append freezes the previous entry and focus must not remain in a frozen block. The view
-  route appends nothing and freezes nothing, and A01 D7 requires the selection to survive
-  the push and be intact on the pop. The absence is the invariant, not an omission.
-- **A cancelled view pops rather than settling**, since there is no entry to settle. The
-  reader gets no record, which is the cost B03 §2 already names for a logs excursion.
-
-**`view` with `streams` is the fourth route, and it is now built** (I48). It was reserved
-here through one stretch, refused loudly at run time rather than silently, and taken by the
-first consumer concrete enough to force it: docker-tui's S9 `/logs`, where `docker logs -f`
-is a stream with no natural end and A01 D4's test makes it a view.
-
-The reservation was right and the refusal was the right shape. Both are kept below, because
-*what it refused to guess* is the useful record — the pair currently fell to the
-non-streaming path, blocked until the process exited, and **held the submission guard for
-the whole of it**, which is precisely what C23 I6 exists to prevent. A silent version of
-that would have been found by a reader watching a shell stop accepting input.
-
-**Three obligations have no equivalent on this route, and the ruling on each is what makes
-it a route rather than a copy.**
-
-- **The patch has nowhere to go.** `streamInto` calls `transcript.patch(id, view)`; the
-  owner has `putBlock(id, block)`, which replaces an existing block and refuses one it does
-  not hold — so a stream's first `append` would be refused and every `/logs` patch with it.
-  (`putBlock` addresses at depth now, through `applyPatch` itself; it did not when this was
-  written, and the sentence above was true of the top level only.)
-  The owner therefore gains **`patch(view: ViewPatch)`, applied through C04's `applyPatch`**:
-  the same pure function C13 itself calls, so the view and the transcript cannot disagree
-  about what a patch means. This is I46's *no second height codepath* argument pointed at
-  patching. `putBlock` stays and is not merged with it — the refresh driver holds a total
-  contract that returns `false`, and `patch` reports C13's three-armed outcome because that
-  is what the streaming loop branches on.
-- **A view cannot settle, and must not pop when the stream ends.** `docker logs` without
-  `-f` ends immediately, and a view that popped on `end` would flash and vanish before
-  anything could be read: **the stream ending is not the reader having finished with it**,
-  and B03 §2 already makes the pop the reader's. So `end`, a malformed patch and a stream
-  failure all collapse to the same shape — *append a notice, stop consuming, leave the view*
-  — and only the wording differs. `refresh.settled` still fires, because the stall machinery
-  is per-host and only `transcript.settle` has no counterpart here.
-- **An append keeps the window at the bottom when the window was at the bottom.** A follow
-  whose window does not move shows its first screen and nothing after it, so the output the
-  reader asked to watch — and the terminal notice above it — are both below the fold for
-  ever. **Only when it was already at the bottom**: a reader who has scrolled up is reading,
-  and moving the window under them is the same failure in the other direction. This is tail
-  semantics, and it belongs to the owner rather than the route, because the owner is what
-  knows where the window is.
-
-  It is ruled here because **neither walk artefact reaches it.** A rule about what a frame
-  *contains* is invisible to a table indexed by obligations and to a trace indexed by
-  events — the fifth recorded blind spot, and the third surface it has caught. Found by
-  reading a frame in which a stopped container's follow showed twenty-six lines of start-up
-  and no sign that anything had happened since.
-- **The subscription is keyed by `DOCUMENT_VIEW_ID`.** There is no entry and so no pending
-  id, and this is the name `refresh` already uses for the view host, so `liveStreams`, the
-  refresh registry and the overlay agree without a fourth. C15 I1 makes it unique while it
-  exists.
-
-**And one obligation is a severity higher here than on the entry route.** Registering the
-canceller in `liveStreams` before the loop is awaited gives the verb C16 §5's newest-first
-rung. Omit it on an entry and a Ctrl-C fails to cancel; omit it here and Ctrl-C falls past
-the rung and **quits the session**, because the view's loop is the only thing on screen. The
-asymmetry that falls out of the same rung: **a cancelled view pops and a finished one does
-not** — Ctrl-C is the reader saying stop, `end` is the far side saying it.
-
-### What the decision leaves behind when it throws
-
-Asked because a ruling's rejection path is where it leaves state, and neither a trace nor a
+Kept because a ruling's rejection path is where it leaves state, and neither a trace nor a
 table indexes it (C13's `settle(id, doc)` is the measured case).
 
-- **A refused declaration throws at parse**, where C05 I19 already puts `interactive`'s
-  refusals — before a session exists, so there is no half-built state to leave.
-- **A push that fails leaves no entry**, because none was appended. This is the property
-  that makes the ruling safe rather than merely tidy: the failure mode of an adapter-side
-  decision would have been an orphaned pending entry that nothing could settle or remove —
-  C23 I9's forbidden state, two components from the decision that produced it.
-- **The owner's `putBlock` is total.** It patches the held document and reprojects the window, and a reprojection that threw after the document had been updated would leave the owner holding a document no frame ever displayed — the same two-step hazard as C13's `settle(id, doc)`, in a component two removed from the driver that called it. So it reprojects into a local, assigns both, and returns `false` rather than throwing; the driver's existing `false → release(host)` covers the other side. **And that other side is why the rewrite is `applyPatch`'s and not this file's**: `false` is read as *the host is gone*, so any input the write refuses and the read accepts becomes a host teardown — the arm below, one component along.
-- **A pop while parts are in flight** is the one real hazard, and it belongs to the producer
-  rather than to this ruling: release must happen at the pop and not one tick later, or a
-  fetch resolves into a layer that has gone. C23 I33's teardown set gains the trigger.
+- **A refused declaration threw at parse**, where C05 I19 puts `interactive`'s refusals.
+  With the declaration gone there is nothing to refuse, and the refusal retires with it.
+- **A push that failed left no entry.** The property that made the ruling safe is the
+  property the design makes unnecessary: there is no push to fail, and the pending entry is
+  appended by the one step that has always appended it.
+- **The owner's `putBlock` was total**, reprojecting into a local so that a throw could not
+  leave a document no frame had displayed. The hazard was the *two-step* — patch the held
+  document, then reproject a window — and the second step is what retires. C13 patches an
+  entry in one step and has no window to reproject.
 
 ---
 
@@ -3291,7 +4379,7 @@ goes unexamined.)
 |---|---|---|---|---|
 | 1 | F15 — `/dashboard` | prompt clears, no entry | the document was **rejected**: two blocks with id `running` (C04 I14) | **destroyed diagnostic** |
 | 2 | F35 — `/drift no-such-container` | prompt clears, no entry | three app documents set `status: "error"` and omitted `error` (C04 I3) | **destroyed diagnostic** |
-| 3 | C22 I47 — a view taller than its region | content stops mid-object | C15 truncated it and nothing said so | **destroyed diagnostic** |
+| 3 | ~~C22 I47 — a view taller than its region~~ — **struck with the view** (F1253); the class it named is C04 I49's residue row, which is built | content stops mid-object | the window cut it and nothing said so | **destroyed diagnostic** |
 | 4 | `/drift` agreeing, `/config` identical | an empty block | **nothing is wrong**: the two sources match | **nothing to say, said as nothing** |
 
 **Rows 1–3 are one mechanism and row 4 is not.** In 1–3 the framework knows precisely what
@@ -3309,7 +4397,7 @@ for row 4 — the state row 4 describes is a **success**.
 |---|---|
 | F15 | **CLOSED.** Two channels — a fault notice at the moment with `origin: "defect"`, and `Pipeline.faults` drained at §8 step 3. Two because *the reporting path is the path that failed* |
 | F35 | app-side ×3, closed as a class by `examples/docker/test/documents.test.ts`; the framework half is F15's |
-| I47 | **specified, and the walk owes whether it is built.** `Placed.truncated` carries the fact and C19's menu reads it; the duty to read it *for a view* is I47's, and I47 is an invariant with an owner |
+| ~~I47~~ | **Struck with the view** (F1253). The duty was *read `Placed.truncated` for a pushed view*, and there is no pushed view. What the walk owed is owed by C04 I49's residue row instead, which is built and asserted — so the row closes rather than moving |
 
 **So entry 6.1 does not own rows 1–3.** It owns row 4, and naming that is what stops the entry
 being planned once and fixed never — *would landing this close it* is the test, and a fix for
@@ -3361,4 +4449,4 @@ first row when it is built, and it is stated so the entry is not read as closed 
 | The auth flow itself | The far side; C22 displays and offers |
 | Prism's chrome content | `prism-tui` |
 | Multi-cluster sessions | Phase 2 |
-| ~~A verb whose result is a pushed view~~ | **Taken — §13a.** Reserved through four stretches and settled by the first consumer concrete enough to force it: docker-tui's S3, a live single-container view reached the way S12's logs view is. The row stays in the table, struck through rather than deleted, because *what it refused to guess* is the useful record |
+| ~~A verb whose result is a pushed view~~ | **Taken, then retired — §13a.** Reserved through four stretches, settled by docker-tui's S3, and overturned by `R-EXA-082`: a verb's result has no prompt and no context of its own, so it is an entry and the transcript is the scroll container. The row stays struck rather than deleted because *what it refused to guess* is still the useful record, and so is the fact that the answer was right about every question except whether to push |

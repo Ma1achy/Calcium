@@ -52,8 +52,9 @@ const results = runPass({
       name: "the ninth axis dropped from the slot",
       file: SESSION,
       // Re-anchored 2026-09-16: the tick left the slot for its own axis (C22 I103).
-      from: "${cursorKey}\\u0000${framesKey}\\u0000${seriesKey}`;",
-      to: "${cursorKey}\\u0000${framesKey}`;",
+      // Re-anchored 2026-09-24: short of the line end, which C14 I54's axis moved.
+      from: "${cursorKey}\\u0000${framesKey}\\u0000${seriesKey}",
+      to: "${cursorKey}\\u0000${framesKey}",
       expect: "T4.17s",
     },
     {

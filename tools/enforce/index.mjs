@@ -16,7 +16,7 @@ import {
   nameExactnessSignal,
   publicSurfaceUseSignal,
 } from "./module-graph.mjs";
-import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases } from "./source-scans.mjs";
+import { checkSourceScans, checkMarks, checkControlBytes, checkAllowLists, checkEmojiBases, checkGlyphWidthClass, checkMarkDomains, checkGlyphPresence, checkTextGrounds, checkRuleCitations, checkBidiLiterals } from "./source-scans.mjs";
 import { checkDependencies, checkPhantomImports } from "./dependencies.mjs";
 import { checkWorkflows } from "./workflows.mjs";
 import { checkRefusals, REFUSALS, unverifiableRefusals } from "./refusals.mjs";
@@ -39,6 +39,8 @@ import {
   checkSectionReferences,
   checkSeamFour,
   checkInvariantCoverage,
+  checkRowFiles,
+  checkRowResolves,
   withoutTodos,
   referenceFiles,
   specFiles,
@@ -100,6 +102,12 @@ const sectionTargets = new Set(
 // SP9's own numbers, computed once and reported beside the gate — the list is
 // the evidence and the count is what a reader watches move.
 const coverage = checkInvariantCoverage(specs, walk("test"));
+// SP15's numbers, for SP9's reason: the list is the evidence and the count of
+// rows it cannot attribute is what a reader watches.
+const rowFiles = checkRowFiles(walk("test"));
+// SP16's numbers: the misfiled are gated by equality, and the rows that dangle
+// — no spec declares the id — are counted beside them and not judged.
+const rowResolves = checkRowResolves(walk("test"), specs);
 const openSet = checkOpenSet();
 const groupTallies = checkGroupTallies();
 
@@ -176,6 +184,15 @@ const violations = [
   // that still read as current; an exemption nothing exercises cannot be told
   // from one that has expired.
   ...checkAllowLists(files),
+  // **SS64 — a gate as of M4's close** (R-GLY-003, R-GLY-002). It reported
+  // rather than gated for exactly as long as it was red: three ASCII characters
+  // carried two marks each inside one row, all three predating this work, and a
+  // gate that is red on its first run is a gate somebody switches off. The
+  // three were ruled — `attention` took `!`, `quote` took `|` when `live`
+  // retired, `current` moved to the chooser row, and the head mark became a
+  // resolution rather than a slot — and with the list empty the rule takes the
+  // place it was always going to.
+  ...checkMarkDomains(),
   // SS54 — the refusal register. A refusal whose premise is *X does not exist*
   // names X, and this asserts it still does not; judgements are counted below.
   ...checkRefusals(),
@@ -195,6 +212,22 @@ const violations = [
   // reason SS47 is: the subject is a literal's contents against a table parsed
   // out of `text.ts`, not a line against a regex.
   ...checkEmojiBases(files),
+  ...checkGlyphWidthClass(),
+  ...checkGlyphPresence(),
+  // SS67 — every ground a renderer names has a disposition against the floor's
+  // table. Its own function for SS65's reason: the subject is a membership with
+  // a bidirectional arm, not a line against a regex.
+  ...checkTextGrounds(files),
+  // SS68 — every `R-XXX-NNN` a spec cites resolves in the design registry. Its
+  // own function for SS63's reason: the subject is a citation against a JSON
+  // document, not a `src/` line against a regex. SP3 and SP8 resolve the
+  // other two citation forms; this was the third, and nothing read it.
+  ...checkRuleCitations(),
+  // SS69 — a literal bidi format character in any tracked text file (F1402).
+  // Its own function for SS52's reason and one more: the corpus is `git
+  // ls-files` rather than any walk here, because the subject is a file a
+  // reviewer reads, and that is every file, not the three trees `walk` visits.
+  ...checkBidiLiterals(),
   ...checkDependencies(),
   ...checkPhantomImports(files),
   // SS62 — the workflows against their record. Its own function rather than a
@@ -254,6 +287,14 @@ const violations = [
   // invariant and nothing paired an invariant to a check, so *every invariant is
   // cited* was a convention held by hand — 86 of 768 were not (F357, F361).
   ...coverage.violations,
+  // SP15 — and the test side of SP7's question: a row id titled in two files
+  // within one spec resolves to whichever a reader opens, and a mutation's
+  // `expect` is satisfied by either.
+  ...rowFiles.violations,
+  // SP16 — the question neither SP7 nor SP15 reaches: the spec a title is
+  // attributed to declares no such row, and the file's owner declares a
+  // different one under the id (F1489), or the id was retired (C23 T3.20).
+  ...rowResolves.violations,
   ...refViolations,
 ];
 
@@ -273,7 +314,6 @@ const exactness = nameExactnessSignal(files);
 // lie: a collision only ever clears, so this list under-reports and cannot
 // over-report. A03 §9.
 const surface = publicSurfaceUseSignal(files, examples);
-
 if (violations.length === 0) {
   console.log(
     `${GREEN}✓${RESET} enforce · ${files.length} files · ${specs.length} specs · ` +
@@ -291,6 +331,12 @@ if (violations.length === 0) {
       // retirement is the one disposition that takes an invariant out of the
       // coverage question altogether (CLAUDE.md §count an exemption).
       `${String(coverage.retired)} retired, and no row may name one${RESET}\n` +
+      `  ${DIM}row files · ${String(rowFiles.split)} ids titled in more than one file within their ` +
+      `spec, over ${String(rowFiles.rows)} titled rows, all listed (SP15, gated by equality); ` +
+      `${String(rowFiles.unowned)} rows no spec owns are not judged${RESET}\n` +
+      `  ${DIM}row resolution · ${String(rowResolves.misfiled)} ids over ${String(rowResolves.rows)} titled rows ` +
+      `locate a row the file's owner declares or their spec retired, all listed (SP16, gated by equality); ` +
+      `${String(rowResolves.dangling)} name an id no spec declares (reported, not gated)${RESET}\n` +
       `  ${DIM}section citations · ${String(sectionsDangling.length)} of ` +
       `${String(sectionRefs.resolved + sectionsDangling.length)} resolve to no section, across ` +
       `${String(sectionTargets)} targets; ${String(sectionsUnowned)} more name no document ` +

@@ -102,9 +102,8 @@ const results = runPass({
       // nobody applied.
       name: "every overlapping child is drawn whole again, as it shipped",
       file: CONTAINERS,
-      from:
-        "        from === 0 && to === height ? r.child : (ctx.windowChild(r.child, width, from, to)?.block ?? r.child);",
-      to: "        r.child;",
+      from: "      if (from === 0 && to === height) return { child: r.child, rendered: ctx.renderChild(r.child, width) };",
+      to: "      return { child: r.child, rendered: ctx.renderChild(r.child, width) };",
       expect: "T2.125",
     },
     {

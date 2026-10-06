@@ -54,6 +54,28 @@ export function stepOf(t: number, bands: number): number {
   return band / (bands - 1);
 }
 
+/** Each channel ×`factor`, clamped at 255 — the design demo's `Math.min` (C04 I148). */
+function liftHex(hex: string, factor: number): string {
+  const c = channels(hex);
+  return `#${hex2(c[0] * factor)}${hex2(c[1] * factor)}${hex2(c[2] * factor)}`;
+}
+
+/**
+ * A slot pair's 24-bit sample, with the overshoot stop when the ramp carries
+ * one (C04 I148, I36): `from` mixes to `to` over `[0, 1 − share]` and `to` is
+ * lifted from ×1 to ×`lift` over the rest. Without the stop it is `mixHex`.
+ */
+function pairHex(ramp: Ramp, t: number, theme: ResolvedTheme): string {
+  const from = hexOf(ramp.from, theme);
+  const to = hexOf(ramp.to, theme);
+  const stop = ramp.overshoot;
+  if (stop === undefined) return mixHex(from, to, t);
+  const knee = 1 - stop.share;
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+  if (clamped <= knee) return mixHex(from, to, clamped / knee);
+  return liftHex(to, 1 + ((clamped - knee) / stop.share) * (stop.lift - 1));
+}
+
 /** A slot's 24-bit hex, whatever the terminal's depth — the ends a pair is mixed between. */
 function hexOf(tone: Ramp["from"], theme: ResolvedTheme): string {
   const colour = resolveTone(tone ?? "default", theme, { colourDepth: 24 }).colour;
@@ -66,7 +88,7 @@ function hexOf(tone: Ramp["from"], theme: ResolvedTheme): string {
  *
  * | backing | 24-bit | 8-bit | 4-bit | 1-bit |
  * |---|---|---|---|---|
- * | slot pair | `mixHex` | `nearestAnsi256` of the mix | a step of two — `from` below ½, `to` from ½ | `from`, resolved as the slot is |
+ * | slot pair | `mixHex`, or the overshoot's lift past `1 − share` | `nearestAnsi256` of the 24-bit sample | a step of two — `from` below ½, `to` from ½ | `from`, resolved as the slot is |
  * | colormap | `sample` | LUT | `undefined` | `undefined` |
  * | palette | the categorical slot | the slot | the slot | `undefined` |
  *
@@ -82,16 +104,38 @@ export function rampStyle(ramp: Ramp, t: number, index: number, theme: ResolvedT
     const colour = resolve(refOf(index), theme, caps).colour;
     return colour === undefined ? undefined : { colour };
   }
-  const tt = ramp.fill === "step" ? stepOf(t, ramp.bands ?? 2) : t;
+  // **The fill's own shaping of `t`, and the arms are exclusive** (C04 I106,
+  // R-MOT-012). `centred` folds — `to` in the middle where `gradient`'s is at
+  // the end, which is the whole difference between §037's `gradient-centre` and
+  // its `gradient-linear`. `step` quantises. **Neither composes with the other**:
+  // `bands` rides on `step` alone and the gate refuses it elsewhere, so there is
+  // no ramp a fold and a quantiser both see.
+  //
+  // Written as a chain because of that. The first draft computed `folded` and
+  // passed it to `stepOf`, which reads as an order that matters and is
+  // unobservable — `stepOf(t)` and `stepOf(folded)` are byte-identical for every
+  // input this type admits, since `folded === t` on every ramp that reaches the
+  // quantiser. A mutation swapping them survived, and the survivor was about the
+  // shape of this expression rather than about a missing row.
+  //
+  // The shaping runs **ahead of the backing**, so a centred colormap and a
+  // centred slot pair are one figure drawn through two inks rather than two
+  // mechanisms.
+  const tt =
+    ramp.fill === "centred" ? 1 - Math.abs(2 * t - 1)
+    : ramp.fill === "step" ? stepOf(t, ramp.bands ?? 2)
+    : t;
   if (ramp.colormap !== undefined) {
     const map = COLORMAPS[ramp.colormap];
     if (map === undefined) return undefined;
     const colour = continuousColour(map, tt, caps);
     return colour === undefined ? undefined : { colour };
   }
-  // A slot pair.
-  if (depth >= 24) return { colour: { kind: "rgb", hex: mixHex(hexOf(ramp.from, theme), hexOf(ramp.to, theme), tt) } };
-  if (depth >= 8) return { colour: { kind: "ansi256", index: nearestAnsi256(mixHex(hexOf(ramp.from, theme), hexOf(ramp.to, theme), tt)) } };
+  // A slot pair. **The overshoot rides the two upper rungs only** (C04 I148):
+  // the step of two and the 1-bit class below have no colour brighter than
+  // `to` to draw it with, so there the stop says nothing.
+  if (depth >= 24) return { colour: { kind: "rgb", hex: pairHex(ramp, tt, theme) } };
+  if (depth >= 8) return { colour: { kind: "ansi256", index: nearestAnsi256(pairHex(ramp, tt, theme)) } };
   if (depth >= 4) {
     const colour = resolveTone((tt < 0.5 ? ramp.from : ramp.to) ?? "default", theme, caps).colour;
     return colour === undefined ? undefined : { colour };

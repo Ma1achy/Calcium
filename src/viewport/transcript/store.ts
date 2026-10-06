@@ -16,7 +16,7 @@
  * loses, taking a subscription with it every time the user types.
  */
 
-import { applyPatch, validateDocument } from "../../data/viewmodel/index.js";
+import { applyPatch, validateDocument, withoutStreaming } from "../../data/viewmodel/index.js";
 import type { ViewDocument, ViewPatch } from "../../data/viewmodel/index.js";
 import { SESSION_BLOCK_CAP, countBlocks, isMarker, sweep } from "./cap.js";
 import { TranscriptError } from "./types.js";
@@ -194,13 +194,22 @@ class Store implements TranscriptStore {
       );
     }
 
-    // I13 — `rev` moves iff the document changed. A bare settle changes nothing
-    // about it, and moving `rev` there would invalidate a height that is still
-    // correct on every stream that ends, which is the common case.
+    // I13 — `rev` moves iff the document changed. A bare settle over a document
+    // with nothing streaming changes nothing about it, and moving `rev` there
+    // would invalidate a height that is still correct on every stream that
+    // ends, which is the common case.
+    //
+    // **And the stream ends in the document, in this same change** (I22). A
+    // block's own `streaming: true` survived settlement, so a settled notice
+    // kept the agent's mark and its reserved cells. Stripped here, after the
+    // throw above, so the rejection path has mutated nothing; and compared by
+    // identity, so a bare settle over a document with nothing streaming still
+    // leaves `rev` where it was.
+    const ended = withoutStreaming(settled === undefined ? entry.doc : settled.value);
     const next =
-      settled === undefined
+      settled === undefined && ended === entry.doc
         ? { rev: entry.rev }
-        : { doc: settled.value, rev: entry.rev + 1, blocks: countBlocks(settled.value) };
+        : { doc: ended, rev: entry.rev + 1, blocks: countBlocks(ended) };
 
     // The sweep matters most here, and it is the one that was missing. A settled
     // entry is newly evictable, so the true overshoot is now *lower* than the

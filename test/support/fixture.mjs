@@ -982,6 +982,9 @@ switch (mode) {
         ? {}
         : { colourDepth: Number(process.env["FORCE_DEPTH"]) }),
       ...(process.env["FORCE_MOUSE"] === undefined ? {} : { mouse: process.env["FORCE_MOUSE"] === "1" }),
+      // C14 T5.6 — the OSC 52 route, declared as a reader whose terminal takes it
+      // would (C02 I18); the PTY's own TERM identifies nothing that does.
+      ...(process.env["FORCE_CLIPBOARD"] === undefined ? {} : { clipboard: process.env["FORCE_CLIPBOARD"] }),
     };
 
     const tui = createTui({

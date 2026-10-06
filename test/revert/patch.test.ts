@@ -179,7 +179,7 @@ describe("C25 fail-on-revert", () => {
     // green, asserting a change on the side that had none.
     const unpaired = kit()
       .renderToLines(patchOf({ hunks: [THE_ILLUSTRATION] }), 120)
-      .find((r) => visible(r).includes("prism.fmx.io/family"));
+      .find((r) => visible(r).includes("prism.example.com/family"));
     const [left] = (unpaired as string).split("│");
 
     expect(/\[[0-9;]*48;/.test(left as string), "the blank side must be unpainted").toBe(false);

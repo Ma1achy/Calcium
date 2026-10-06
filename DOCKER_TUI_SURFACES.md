@@ -19,7 +19,7 @@ Grounded in three decisions: **dense rows** (many containers fit), a **composed 
 dashboard** (shown before any command), and **real tool that demos well** (density over
 decoration, every frame useful).
 
-Local resolution: `"@fmx/calcium": "file:../calcium"` in `docker-tui/package.json`,
+Local resolution: `"calcium-tui": "file:../calcium"` in `docker-tui/package.json`,
 imported from the three entry points as the probe was. R01-honest — a built package, not
 the source tree. Real docker, subprocess transport; `docker … --format json` is the far
 side and the adapter turns it into blocks.
@@ -36,7 +36,7 @@ b.live in a view    S3  ⏎ drill-in (HEADLINE)      ✓✓  the composition the
 b.live in an entry  S4  /stats · S1 landing        ✓✓  the tested host, the stable baseline
 plot (C12)          S3 · S4 --graph                ✓✓
 comparison (a/b)    S6  /compare · S7 /drift        ✓✓  two-column before/after
-patch (real hunks)  S8  /config                     ✓✓  hunks + context + syntax
+patch (real hunks)  S8  /filediff                     ✓✓  hunks + context + syntax
 code + syntax       S5  /inspect --raw              ✓   lowlight over real JSON
 pushed view         S3 · S9 /logs                   ✓✓
 pills + tone        S1 landing · S2 /ps             ✓✓
@@ -525,14 +525,16 @@ the word "diff" was doing work the picture never supported. FINDINGS F11.
 
 ---
 
-## S8 — `/config <c>` (real unified patch, hunks + syntax)
+## S8 — `/filediff <c>` (real unified patch, hunks + syntax)
+
+*Drawn as `/config`; renamed `/filediff` on 2026-09-28 by ruling 43, which gives `/config` to §075's framework verb.*
 
 The patch block doing its *actual* job — hunks, context lines, syntax highlighting — not
 `docker diff`'s change list. Source: a config file the image ships and a mount/edit
 overrides; `docker exec cat` the running one, pull the image's original, diff.
 
 ```
-❯ /config api-gateway
+❯ /filediff api-gateway
 
   /etc/nginx/conf.d/default.conf
    ┌──────────────────────────────────────
@@ -561,9 +563,9 @@ instance). Measured against `dtui-cfg`, an `nginx:alpine` container with a bind-
 - **The pair does not exist by default.** `nginx:alpine` ships a 44-line `default.conf` and
   a plain container has it byte-identical. A container whose config differs from its image's
   is one somebody set up that way, so the fixture is part of the surface.
-- **`/config <c>` cannot discover the file.** `.Mounts` gives `Type: "bind"` for a file and
+- **`/filediff <c>` cannot discover the file.** `.Mounts` gives `Type: "bind"` for a file and
   for a directory with no distinguishing field, so the bare form offers the bind
-  destinations as candidates rather than guessing. `/config <c> <path>` is the verb.
+  destinations as candidates rather than guessing. `/filediff <c> <path>` is the verb.
 
 And the drawing never said it joins two sources: the running file is `docker exec <c> cat`,
 the image's needs `docker run --rm <image> cat` — **442ms, measured**, a container created,
@@ -736,7 +738,7 @@ consumer proving it is needed.
 3. ⏎ live single-container view                                 (S3) — HEADLINE, gap 7, the plot
    └ the plot needs gap 1's history buffer — build it here
 4. /drift, then /compare                                        (S7, S6) — comparison at its best
-5. /config, then /inspect --raw                                 (S8, S5) — real patch, syntax
+5. /filediff, then /inspect --raw                                 (S8, S5) — real patch, syntax
 6. /logs, /diff, the smaller verbs                              (S9-S11)
 7. degradation showcase — the S3 view at five depths            (S12)
 8. whatever gaps 1-7 turned out to be, each with a consumer

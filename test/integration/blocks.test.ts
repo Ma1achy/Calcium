@@ -61,7 +61,7 @@ describe("C09 × C10", () => {
     const kit = measurable({ capabilities: { ...FULL_CAPS, colourDepth: 4 } });
     const notices = (["ok", "warn", "error"] as const).map((tone) =>
       kit.renderToLines(
-        block({ kind: "notice", id: `n-${tone}`, tone, glyph: "running", text: "status" }),
+        block({ kind: "notice", id: `n-${tone}`, tone, glyph: "work-unit", text: "status" }),
         40,
       )[0] ?? "",
     );

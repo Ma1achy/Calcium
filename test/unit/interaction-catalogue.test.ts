@@ -9,7 +9,7 @@
 // is the row that would have said so.
 import { describe, expect, it } from "vitest";
 
-import { tone, selectionStyle } from "../../src/presentation/blocks/paint.js";
+import { tone, focusStyle, selectionStyle, background, slot as surfaceOf } from "../../src/presentation/blocks/paint.js";
 import { defaultTheme, loadTheme } from "../../src/presentation/theme/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -63,17 +63,27 @@ describe("interaction-catalogue — the corpus renders", () => {
   it("IC2 (C11 I14): the selection scene at 24-bit washes a and b, accents c, leaves d — the same frame the session draws", () => {
     const c = capsNamed("24bit");
     const accent = params(tone("accent", theme, c));
-    const plain = params(tone("default", theme, c));
     const wash = params(selectionStyle(theme, c));
+    const focusBg = params(focusStyle(theme, c));
+    // Each ink on the ground it lands on (C10 I48): a row keeps its cells' own
+    // tones and the ground decides what each of them inks as.
+    const plainOnWash = params(tone("default", theme, c, "selection"));
+    const plainOnFocus = params(tone("default", theme, c, "focusGround"));
     const lines = frameFor(scene("table-selection"), c);
-    expect(cellOf(lines, "alpha")).toEqual({ fg: plain, bg: wash, attrs: [] });
-    expect(cellOf(lines, "bravo")).toEqual({ fg: plain, bg: wash, attrs: [] });
-    expect(cellOf(lines, "charlie")).toEqual({ fg: accent, bg: "", attrs: [] });
+    expect(cellOf(lines, "alpha")).toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
+    expect(cellOf(lines, "bravo")).toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
+    // **The head is inside the extent, so selection owns its ground** (R-SEL-006,
+    // C10 I47) and `▸` in the reserved column is what focus keeps. Its cells are
+    // inked like every other row's, on the ground the row took (C11 I14, F1240).
+    expect(cellOf(lines, "charlie")).toEqual({ fg: plainOnWash, bg: wash, attrs: [] });
+    expect(accent, "and not accent, which the retired rule painted here").not.toBe(plainOnWash);
     expect(cellOf(lines, "delta").bg).toBe("");
     // **The frame responds to the thing under test**: the focus scene, same
-    // table, washes nothing and accents `bravo`.
+    // table, washes nothing and puts `bravo` on the focus ground — a *different*
+    // ground, which is the whole of this change.
     const focus = frameFor(scene("table-focus"), c);
-    expect(cellOf(focus, "bravo")).toEqual({ fg: accent, bg: "", attrs: [] });
+    expect(cellOf(focus, "bravo")).toEqual({ fg: plainOnFocus, bg: focusBg, attrs: [] });
+    expect(focusBg, "and the two grounds are not one").not.toBe(wash);
     for (const name of ["alpha", "charlie", "delta"]) expect(cellOf(focus, name).bg, `${name} unwashed`).toBe("");
   });
 
@@ -93,7 +103,11 @@ describe("interaction-catalogue — the corpus renders", () => {
     const lines = frameFor(scene("table-selection"), c);
     expect(cellOf(lines, "alpha").attrs).toContain(7);
     expect(cellOf(lines, "bravo").attrs).toContain(7);
-    expect(cellOf(lines, "charlie").attrs, "the head is not inverse").not.toContain(7);
+    // **The head inverts too, and `▸` is what tells it apart** (R-SEL-006: at
+    // 1-bit the selection is reverse video while the focus mark persists). This
+    // read *the head is not inverse*, which was true when one ground served both
+    // facts and left focus with no carrier once colour was gone.
+    expect(cellOf(lines, "charlie").attrs, "the head is inside the extent, so it inverts").toContain(7);
     expect(cellOf(lines, "delta").attrs).not.toContain(7);
 
     // **The instrument's half.** On the day this corpus was first rendered the
@@ -117,6 +131,7 @@ describe("interaction-catalogue — the corpus renders", () => {
     const c = capsNamed("24bit");
     const accent = params(tone("accent", theme, c));
     const dim = params(tone("dim", theme, c));
+    const muted = params(tone("muted", theme, c));
     const none = frameFor(scene("scroll-midstream"), c);
     const focused = frameFor({ ...scene("scroll-midstream"), focus: { blockId: "s", rowId: "n4" } }, c);
     const plain = (lines: readonly string[]) => lines.map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""));
@@ -132,10 +147,21 @@ describe("interaction-catalogue — the corpus renders", () => {
       }
     }
     expect(moved.length).toBeGreaterThan(0);
-    expect(new Set(moved.map((m) => m.row)), "the residue row and no other").toEqual(new Set([3]));
-    expect(moved.map((m) => m.ch).join("").trim()).toBe("⋯ 2 above, 1 below");
+    // **The box's chrome is two things now** (C26 §7, C09 I92, §021): the
+    // residue row and the bar's column, both reserved whether or not a reader
+    // is in the box, and §021 gives the bar the same rule in the same words —
+    // *the thumb takes the ACCENT when its container has focus*.
+    expect(
+      new Set(moved.map((m) => m.row)),
+      "the residue row and the bar's column, and no other row",
+    ).toEqual(new Set([0, 1, 2, 3]));
+    expect(
+      moved.filter((m) => m.row === 3).map((m) => m.ch).join("").trim(),
+    ).toBe("⋯ 2 above, 1 below");
     for (const m of moved) {
-      expect(m.was).toBe(dim);
+      // `dim` is the residue row's resting ink and `muted` is the bar's; they
+      // were never the same word, and both go to `accent`.
+      expect(m.was).toBe(m.row === 3 ? dim : muted);
       expect(m.now).toBe(accent);
     }
 
@@ -153,29 +179,45 @@ describe("interaction-catalogue — the corpus renders", () => {
     // selection ground and the active chip does not.
     const c = capsNamed("24bit");
     const accent = params(tone("accent", theme, c));
-    const wash = params(selectionStyle(theme, c));
     const lines = frameFor(scene("pills-focus"), c);
-    expect(cellOf(lines, "exited"), "the head: accent over the ground").toEqual({ fg: accent, bg: wash, attrs: [] });
+    expect(cellOf(lines, "exited"), "the head: accent over the focus ground").toEqual({ fg: accent, bg: params(focusStyle(theme, c)), attrs: [] });
     expect(cellOf(lines, "running"), "the active chip: accent, no ground").toEqual({ fg: accent, bg: "", attrs: [] });
     expect(cellOf(lines, "all").bg, "an ordinary chip has no ground").toBe("");
-    // At 1-bit: the head is bold and inverse, the active chip bold alone.
+    // **At 1-bit the head inverts** (C09 I121, R-FOC-001). This row asserted
+    // *bold and NOT inverse*, and read the cost aloud — the head and the active
+    // chip were then both bold, one frame for two facts. A pill has no `▸` to
+    // carry focus, so the focus-shape rung does: the ground where it carries,
+    // the whole chip inverted where it does not. The active chip is untouched.
     const mono = frameFor(scene("pills-focus"), capsNamed("1bit"));
-    expect(cellOf(mono, "exited").attrs).toEqual(expect.arrayContaining([1, 7]));
+    expect(cellOf(mono, "exited").attrs, "bold and inverse").toEqual([1, 7]);
     expect(cellOf(mono, "running").attrs).toContain(1);
-    expect(cellOf(mono, "running").attrs).not.toContain(7);
+    expect(cellOf(mono, "running").attrs, "the active chip stays upright").not.toContain(7);
   });
 
-  it("IC8 (C26 §7, C04 §3): the focused notice is accent over the ground and the plain notice beside it is untouched", () => {
+  it("IC8 (C26 §7, C04 §3, C09 I83): the focused notice keeps its own tone over the focus ground and the plain notice beside it is untouched", () => {
     const c = capsNamed("24bit");
-    const accent = params(tone("accent", theme, c));
     const info = params(tone("info", theme, c));
-    const wash = params(selectionStyle(theme, c));
     const lines = frameFor(scene("notice-action-focus"), c);
-    expect(cellOf(lines, "image pull failed"), "the button, focused").toEqual({ fg: accent, bg: wash, attrs: [] });
-    expect(cellOf(lines, "✗"), "its glyph too").toEqual({ fg: accent, bg: wash, attrs: [] });
+    // **The chosen pair, because this scene's notice is a BUTTON** (C09 I102,
+    // §073). The row asserted `focusGround` and the notice's own tone, which is
+    // I83's rule — and I83 is the *call head's* arm: a focused button is a
+    // choice about to be taken and takes `pick` with `pickInk`, bold. The row's
+    // own label already said *the button*; only the mechanism under it was the
+    // other member's.
+    const pickOn = params(surfaceOf("surface.pickInk", theme, c));
+    const pickBg = params(background("surface.pick", theme, c));
+    const cell = cellOf(lines, "image pull failed");
+    expect(cell?.fg, "the button, focused: pickInk").toBe(pickOn);
+    expect(cell?.bg, "on pick, not focusGround").toBe(pickBg);
+    expect(cell?.attrs, "and bold").toContain(1);
+    expect(cell?.bg, "the chosen ground is not the focus ground").not.toBe(params(focusStyle(theme, c)));
     expect(cellOf(lines, "no containers"), "the plain notice: its tone, no ground").toEqual({ fg: info, bg: "", attrs: [] });
     const mono = frameFor(scene("notice-action-focus"), capsNamed("1bit"));
-    expect(cellOf(mono, "image pull failed").attrs).toEqual(expect.arrayContaining([1, 7]));
+    // **At 1-bit the focused notice inverts** (C09 I121, C09 I83 superseded). The
+    // old arm read *no ground and no inverse — says nothing false about focus*,
+    // and it also said nothing true: the frame was the resting one. The plain
+    // notice beside it declares no element and stays upright.
+    expect(cellOf(mono, "image pull failed").attrs, "inverse carries focus").toContain(7);
     expect(cellOf(mono, "no containers").attrs).not.toContain(7);
   });
 

@@ -1,0 +1,67 @@
+the channel never changes. The TARGET follows the SHAPE.
+
+1 · an unpainted BOX inverts whole — it already has a ground, so focus lifts it [R-FOC-001]
+   Approve    Deny         at rest
+     Approve    Deny       hovered — active ground, no focus mark
+   › Approve    Deny       focused — active ground plus mark and edge
+   Approve    › Deny       Deny has a TONE, so it inverts to it
+  [ Approve ]  [ Deny ]      1-bit — the brackets carry it
+
+2 · a CONTROL takes a WASH over ALL of it — label, track and value [R-FOC-002]
+  learning rate  ├──────●────────┤  3e-4      at rest
+   learning rate  ├──────●────────┤  3e-4     focused
+   learning rate  ├━━━━━━ ◉ ━━━━━━━┤  3e-4     INSIDE
+
+  the VALUE is INFO and it never changes; FOCUS is the wash; INSIDE is
+  weight plus a painted handle. Three states, three mechanisms.
+
+  ★ an inside-bearing continuous control CANNOT COMMIT its domain value from outside.
+  Arrowing down a document past three sliders must not move three sliders;
+  a declared plot readout may preview without committing; direct-action toggles
+  and choices act without an inside state.
+
+3 · a CHECKBOX and a RADIO are the same shape — the label is part of it [R-FOC-003]
+  ✓ run the suite after each edit            at rest
+   ✓ run the suite after each edit    focused
+   ✗ run the suite after each edit    ⏎ toggled it off
+
+  scale    ● linear     ○ log     ○ log₂       at rest
+  scale    ● linear      ○ log      ○ log₂   focused, NOT chosen
+
+  the MARK carries chosen — ● against ○, ✓ against ✗ — and the WASH
+  carries focus. So you can be on an option you have not chosen, which
+  is the whole point of a radio group.
+
+4 · a PICTURE takes its BORDER — or its AXES, when it has none [R-FOC-004]
+  4.0┤⣀⠡⠤⠒⠉⠉⠑⠒⠢⡄                at rest — muted axes
+  0.0┼─────────────
+
+  4.0┤⣀⠡⠤⠒⠉⠉⠑⠒⠢⡄                focused — the axes take the tone
+  0.0┼─────────────
+
+  4.0┨⣀⠡⠤⠒⠉⠉⠑⠒⠢⡄                inside — heavy axes, ←→ orbit
+  0.0╂━━━━━━━━━━━━━
+
+  furniture.ts carries frame?: boolean and most plots have none, so
+  the AXES are what frames a figure. And a ground ACROSS a figure is not
+  a highlight — the background is half of what braille draws with.
+
+  drawing a border on focus is REFUSED: it changes the height, and
+  measure already committed to one.
+
+5 · nothing here assumes ONE ELEMENT PER ROW [R-FOC-005]
+  ┌ loss ────────────┐  ┏ accuracy ━━━━━━━━┓  ┌ gpu ─────────────┐
+  │ ⣀⠡⠤⠒⠉⠉⠑     │  ┃ ⠉⠑⠒⠢⡄⡀     ┃  │ █▇▆█▇█      │
+  └──────────────────┘  ┗━━━━━━━━━━━━━━━━━━┛  └──────────────────┘
+
+  three plots in a mosaic, the middle one focused. A row wash would have
+  lit all three — which is why ←→ must move BETWEEN elements in a row,
+  and NavElement already carries rows AND cols to make that possible.
+
+the whole thing, as one rule
+
+  the CHANNEL never changes   focus treatment follows SHAPE
+  the TARGET follows content  a run, a box, a frame, a handle
+  a picture keeps its hole    the chrome takes it, the figure does not
+  entering narrows it         and the arrows change what they drive
+  esc widens ordinary states  captured owners expose host.detach instead

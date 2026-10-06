@@ -288,7 +288,7 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
       expect(a, "released, `CSI 13;2:3 u`").toContain("\x1b[13;2:3u");
 
       // **The decoder, on the emulator's bytes** — the pair T4.72 could not see (F799).
-      const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true }, now: () => 0 });
+      const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true, keyboardProtocol: "none" }, now: () => 0 });
       const events = d.push(new TextEncoder().encode(a)).filter((e) => e.kind === "key");
       const keys = events.map((e) => (e.kind === "key" ? `${e.key.name}${e.key.shift ? "+shift" : ""}${e.event === "release" ? "/release" : ""}` : ""));
       expect(keys).toEqual(["escape", "escape/release", "enter+shift", "enter+shift/release", "k", "k/release"]);
@@ -385,7 +385,7 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
       // exactly as long as the defect is; the arm is C16 I32 and this now
       // asserts it.
       const decode = (bytes: string): string[] => {
-        const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true }, now: () => 0 });
+        const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true, keyboardProtocol: "none" }, now: () => 0 });
         return d.push(new TextEncoder().encode(bytes)).map((e) =>
           e.kind === "key" ? `${e.key.name}${e.key.meta ? "+meta" : ""}${e.key.ctrl ? "+ctrl" : ""}` : e.kind,
         );

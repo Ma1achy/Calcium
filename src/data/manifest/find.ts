@@ -78,32 +78,16 @@ export function visibleTools(m: Manifest): readonly ToolDef[] {
 }
 
 /**
- * Whether an invocation's result is a pushed view — C22 §13a, C05 I20.
- *
- * **One definition, for the same reason `visibleTools` is one.** The tier is
- * read at two moments that must not disagree — C23 decides where the result goes,
- * and the shell decides who owns input — and two implementations of *"is this a
- * view"* would drift on exactly the case that matters: a tool that appends
- * except when a flag is present.
- *
- * **A tool or a flag may declare it, and either is enough.** `/dashboard` is a
- * verb; S12's `--logs` and S3's `--watch` are flags on a `ps` that otherwise
- * appends. A tool-level field alone would need `ps` split in two to express that,
- * which puts one verb's flags in two places.
- *
- * `args` is the *validated* set, so a flag the user typed but the parser rejected
- * cannot promote a result to a view. That ordering is the point: the tier is
- * settled before C23's step 3 appends anything, and a refused line never reaches
- * step 3 at all.
- */
-/**
  * The tokens that ask this far side for JSON, resolved (C05 I26, C06 I25, F1).
  *
- * **Here rather than at the two call sites**, for `isViewInvocation`'s reason
- * one paragraph up: two implementations of a resolution drift on exactly the
- * case that matters, and this one has a case — the verb replaces the manifest's
- * *whole*, never merging with it, because merging two token sequences has no
- * meaning. C06 is handed the answer and never learns what a verb is.
+ * **A function rather than an expression at `execution.ts`' call site**, for
+ * `visibleTools`' reason above: two implementations of a resolution drift on
+ * exactly the case that matters, and this one has a case — the verb replaces
+ * the manifest's *whole*, never merging with it, because merging two token
+ * sequences has no meaning. C06 is handed the answer and never learns what a
+ * verb is. (It cited `isViewInvocation` for that reason, and two call sites;
+ * the predicate went with the pushed view, R-EXA-082, and left its doc comment
+ * above this one with nothing under it.)
  *
  * **Three states**: a verb's declaration wins; absent inherits the manifest's;
  * a manifest with none resolves to `["--json"]`, which is what the transport
@@ -115,10 +99,3 @@ export function jsonFlagFor(manifest: Manifest, tool: ToolDef): readonly string[
   return tool.jsonFlag ?? manifest.jsonFlag;
 }
 
-export function isViewInvocation(
-  tool: ToolDef,
-  args: Readonly<Record<string, unknown>>,
-): boolean {
-  if (tool.view === true) return true;
-  return tool.flags.some((f) => f.view === true && Object.hasOwn(args, f.name));
-}

@@ -42,8 +42,9 @@ const results = runPass({
     {
       name: "rowActivate takes liveId as the origin",
       file: "src/shell/keys.ts",
-      from: "      const from = deps.focusedEntryId();\n      if (action === undefined || from === null) return;",
-      to: "      const from = deps.liveEntryId();\n      if (action === undefined || from === null) return;",
+      // Re-anchored 2026-09-28 (review batch 3, M7): rowActivate's body moved into `activationOf` (C16 I71); the mutation is unchanged.
+      from: "      activationOf(deps.focusedEntryId(), elements[i])?.();",
+      to: "      activationOf(deps.liveEntryId(), elements[i])?.();",
       expect: "T3.41",
     },
     {
@@ -56,10 +57,18 @@ const results = runPass({
       expect: "T3.40",
     },
     {
-      name: "interaction gate widened back to any live entry",
+      // **Re-anchored 2026-09-24, and the mutation inverts with its subject**
+      // (§102, C26 I2, §8b.9). The gate this narrowed is gone: *VIEW STATE IS
+      // NOT LIVENESS*, so `activeTarget` answers `interaction` for the focused
+      // entry whatever its liveness. The live mutation is the gate coming
+      // **back** — which is what the design withdrew, and what T3.45 now
+      // asserts from the other side.
+      name: "the liveness gate restored, so a settled plot stops orbiting",
       file: "src/interaction/router/focus.ts",
-      from: "    deps.liveEntry !== null &&\n    deps.stored.entryId === deps.liveEntry.id",
-      to: "    deps.liveEntry !== null",
+      from: '  if (deps.stored.at === "liveBlock" && deps.stored.mode === "interact") {',
+      to:
+        '  if (\n    deps.stored.at === "liveBlock" &&\n    deps.stored.mode === "interact" &&\n' +
+        '    deps.liveEntry !== null &&\n    deps.stored.entryId === deps.liveEntry.id\n  ) {',
       expect: "T3.45",
     },
     {

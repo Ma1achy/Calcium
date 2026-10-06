@@ -5,7 +5,11 @@
 // holds the comparison against what the spec *states*; this file holds the
 // properties that must hold whatever a surface declares.
 import { describe, expect, it } from "vitest";
+import { atContent, body } from "../support/table-gutter.js";
 import { COLUMN_GAP, planColumns, tableDefinition, tableElements } from "../../src/presentation/table/index.js";
+import { columnAlignments } from "../../src/presentation/table/kind.js";
+import { markdownBlocks } from "../../src/data/viewmodel/markdown.js";
+import { runsOf } from "../../src/presentation/runs.js";
 
 /**
  * The drawn order of a table's rows (C26 §5).
@@ -19,7 +23,15 @@ const drawnOrder = (block: Table, width = 160): readonly string[] =>
   tableElements(block, width, registry.measure).map((e) => e.id);
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { psColumns, psTable } from "../support/blocks.js";
-import { MONO_UNICODE_CAPS, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, DITHER_CAPS, FULL_CAPS, MONO_UNICODE_CAPS, measurable, visible } from "../support/render.js";
+import { tone } from "../../src/presentation/blocks/paint.js";
+import { styledScreenFrom } from "../support/styled-screen.js";
+import { background, focusStyle } from "../../src/presentation/blocks/paint.js";
+import { sgr } from "../../src/terminal/escapes.js";
+
+/** `sgr(style)` without the frame, so an expected ground reads as the model's channel. */
+const params = (style: Parameters<typeof sgr>[0]): string =>
+  sgr(style).replace(/^\u001b\[/u, "").replace(/m$/u, "");
 import { glyphFor } from "../../src/presentation/blocks/glyphs.js";
 import { cells } from "../../src/presentation/text.js";
 import type { Cell, ColumnDef, Table } from "../../src/data/viewmodel/index.js";
@@ -276,11 +288,12 @@ describe("C11 tier 1 — planColumns", () => {
     const opened = psTable({ rows: 2, expanded: [1] });
 
     // At 80, three columns drop, so every row is expandable (I2) and the marker is
-    // drawn. `▸` collapsed, `▾` open.
+    // drawn. `▹` collapsed, `▿` open — hollow, because the filled `▸` is the
+    // focus mark and disclosure stopped borrowing it (§024, R-BLK-928).
     const first = registry.renderToLines(collapsed, 80)[1] ?? "";
     const openedFirst = registry.renderToLines(opened, 80)[1] ?? "";
-    expect(first).toContain("▸");
-    expect(openedFirst).toContain("▾");
+    expect(first).toContain("▹");
+    expect(openedFirst).toContain("▿");
 
     // The same table with the role removed: no marker anywhere, and the column
     // renders its own cell text instead.
@@ -293,7 +306,7 @@ describe("C11 tier 1 — planColumns", () => {
       rows: collapsed.rows.map((r) => ({ ...r, cells: { ...r.cells, expand: { text: "#" } } })),
     };
     const rolelessFirst = registry.renderToLines(roleless, 80)[1] ?? "";
-    expect(rolelessFirst).not.toContain("▸");
+    expect(rolelessFirst).not.toContain("▹");
     expect(rolelessFirst).toContain("#");
   });
 
@@ -379,7 +392,7 @@ describe("C11 tier 1 — planColumns", () => {
     // and a marker that did nothing when pressed would be worse than none.
     const plan = planColumns(psColumns(), 160);
     expect(plan.dropped).toEqual([]);
-    expect(registry.renderToLines(psTable({ rows: 2 }), 160)[1] ?? "").not.toContain("▸");
+    expect(registry.renderToLines(psTable({ rows: 2 }), 160)[1] ?? "").not.toContain("▹");
   });
 
   it("T1.18 (C04 I30): a column truncates from the end it declares", () => {
@@ -391,8 +404,11 @@ describe("C11 tier 1 — planColumns", () => {
     ];
     const rows = [{ id: "r1", cells: { key: { text: "ui.show_banner" } } }];
 
+    // **Rendered two cells wider and read past the gutter** (C11 I15, §5b): the
+    // block reserves a column for `▹` on every row, and this row is about the
+    // column's own 12 cells.
     const draw = (from: "start" | "end"): string =>
-      visible(registry.renderToLines({ kind: "table", id: "t", columns: columns(from), rows }, 12)[1] ?? "");
+      body(visible(registry.renderToLines({ kind: "table", id: "t", columns: columns(from), rows }, atContent(12))[1] ?? ""));
 
     // 14 characters into 12 cells: 11 kept plus a one-cell marker, from whichever
     // end the column declared.
@@ -403,9 +419,9 @@ describe("C11 tier 1 — planColumns", () => {
     // The default is `end`, so a column that says nothing renders as it did before
     // the field existed.
     const silent = columns("end").map(({ truncateFrom: _t, ...rest }) => rest);
-    expect(visible(registry.renderToLines({ kind: "table", id: "t", columns: silent, rows }, 12)[1] ?? "")).toBe(
-      draw("end"),
-    );
+    expect(
+      body(visible(registry.renderToLines({ kind: "table", id: "t", columns: silent, rows }, atContent(12))[1] ?? "")),
+    ).toBe(draw("end"));
   });
 
   it("the gap is two cells, and it is the plan's own number", () => {
@@ -449,7 +465,7 @@ describe("C11 tier 1 — planColumns", () => {
   /** The cell alone, with the header dropped and the styling stripped. */
   const drawn = (block: Table, caps: TerminalCapabilities, trim = true): string => {
     const kit = measurable({ definitions: [tableDefinition], capabilities: caps });
-    const line = kit.renderToLines(block, 40)[1];
+    const line = body(kit.renderToLines(block, atContent(40))[1] ?? ""); // the gutter is C11 I15's, not this row's
     expect(line, "the table drew a row").toBeDefined();
     return trim ? visible(line ?? "").trimEnd() : visible(line ?? "");
   };
@@ -503,7 +519,7 @@ describe("C11 tier 1 — planColumns", () => {
           { id: "cool", cells: { cpu: { text: "", bar: { value: 45.2, max: 100, format: "percent" } } } },
         ],
       };
-      return kit.renderToLines(block, 40).slice(1).map((l) => visible(l));
+      return kit.renderToLines(block, atContent(40)).slice(1).map((l) => body(visible(l)));
     };
 
     const [hot, cool] = both(true);
@@ -578,6 +594,92 @@ describe("C11 tier 1 — planColumns", () => {
       expect(toned, `and the value whole at ${at}`).toContain("101.2%");
       expect(bare, `the control carries it too at ${at}`).toContain("101.2%");
     }
+  });
+
+  // **A ground's EXTENT is what these two read, and only a grid can answer it.**
+  // Every assertion about `▸` — which row carries it, what tone it takes,
+  // whether it survives 1-bit — passes whether the mark's cell is on the row's
+  // ground or on the page beside it, because the glyph, the column and the ink
+  // are identical either way. One cell of background is the whole difference,
+  // so the rows below fold the frame into a styled grid and compare cells.
+  const gridOf = (block: Table, width: number, focus: { blockId: string; rowId: string } | null) => {
+    const kit = measurable({
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      ...(focus === null ? {} : { focus }),
+      definitions: [tableDefinition],
+    });
+    const lines = kit.renderToLines(block, width);
+    return styledScreenFrom([lines.join("\n")], { columns: width, rows: lines.length });
+  };
+  /** The row a grid holds whose text contains `needle`. */
+  const rowWith = (grid: ReturnType<typeof gridOf>, needle: string) =>
+    grid.find((r) => r.map((c) => c.ch).join("").includes(needle));
+
+  it("T1.29 (I14, §5c): a focused row's ground opens at the block's edge and covers the focus mark's cell", () => {
+    const table = psTable({ rows: 3 });
+    const focused = rowWith(gridOf(table, 80, { blockId: "ps", rowId: "r1" }), "a3f9b21");
+    expect(focused, "the focused row was found").toBeDefined();
+    if (focused === undefined) return;
+    const mark = focused.findIndex((c) => c.ch === "▸");
+    expect(mark, "the mark is in the gutter, at the block's edge").toBe(0);
+
+    // **The claim is the ground, not the ink.** The mark's cell carries the same
+    // background as the cells beside it and the background is real — two halves,
+    // because "same as its neighbour" is satisfied by a row with no ground at all.
+    const ground = focused[0]?.style.bg ?? "";
+    expect(ground, "the mark's cell is grounded").not.toBe("");
+    expect(ground, "and it is the focus ground").toBe(params(focusStyle(DARK_THEME, FULL_CAPS)));
+    const bgs = new Set(focused.map((c) => c.style.bg));
+    expect([...bgs], "one ground across the whole row, gutter to edge").toEqual([ground]);
+
+    // **The control, and it is the row this could not otherwise be told from.**
+    // At rest the same block draws the same columns in the same places with
+    // nothing in the gutter and no ground anywhere — without it, a renderer
+    // that grounded every gutter unconditionally passes every line above.
+    const rest = rowWith(gridOf(table, 80, null), "a3f9b21");
+    expect(rest, "the control row was found").toBeDefined();
+    expect(new Set((rest ?? []).map((c) => c.style.bg)), "no ground at rest").toEqual(new Set([""]));
+  });
+
+  it("T1.30 (I25): an expanded row's detail carries `bgElev` the block's whole width, and the row beneath it carries none", () => {
+    // **Asserted with nothing focused**, so the detail's ground is shown to
+    // follow *expansion* (C11 I9 — block state) rather than being the head's
+    // ground spilling downward, which one focus on the row above cannot separate.
+    const table = psTable({ rows: 3, expanded: [1], detail: true });
+    const grid = gridOf(table, 80, null);
+    const elev = params(background("surface.bgElev", DARK_THEME, FULL_CAPS));
+    expect(elev, "bgElev is a real ground at 24-bit").toMatch(/^48;/u);
+
+    const rowText = (r: (typeof grid)[number]): string => r.map((c) => c.ch).join("");
+    const headAt = grid.findIndex((r) => rowText(r).includes("a3f9b21"));
+    const nextAt = grid.findIndex((r) => rowText(r).includes("7c2d4e1"));
+    expect(headAt, "the expanded row was found").toBeGreaterThanOrEqual(0);
+    expect(nextAt, "and the row after its detail").toBeGreaterThan(headAt + 1);
+
+    const detail = grid.slice(headAt + 1, nextAt);
+    expect(detail.length, "the detail drew rows").toBeGreaterThan(0);
+    for (const [i, r] of detail.entries()) {
+      expect(new Set(r.map((c) => c.style.bg)), `detail row ${String(i)} is bgElev, edge to edge`).toEqual(
+        new Set([elev]),
+      );
+    }
+
+    // **The second half is the one §082 rests on.** A ground that leaked past
+    // the detail would draw the pushed frame the section exists to refuse, and
+    // the row above is the other end of the same claim.
+    expect(new Set(rowText(grid[nextAt] ?? []) === "" ? [] : (grid[nextAt] ?? []).map((c) => c.style.bg)),
+      "the row beneath the detail carries none").toEqual(new Set([""]));
+    expect(new Set((grid[headAt] ?? []).map((c) => c.style.bg)),
+      "and neither does the unfocused row the detail belongs to").toEqual(new Set([""]));
+
+    // **The control**: with `expanded` cleared those lines are absent entirely
+    // rather than merely unpainted, so the row cannot pass by measuring a
+    // renderer that draws no detail at all.
+    const flat = gridOf(psTable({ rows: 3, detail: true }), 80, null);
+    const flatHead = flat.findIndex((r) => rowText(r).includes("a3f9b21"));
+    const flatNext = flat.findIndex((r) => rowText(r).includes("7c2d4e1"));
+    expect(flatNext - flatHead, "collapsed, the two rows are adjacent").toBe(1);
   });
 
   it("T1.25 (I22): `maxWidth` on a column with no `flex` cannot change a plan, at any width", () => {
@@ -843,5 +945,431 @@ describe("C11 §5a — the window", () => {
     expect(bar.skipRows, "and charged to the leading residual").toBe(2);
     expect(bar.dropRows).toBe(0);
     expect((bar.block as Table).showHeader, "the header is out of range").toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C11 §3 — I27, a column's alignment derived from its own values.
+// ---------------------------------------------------------------------------
+
+/** A column declaring everything but an alignment. */
+const undeclared = (key: string, minWidth: number): ColumnDef => ({
+  key,
+  label: key,
+  priority: 50,
+  minWidth,
+  sortable: false,
+});
+
+describe("derived alignment (I27)", () => {
+  it("T1.31 (I27, §078, R-TBL-001): four undeclared columns take the alignment their values imply, and a declared one is left alone", () => {
+    const block: Table = {
+      kind: "table",
+      id: "kinds",
+      columns: [
+        undeclared("ints", 8),
+        undeclared("decs", 8),
+        undeclared("age", 8),
+        // **The row that matters.** Two of its three values parse as numbers,
+        // so a classifier taking the majority would right-align it; the
+        // agreement rule says a column whose values disagree has no kind.
+        undeclared("status", 8),
+        // The control: the same integers with `left` declared. Without it the
+        // assertions below pass against an implementation that ignores a
+        // declaration — which is exactly what would reach into C07's adapter.
+        { ...undeclared("declared", 8), align: "left" },
+      ],
+      rows: [
+        { id: "a", cells: { ints: { text: "1204" }, decs: { text: "0.0372" }, age: { text: "12m" }, status: { text: "200" }, declared: { text: "1204" } } },
+        { id: "b", cells: { ints: { text: "88" }, decs: { text: "0.941" }, age: { text: "1h 12m" }, status: { text: "404" }, declared: { text: "88" } } },
+        { id: "c", cells: { ints: { text: "120" }, decs: { text: "3e-4" }, age: { text: "2h ago" }, status: { text: "timeout" }, declared: { text: "120" } } },
+      ],
+      showHeader: false,
+    };
+
+    expect(Object.fromEntries(columnAlignments(block))).toEqual({
+      // All integers, nothing to align on: flush to the column's inline end,
+      // which is what §078's `rows` column draws.
+      ints: "right",
+      // A point exists, so the column aligns on it — §078's `metric` column,
+      // and R-TBL-002 arriving through the same field.
+      decs: "decimal",
+      age: "right",
+      status: "left",
+      declared: "left",
+    });
+
+    // **And it reaches the frame rather than only the map.** The integer column
+    // ends flush and the declared one starts flush, over the same three values —
+    // so the two are distinguished by where the slack sits rather than by the
+    // digits, which is the whole of what the declaration buys.
+    const rows = registry.renderToLines(block, atContent(64)).map((l) => body(visible(l)));
+    expect(rows.length).toBe(3);
+    const ints = rows.map((r) => r.slice(0, 8));
+    const declared = rows.map((r) => r.slice(-8));
+    // `1,204` rather than `1204`: I28 groups this column, which is the later
+    // invariant showing through here rather than a change to this one.
+    expect(ints, "an integer column is flush to its inline end").toEqual(["   1,204", "      88", "     120"]);
+    expect(declared, "a declared `left` is untouched").toEqual(["1204    ", "88      ", "120     "]);
+  });
+
+  it("T1.32 (I27, I26): a derived integer column renders byte-identical to a declared `right`, and parts from it the moment a point exists", () => {
+    const rows = (v: readonly string[]) =>
+      v.map((text, i) => ({ id: `r${String(i)}`, cells: { n: { text } } }));
+    const of = (align: ColumnDef["align"], values: readonly string[]): Table => ({
+      kind: "table",
+      id: "refine",
+      columns: [align === undefined ? undeclared("n", 10) : { ...undeclared("n", 10), align }],
+      rows: rows(values),
+      showHeader: false,
+    });
+
+    const integers = ["1204", "88", "120"];
+    for (let w = 20; w <= 120; w += 1) {
+      expect(
+        registry.renderToLines(of(undefined, integers), w),
+        `derived and declared right agree on integers at width ${String(w)}`,
+      ).toEqual(registry.renderToLines(of("right", integers), w));
+    }
+
+    // **The control, and it is what overturned the invariant's first form.** One
+    // fractional value and the two must part — because `decimal` leaves the
+    // column's slack *after* the number where `right` puts it before, so a
+    // byte-identical result here would mean nothing is being resolved at all.
+    const mixed = ["1204", "0.941", "120"];
+    expect(registry.renderToLines(of(undefined, mixed), 40)).not.toEqual(
+      registry.renderToLines(of("right", mixed), 40),
+    );
+    expect(registry.renderToLines(of(undefined, mixed), 40)).toEqual(
+      registry.renderToLines(of("decimal", mixed), 40),
+    );
+  });
+
+  it("T1.34 (I27): a markdown table's numeric column reaches the frame flush to its inline end", () => {
+    // **The only row here that goes through a producer.** `markdownBlocks` is
+    // one of the three that hardcoded `left` without reading a row, and this is
+    // what the awkward measurement asked for: the derivation moved no golden
+    // frame, because every table in that corpus either declares its alignment
+    // or holds text. A change that fails nothing is a finding about the tests.
+    const md = "| file | rows |\n| --- | --- |\n| parse.ts | 1204 |\n| lexer.ts | 88 |\n";
+    const table = markdownBlocks(md).find((b) => b.kind === "table");
+    expect(table, "markdown yields a table").not.toBeUndefined();
+    const lines = registry.renderToLines(table as Table, atContent(38)).map((l) => body(visible(l)));
+    // Header, then two rows. The assertion is that the shorter number is
+    // **padded on its left** — which is the whole of the derivation reaching
+    // the frame — rather than a literal width, so the row survives a change to
+    // the markdown producer's `minWidth`.
+    const rows = lines.slice(1).map((l) => l.trimEnd());
+    expect(rows.length).toBe(2);
+    expect(new Set(rows.map((r) => r.length)).size, "both rows end at the same cell").toBe(1);
+    expect(rows[0]?.endsWith("1204")).toBe(true);
+    expect(rows[1]?.endsWith("  88"), "88 is padded to 1204's width, not left-aligned").toBe(true);
+  });
+
+  it("T1.33 (I27, I19, F429): a window takes the whole table's alignment, not its slice's", () => {
+    const block: Table = {
+      kind: "table",
+      id: "slice",
+      columns: [undeclared("status", 9)],
+      rows: [
+        { id: "a", cells: { status: { text: "200" } } },
+        { id: "b", cells: { status: { text: "404" } } },
+        { id: "c", cells: { status: { text: "503" } } },
+        // The only non-numeric value, and it is the last row — so every window
+        // that stops short of it sees a column of numbers.
+        { id: "d", cells: { status: { text: "timeout" } } },
+      ],
+      showHeader: false,
+    };
+
+    const at = atContent(12);
+    const whole = registry.renderToLines(block, at).map((l) => body(visible(l)));
+    const win = tableDefinition.window?.(block, at, 0, 3, registry.measure);
+    expect(win, "the definition windows").not.toBeUndefined();
+    const sliced = registry.renderToLines(win?.block as Table, at).map((l) => body(visible(l)));
+
+    // **The slice agrees with the whole**, row for row, which is the pin.
+    expect(sliced).toEqual(whole.slice(0, sliced.length));
+    // **And it is left-aligned rather than right**, which is what says the whole
+    // table's answer travelled rather than the two happening to agree: the
+    // slice alone holds `200 / 404 / 503` and would derive `right` from them.
+    expect(sliced.map((r) => r.search(/\S/u))).toEqual([0, 0, 0]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C11 §3 — I28, a numeric column groups its thousands.
+// ---------------------------------------------------------------------------
+
+describe("thousands grouping (I28)", () => {
+  /** One numeric column, `minWidth` wide, over the given values. */
+  const numbers = (values: readonly string[], minWidth: number, extra?: string): Table => ({
+    kind: "table",
+    id: "grp",
+    columns: [{ key: "n", label: "n", priority: 50, minWidth, sortable: false }],
+    rows: [
+      ...values.map((text, i) => ({ id: `r${String(i)}`, cells: { n: { text } } })),
+      ...(extra === undefined ? [] : [{ id: "x", cells: { n: { text: extra } } }]),
+    ],
+    showHeader: false,
+  });
+
+  const drawn = (block: Table, width: number): readonly string[] =>
+    registry.renderToLines(block, atContent(width)).map((l) => body(visible(l)).trim());
+
+  it("T1.35 (I28, §078, R-TBL-004): a numeric column groups; one non-numeric value takes the whole column out; and a column that cannot afford its separators draws bare rather than truncating", () => {
+    const values = ["1204", "41208", "88", "10000"];
+    expect(drawn(numbers(values, 8), 20)).toEqual(["1,204", "41,208", "88", "10,000"]);
+
+    // **The clause doing the work.** `timeout` makes the column text by I27's
+    // agreement rule, so it never reaches the grouping at all — which is how a
+    // port, a year and a line number stay bare without anything telling them
+    // apart.
+    expect(drawn(numbers(values, 8, "timeout"), 20)).toEqual([
+      "1204",
+      "41208",
+      "88",
+      "10000",
+      "timeout",
+    ]);
+
+    // **The control**: one cell too narrow for `41,208`. Without it the row
+    // passes against an implementation that groups and then truncates, which is
+    // §078's *half a number is a different number*.
+    expect(drawn(numbers(values, 5), 12)).toEqual(["1204", "41208", "88", "10000"]);
+
+    // **A duration column stays bare, and this is the only arm that reaches
+    // clause 1.** Dropping the numeric guard failed nothing on the first
+    // mutation pass, because a text column is already `left` by I27 and never
+    // arrives — a duration is the one kind that resolves to `right` and is not
+    // a bare quantity. `10000s` would otherwise draw `10,000s`, which the
+    // design shows nowhere: §078's durations are `2m`, `41m`, `1h`, none of
+    // them near a thousand, so bare is the reading that invents nothing.
+    expect(drawn(numbers(["10000s", "88m", "1h 12m"], 8), 20)).toEqual([
+      "10000s",
+      "88m",
+      "1h 12m",
+    ]);
+  });
+
+  it("T1.36 (I28, C04 I83): a cell carrying spans takes its column out of grouping, and the runs still address the characters they named", () => {
+    const spanned: Table = {
+      kind: "table",
+      id: "spanned",
+      columns: [{ key: "n", label: "n", priority: 50, minWidth: 8, sortable: false }],
+      rows: [
+        // The span names the last three characters — `204` of `1204`. Grouped,
+        // those offsets would land on `204` of `1,204` shifted by one, so the
+        // run would paint `,20`.
+        { id: "a", cells: { n: { text: "1204", spans: [{ from: 1, to: 4, tone: "error" }] } } },
+        { id: "b", cells: { n: { text: "41208" } } },
+      ],
+      showHeader: false,
+    };
+    expect(drawn(spanned, 20), "the column does not group").toEqual(["1204", "41208"]);
+
+    // **Asserted on the run boundary rather than on the text**: a row checking
+    // only the text passes against an implementation that groups and shifts
+    // every offset silently.
+    const runs = runsOf("1204", spanned.rows[0]?.cells["n"]?.spans);
+    expect(runs.map((r) => r.text)).toEqual(["1", "204"]);
+
+    // The control: the same column with the spans gone, which groups.
+    const bare: Table = {
+      ...spanned,
+      rows: spanned.rows.map((r) => ({ id: r.id, cells: { n: { text: r.cells["n"]?.text ?? "" } } })),
+    };
+    expect(drawn(bare, 20), "and it groups once nothing addresses the string").toEqual([
+      "1,204",
+      "41,208",
+    ]);
+  });
+
+  it("T1.37 (I28, I26): a decimal column's point is taken over the grouped text", () => {
+    const decimals = (minWidth: number): Table => ({
+      kind: "table",
+      id: "dec",
+      columns: [{ key: "n", label: "n", align: "decimal", priority: 50, minWidth, sortable: false }],
+      rows: [
+        { id: "a", cells: { n: { text: "1204.5" } } },
+        { id: "b", cells: { n: { text: "88.2" } } },
+      ],
+      showHeader: false,
+    });
+
+    // Wide enough to group: the point sits after `1,204`, five cells in.
+    const wide = registry
+      .renderToLines(decimals(10), atContent(10))
+      .map((l) => body(visible(l)));
+    expect(wide.map((l) => l.indexOf(".")), "both points in one column").toEqual([5, 5]);
+    expect(wide[0]?.trim()).toBe("1,204.5");
+
+    // **The control**: six cells. `1,204.5` is seven and does not fit, so
+    // clause 3 suppresses grouping; `1204.5` is six and the decimal alignment
+    // still holds, since `max(int) + max(frac)` is 4 + 2. So the only thing
+    // that moves between the two is the separator, and the point follows it by
+    // exactly one cell. Every width assertion is correct in both, which is why
+    // this needs a row of its own.
+    //
+    // The two widths were chosen to keep I26's own fallback out of it: at a
+    // fraction of three cells there is no width where grouping is off and the
+    // decimal alignment is on, and the first draft of this row measured that
+    // fallback instead — the column right-aligning, both points wrong, and the
+    // failure reading as if the grouping had leaked into the point.
+    const narrow = registry
+      .renderToLines(decimals(6), atContent(6))
+      .map((l) => body(visible(l)));
+    expect(narrow.map((l) => l.indexOf("."))).toEqual([4, 4]);
+    expect(narrow[0]?.trim()).toBe("1204.5");
+  });
+});
+
+describe("the missing number and the trend (I29, I30)", () => {
+  it("T1.38 (C11 I29, R-TBL-003): a missing number draws the absent mark, muted, at the inline end, and a text column's stays blank", () => {
+    // §078's own rows: a decimal column, a duration column, a text column.
+    const block: Table = {
+      kind: "table",
+      id: "missing",
+      columns: [
+        { key: "name", label: "name", priority: 1, minWidth: 10, sortable: false },
+        { key: "metric", label: "metric", priority: 2, minWidth: 8, sortable: false },
+        { key: "age", label: "age", priority: 3, minWidth: 5, sortable: false },
+      ],
+      rows: [
+        { id: "a", cells: { name: { text: "parse.ts" }, metric: { text: "0.0372" }, age: { text: "2m" } } },
+        { id: "b", cells: { metric: { text: "" } } },
+        // A glyph is content, so a cell carrying one is not missing.
+        { id: "c", cells: { name: { text: "lexer.ts" }, metric: { text: "", glyph: "warn" }, age: { text: "1h" } } },
+      ],
+      showHeader: false,
+    };
+    const kit = (caps: TerminalCapabilities) => measurable({ capabilities: caps, definitions: [tableDefinition] });
+    const [full, missing] = kit(FULL_CAPS).renderToLines(block, atContent(40));
+    if (full === undefined || missing === undefined) throw new Error("two rows");
+    const [shown, gone] = [body(visible(full)), body(visible(missing))];
+
+    // **The control first**: a row with values draws no dash.
+    expect(shown).not.toContain("—");
+    // Two marks — the number and the duration — and none in the name column.
+    expect([...gone].filter((c) => c === "—")).toHaveLength(2);
+    expect(gone.slice(0, 10).trim(), "a text column's empty cell stays blank").toBe("");
+    // **At the inline end**: each dash sits where its column's last character does.
+    expect(gone.indexOf("—"), "under the metric's last digit").toBe(shown.indexOf("0.0372") + 5);
+    expect(gone.lastIndexOf("—"), "under the age's last character").toBe(shown.indexOf("2m") + 1);
+
+    // **Muted**: the sequence opening the dash is the muted tone's.
+    const at = missing.indexOf("—");
+    const opener = missing.slice(0, at).match(/\x1b\[[0-9;]*m(?=[^\x1b]*$)/u)?.[0];
+    expect(opener).toBe(sgr(tone("muted", DARK_THEME, FULL_CAPS)));
+
+    const glyphRow = body(visible(kit(FULL_CAPS).renderToLines(block, atContent(40))[2] ?? ""));
+    expect(glyphRow, "a glyph-only cell keeps its glyph").toContain(glyphFor("warn", FULL_CAPS));
+    expect(glyphRow).not.toContain("—");
+
+    // At ASCII and at `wide` the mark is `-`, a dash and never a zero.
+    for (const caps of [ASCII_CAPS, DITHER_CAPS]) {
+      const row = body(visible(kit(caps).renderToLines(block, atContent(40))[1] ?? ""));
+      expect([...row].filter((c) => c === "-"), `${caps.unicode}/${caps.ambiguousWidth}`).toHaveLength(2);
+      expect(row).not.toContain("—");
+    }
+  });
+  it("T1.39 (C11 I30, R-COL-006): a trend cell's arrow takes its tone from the column's polarity", () => {
+    // §088 §4's three rows, and the three arms it does not draw: a neutral
+    // column, a reading that held, and a cell with no trend in a trend column.
+    const col = (key: string, polarity?: "higher" | "lower" | "neutral"): ColumnDef => ({
+      key, label: key, priority: 1, minWidth: 14, sortable: false, ...(polarity === undefined ? {} : { polarity }),
+    });
+    const metrics = {
+      kind: "table",
+      id: "m",
+      columns: [col("loss", "lower"), col("acc", "higher"), col("n")],
+      rows: [
+        { id: "a", cells: { loss: { text: "from 0.41", trend: { from: 0.41, to: 0.3 } }, acc: { text: "from 0.62", trend: { from: 0.62, to: 0.71 } }, n: { text: "from 3", trend: { from: 3, to: 5 } } } },
+        { id: "b", cells: { loss: { text: "from 0.04", trend: { from: 0.04, to: 0.09 } }, acc: { text: "from 0.5", trend: { from: 0.5, to: 0.5 } }, n: { text: "-" } } },
+      ],
+    } as unknown as Table;
+    const draw = (caps: TerminalCapabilities) =>
+      measurable({ capabilities: caps, definitions: [tableDefinition] }).renderToLines(metrics, atContent(60));
+    const [, good, bad] = draw(FULL_CAPS);
+    // The arrow is its own run, so it is found by character and occurrence, and
+    // the sequence that opens it is the one its tone resolved to.
+    const opener = (row: string, arrow: string, nth: number): string | undefined => {
+      let at = -1;
+      for (let i = 0; i <= nth; i += 1) at = row.indexOf(arrow, at + 1);
+      expect(at, `${arrow} #${String(nth)} is drawn`).toBeGreaterThanOrEqual(0);
+      return row.slice(0, at).match(/\x1b\[[0-9;]*m(?=[^\x1b]*$)/u)?.[0];
+    };
+    const ink = (name: "ok" | "error" | "default") => sgr(tone(name, DARK_THEME, FULL_CAPS));
+    expect(visible(good!)).toContain("\u2193 from 0.41");
+    expect(visible(good!)).toContain("\u2191 from 0.62");
+    // Lower is better and it fell: down, ok. Higher is better and it rose: up, ok.
+    expect(opener(good!, "\u2193", 0), "loss fell").toBe(ink("ok"));
+    expect(opener(good!, "\u2191", 0), "accuracy rose").toBe(ink("ok"));
+    // A neutral column draws the arrow in the cell's default tone.
+    expect(opener(good!, "\u2191", 1), "a neutral column").toBe(ink("default"));
+    // Lower is better and it rose: up, and **error** — the row §088 says a
+    // trend that always paints DOWN as ok gets wrong.
+    expect(visible(bad!)).toContain("\u2191 from 0.04");
+    expect(opener(bad!, "\u2191", 0), "loss rose").toBe(ink("error"));
+    // **A reading that held draws `→`, in the default tone** (question 37): no
+    // arrow is not *flat*, so a held reading and a missing one are two pictures.
+    expect(visible(bad!)).toContain("\u2192 from 0.5");
+    expect(opener(bad!, "\u2192", 0), "a reading that held").toBe(ink("default"));
+    // The control: the cell with no trend in the same row draws no mark at all —
+    // the text alone, where the flat mark would have stood.
+    const noTrend = visible(bad!).slice(visible(bad!).lastIndexOf("from 0.5") + "from 0.5".length);
+    expect(noTrend.trim(), "a cell with no trend is its text alone").toBe("-");
+
+    // **The shape carries the direction at every rung** (R-DEG-001): at 1-bit the
+    // arrows survive the tone, and at ASCII they are `^` and `V`.
+    const mono = draw(MONO_UNICODE_CAPS).map(visible);
+    expect(mono[1]).toContain("\u2193 from 0.41");
+    expect(mono[2]).toContain("\u2191 from 0.04");
+    expect(mono[2]).toContain("\u2192 from 0.5");
+    const ascii = draw(ASCII_CAPS).map(visible);
+    expect(ascii[1]).toContain("V from 0.41");
+    expect(ascii[1]).toContain("^ from 0.62");
+    expect(ascii[2]).toContain("= from 0.5");
+  });
+});
+
+describe("a number column is planned at its widest value (I31)", () => {
+  /** A text column that outranks a number column, both declared four cells wide. */
+  const ranked = (values: readonly string[]): Table => ({
+    kind: "table",
+    id: "whole",
+    columns: [
+      { key: "name", label: "name", priority: 2, minWidth: 4, sortable: false },
+      { key: "n", label: "n", priority: 1, minWidth: 4, sortable: false },
+    ],
+    rows: values.map((text, i) => ({ id: `r${String(i)}`, cells: { name: { text: "abcdefgh" }, n: { text } } })),
+    showHeader: false,
+  });
+  const rowsAt = (block: Table, width: number): readonly string[] =>
+    registry.renderToLines(block, atContent(width)).map((l) => body(visible(l)));
+
+  it("T1.40 (C11 I31, C11 I10, R-TBL-005): a number column is shown whole or dropped, never cut", () => {
+    const block = ranked(["41208", "88"]);
+
+    // **Room for five**: the column is planned at its widest value and `41208`
+    // is drawn whole. Bare, since five cells cannot afford the separator (I28).
+    const roomy = rowsAt(block, 4 + COLUMN_GAP + 5);
+    expect(roomy[0], "drawn whole").toContain("41208");
+    expect(roomy[0]).not.toContain("4120…");
+    // **The control is the text column beside it**: same `minWidth`, and it
+    // still truncates, which says the raise is by kind and not for every column.
+    expect(roomy[0], "a text column is cut as before").toContain("abc…");
+
+    // **Room for four**: the declaration fits and the value does not. Before
+    // I31 this drew `4120…` — a different number. Now the column is dropped.
+    const tight = rowsAt(block, 4 + COLUMN_GAP + 4);
+    expect(tight[0], "no digit survives: dropped, not cut").not.toMatch(/\d/u);
+    expect(tight[1]).not.toMatch(/\d/u);
+
+    // **A duration is a number by I27** and plans at its widest value too:
+    // `1h 12m` is six cells in a four-cell column.
+    const durations = ranked(["1h 12m", "3m"]);
+    expect(rowsAt(durations, 4 + COLUMN_GAP + 6)[0]).toContain("1h 12m");
+    expect(rowsAt(durations, 4 + COLUMN_GAP + 5)[0]).not.toMatch(/\d/u);
   });
 });

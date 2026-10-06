@@ -7,14 +7,14 @@
 import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
 import { cells, truncate, wrapCells } from "../../src/presentation/text.js";
-import { SUBSTITUTIONS } from "../../src/presentation/blocks/index.js";
+import { FREE_WIDTH_SLOTS, glyphs } from "../../src/presentation/blocks/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, QUIET, measurable, visible } from "../support/render.js";
 import { CORPUS } from "../support/blocks.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { renderToLines } from "../../src/presentation/render-lines.js";
+import { renderSequenceToLines, renderToLines } from "../../src/presentation/render-lines.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
@@ -45,21 +45,47 @@ describe("C09 tier 6", () => {
     expect(kit.measure(notice, 30), "97 cells over 28 columns is four rows").toBe(4);
   });
 
-  it("T6.2 (I5): changing the ASCII ellipsis to `...` → T2.5 and T3.4 fail", () => {
-    // The classic. `…` is one column and `...` is three, so a three-cell marker
-    // shifts every truncation point — for users with a non-UTF-8 locale, and
-    // nobody else, which is why it survives review.
+  it("T6.2 (I5): drawing the residue mark unpadded → T2.5 fails", () => {
+    // **This row used to say the opposite, and the design is why it changed.**
+    // It read *changing the ASCII ellipsis to `...` → T2.5 and T3.4 fail*, on
+    // the rule that every substitution is 1:1 by cell count. The design
+    // declares `ellipsis` with `ascii: "..."` and `reservedCells: 3`
+    // (R-GLY-003, §096), so the character the row forbade is the character the
+    // framework now draws — and an invariant that blocks the design is amended
+    // rather than cited.
+    //
+    // **What the old row protected survives, and it is the only part that was
+    // ever load-bearing**: a marker whose width changes with the alphabet
+    // shifts every truncation point behind it, for readers in a non-UTF-8
+    // locale and nobody else, which is why it survives review. A declared slot
+    // keeps that; a 1:1 character was one way of getting it.
     expect(cells("…")).toBe(1);
     expect(cells("~")).toBe(1);
     expect(cells("...")).toBe(3);
 
+    // The truncation marker is a different slot and is untouched — `~` is C04
+    // §5's, not `residue`'s, and the two were only ever the same character by
+    // coincidence of both being one cell.
     const line = "y".repeat(80);
     expect(cells(truncate(line, 20, ASCII))).toBe(20);
     expect(truncate(line, 20, ASCII).endsWith("~")).toBe(true);
 
-    for (const [unicode, ascii] of SUBSTITUTIONS) {
-      expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
-    }
+    // **The revert, and the thing that makes it a revert**: the residue mark
+    // is three different widths at three rungs, which is exactly why it is
+    // declared a free-width slot rather than padded into a column. Dropping it
+    // from `FREE_WIDTH_SLOTS` makes T2.5's fixed-column loop see it and fail.
+    const rungs = [
+      { unicode: "full", ambiguousWidth: "narrow" },
+      { unicode: "full", ambiguousWidth: "wide" },
+      { unicode: "ascii", ambiguousWidth: "narrow" },
+    ] as const;
+    expect(FREE_WIDTH_SLOTS.has("residue"), "the exemption is declared").toBe(true);
+
+    const unpadded = rungs.map((caps) => cells(glyphs(caps).residue, caps.ambiguousWidth));
+    expect(
+      new Set(unpadded).size,
+      `the revert — the bare mark is ${unpadded.join(", ")} cells, so the column moves with the alphabet`,
+    ).toBeGreaterThan(1);
   });
 
   it("T6.3 (I6): using `.length` for display width → T2.9 fails, and CJK misaligns", () => {
@@ -379,3 +405,71 @@ describe("C09 §2c width — fail-on-revert", () => {
       "and the child whole is what the box used to paint",
     ).toBe(30);
   });
+
+describe("C09 I133–I136 — tier 6 (review batch 4)", () => {
+  /** The last cluster of a rendered notice's text and the SGR before it, read by grapheme. */
+  const streamed = (text: string): { frame: string; headSgr: string } => {
+    const line = measurable({ capabilities: FULL_CAPS }).renderToLines(
+      block({ kind: "notice", id: "n", tone: "default", text, streaming: true, trail: "hotEdge" } as never),
+      40,
+    )[0]!;
+    const at = line.lastIndexOf(text.slice(-1));
+    const sgrs = line.slice(0, at).match(/\u001b\[[0-9;]*m/gu) ?? [];
+    return { frame: visible(line), headSgr: sgrs.at(-1) ?? "" };
+  };
+
+  it("T6.184 (C09 I133): hotEdge without its overshoot → T1.150 fails at the head", () => {
+    // **The plain gradient's head is the accent** (#e8a87c); the overshoot's is
+    // every channel ×1.35 clamped (#ffe3a7). Drawing hotEdge without the stop
+    // puts the first where T1.150 asserts the second.
+    const { headSgr } = streamed("abcdefghijklmnopqrstu");
+    expect(headSgr, "the head is the lifted accent").toContain("38;2;255;227;167");
+    expect(headSgr, "and not the plain accent").not.toContain("38;2;232;168;124");
+  });
+
+  it("T6.185 (C09 I134): the band walk by code unit → T3.129 fails on the dropped mark", () => {
+    // **A zero-width mark is a step of its own to a code-unit walk**: it stops
+    // between `k` and U+0301, and the cut split the cluster out of the frame.
+    // The grapheme walk keeps it — T3.129's first row.
+    const text = "abcdefghijk\u0301lmnopqrstuvwxy";
+    expect(streamed(text).frame, "the combining mark is in the frame").toContain("k\u0301");
+    // **And `of` in code points** put a five-code-point family's head at 12/17
+    // of the way up: the cluster count is what reaches `t = 1`.
+    const family = "abcdefghijklmnop\u{1F468}\u200D\u{1F469}\u200D\u{1F467}";
+    expect([...family.slice(-8)].length, "five code points, one cluster").toBe(5);
+    expect(streamed(family).headSgr, "the family is the head").toContain("38;2;255;227;167");
+  });
+  it("T6.186 (C09 I135): the crop removed → T3.76 and T3.130 fail", () => {
+    // **What the kept-whole arm drew, from its parts**: at offset 1 the first
+    // notice is cut (its second row only) and the second is whole, so a box
+    // keeping the cut one whole paints 2 + 2 interior rows and the residue — 5
+    // against a measure of 4, with a notice's row where the residue belongs.
+    const kit = measurable({ capabilities: FULL_CAPS });
+    const notice = (i: number) => ({ kind: "notice", id: `n${String(i)}`, tone: "info", text: "n".repeat(76) });
+    const box = block({ kind: "scroll", id: "f1334", height: 3, children: [0, 1, 2].map(notice) } as never);
+    const childRows = kit.registry.measure(block(notice(0) as never), 74);
+    expect(childRows, "each notice is two rows at the content width").toBe(2);
+    expect(kit.registry.windowChild(block(notice(0) as never), 74, 1, 2), "and refuses the slice").toBeNull();
+    const kept = childRows + childRows + 1;
+    const lines = renderSequenceToLines(kit.registry, [box], 75, {
+      theme: DARK_THEME,
+      capabilities: FULL_CAPS,
+      focus: null,
+      scrollOffsets: { f1334: 1 },
+    }).map((l) => visible(l).trimEnd());
+    expect(kept, "the kept-whole count").toBe(5);
+    expect(lines.length, "the crop paints the measure").toBe(kit.registry.measure(box, 75));
+    expect(lines.at(-1), "with the residue last").toMatch(/1 above, 2 below/u);
+  });
+  it("T6.187 (C09 I136): segmented mapped back to slant → T2.226 fails", () => {
+    // **Two reverts, each against the row that names it**: `segmented` drawing
+    // `▰` rather than `▮`, and the braille steps dropped, which draws a bar at
+    // 1/8 of a cell as a blank where T2.227 wants `⡀`.
+    const row = (spec: Record<string, unknown>, width = 40) =>
+      visible(measurable({ capabilities: FULL_CAPS }).renderToLines(block({ kind: "progress", id: "m", label: "", ...spec } as never), width).join(""));
+    const segmented = row({ granularity: "segmented", current: 6, total: 10 });
+    expect(segmented, "posts").toContain("▮");
+    expect(segmented, "and not slant").not.toContain("▰");
+    expect(row({ style: "braille", current: 1, total: 8 }, 1 + 1 + 3)[0], "one eighth of one cell").toBe("⡀");
+  });
+});

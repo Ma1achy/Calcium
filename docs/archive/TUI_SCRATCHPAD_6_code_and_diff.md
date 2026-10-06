@@ -97,7 +97,7 @@ consequences.
 ▌   20  20        matchLabels:
 ▌   21          -   app: volatility-estimator
 ▌       21    +   app: volatility-estimator
-▌       22    +   prism.fmx.io/family: volatility
+▌       22    +   prism.example.com/family: volatility
 ▌   22  23      replicas: 2
 ▌   23  24      template:
 ▌
@@ -182,7 +182,7 @@ No `expanded` flag on `Hunk` — expansion *is* the rewrite.
 ▌   19      selector:                    │  19      selector:
 ▌   20        matchLabels:               │  20        matchLabels:
 ▌   21 -       app: volatility-estimator │  21 +       app: volatility-estimator
-▌                                        │  22 +       prism.fmx.io/family: …
+▌                                        │  22 +       prism.example.com/family: …
 ▌   22      replicas: 2                  │  23      replicas: 2
 ```
 

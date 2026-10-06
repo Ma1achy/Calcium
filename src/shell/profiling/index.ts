@@ -2,7 +2,7 @@
  * C28 — the profiler's **published** face. See `docs/components/C28_profiler.md`.
  *
  * **Types, the tier ordering, and nothing that runs** (C24 I31). This module is
- * what `@fmx/calcium/profiling` resolves to, and a consumer imports it to
+ * what `calcium-tui/profiling` resolves to, and a consumer imports it to
  * *read* a report: everything that produces one is reached through `createTui`'s
  * `profile` field, so an entry point shipping a recorder would be a second way
  * in (→ C22 I93).

@@ -13,7 +13,7 @@ import { rows } from "../../src/presentation/blocks/paint.js";
 import { renderToLines } from "../../src/presentation/render-lines.js";
 import { normaliseRow, placeRows } from "../../src/presentation/rows.js";
 import { TEST_KINDS } from "../support/lifted.js";
-import { DARK_THEME, FULL_CAPS, registry } from "../support/render.js";
+import { ORACLE_THEME, FULL_CAPS, registry } from "../support/render.js";
 import { InkOracle, oracleName } from "../support/ink-oracle.js";
 
 const oracle = new InkOracle("edge-rows");
@@ -61,7 +61,7 @@ describe("C09 I72 — rows at the edges", () => {
     // asserted to give the same `[""]`. It went with the arm (F1209), and what
     // it proved is the floor's alone now.
     const r = registry([empty]);
-    const options = { theme: DARK_THEME, capabilities: FULL_CAPS };
+    const options = { theme: ORACLE_THEME, capabilities: FULL_CAPS };
     expect(renderToLines(r, { kind: "empty-rows", id: "e" } as unknown as Block, 20, options)).toEqual([""]);
   });
   it("T3.89 (C09 I73, F1209): a row group whose fixed share exceeds its width cuts the child at the group's edge; a row group with a short child is the tallest child's height with the short cell blank below, and a panel whose body answers more rows than measured extends below the rails — each equal to the capture Ink wrote", () => {
@@ -71,7 +71,7 @@ describe("C09 I72 — rows at the edges", () => {
       const expected = oracle.frozen(oracleName(`${b.kind}-${b.id}`, "full", width));
       const names: string[] = [];
       const probe: Probe = { ...NO_PROBE, on: true, span: (name: string) => { names.push(name); return NO_SPAN; } };
-      const got = renderToLines(r, b, width, { theme: DARK_THEME, capabilities: FULL_CAPS, probe });
+      const got = renderToLines(r, b, width, { theme: ORACLE_THEME, capabilities: FULL_CAPS, probe });
       return { got, expected, names };
     };
     // **This row opened with an element child** — a `lifted` block wrapping

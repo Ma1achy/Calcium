@@ -9,14 +9,16 @@
  * hand-maintained list is the one that reads as authoritative.
  *
  * **Two entries by kind, and that is the whole population of kinds.** `status`
- * animates unconditionally (C09 I32) and `steps` draws a spinner frame while a
- * step is active. A block also animates **by content** — a span or a bar whose
+ * draws unconditionally and asks for a tick while its activity line draws
+ * (C09 I32, ruling 106 c), and `steps` draws a spinner frame while a step is
+ * active. A block also animates **by content** — a span or a bar whose
  * ramp carries an `animate` (C09 I54) — and `tickIntervalOf` answers for both;
  * this record stays what it was, the kinds that animate by nature.
  */
-import { spinnerIntervalMs } from "./glyphs.js";
-import { animatesByContent, rampCadenceMs } from "./ramp.js";
-import type { Block, BlockKind, KnownBlockKind, Status } from "../../data/viewmodel/index.js";
+import { spinnerIntervalMs, type GlyphCaps } from "./glyphs.js";
+import { activityLine } from "./kinds/status.js";
+import { animatesByContent, rampCadenceMs, type TickAt } from "./ramp.js";
+import type { Block, BlockKind, KnownBlockKind, Notice, Status } from "../../data/viewmodel/index.js";
 
 // **`KnownBlockKind` and not `BlockKind`** (C04 I119): the union is open and
 // this table is the framework's own. Keyed on the open union it would demand
@@ -26,6 +28,10 @@ export const ANIMATES: Readonly<Record<KnownBlockKind, boolean>> = Object.freeze
   comparison: false,
   events: false,
   group: false,
+  // A split draws its panes; a pane that animates ticks through the walk
+  // below, which reaches it by `children` (C04 §3aq).
+  split: false,
+  form: false,
   keyValue: false,
   image: false,
   // A terminal redraws when the child writes, on C23's stream cadence, not on a
@@ -37,6 +43,10 @@ export const ANIMATES: Readonly<Record<KnownBlockKind, boolean>> = Object.freeze
   panel: false,
   patch: false,
   pills: false,
+  // §018's shapes animate nothing: chosen is a mark and focus is a ground,
+  // and neither is a thing that moves (C09 I105, I106).
+  choice: false,
+  control: false,
   plot: false,
   progress: false,
   raw: false,
@@ -44,6 +54,13 @@ export const ANIMATES: Readonly<Record<KnownBlockKind, boolean>> = Object.freeze
   scroll: false,
   status: true,
   steps: true,
+  // A running member draws the spinner in its duration slot (§030), which is
+  // the same fact `steps` animates for — the window itself never moves on a
+  // tick, only when the current leaves it (C04 I124).
+  tape: true,
+  // A tree has no clock and no spinner: its rows change when a flag does,
+  // which is a patch and a frame, never a tick (C04 I129).
+  tree: false,
   table: false,
   tip: false,
 });
@@ -64,19 +81,45 @@ function childrenOf(block: Block): readonly Block[] {
  *
  * Driven by `ANIMATES` rather than by a second list, so the two cannot disagree
  * about which kinds are in scope.
+ *
+ * **`at` is where the ticker is asking** (C09 I120): given the session's tick and
+ * the region's width, a one-shot that has run its course asks for nothing, so a
+ * transcript whose only motion was a finished `pop` disarms. Without it the
+ * answer is I54's — a caller with no tick cannot know an effect has ended.
  */
-export function tickIntervalOf(block: Block): number | null {
+export function tickIntervalOf(
+  block: Block,
+  at?: TickAt,
+  caps?: GlyphCaps,
+): number | null {
   // **Read through a widening cast, for the reason `rampExtentOf` states**
   // (C04 I119): the declaration is the exhaustiveness assertion and the read is
   // total. `=== true` was already the right comparison — an app's kind answers
   // `undefined` and is not animated by nature.
   if ((ANIMATES as Readonly<Partial<Record<BlockKind, boolean>>>)[block.kind] === true) {
-    return block.kind === "status" ? spinnerIntervalMs((block as Status).spinner) : spinnerIntervalMs();
+    // **At the rung the frames are drawn at** (C09 I112, question 40): given the
+    // capabilities, a set's ASCII rung asks for its one cadence, so a set slower
+    // than it is woken at the rate its ASCII frames turn.
+    if (block.kind !== "status") return spinnerIntervalMs(undefined, caps);
+    // **A status asks only while its line moves** (C09 I32, ruling 106 c,
+    // F1526). The drawing stays state-independent; the wake does not, because
+    // a settled `error` box drew the same bytes every tick and the session
+    // still woke at the set's cadence to find that out. `activityLine` is the
+    // renderer's own answer — `loading`, and `retrying` with a countdown — so
+    // this is not a second list of the states that move.
+    const status = block as Status;
+    return activityLine(status, "") === "" ? null : spinnerIntervalMs(status.spinner, caps);
   }
+  // **A streaming notice animates by nature too, and did not** (C09 I101,
+  // §026). `ANIMATES` says `notice: false` and `animatesByContent` reads a
+  // *span's* ramp — the trail's is derived at render from `streaming` and never
+  // reaches a span — so neither carrier has ever asked C03 for a tick. The set
+  // is named, because the cadence has to be the mark's own.
+  if (block.kind === "notice" && (block as Notice).streaming === true) return spinnerIntervalMs("agent", caps);
   // By content (C09 I54): a moving ramp asks for the default set's cadence
   // through the lookup the kinds use; its periods are counted in the ticks C03
   // then delivers.
-  return animatesByContent(block) ? rampCadenceMs() : null;
+  return animatesByContent(block, at) ? rampCadenceMs() : null;
 }
 
 /**
@@ -86,10 +129,14 @@ export function tickIntervalOf(block: Block): number | null {
  * is exactly where a live part puts one — a scan of the top level only would
  * answer *nothing animates* for the arrangement the framework itself builds.
  */
-export function animationIntervalOf(blocks: readonly Block[]): number | null {
+export function animationIntervalOf(
+  blocks: readonly Block[],
+  at?: TickAt,
+  caps?: GlyphCaps,
+): number | null {
   let fastest: number | null = null;
   const visit = (block: Block): void => {
-    const own = tickIntervalOf(block);
+    const own = tickIntervalOf(block, at, caps);
     if (own !== null && (fastest === null || own < fastest)) fastest = own;
     for (const child of childrenOf(block)) visit(child);
   };

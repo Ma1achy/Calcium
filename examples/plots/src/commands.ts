@@ -13,14 +13,14 @@
  * returns blocks and touches no clock, no session and no terminal, which is
  * what makes `everyDocument()` in the suite able to validate all of them.
  */
-import { b, barStyleNames, CARDS, halfBlockEligible, profileCard, SECTIONS, spinnerSetNames } from "@fmx/calcium";
+import { b, barStyleNames, CARDS, halfBlockEligible, profileCard, SECTIONS, spinnerSetNames } from "calcium-tui";
 import type {
   AdapterDocument,
   Block,
   ProfileReport,
   TerminalCapabilities,
   ViewDocument,
-} from "@fmx/calcium";
+} from "calcium-tui";
 import os from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1024,7 +1024,7 @@ export function barStyles(): Block {
  * ask for a profiler sees, and it is the arm a document test can construct. The
  * present arm needs a live session — `ProfileReport` is reachable only through
  * `ctx.profile()`, with no constructor on the public surface or in
- * `@fmx/calcium/testing` (F917) — and `profileCard` itself is covered across
+ * `calcium-tui/testing` (F917) — and `profileCard` itself is covered across
  * every card by the framework's own `test/unit/profile-deck.test.ts`.
  *
  * **A card and not a section**, which is what the deck made of this: `argv[0]`

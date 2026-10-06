@@ -29,6 +29,8 @@ const runsOf = parseLine as (l: string) => readonly { text: string; colour: stri
 
 /** `Down` on the wire, in both the forms a terminal sends. */
 const DOWN = "\u001b[B";
+/** `←` — the inside's orbit key (§102, C16 I28). */
+const LEFT = "\u001b[D";
 
 /** One revolution in twelve seconds, in radians per millisecond — session.ts's ORBIT_RATE. */
 const RATE = (2 * Math.PI) / 12_000;
@@ -116,6 +118,12 @@ async function session(
   // declares one exactly when it declares a camera (C12 I85).
   await type(DOWN);
   await type(DOWN);
+  // **And `\r` enters the plot** (C26 I26, §102: *focused — the way IN — ⏎
+  // enter*). Every camera key moved to `interaction` with `R-INT-005`: a camera
+  // nudged from `liveBlock` is a domain value committed from outside, which is
+  // the one thing §018 forbids. The plot declares `viewState`, so `⏎` enters
+  // rather than dispatching an action.
+  await type("\r");
   return { ...built, type };
 }
 
@@ -310,6 +318,60 @@ describe("C22 §6i — the ticker is the second writer", () => {
     }
   });
 
+  it("T4.17v (C22 I74, C09 I112): the counter is elapsed time over 80 ms, whatever the wake", async () => {
+    vi.useFakeTimers();
+    try {
+      const SPAN = 1200;
+      // A streaming notice draws the `agent` mark, a 120 ms set, and nothing
+      // else on screen animates — so the wake is armed at 120.
+      const HEAD = { kind: "notice", id: "n", tone: "default", text: "streaming", streaming: true };
+
+      const a = watching();
+      const ba = await session(a.definition, [{ kind: "count", id: "c" }, HEAD]);
+      const a0 = a.ticks().at(-1) ?? 0;
+      await pass(ba, SPAN);
+
+      // **The control: a braille spinner beside it**, whose 80 ms wake is the
+      // unit — so the two arms agree only if the counter is time and not wakes.
+      const b = watching();
+      const bb = await session(b.definition, [{ kind: "count", id: "c" }, HEAD, SPINNER]);
+      const b0 = b.ticks().at(-1) ?? 0;
+      await pass(bb, SPAN);
+
+      expect((b.ticks().at(-1) ?? 0) - b0, "beside an 80 ms spinner").toBe(SPAN / 80);
+      expect((a.ticks().at(-1) ?? 0) - a0, "and with the 120 ms mark alone").toBe(SPAN / 80);
+
+      // **The wake is the rung's, given the capabilities** (C09 I112, question
+      // 40). A `toggle` status turns every 400 ms at the Unicode rung and every
+      // 120 at ASCII, so the session must ask for 120 there — a wake armed at
+      // the set's own 400 samples its ASCII frames at a third of their rate.
+      // **Counted in frames written**, T4.17u's measure: I103 keeps a block that
+      // does not animate out of a tick's render, so the watcher's renders read
+      // one whatever the ticker does.
+      const TOGGLE = { kind: "status", id: "t", state: "loading", message: "waiting", height: 1, spinner: "toggle" };
+      const SYNC_BRACKETS = new Set(["\u001b[?2026h", "\u001b[?2026l"]);
+      const written = async (unicode: "full" | "ascii"): Promise<number> => {
+        const w = watching();
+        const built = await session(w.definition, [{ kind: "count", id: "c" }, TOGGLE], {
+          capabilities: { unicode, synchronisedUpdate: true },
+        });
+        const before = built.stdout.chunks.length;
+        await wake(built, SPAN);
+        return built.stdout.chunks.slice(before).filter((c) => !SYNC_BRACKETS.has(c)).length;
+      };
+      const unicode = await written("full");
+      const ascii = await written("ascii");
+      // Measured on landing: 2 and 14, and 2 and 2 with the session's
+      // capabilities dropped from the cadence it asks for. The bounds are the
+      // arithmetic — three 400 ms steps, ten 120 ms ones — with the room a
+      // write count needs, since a frame can be more than one chunk.
+      expect(unicode, "a toggle at the Unicode rung wakes at its own 400 ms").toBeLessThanOrEqual(3);
+      expect(ascii, "and at ASCII at the rung's 120").toBeGreaterThanOrEqual(9);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("T4.17j (C22 I73): a live orbit draws at the stream rate and a spinner at the spinner's", async () => {
     vi.useFakeTimers();
     try {
@@ -449,7 +511,7 @@ describe("C22 §6i — the cache, and the manual family", () => {
     await built.type("x");
     expect(renders, "a frame with nothing moved is served from the cache").toBe(settled);
 
-    await built.type("[");
+    await built.type(LEFT); // §102: `←→ orbit`, and the brackets retired with `liveBlock`
     const afterNudge = renders;
     expect(afterNudge, "a camera that moved is a miss").toBeGreaterThan(settled);
 
@@ -495,7 +557,7 @@ describe("C22 §6i — the cache, and the manual family", () => {
       { kind: "panel", id: "pan", title: "inside", children: [plot("deep")] },
     ]);
 
-    await built.type("[");
+    await built.type(LEFT); // §102: `←→ orbit`, and the brackets retired with `liveBlock`
     const cam = w.cameras().at(-1)?.deep;
     expect(cam, "the nested plot's camera reached the renderer").toBeDefined();
     expect(cam?.azimuth ?? 0, "and the key turned it").toBeCloseTo(-Math.PI / 8, 9);

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L0 data |
 | **Depends on** | Nothing. Pure types and pure functions |
 | **Consumed by** | C07 adapters (produce documents) · C09 blocks (implement measure and render) · C13 transcript (holds documents, applies patches) · C14 viewport (reads measured heights) · every surface spec |
@@ -44,7 +44,17 @@ type ViewDocument = Readonly<{
     stderr:     string;               // usually empty
     transport:  "emulated" | "fixture" | "subprocess" | "local";
     origin:     "user" | "action" | "agent" | "refresh" | "defect";
+    echo?:      readonly EchoChip[];  // the submitted line's chips, ranges into `command` (I152)
   }>;
+}>;
+
+type EchoChip = Readonly<{
+  from:     number;                   // code units into `command`, [from, to), sorted, disjoint
+  to:       number;
+  ordinal:  number;
+  kind:     ChipKind;                 // "paste" | "file" | "image"
+  name:     string;
+  lines?:   number;
 }>;
 ```
 
@@ -55,6 +65,14 @@ type ViewDocument = Readonly<{
 `argv`, `stderr` and `transport` answer the question a rendered block cannot: *did the far side return something unexpected, or did the adapter mishandle it?* They live in `meta` rather than in a block because a block is content and the invocation is *about* the document — in `meta` it is uniformly available to any inspector, including one an app writes. C23 renders them through `/debug`.
 
 **`origin` is not a debugging field, and it is required.** It is what makes a transcript legible once more than one thing is putting entries into it. Shipped optional it would be unset, then unreliable, and the first agent feature is the one that needs to trust it — so it is always present, always set by C23 (`user` for a typed submission, `action` for an exec action, `refresh` for a time-driven tick, `defect` for a failure the framework contained and is reporting, `agent` reserved). A string now costs less than a schema migration later.
+
+**`echo` is the shell's record of the chips a submitted line held** (I152, ruling 104 c, F1521).
+A chip is one character in the prompt standing for a block of content (C17 §5c); the line C23
+hands the far side has each chip's content in its place, and `command` states that line. `echo`
+says where each chip stood: a code-unit range of `command` covering exactly the content, with the
+parts C17 composes a label from. The content is `command.slice(from, to)` and is not carried
+twice. Shell-owned, as `origin` is — `ProducedMeta` refuses it, so a producer cannot draw a chip
+into an echo — and absent on every document whose line held none. C22 draws it (C22 I153).
 
 `partial` exists for streaming documents that have not finished. **A partial document is renderable at every point in its life** — there is no assembly state in which it cannot be drawn.
 
@@ -96,14 +114,17 @@ type Rule     = Readonly<{ kind: "rule"; id: string; label: string;
 type Notice   = Readonly<{ kind: "notice"; id: string; tone: Tone; glyph?: Glyph; text: string;
                            action?: Action }> & Gap;   // one button, the whole notice (arc 6 §5)
 type KeyValue = Readonly<{ kind: "keyValue"; id: string;
-                           rows: readonly Readonly<{ label: string; value: string; tone?: Tone }>[] }> & Gap;
+                           rows: readonly Readonly<{ label: string; value: string; tone?: Tone }>[];
+                           expanded?: boolean }> & Gap;   // the shed parts drawn under each row — C09 I124
 type Steps    = Readonly<{ kind: "steps"; id: string;
                            steps: readonly Readonly<{ label: string; detail?: string;
-                             state: "pending" | "active" | "done" | "failed" }>[] }> & Gap;
+                             state: "pending" | "active" | "done" | "failed" }>[];
+                           expanded?: boolean }> & Gap;   // C09 I124
 type Logs     = Readonly<{ kind: "logs"; id: string;
                            lines: readonly Readonly<{ ts: string; level: string; message: string }>[] }> & Gap;
 type Events   = Readonly<{ kind: "events"; id: string;
-                           events: readonly Readonly<{ ts: string; type: string; message: string }>[] }> & Gap;
+                           events: readonly Readonly<{ ts: string; type: string; message: string }>[];
+                           expanded?: boolean }> & Gap;   // C09 I124
 type Progress = Readonly<{ kind: "progress"; id: string; label: string;
                            current: number; total: number; ramp?: Ramp }> & Gap;   // `ramp`: §3am.2
 type Code     = Readonly<{ kind: "code"; id: string; language: string; text: string;
@@ -112,12 +133,15 @@ type Code     = Readonly<{ kind: "code"; id: string; language: string; text: str
                            // view state: source lines `[from, to)` a window keeps (§3d, I82)
 type Comparison = Readonly<{ kind: "comparison"; id: string;
                            rows: readonly Readonly<{ field: string; a: string; b: string;
-                             comparison?: "same" | "better" | "worse" | "changed" }>[] }> & Gap;
+                             comparison?: "same" | "better" | "worse" | "changed" }>[];
+                           expanded?: boolean }> & Gap;   // C09 I124
 type Patch    = Readonly<{ kind: "patch"; id: string;
                            path: string;               // the file, for the header
                            language: string;           // syntax palette, per hunk line
                            hunks: readonly Hunk[];
                            collapsedAfter?: number;
+                           cap?: number;               // the collapsed form's row budget, the producer's (C25 I14, D12)
+                           expanded?: boolean;         // the cap set aside — C25 I11, I14, D13
   /** The gutter width, pinned when this block is a window of a larger one (C25 I21a). */
   numberWidth?: number;    // elided below the last hunk
                            actions?: readonly Action[];
@@ -232,7 +256,7 @@ type BarSpec = Readonly<{
 | `logs` | lines with ts, level, message | lines — never wrapped, truncated with `…` |
 | `events` | ts, type, message | events |
 | `plot` | series, axis labels, `line \| sparkline` | `sparkline` → 1; `line` → declared `height`, or `height + 2` with `axes: true` (C12 §3) |
-| `progress` | label, current, total | 1 |
+| `progress` | label, current, total | 1 — or **0** once a declared `progress` or `count` is finished (I145) |
 | `code` | language, text, `wrap`; `lineRange` (view state, §3d) | lines when truncating; `Σ ceil(len / w)` when wrapping — over the lines in `lineRange` when a window set one |
 | `comparison` | field / a / b rows | rows + header |
 | `patch` | path, language, hunks, optional `layout` | 1 header + `Σ` over hunks of (1 hunk header + lines + 1 per collapsed region) |
@@ -714,6 +738,7 @@ type Cell = Readonly<{
   glyph?: Glyph;                      // leading status glyph — a slot, never a character
   spark?: readonly (number | null)[]; // inline sparkline; `null` is a gap (I46a)
   bar?:   BarSpec;                    // a quantity against a scale (I50c, C12 I20)
+  trend?: Readonly<{ from: number; to: number }>; // a movement between two readings (I128)
 }>;
 
 type Table = Readonly<{
@@ -724,6 +749,7 @@ type Table = Readonly<{
   sort?:         Readonly<{ key: string; direction: "asc" | "desc" }>;
   showHeader?:   boolean;                // default true
   emptyMessage?: string;
+  current?:      string;                 // the row a chooser is on: an id, never an index (I150)
 }> & Gap;
 
 type ColumnDef = Readonly<{
@@ -737,6 +763,7 @@ type ColumnDef = Readonly<{
   sortable:  boolean;
   role?:     "expand";                // C11 fills the cell; not view state (I32)
   truncateFrom?: "start" | "end";     // default "end" — keeps the start (I30)
+  vocabulary?: readonly string[];     // a closed set of words; the cells are drawn from it (I6, ruling 44)
 }>;
 
 type TableRow = Readonly<{
@@ -753,9 +780,13 @@ type MergeRow = Omit<TableRow, "expanded">;
 
 `showHeader: false` gives a headerless list with per-row actions — the shape small lists need, without inventing a block type for it. `detail` being `Block[]` is what lets an expanded run row reveal a plot, a progress bar and a set of actions, composed from the same vocabulary rather than a bespoke detail renderer.
 
+**`current` names the row a chooser is on, and it is the table's `active`** (I150, C11 I33, C19 I29, §097, ruling 89). A chip carries `active` and a tape carries `current`; a table had neither, so the completion menu marked its selection with a cell glyph, and a glyph is all a cell can carry. §097 draws the current candidate with `›`, the `pick` ground and its ink across the row, and the label in bold, and a ground across a row is C11's to paint (C11 §5c). **An id, never an index**, on the tape's argument (I124): rows arrive and sort, and an index names a different row the moment one is inserted before it. **An id naming no row is valid and draws no mark**, and it is the field's *presence* that reserves the mark's cells on every row, so a chooser whose current has scrolled out of a window keeps its labels where they were. **Not view state in §4's sense**: nothing a reader does to the table writes it, and it changes no height and no width (C11 I33). It is written by the block's own producer, as `active` is, and C19's menu is the one writer today. C19 §6 once refused a `selected` field on `TableRow` as view state beside `expanded`; that refusal stands for the row, and this is a block's declaration about which of its rows its producer is on.
+
 **`role: "expand"` names the column C11 fills.** Every surface with an expandable table already declares an `expand` column of `minWidth` 1 whose content is drawn by C11 rather than supplied as data, and its cell is inside those surfaces' width arithmetic — so it must stay an ordinary column for planning while being extraordinary for content. The role is how a renderer recognises it. Two alternatives were rejected: a reserved `key === "expand"`, which puts a magic string in a generic engine and silently eats a far side's field of that name; and a gutter reserved by C11, which would move every drop total the S-series states. The role is declared by the surface, is not view state, and is not carried by `merge` any differently from the rest of `columns` — `expanded` remains the only view state on a table row (I9, I18). C11 I15 holds the other half: planning never reads it.
 
 **`truncateFrom` names the end characters are removed from, not the end that survives.** `"end"` removes from the end and keeps the start, which is what prose wants and is the default; `"start"` keeps the tail, which is what paths, hierarchical keys and hash-suffixed names want. The naming matters more than it looks: `truncate: "head" | "tail"` and `keep:` both invite the reader to guess which side is being described, and this is a field somebody sets once per column and never revisits — so it is named for the operation, in the direction the operation runs.
+
+**`vocabulary` declares that a column's cells are words from a closed set, and it is what lets a word carry a tone without a glyph** (I6, ruling 44). §075's source column is the case: `default`, `config`, `env`, `flag`, toned by a ladder whose two loud rungs are `warn` and `error`. The word **is** the fact — `flag` says *this invocation chose it* — so the tone is its second carrier and colour is not alone, which is D29's whole concern; tie-break 4 counts carriers per fact, and I6 as first written counted them per effect. **Declared on the column, never inferred from the text**: a free-text cell cannot say whether its text is a label or the fact, and a rule that looked at the text would let any cell opt itself out by spelling. So the set is named once, every cell in the column is refused unless its text is a member, and only then is the glyph optional. A column without the field is held to I6 exactly as before, and a `Notice` has no column and no exemption.
 
 Nine places in the S-series state a truncation side in prose. **Four of them are table columns and the rest are not** — `keyValue` values in S04, S08 and S15, `steps` detail in S10, `logs` lines in S11 — so this field expresses less than half the intent that exists.
 
@@ -804,13 +835,67 @@ The constraint is indirection, not scarcity. Three things depend on it and none 
 
 ```typescript
 type Glyph =
+  | "question" | "current"  // C09 I88 — a question's mark, and the current item in a row you navigate
   | "ok" | "warn" | "error" | "info"
-  | "pending" | "working" | "running" | "queued" | "cancelled"
-  | "expand" | "collapse" | "live" | "bullet"
+  | "pending" | "working" | "work-unit" | "queued" | "cancelled"
+  | "expand" | "collapse" | "focus" | "bullet"
   | "quote" | "nested"      // §3an — a rail, and the mark past the depth cap
-  | "continuation"
-  | "step";                 // a call's head — C09 §4, `⬤` U+2B24 over `*`
+  | "continuation";
 ```
+
+**`work-unit` is the registry's id for `●` / `*`, and it was `running`** (R-GLY-003, question
+57). The slot and `CallState`'s `running` shared one word for two things — a mark, and the
+state of a call that draws it — so `CALL_HEAD_GLYPH.running` read `running: "running"`, and a
+reader could not tell which side of the map a `"running"` was on. The slot takes the registry's
+name and `CallState` keeps its own. It is the first hyphenated token, so it is written quoted
+wherever it is a key, and the tools that read `glyphs.ts` as text read a quoted key (A03 SS64).
+**The union above is the tree's**, `question` and `current` included; this block had fallen
+behind it by those two, which C09 I88 added.
+
+**`step` is not in it, and its absence is a ruling rather than an omission** (C09 I45,
+R-BLK-125, §030). It held one character — `⏺` U+23FA with its text selector — for a
+position whose whole point is that it changes. The design draws `●` for **every** call
+state and lets tone say which; at 1 bit and in ASCII tone is gone and the shape has to
+carry it, so each state takes its own mark. That is a question about the terminal, and a
+producer composing a call head has never seen one. So a call head carries `state` beside
+its `glyph`, and the renderer resolves the character:
+
+```typescript
+type CallState = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+// on Notice:
+  state?: CallState;        // present ⇒ this notice is a call's head (C09 I45)
+```
+
+`glyph` stays the answer for the rung where tone carries — `work-unit`, and `queued` for a
+queued call, which is hollow at every rung (R-BLK-220) — so `measure` reads one field and is
+right at every rung, since every candidate is one cell with no indent.
+
+**And the tone is the state's, not the producer's** (I141, R-BLK-214). Above 1 bit the dot
+is one character and the tone is the only thing saying which state it is in, so a tone
+chosen independently of the state is a head that draws the same for all five — which is
+what shipped: `callHead` wrote `tone: "info"` for every state, and a failed call was a blue
+`●` beside a succeeded one. The map is exhaustive over `CallState` and lives here, beside
+the union, because the validator and every builder read it:
+
+```typescript
+const CALL_STATE_TONE: Readonly<Record<CallState, Tone>> = {
+  queued: "muted",      // ○ hollow, muted, still
+  running: "default",   // white, still — the duration spinner is the liveness
+  succeeded: "ok",
+  failed: "error",
+  cancelled: "muted",   // it did not finish, which is not a failure
+};
+```
+
+R-BLK-214's table has two rows this union does not: *the agent said something* is prose and
+has no state, so it is not a call head at all; *blocked on you* (`warn`, blinking) is a call
+waiting on a question, and it has no member because nothing in the tree yet ties a question
+to the call that raised it. That is recorded as owed with its subject (F1260), not folded
+into `running`.
+`state` is also what makes a notice a call head for I46 and I47: one committed row, and an
+element in the focus ring. That test used to be `glyph === "step"`, and a predicate over
+the character would now answer differently at different capabilities — a focus ring that
+changes shape when the terminal does.
 
 **The identical argument.** A glyph embedded in a block is the same character on every terminal, has no fallback at `unicode: "ascii"`, and cannot be width-checked at load. `glyph: "✗"` is `colour: "#c0ffee"` written in a different field.
 
@@ -822,7 +907,7 @@ C09 §4 owns the vocabulary and both renderings, and the 1:1 rule holds by const
 
 **The escape hatch, stated so that the guarantee stays absolute:** a glyph outside the vocabulary goes in the block's **text**, not its glyph field, and its behaviour under ASCII is the app's problem. That is where every action label already lives — `↗ open`, `⊘ cancel`, `⬡ pods` are text in a label, not glyph slots — and it is why the surfaces need no change. A vocabulary with an "or any string" arm is not a vocabulary.
 
-**`working` is in the list because S11 and S15 illustrate it** and nothing else covers it: `◐ connecting`, `◐ mlflow starting`, `◐ layers installing` is a fourth state beside `pending` (not started), `running` (steady) and `queued`. A token missing from the type is a surface that cannot be built, so the list was checked against the illustrations rather than reasoned out. **`continuation` is the third direction and the only token with its consumers named before it existed** (`docs/design/AGENT_TUI_DESIGN.md` §A1, which is where the mark was written down and is **not** a shipping consumer — agent-tui is stopped at step 0). It marks a line *subordinate to the one above it* rather than a state, which is why it is the first token whose eligibility is a property of the entry and not of the block: it needs a line above, and C22's `commandRows` returns `[]` for `command: ""`. So the vocabulary now contains a token a block can name in a position where it means nothing, and C09 §4 records which two blocks are in that position and which two look as though they are. `info`, `cancelled` and `bullet` are the other direction — no surface illustrates them today. They ship anyway because adding a token later is additive and cheap while a renderer meeting an unrepresentable state is not, and because `info` is already a `Tone`.
+**`working` is in the list because S11 and S15 illustrate it** and nothing else covers it: `◐ connecting`, `◐ mlflow starting`, `◐ layers installing` is a fourth state beside `pending` (not started), `work-unit` (steady) and `queued`. A token missing from the type is a surface that cannot be built, so the list was checked against the illustrations rather than reasoned out. **`continuation` is the third direction and the only token with its consumers named before it existed** (`docs/design/AGENT_TUI_DESIGN.md` §A1, which is where the mark was written down and is **not** a shipping consumer — agent-tui is stopped at step 0). It marks a line *subordinate to the one above it* rather than a state, which is why it is the first token whose eligibility is a property of the entry and not of the block: it needs a line above, and C22's `commandRows` returns `[]` for `command: ""`. So the vocabulary now contains a token a block can name in a position where it means nothing, and C09 §4 records which two blocks are in that position and which two look as though they are. `info`, `cancelled` and `bullet` are the other direction — no surface illustrates them today. They ship anyway because adding a token later is additive and cheap while a renderer meeting an unrepresentable state is not, and because `info` is already a `Tone`.
 
 ### A categorical axis is a marker plus a derived tone, never a second palette
 
@@ -1571,8 +1656,7 @@ type Action =
   | { kind: "fill";   label: string; command: string }
   | { kind: "exec";   label: string; command: string }
   | { kind: "open";   label: string; url: string }
-  | { kind: "expand"; label: string; target: string }
-  | { kind: "view";   label: string; target: string };
+  | { kind: "expand"; label: string; target: string };
 ```
 
 `fill` is the default; `exec` is the exception. Populating the prompt lets the dev read and edit before running, which matters when the command is `production cancel <uuid>`. Only filter pills use `exec`, because a filter is trivially reversible (A01 D8).
@@ -1581,46 +1665,88 @@ type Action =
 log*, *dismiss* — a notice that says something went wrong is where a reader wants the thing to do about
 it, and `pills` chips were the only element with an `activate`. No new kind: `action?: Action`, the same
 union a chip carries, validated at the gate exactly as `Tip.actions` and `Patch.actions` are — `kind`
-one of the five and the kind's own field a string — so a far side may send one. When present, C09's
+one of the four and the kind's own field a string — so a far side may send one. When present, C09's
 `notice` declares **one block-level element**, the whole notice, with `activate: action` and `copy:
 text`; absent, it declares none and the notice is what it was — `↓` does not stop on it and no frame of
-it changes. **Which of the five**: any at the gate, as a chip's. In use, `fill` is the retry — the
+it changes. **Which of the four**: any at the gate, as a chip's. In use, `fill` is the retry — the
 command lands in the prompt for the reader to read before running — and `open` is the log; `exec` stays
 the filter pills' by D8's argument, which a notice does not have. On a **settled** entry C23 I18 refuses
-`fill`, `exec`, `open` and `view` and patches the refusal — a `warn` notice — into the entry the action
+`fill`, `exec` and `open` and patches the refusal — a `warn` notice — into the entry the action
 came from, so a stale retry is answered beside the notice that offered it; `expand` is I18's one exception
 and fires. `b.notice(...)` and its four tone arms take `{ action }` (C24 I18, MG27).
 
-#### `view` is the fifth, and `target` is the half that needed a ruling
+#### ~~`view` is the fifth~~ — retired, and `expand` took its subject
 
-`view` fills the screen with one block — C25 §3b's fullscreen patch is its first
-and so far only producer. It is the same category as `expand`: an affordance on a
-block that the *reader* invokes, not something the far side causes.
+`view` filled the screen with one block, and C25 §3b's fullscreen patch was its
+first and only producer. The design language deletes that surface (R-EXA-082: *a
+run's detail EXPANDS IN PLACE*), so the kind has no producer and no destination.
+**The union is four.**
 
-**It is not the thing C22 §13 records as undecided, and the two must not be
-conflated.** That row asks what makes *a verb's result* a pushed view — who
-decides, and what `Esc` does to the entry it came from. This kind answers none of
-it. Something in the tree finally pushes a `kind: "view"` layer, which narrows the
-gap; the ruling C15 T5.5 waits on is untouched.
+**`expand` took the subject, and the merge was already argued for here.** This
+section said `view` *is the same category as `expand`: an affordance on a block
+that the reader invokes, not something the far side causes* — which is a statement
+that the two were one kind wearing two names, written one paragraph above the
+paragraph explaining why they were two. The distinction it drew was *`expand` needs
+no resolution at all — it toggles a row on the entry it came from* against *a view
+has to say what fills the screen*. That difference went when nothing fills a screen:
+both now name something on the entry the action fired from, and both are refused by
+name when they do not resolve.
 
-**`target` names a block id, and it is resolved against the blocks of the entry the
-action fired from.** Never trusted, never searched across the transcript, and never
-permitted to name a block in another entry. The distinction from `expand` is that
-`expand` needs no resolution at all — it toggles a row on the entry it came from,
-and the entry is already in hand — whereas a view has to say *what* fills the
-screen, and `target` is a free string an adapter supplies. An unresolvable target
-is refused with a notice, not silently ignored: an adapter emitting a stale block
-id would otherwise produce a key that does nothing and reports nothing.
+**`target` widens by exactly one word.** It named *a row* and now names **a row or a
+block** — a table row, a folded `scroll`, or a `patch` — resolved against the blocks
+of the entry the action fired from, at any depth, and never searched across the
+transcript (I34, C23 I31). Rows are looked for first, so a row id equal to a block id
+has a known answer.
 
-**And the kind is `view` rather than `fullscreen`** because C15's layer kind is
-already `"view"`. Two words for one concept is what the vocabulary audits keep
-finding, and this is the moment it would have been introduced.
+**The naming argument retires with the kind and is worth keeping.** `view` was
+chosen over `fullscreen` *because C15's layer kind is already `"view"`* — two words
+for one concept being what the vocabulary audits keep finding. The same reasoning now
+says `expand`: C25 §3a's two presentations are `collapsed` and `expanded`, so the
+action and the presentation share a word rather than inventing a second.
 
 **`actions` is on `Patch` for the same reason it is on `Tip` and `Notice`**: the
 affordance is data the producer supplies, so a patch that should not offer
-fullscreen simply does not carry the action. The alternative — a key binding that
+expansion simply does not carry the action. The alternative — a key binding that
 applies to every patch — makes the offer unconditional and gives the block no way
 to decline, which is the shape C09 I1's neighbours keep rejecting.
+
+
+## 3as. `progress` — when the bar is gone, and what its fields may say (I145, I146; review batch 4 M16.2, M16.4)
+
+**A classification table, quantity × fraction** — the cell where two correct statements meet is
+*a present block measures at least one row* (I17) against *progress completes, and when it does
+the bar is gone rather than full* (§035, `Progress.quantity`'s own comment, which described this
+as built while `measure` answered 1 at every fraction).
+
+| `quantity` | `current < total` | `current = total` | `current > total` |
+|---|---|---|---|
+| `progress` | one row | **zero rows** | zero rows |
+| `count` | one row | **zero rows** | zero rows |
+| `capacity` | one row | one row — a capacity persists | one row, and the number is not clamped (C09 I28) |
+| absent | one row | one row | one row (D25) |
+
+**D25: only a declared quantity vanishes.** `examples/docker`'s CPU bar declares none and
+overshoots by design, and an undeclared bar vanishing at 100% would take a saturated host off the
+screen at exactly the moment it matters.
+
+| edge | ruling |
+|---|---|
+| `total` is 0 | never finished — no proportion exists (C09 I28), and `0 / 0` completing would draw nothing for a job with nothing counted yet |
+| `current` negative | never finished |
+| the block carries `padding` or a floor | **kept.** Padding and the floor are the registry's (C09 I80), applied to the definition's rows whatever they are — the same arithmetic an empty container's zero already takes. A producer that padded the bar declared that space; a consistent picture beats a lone rule (tie-break 2) |
+| the finished bar's `copy` and node | untouched: `progress` declares no `copy`, and I145 is about rows |
+| C23 I76's operation bar | unaffected: the shell drops that bar at an operation's settlement, and it declares no quantity |
+
+**What the fields may say (I146).** `painted`, `quantity`, `granularity` and `liveness` were not
+checked at all, and T2.162 cast its fixtures `as never` to pass them. The table is the gate's:
+
+| field | refused when |
+|---|---|
+| `painted` | present and not a boolean |
+| `quantity` | present and not `capacity`, `progress` or `count` — a misspelling never finishes and nothing says why, the `trail` precedent (I123) |
+| `granularity` | present and not `continuous` or `segmented` |
+| `liveness` | present and not `still`, `active` or `stalled` |
+| `style` | present and not a string. **A name outside the set is not refused**: `style` is unknown-tolerant by its own contract (roadmap 51) — a bar is decoration over a number that is already correct |
 
 ---
 
@@ -2225,6 +2351,13 @@ worse, `measure` and `render` would disagree the moment the file changed between
 `b.image({ path })` reads at **construction**, where the shell already reads files, and the block
 carries bytes. **One block, one array of bytes, decided once.**
 
+**The path travels as a record, not as a source** (I142). The builder keeps the path it read as
+`Image.path`, beside `data` and never instead of it, so a copy can say where the picture came from
+(C09 I86) — which `R-SEL-004` asks for by name, and which the block could not answer while the
+path died in the builder. Nothing below the builder opens it: `data` is still what is drawn, the
+digest is still the data's, and a path that no longer resolves changes nothing on screen. A block
+built from bytes has no path and copies as its alt alone.
+
 **Refused at both gates**, each naming its own part: neither `data` nor `path`; both together; a
 non-positive or non-integer `height`; an empty `alt`; bytes that are not a PNG; and a decoded
 pixel count past a cap. **`alt` is required rather than optional** because it is not a courtesy —
@@ -2766,6 +2899,24 @@ an `elide` span wraps as it always did, because the member says *shorten me firs
 row shortens nothing. Admitted by one consumer, the head, and the member the first pass could not
 have named because the token it serves did not exist.
 
+**`ground`** (I151). §101 draws the chip preview's header with the chip's name on `pick` in
+`pickInk`, bold, and its size muted beside it on the panel's ground — a ground on a run inside a
+line, which no member could say (F1522). `ground: "pick"` paints the run's cells on
+`surface.pick` with `surface.pickInk` as its ink, **the pair resolved together**, as C11's
+current row and a focused button resolve it (C10 I51); so it replaces the run's tone rather than
+composing with one. A `tone` beside it is an ink nothing measured against that ground, and is
+refused, as `value` (a second background) and `ramp` (a second ink) are; a hunk line refuses it
+(I91). **One member of one value, because one consumer**: `pick` is the one ground the design
+draws on a run, and a wider union is the next consumer's to argue (I85). Where `pick` does not
+resolve — 1 bit, a theme declaring none — the run paints as though it carried no ground, its
+attributes kept (→ C09 I139). Appearance only: `measure` never reads it (I83).
+
+*F1522 named two remedies — a ground on a span, or a kind that draws a chip as the prompt does —
+and the second draws a different picture*: the prompt's chip is `meta` on `bgDeep` with its size
+inside the well (§099), and §101's header is the name alone on `pick` with the size outside it.
+The echo, the other place F1522 expected to need one, is chrome painted by the prompt's own
+painter and needs neither (C22 §6t ruling 6).
+
 
 ### 3am.2 — a ramp: an ink that is a function of position, on a span and on the bar
 
@@ -2778,31 +2929,54 @@ the gate refuses. What a ramp varies *over* is C09's to rule (C09 §5, `RAMP_EXT
 colour degrades is C10's (C10 §4e). This section says what one **is**.
 
 ```typescript
-type RampFill      = "gradient" | "step" | "palette";
-type RampAnimation = "none" | "shimmer" | "wave" | "breathe" | "pulse" | "heartbeat";
+type RampFill      = "gradient" | "centred" | "step" | "palette";
+type RampAnimation = "none" | …;              // the registry's 23 animated effects (I109)
 
 /** An ink that is a function of position (I106–I109). */
 type Ramp = Readonly<{
   fill:      RampFill;
-  from?:     Tone;            // a slot pair — `gradient` and `step`
+  from?:     Tone;            // a slot pair — every fill but `palette`
   to?:       Tone;
-  colormap?: ColormapName;    // `gradient` and `step`; on `progress` only (I107)
+  colormap?: ColormapName;    // every fill but `palette`; on `progress` only (I107)
   bands?:    number;          // `step` only; integer, 2 ≤ bands ≤ 8
   animate?:  RampAnimation;   // absent is "none"
+  since?:    number;          // a one-shot's birth tick (I109)
 }>;
 
 type TextSpan = Readonly<{ …; elide?: true; ramp?: Ramp }>;                        // the ninth member
 type Progress = Readonly<{ …; current: number; total: number; ramp?: Ramp }> & Gap;
 ```
 
-**Three fills, because they mean three things, and the backing's arity is the gate's** (I106).
-A `gradient` says *this varies continuously*, a `step` says *these are N groups*, a `palette`
+**Four fills, because they mean four things, and the backing's arity is the gate's** (I106,
+R-MOT-012). A `gradient` says *this varies continuously*, a `centred` says *this varies
+continuously and the middle is the extreme*, a `step` says *these are N groups*, a `palette`
 says *these are unordered identities*; drawing one as another is the encoding violation C12's
-ramp types already refuse (C12 §3b). `gradient` and `step` take **exactly one** backing — a
+ramp types already refuse (C12 §3b). Every fill but `palette` takes **exactly one** backing — a
 `from`/`to` pair of slots, or a `colormap` — and `palette` takes neither; `bands` rides on
-`step` alone. `RAMP_KEYS` is the key gate, six members, asserted as `TEXT_SPAN_KEYS` is. **No
+`step` alone. `RAMP_KEYS` is the key gate, seven members, asserted as `TEXT_SPAN_KEYS` is. **No
 member can hold a colour value**: the type is closed to `Tone` and `ColormapName`, so §3's
 *never embeds a colour* holds here by construction and no source scan is owed for it.
+
+**`centred` is a sampling and not a backing, which is why it is a fill and not a member**
+(I106, R-MOT-012). §037 registers **five** `static-tone` ramps and the type carried **three**
+fills, so the design's *brightest in the middle* — `gradient-centre`, whose own column reads
+`centred` where `gradient-linear`'s reads `linear` — was a picture nothing in this tree could
+draw. **The sentence that kept it out was true and about the wrong thing**: `centre` and
+`linear` *are* both gradients, and that is a fact about the family rather than about the
+sampling, so it read as a reconciliation while the two ends of a linear ramp and the one middle
+of a centred one stayed two different figures. `centred` folds the argument — `t' = 1 − |2t − 1|`
+— and hands it to whichever backing the ramp declares, so it composes with a slot pair and with
+a colormap exactly as `gradient` does and needs no arm of its own at the gate: the arity rule
+is already written over *every fill but `palette`*. It does **not** compose with `bands`, for
+the reason `gradient` does not: quantising a fold gives N groups whose order is not the
+extent's, which is the encoding violation two paragraphs up.
+
+**The other four registered fills are four of these and not five.** `gradient-linear` and
+`gradient-map` are one fill distinguished by **backing** — a slot pair against a `colormap` —
+which is the arity the gate already checks, and registering the backing as a second fill would
+put one axis in two places. `gradient-step` is `step` and `gradient-palette` is `palette`. So
+five registered records project onto four fills × two backings, and T2.117b is the row that
+compares the projection rather than the counts.
 
 **`palette` takes no name** (I106). The brief offered *a palette name*, citing the waffle and
 the pie; measured, both cycle the **theme's** categorical slots through `refOf`, and
@@ -2839,11 +3013,44 @@ member to put a ramp in, so that refusal is by type and not by gate. `rule`, `pa
 and plot series are deferred with symbols in design §7, admitted by a consumer appearing and
 never by symmetry — the same rule I88 applies to spans.
 
-**`animate` is a closed union of six, and timing is not a member** (I109). Five loops and
-`none`. A one-shot — `sweep`, `ripple` — is an event and needs a birth tick the render does
-not have (design Q8; the symbol is `RenderContext.since`); `typewriter` and `marquee` change
-which clusters show, a text-window mechanism that belongs beside `elide` and not inside a
-colour. No period and no easing: a caller choosing a period is two callers choosing
+**`animate` is a closed union of twenty-four, and timing is still not a member** (I109,
+R-MOT-012). Twenty-three effects and `none`: eighteen periodic and five one-shots.
+
+**The two exclusions this paragraph carried are both retired, and the second was wrong
+about the mechanism rather than about the cost.** It read: *a one-shot — `sweep`, `ripple`
+— is an event and needs a birth tick the render does not have (design Q8; the symbol is
+`RenderContext.since`); `typewriter` and `marquee` change which clusters show, a
+text-window mechanism that belongs beside `elide` and not inside a colour.*
+
+- **The birth tick exists and always did.** The clock is injected at `shell/session.ts` and
+  handed down, so a one-shot that records the tick it began on is timeable by the render
+  exactly as the spinner's stamp is. **The deferral named its own satisfier and named it in
+  the wrong place**: `RenderContext.since` is one value for a whole frame, and a document
+  may carry two one-shots begun at different moments — the stamp is a property of the
+  effect, so it is `Ramp.since`. A deferral that states its blocker as a symbol is the
+  right habit and it does not make the symbol right.
+- **None of them change which clusters show.** R-MOT-005 is the design's own constraint and
+  it settles this: an animation may change a cell's colour, opacity or brightness and
+  nothing else. `typewriter` reveals by *brightening* toward `to`, cell by cell; `marquee`
+  lights a sliding window. Both are values in `[0, 1]` that the fill is sampled at, so
+  `measure` never sees them and *appearance animates, geometry never does* is untouched.
+  A completed one-shot holds its final frame, so the finished document measures as the
+  unstarted one did.
+
+**`Ramp.since` is a tick and not a millisecond**, because that is the unit the render
+counts in and `presentation/` may not read a clock. Absent on a one-shot means *not
+started*: the effect draws its frame 0 and holds, which is why a one-shot does not replay
+on every render. On a periodic effect it is refused rather than ignored — a stamp nothing
+reads is a field that looks like it does something, which is the shape a reader trusts and
+a check cannot see.
+
+**`marquee` is periodic and an earlier reading had it as a one-shot.** §037 says it
+*travels and wraps around*, which is a loop by its own description; the design's own
+terminal group is `sweep · pop · wipe`, and `typewriter` and `ripple` join them on their
+semantics — *arrived* and *acknowledged*, things that happen once. The word *travels* is
+what carried the mistake.
+
+No period and no easing: a caller choosing a period is two callers choosing
 differently for one meaning, which is the drift the spinner sets already refused (C09 §4),
 and easing is a function, and a function is not serialisable. The static frame is `tick = 0`
 of the same evaluation (C09 §5), so a document with `animate` and one without measure and
@@ -2994,6 +3201,510 @@ answer.
 Cells 3, 4, 7 and 11 are the four that no assertion about a single rule reaches, and cell 7
 is the one the frame found: every count agreed with a quote drawing its mark once.
 
+## 3ao. `tape` — a row of peers you navigate, which slides rather than sheds (§095)
+
+**A row of peers sheds members; a list you navigate slides a window.** That sentence
+is §095's whole subject and it names two kinds, not one. `pills` is the first and is
+untouched: a row of peers nobody walks can lose its tail, because nothing is pointing
+at what went. A tape is the second — every member keeps its place, the window moves to
+hold the current, and `«2` and `1»` say how many are off each end. *Nothing is lost,
+only offscreen.*
+
+**This kind answers a refusal already in the tree rather than overturning one.**
+`structured.ts` rewrote C09 I81's shedding order for `steps` because *dropping a row
+changes the block's element ids and orphans a C26 focus* — which is exactly §095's
+argument for sliding, so the refusal is satisfied by this kind and not contradicted by
+it. `steps` may adopt the kind afterwards; that is a separate change, and `pills` keeps
+shedding on §095's own rule.
+
+```ts
+Readonly<{
+  kind: "tape";
+  id: string;
+  members: readonly Readonly<{
+    id: string;
+    label: string;
+    detail?: string;       // the elapsed time in §095's figure — the group
+    state?: CallState;     // the mark, resolved by C09 as every other state is
+  }>[];
+  current?: string;        // a member's id, never an index
+}>
+```
+
+**`current` is an id and not an index**, on the same argument as the rest of the kind:
+a tape's members arrive and settle while a reader is in it, and an index names a
+different member the moment one is inserted before it. The id names the member.
+
+**The window is not a field.** *The window moves only when the current leaves it* is a
+statement about the previous window, so the window is state, and it is the same state
+a scroll box holds one axis over — one integer, the index the window starts at, held
+where `scrollOffsets` is held and reconciled by the shell. A producer cannot compute it
+(it cannot see the width) and a renderer cannot write it (it is pure), which is the
+seam M4 met on the head mark and is answered the same way: the block carries the fact,
+the layer that has the width resolves it.
+
+### The walk — both artefacts, because the window is state and the ladder is structure
+
+**The sequence trace — the window, and the star rule.** §095's starred sentence is the
+one worth tracing: *moving the window COSTS a `«n`, which SHRINKS it — so one move can
+push the current straight back out. It settles to a fixed point.*
+
+| # | from | the current moves | the window, by the minimum | what the trace found |
+|---|---|---|---|---|
+| S1 | `[0,3)`, no marks | to 3 | `[1,4)` — and a `«1` appears, costing cells the window was spending on a member, so `[2,4)` | the star, reproduced: the first move off the head costs a mark and the window loses a member on top of the one it slid past |
+| S2 | `[2,4)`, both marks | to 4 | `[2,5)`; `1»` **disappears**, so the window ends up *wider* than the move asked for | the mark vanishing at the end is a cell the window gets back, and it is what makes the cost non-monotone — D1 |
+| S3 | `[3,5)`, `«3` | back to 0 | `[0,k)` — `«3` disappears too | the mark vanishing at the left end as well; **the start is still a distance and not an extremum**, and reading S2 and S3 as one rule is what the implementation falsified |
+| S4 | `[9,13)`, `«9` | to 13 | `«10` is a cell wider than `«9`, so crossing ten hidden members costs the window a cell | the mark's own width is a function of what it counts, which is the star rule at a second scale |
+| S5 | any window, the current already inside | anywhere inside | unchanged | *the window moves ONLY when the current leaves it* — the clause that separates a tape from a cursor dragging the row along |
+
+**D1, and it is the walk's finding.** The cost of a window is **not monotone in its
+end**, because the residue mark disappears when the run reaches the last member. So the
+obvious implementation of *grow while it fits* stops short: measured over 200,000
+random tapes, a greedy loop drew fewer members than fit in **233** of them, and the
+cases are not exotic — members of `[5,7,3,8,1]` at a width of 20 reaching index 4 hold
+**three** where a greedy loop draws one, because the last member's arrival removes a
+`1»` worth more than the member costs. The end is therefore a **maximum over the
+candidates**, never a loop that stops at the first failure.
+
+**And the start is a different question, which the walk got wrong and the
+implementation corrected.** This section first read *both ends, one cause, one rule*,
+with a second measurement of 447 beside the 233 — and that figure was taken over
+*scanning down from the current to the globally smallest start that fits*, which is not
+a question the window ever asks. The start is the **minimum move**: the first start at
+or after the one the window already has. A smaller start than the held one exists in
+most tapes, and taking it would drag the window backwards to reach something ahead of
+it, which is the cursor-dragging behaviour §095 separates a tape from in its own first
+paragraph. The two bounds read as one rule because both are about a mark that vanishes,
+and they are not: one is an extremum and the other is a distance.
+
+**The symmetry was the tell and it was read as corroboration.** Two measurements of the
+same shape at two ends is exactly what a real law looks like, which is why the second
+one was not checked against what the code would ask. *Two instances fitting a rule is
+not evidence for the rule* — here the second instance was an artefact of the probe.
+
+**D2 — the fixed point is reached by construction, not by iteration.** Asking *which
+`lo` is smallest such that the window from `lo` to the current fits* prices the mark in
+already, so the answer is a fixed point the first time it is asked. An implementation
+that moved the window and then re-priced the mark would be iterating towards the same
+number and would have to be shown to terminate; this one has nothing to converge.
+
+**The classification table — the ladder, where two rules hold at rest.** §095's rule 1
+is structural: *an ALL-OR-NOTHING group goes before any single member.*
+
+| # | the state | rules meeting | the ruling |
+|---|---|---|---|
+| C1 | everything fits | none | drawn whole, no marks |
+| C2 | the members fit without their details | *the details are a group* × *nothing is offscreen* | **every** detail goes, never some — a row with three clocks and two blanks says the blanks are still running |
+| C3 | the window has slid **and** the few visible members would fit with their details | *drop the group* × *the window slid* | **the details stay gone.** Bringing them back trades a member for a clock, which is the one thing rule 1 forbids, and it is what keeps the ladder monotonic |
+| C4 | one member, wider than the whole width | *the current is always visible* × *a member is atomic* | the member **truncates**; it is never shed, because a tape with nothing in it says less than a tape with one truncated name |
+| C5 | the current is absent, or names no member | *the window holds the current* | the window holds its place and no `›` is drawn — a tape nobody is in is still a tape |
+| C6 | one member in total | *marks count what is hidden* | neither mark, at any width: zero hidden is no mark and not `«0` |
+
+**C3 is the row that matters and it is invisible to a reader checking the rules one at
+a time.** *Drop the whole group before any member* and *draw as much as fits* are both
+correct, and they disagree exactly once the window has slid — at which point the
+question is whether a clock may be bought back with a member. Rule 1 answers it, and
+the answer has to be written down or the natural implementation re-measures and puts
+the clocks back.
+
+### 3ao.1 What a member may say, how wide the row is, and where each member is drawn (I144, I147, I124; review batch 4 M14.7, M14.9, M14.2)
+
+**A classification table, because every interaction here is structural** — two rules that both
+hold at rest, with no event between them.
+
+| member field | value | which rules meet | ruling |
+|---|---|---|---|
+| `members` | not an array | the gate | refused, as it was |
+| a member | not a record | I124 (every member is an element) × the gate | **refused**, naming the index |
+| `id` | absent, not a string, or `""` | I124 × C26 I6 (an element is addressed by its id) | **refused** |
+| `id` | equal to another member's | I124 × C26 I6 × I129's argument one kind over | **refused**, naming the id and its count — two members `x` are two targets for one name |
+| `label` | absent or not a string | the row draws it | **refused** |
+| `detail` | present and not a string | I126 (the all-or-nothing group) | **refused** |
+| `state` | outside `CALL_STATES` | I141's union × the render's no-mark guard | **refused**; the guard stays for a block that never met the gate |
+| `current` | present and not a string | I124 (*an id, never an index*) | **refused** |
+| `current` | a string naming no member | C5 × T1.48 | **valid.** The plan read *`current` names a member or is absent*; C5 rules the case the other way, T1.48 asserts it, and the gate's own comment records why — a producer between rebuilding the row and choosing within it. The repo is right about what ships (tie-break 4) |
+
+**The width, walked on the measured case.** At 91842503 `width()` summed the labels and the gaps
+at `narrow` and nothing else. A tape of `seams` (succeeded, `2:53`), `arm` (running, `4:02`, the
+current) and `count` answered **17**, and laid out at 17 it drew `«1  › arm ⋅  1»` — a tape told
+its own width and still sliding.
+
+| part of the row | at 91842503 | counted now (I147) | why at that width |
+|---|---|---|---|
+| a label | `narrow` | `wide` | `width` takes no capability (C09 I42), so it answers at the widest convention — the safe direction for a width disagreement |
+| a detail | not counted | `wide` | the row draws every detail at an unbounded width (I126 sheds only when they do not fit) |
+| a settled state's mark | not counted | its reservation, `glyphCells` (C09 I5) | a slot is one cell at either arm by the 1:1 rule, and the reservation is written from the table |
+| a running member's spinner | not counted | one cell | C09 I44: every frame of every set is one cell, which is why `tapeStart` needs no tick |
+| the joins inside a member | not counted | one per part | `label detail mark` is `join(" ")` |
+| the current's `› ` | not counted | `LEAD_CELLS` | drawn by the render, priced by `widthsOf` |
+| the gaps | `TAPE_GAP` each | the same | — |
+| `«n` / `n»` | not counted | not counted | at the answered width nothing is offscreen, so neither is drawn — the property the row asserts |
+
+**The columns (I124 amended), a table by piece of the row** — the answer `tapeMemberCols` gives,
+from the same `layout` the render and `tapeStart` take:
+
+| piece | whose columns |
+|---|---|
+| `«n` and the gap after it | nobody's |
+| the gap between two members | nobody's |
+| the current's `› ` | the current's — a press on the lead is a press on the member |
+| a member's text, truncated where it is wider than the row (C4) | its own, as drawn |
+| `n»` | nobody's |
+| a member before the window | empty at `0` |
+| a member after the window | empty at the width |
+
+**`elements` keeps `[0, width)` and that is D11, not an oversight.** A member's columns move when
+the held start moves, and the held start is view state, so geometry in `elements` would move
+without `rev` moving — the cache C26 I3 exists to keep. The comment in `tape.ts` that said the
+offscreen members *carry a zero-width column range* described this helper before it existed; the shell asks it where it has the held start, and that consumer is the batch's shell
+lane, queued.
+
+## 3ap. `tree` — the twisty is content, the guides are decoration (§105)
+
+**§105's first primitive, and a kind because of what it holds rather than how it
+looks.** A tree needs node-level expansion that a reader changes, guides that shed
+independently of the names, and one focusable row per visible node — which is a
+`table`'s `expanded` arm, a `pills` ladder and a list's elements, and no existing kind
+holds all three. §105 says *built from what already exists* and each part is: the
+twisty is `GlyphSet`'s disclosure pair, the guide is `vertical`, expansion is the
+`expand` op and its action, and the ladder is §094's three tiers.
+
+```ts
+Readonly<{
+  kind: "tree";
+  id: string;
+  nodes: readonly TreeNode[];
+}>
+
+type TreeNode = Readonly<{
+  id: string;               // unique within the block, at any depth
+  label: string;            // the name — content, never shed
+  aside?: string;           // right-aligned, §105's `4.1 kB` — one all-or-nothing group
+  expanded?: boolean;       // absent is collapsed, as a table row's is
+  children?: readonly TreeNode[];  // present, even empty, is a node with a twisty
+}>
+```
+
+**The twisty is the disclosure pair and not the glyphs §105 draws.** §105 writes
+`▾`/`▸`; the repository already separated disclosure from focus (§024, `R-BLK-928`) —
+`▸` is focus and disclosure is hollow, `▹` collapsed and `▿` expanded — because one
+row can be focused and collapsed at once and one slot cannot say both. A tree is the
+case that ruling was made for, so it takes `expand` and `collapse` and the fixture's
+filled pair is read as the fixture predating the split (the tie-break: a consistent
+picture beats a single figure).
+
+**The figure, drawn before the code** — §105's own tree at 40 columns:
+
+```
+▿ src
+│  ▿ interaction
+│  │  ▹ parser
+│  │    frame.ts                    4.1 kB
+│  ▹ data
+  package.json                      1.2 kB
+```
+
+A row at depth `d` is `d` guide columns of three cells each (`│` and two spaces), a
+two-cell twisty slot (the mark and a space, or two blanks for a leaf), the label, and
+the aside right-aligned with at least two cells before it. **A guide is drawn at every
+ancestor's twisty column** — §105 draws no elbows, so the guide says *inside this* and
+not *last child*, and a row needs nothing but its own depth to draw it.
+
+### The walk — both artefacts, because expansion is state and the ladder is structure
+
+**The classification table — where two rules hold at rest.**
+
+| # | the state | rules meeting | the ruling |
+|---|---|---|---|
+| L1 | everything fits | none | guides, three-cell steps, every aside |
+| L2 | the asides fit only without the guides | *guides are decoration* × *asides are content* | **the guides go first** (§105, §094): the step narrows to two cells, which is the only width a guide was ever buying, and the asides stay |
+| L3 | one row's aside does not fit at two-cell steps | *asides are a group* × *each row fits or does not* | **every** aside goes, never one — a column of sizes with a hole says that file has none |
+| L4 | a label does not fit at its depth, asides gone | *names never shed* × *depth is indentation* | **the indent is capped, by the widest visible name**: no row starts past `width − 2 − widest`, so every name keeps its whole width while one can. §105's *depth is capped by the floor rule, not by a constant* — and the floor of a name is the name |
+| L5 | the widest name alone is wider than the row | *names never shed* × *the row has a width* | the cap reaches zero and that name **truncates with a mark**; nothing is shed, because a tree whose node vanished says less than one whose node is cut |
+| L6 | `children: []` | *children present has a twisty* × *there is nothing to show* | **drawn with a twisty** — a directory with nothing in it is still a directory; expanding it reveals no rows and is not an error |
+| L7 | `expanded: true` on a node with no `children` | *expanded shows children* × *a leaf has none* | the flag is ignored and the slot is blank: a leaf's twisty would be a control that does nothing |
+| L8 | a collapsed node whose descendants are `expanded` | *a node is visible when every ancestor is expanded* × *each node owns its flag* | the descendants are hidden and **their flags are kept**, so re-expanding restores the subtree as the reader left it — the flag is on the node and never derived from its parent's |
+
+**L4 is the row the first draft got wrong, and the figure is what showed it.** Capping
+each row by its own label makes a deep short name sit to the right of its shallow long
+parent — the indentation contradicting the depth it exists to show. One cap for the
+block, set by the widest name, keeps every row's order: two rows past the cap share a
+column, which loses the difference between them and never inverts it.
+
+**The sequence trace — expansion, where something happens in between.**
+
+| # | what happens | ruling |
+|---|---|---|
+| E1 | `⏎` on a node with children | its element's `activate` is `expand` aimed at the node's id; the shell patches `op: "expand"` with the node as `rowId`, the flag inverts, and the node's own element survives, so focus stays on it (C26 I11 re-resolves it) |
+| E2 | a producer's `replace` collapses a node while focus is inside it | the focused element is gone at the next dispatch, and C26's trace 4 remedy (fall forward from the anchor) is the operation, which exists. **Not reachable from the keyboard**: only a node's own element collapses it |
+| E3 | a producer rebuilds the tree without the flags | every expansion the reader made is lost. **A `table` has `merge` for a `--watch` tick and a tree has none**; stated as the kind's limit rather than built, because no producer rebuilds a tree yet and a merge op with no caller is surface nobody asked for |
+| E4 | two blocks in one entry both hold id `x` — a tree node and a table row | the dispatcher takes the first block, in document order, holding a row or node `x`, which is the rule tables already live under (C23 I31); I129's uniqueness is per block and does not widen it |
+
+**Checked against the layer below, because two rulings name an operation.** E1 needs the
+`expand` op to reach a node at any depth of one block — it did not: the arm refused
+every kind but `table` (*is a tree, which has no rows*), so the op is extended rather
+than a second op added. E2 needs the fall-forward, which is C14's `#restoreFromAnchor`
+and exists.
+
+## 3aq. `split` — two peer panes, and a divider that is a control (§105)
+
+**§105's second primitive.** A split is two regions side by side that each hold their
+place: they scroll on their own, focus crosses between them only when asked, and the
+column between them can be moved. A `row` group divides a width and then forgets it. It
+has no divider, no per-pane scrolling, and a `↓` that runs from the last row on the left
+into the first row on the right. §105 draws it:
+
+```
+src/              │ export function layout(b, w, h) {
+  interaction/    │   b = chooseRep(b, w);
+  data/           ┃   solveW(b, w);
+README.md         │   return b;
+```
+
+```ts
+Readonly<{
+  kind: "split";
+  id: string;
+  height: number;                          // the panes' rows — a positive integer
+  children: readonly [Block, Block];       // the left pane, the right pane
+  divider?: number;                        // the left pane's width in cells; absent is half
+}>
+```
+
+**`children` is the field name on purpose.** Which blocks hold blocks is `tree.ts`'s
+question, and the compiler answers it from the field. Calling the panes `left` and
+`right` would have made this the seventh kind with children that the six walks do not
+see. A pane holds **one** block. An author who wants several stacks them in a `column`
+group, the way a `panel` gets several.
+
+**The divider is the left pane's bar.** This is read off the figure, and the design
+decides it. Ruling 22 says each scrollable box draws its bar in its own last column. The
+left pane's last column is the divider: the figure has one column there, not two. The
+figure's `┃` is therefore §021's thumb (the heavy weight of the same line) riding in the
+divider. A left pane that fits draws the divider as bare track, and one that overflows
+draws its position. The right pane draws its own bar in its own last column, as a
+`scroll` does (C09 §7f): *two bars is legal when they are two documents* (§021).
+
+**The divider's position is block data, not view state.** It sets both panes' widths.
+Width sets the height of wrapped content, and height sets the elements — so a position
+held in a view store would give `elementsOf` a geometry it cannot see. C04 I18 says
+view state that affects height lives in the block. This one affects widths and, through
+them, heights. The reader moves it with a **shell-origin `replace`**. That is the
+precedent the scroll's `collapsed` fold set (I98), for the fold's reason: the reader
+changes it and the geometry reads it. **The panes' offsets are view state.** Like a
+scroll's, they move rows inside a declared box and never the box (I48). Each pane's
+offset is held under its own key, so a pane that is itself a `scroll` does not share
+one number with the box it sits in.
+
+**The geometry at width `w`.**
+
+- `d = clamp(divider ?? ⌊(w − 2) / 2⌋, 1, w − 3)` is the left pane's width. The divider
+  sits at column `d`, column `d + 1` is blank, and the right pane takes the `w − d − 2`
+  columns after that.
+- **The blank column is the figure's, and it is on one side only.** §105 draws
+  `│ export`, with one cell between the divider and the right pane's text, and nothing
+  on the left that says either way. The divider is the left pane's bar, and a bar sits
+  against its own content, as a scroll box's does (C09 §7f). The blank cell keeps it
+  off the other pane's content, which is a different document.
+- The right pane's bar is `barOf`'s rule. The pane is measured at its full width, then
+  re-measured one cell narrower only if it overflowed there.
+- Below four columns there is no room for two panes, a divider and the blank cell. The
+  left pane draws alone at the full width, and the right is placed by neither `render`
+  nor `elements`.
+  This is `placeable`'s rule for a `row` group (§3): *a child that cannot be placed is
+  placed by neither half*.
+- `measure` is `height` at every width. There is no residue row. The bars say where, and
+  a split is a box whose height is declared.
+
+### The walk — both artefacts, because the divider is structure and focus is state
+
+**The classification table — where two rules hold at rest.**
+
+| # | the state | rules meeting | the ruling |
+|---|---|---|---|
+| S1 | both panes fit | *the divider is a column* × *a bar that cannot move is decoration* | the divider is bare track at every row. The column is still spent, because it is the boundary between two regions, and a boundary is not a bar |
+| S2 | the left pane overflows | *each box draws its bar in its own last column* × *the divider is one column* | **the divider is the left pane's bar**: track, thumb and half-row forms, at §021's arithmetic. Never a second column beside it |
+| S3 | the right pane overflows | *its own last column* × *a bar takes a column from the content* | the right pane's content narrows by one and is re-measured once, which is `barOf`'s rule; its bar is the split's last column |
+| S4 | `divider` wider than the split allows, after a resize or from a producer | *the producer's number* × *two panes need a cell each* | clamped **at read** to `[1, w − 3]` and never corrected at write. This is I48's rule for an offset: a store fixed up on every change is one that accumulates |
+| S5 | `w < 4` | *two persistent panes* × *the width has room for one* | the left pane alone at `w`. The right is placed by neither half, so `measure`, `render` and `elements` agree |
+| S6 | a pane whose block declares no elements (prose, a `code` block) | *focus lands on elements* × *a pane is a region focus can be in* | **the pane contributes one block-level element**, addressed `(split, pane's block)` as a mosaic's pane is. Otherwise a pane of code is a region explicit transfer cannot reach, and §105's figure has one. **Focused, the pane takes `focusGround` behind its whole extent**, on the mosaic's rule (C09 I100, `R-FOC-004`): a pane is a region, and the child cannot light itself for a focus that names its container |
+| S7 | focus is inside the left pane | *the thumb takes accent when its container has focus* (§021) × *the divider is that thumb's track* | the divider takes **accent**. It is `muted` otherwise. **Whether it also takes accent while the right pane holds focus is parked (46)**: §105 says *the focused pane takes the accent ON the divider* and draws only one state |
+
+**S6 is what stops the walk's own figure from being unreachable.** §105's right pane is
+a code listing, and a code block declares no elements. Without the fallback, `→` from
+the tree has nowhere to go, and the split is one pane plus a picture of another.
+
+**The sequence trace — where something happens in between.**
+
+| # | what happens | ruling |
+|---|---|---|
+| E1 | `↓` on the left pane's last element | **the right pane is skipped.** `↓` goes to the first element after the split, or stops at the entry's end. Vertical motion never crosses the divider, and that is what *explicit focus transfer* means |
+| E2 | `↑` or `↓` arriving at the split from outside it | lands in the **left** pane: its first element from above, its last from below. A split is entered on its first pane from either side, so which pane a reader lands in does not depend on which way they came |
+| E3 | `→` with focus in the left pane | focus moves to the right pane's element **nearest the focused row on screen**: the first whose visible rows reach the focused element's visible row, or the pane's last element when none does. Each pane's offset is applied, because the two panes scroll apart. The pull (C26 I24) then moves the right pane by the minimum. `←` is the mirror. Outside a split both are no-ops, as they were before this |
+| E4 | `⌥→` with focus in either pane | `divider` grows by one cell, as a shell-origin `replace`. **Focus stays on its element**: element ids do not change with width, and C26 I10 re-resolves the element's rows at the new geometry. At the clamp it is a no-op, and there is no patch to make one |
+| E5 | a press on the divider's column, then motion with the button held, then the release | the press **arms a drag on that split**. Each motion report sets `divider` to the pointer's column less the split's left edge, clamped. The release ends the drag. Focus is untouched throughout, because a divider is a control and not an element |
+| E6 | a producer's `replace` of the split without `divider` | the reader's position is lost. This is the tree's E3 limit, stated rather than built round, for the tree's reason |
+| E7 | `⌥←` in the prompt | **word-left, unchanged.** §019 scopes `⌥←→` to word motion *in text fields*, and the divider's binding is at `liveBlock`, a target the prompt never is. The same chord at two targets is resolved by the ladder. It is not the duplicate the conflict rule refuses |
+
+**Checked against the layer below, because four rulings name an operation.**
+
+- E1 and E2 need the element walk to say which pane an element is in. It did not: the
+  walk's records were `{blockId, element}`. They gain an optional `pane`, and it is set
+  in one place, the walk's `split` arm.
+- E3 needs each pane's offset readable from the shell. The offset store holds any key
+  per entry, so this is a key, not a new store.
+- E4 needs a shell-origin `replace`, which exists (I98's fold uses it).
+- E5 needs motion reports with a button held. Mode 1002 is what the session enables
+  (`escapes.ts`, `MOUSE`), and C16 I30 decodes them as `press: true, motion: true`.
+
+## 3ar. `form` — labelled fields and the buttons that act on them (§105)
+
+**§105's third primitive.** A form is labelled one-line text fields, each with an optional
+hint or error, and a row of buttons. The reader edits each field in place and a button acts
+on the values. §105 draws it:
+
+```
+ name        prism-serve
+ port        80▌
+             ✗ ports below 1024 need root
+ replicas    3
+             0 stops the service
+
+› save    cancel
+```
+
+**Built flush, one cell left of the figure — parked 47.** The figure's field rows start one
+cell right of the button row's `›`, and C09 I87 forbids any row starting left of a block's
+head, because a naive drag picks up whatever sits in that gutter. The fields are therefore
+drawn at column 0, flush with the button row, and every column below is the figure's less
+one. Keeping the indent would mean weakening I87, which is not this section's to do.
+
+```ts
+Readonly<{
+  kind: "form";
+  id: string;
+  fields: readonly FormField[];            // at least one
+  buttons?: readonly FormButton[];
+}>
+
+type FormField = Readonly<{
+  id: string;
+  label: string;
+  value?: string;                          // one line; absent is empty
+  hint?: string;                           // decoration: dropped whole where it does not fit
+  error?: string;                          // content: replaces the hint, and wraps
+  flag?: string;                           // the flag a submit writes it under; absent is `--<id>`, "" is positional
+}>
+
+type FormButton = Readonly<{
+  id: string;
+  label: string;
+  action?: Action;
+  submit?: boolean;                        // the action's command gains the fields' values
+  default?: boolean;                       // at most one; absent everywhere is the first
+}>
+```
+
+**The figure's columns, read cell for cell.** The document indents every figure in §105
+by two cells, and the split's is flush, so the offsets below are the form's own relative
+to its button row, which starts at column 0.
+
+- **The label is Fixed and the field Grows.** Field rows start at column 0, flush with
+  the button row (parked 47). The label column is the widest label plus a gap of four,
+  which puts `prism-serve` at column 12: `replicas`' eight, then four. The field takes the
+  rest of the width, `F = w − L − 4` for the widest label `L`.
+- **The hint and the error sit under the field**, at the field's column. §105: *an ERROR
+  REPLACES THE HINT rather than joining it*. The error is `✗` and a space, then the text,
+  in `error` tone. It is the same `✗` and tone as every other failure, so a form error is
+  not a new visual idea.
+- **A blank row, then the buttons.** Each button is a two-cell mark slot then its label,
+  with two cells between buttons. The default button's slot holds `›`. The others' hold
+  two blanks, which is what puts `cancel` at column 10.
+
+**§094 decides every narrow width, and no threshold is invented here.**
+
+- **Labels and fields are content**, with a floor. The field's floor is one cell. Below it,
+  at `F < 1`, the form takes its **representation** rung: each label on a row of its own
+  at column 0, with its field, hint and error under it at column 2, where `F = w − 2`.
+  Every row then takes §094's final container clip at `w`.
+- **The hint is decoration.** It is drawn whole where it fits in `F`, and dropped with no
+  mark where it does not. Decoration's minimum is a threshold and never a floor.
+- **The error is content.** It wraps in `F`, with continuation rows hung under the text
+  rather than under the `✗`. It is never truncated and never dropped. §096's
+  *losing the end loses the fact* is the reason.
+- **A value is content.** One row, end-truncated with `…` where it is longer than `F`.
+- **Buttons are content.** They wrap onto further rows as whole buttons, and one wider
+  than the row is truncated. None is shed: a button that sheds is an action the reader
+  cannot reach.
+
+`measure` is therefore the sum, per field, of `1` plus the error's wrapped rows or the
+hint's one row where it fits, plus a stacked label row per field on the representation
+rung, plus `1 + button rows` where there are buttons. It reads block data and the width
+only. The draft being edited is appearance: it is drawn on the field's one row, windowed
+round the caret, and never changes a height.
+
+**A field's value is block data, and the reader writes it with a shell-origin
+`replace`.** This is the split's divider's precedent (§3aq). A submit reads the values,
+and a value in a view store would be a submit the producer's own `replace` could not see.
+While a field is being edited the text lives in the prompt's editor, borrowed (C17 I28,
+I29, `R-QST-003`: *editor code is shared; buffers, undo stacks, and histories are
+isolated by owner*). A field is the third owner, after the prompt and a typed reply, and
+it owns neither history nor newline.
+
+**A submit writes the values as the command's own arguments.** A button with `submit: true`
+must carry a `fill` or an `exec`. Its command gains, per field with a non-empty value in
+field order, ` <flag> <value>`, with the value quoted by C18's `quote`. `flag` is `--<id>`
+when absent, and the value alone when `""`. The command is still a string the reader can
+read before it runs, which is A01 D8's argument for `fill`. C23 I18's frozen-entry refusal
+applies unchanged.
+
+### The walk — both artefacts, because a form is structure and the borrow is state
+
+**The classification table — where two rules hold at rest.**
+
+| # | the state | rules meeting | the ruling |
+|---|---|---|---|
+| S1 | `F < 1` | *the label is Fixed* × *the field has a floor* | **the representation rung**: labels on their own rows, fields under them at column 2. The label is never shortened to make room, because it is the fact that says what the field is |
+| S2 | a field with a hint and an error | *the hint is decoration* × *an error replaces the hint* | the error alone. §105 says why: *two lines under one field is two things competing to be read* |
+| S3 | a hint longer than `F` | *decoration truncates with no mark* × *a hint is a sentence* | **dropped whole**. A cut sentence reads as a different one, and §094's *then drops with no trace* is the rung that does not |
+| S4 | an error longer than `F` | *content has a floor* × *the error is one fact* | wrapped, hung under its text. The height is the producer's data and the width's, and never the focus's |
+| S5 | a value longer than `F`, not being edited | *content truncation marks loss* × *one row* | end-truncated with `…` |
+| S6 | a value longer than `F`, being edited | *the caret must be visible* × *the draft never changes a height* | the draft windowed round the caret on the field's one row, the caret drawn as §105's `▌` in a cell of its own. A block has no terminal cursor to place |
+| S7 | `›` beside a button while focus is in a field | *`›` is the palette's current-row mark* × *focus is on `port`, not `save`* | **`›` marks the default button, not focus.** The figure draws it on `save` while `port` is being edited, so it cannot be focus's. Focus is the wash, as a `choice`'s is (C09 I105) |
+| S8 | two buttons declaring `default` | *at most one default* × *a producer's data* | refused by `validateDocument`, with the field named |
+| S9 | a field id equal to a button id | *an element is addressed by id within its block* | refused. Ids are unique across fields and buttons |
+| S10 | `submit: true` on an `open` or an `expand` | *a submit writes arguments* × *those kinds have no command* | refused |
+
+**The sequence trace — where something happens in between.**
+
+| # | what happens | ruling |
+|---|---|---|
+| F1 | `⏎` on a field | **the field is entered**: C26's inside mode, and the shell takes the prompt's line whole (`hold`) and loads the field's value with the caret at its end. The field draws the editor's text and caret. The prompt row draws the held line |
+| F2 | an editing key inside | the prompt's own binding, through the borrower's action set: the reply's set without `insertNewline`, `historyPrev` and `historyNext`. `⌥←`/`⌥→` are word motion, because a field being edited is a text field (§019) |
+| F3 | a key a field does not own, inside | **passed to the `global` fallback** (C16 I60), as the plot's inside rung passes it — so `F1` and `PgUp` still answer, and `↓`, bound at neither rung, is dropped with focus on the field. Dispatch never falls to a lower rung, so nothing can leave the field by a key it does not own. *Amended*: first ruled **rejected**, which withheld help and scrolling from a field and bought nothing, since no lower rung was ever reachable |
+| F4 | `⏎` inside | **commit**: the value is written by a shell-origin `replace` of the form, built from the form as the store holds it now, so a producer's newer `error` survives. Focus moves to the next field, which is entered, and the held line stays held. From the last field focus moves to the default button, in navigate mode, and the held line is given back. **`⏎` never presses a button from inside a field**: a submit is a command, and it takes a key aimed at it |
+| F5 | `esc` or `⌃c` inside | **discard**: the held line is given back exactly (C17 I28), the value is unchanged, and focus stays on the field |
+| F6 | focus leaves the field by any other path: a pointer press elsewhere, a producer's `replace` that drops the field, the entry evicted, a programmatic move | **the borrow ends, and it commits where the field still exists** — a blur keeps what was typed. **One predicate separates F5 from F6**: whether focus is still on the field. It is checked after every event, so no path out of the inside mode can leave the line borrowed |
+| F7 | an action dispatches while a field is being edited: a pointer release on a `submit` button, or a `fill` from another entry | **it cannot, and that is what keeps a submit reading what was typed.** Every action reaches the dispatcher through `rowActivate` (C26 I26), which activates the *focused* element — and while a field holds the line the focused element is that field, which declares view state and is entered, never activated. A pointer reaches a button by focusing it on the press, and F6's reconcile after that event has written the field before the release can activate anything; the first click on `save` focuses it and presses nothing (T4.100). *Amended*: this row first ruled a seam before every action that wrote the borrow, for the case where a pointer's activation left focus on the field. No path constructs that case, the seam's code was reached by no row, and the mutation removing it failed nothing — the premise was the defect, not the test. **A second path to the dispatcher must end the borrow before it dispatches**, or a submit reads the value from before the edit and a `fill` writes a line the restore then overwrites |
+| F8 | a producer's `replace` of the form while a field is being edited, the field still present | the draft is kept. F4's `replace` is built from the form the store holds at commit, so the producer's other changes survive and the reader's value is the last write |
+| F9 | a paste inside a field | one line is inserted as one edit (C17 I5). **A paste holding a newline is refused, and says why**, which is §089's own example of REJECTED: *a refused paste*. A chip is the prompt's and never a field's |
+| F10 | `⏎` on a field in a frozen entry | entered and edited as in a live one. A value is the reader's, and nothing stale is read or run. A submit from it is refused by C23 I18 |
+
+**Checked against the layer below, because six rulings name an operation.**
+
+- F1 and F5 name `hold` and `resume`. Both exist (C17 I29), and a typed reply uses them.
+- F2 names the prompt's bindings under a borrower's filter. A typed reply's forward does
+  exactly this (C16 I54), with `REPLY_ACTIONS` as the filter.
+- F4 names a shell-origin `replace`. The split's divider uses it.
+- F1 names C26's inside mode. A `control` enters it through `viewState: true`.
+- F6 needs the focus after every event. The session already reads it to draw.
+- F7 needs no seam of its own. Every action reaches `createActionDispatcher` through the
+  one `onAction`, whose one caller activates the focused element, and a field is entered.
+
+**What the tree did not have**, and so what is built: a field's draft on the render context,
+a caret drawn by a block, a borrower's forward at the inside rung, and an action whose
+command is completed from block data.
+
 ## 4. Patches
 
 **Four ops carry data and two carry view state, and that split is the whole reason the fifth and sixth exist.** `append`, `replace`, `merge` and `status` all say *something arrived or changed on the far side*. `expand` says *the reader opened a row*. C13 gates the first four on an entry still streaming (C13 §6) — a settled stream can receive nothing more — and the gate is wrong for the second kind: expansion is exactly what a reader does to a **finished** table.
@@ -3088,7 +3799,7 @@ This is why a `merge` against the wrong kind is a failure rather than a no-op: o
 
 C04 ships a constructor per block kind. They are not a second way to build a block and C24's builders are not a parallel implementation — **`b` is built on these**.
 
-- **C04's constructors enforce the shape invariants.** Deep freeze (I1), a glyph on `error` and `warn` tones (I6), `height` present for `form: "line"` (§3). They take a *complete* block and return a frozen one.
+- **C04's constructors enforce the shape invariants.** Deep freeze (I1), a glyph on `error` and `warn` tones (I6 — refused at the wire too, ruling 77), `height` present for `form: "line"` (§3). They take a *complete* block and return a frozen one.
 - **C24's `b` is the ergonomic layer over them** — generated ids, bare strings accepted as cells, action helpers. It adds convenience and delegates enforcement. **`b` never freezes or validates directly.** If it did, I1 would have two places to be wrong, and the one that drifts is always the one with fewer tests.
 
 Stated here rather than only in C24 because the failure is asymmetric: an implementer reading C24 alone will reasonably freeze in the builder, and nothing about a frozen block reveals that it was frozen twice.
@@ -3287,6 +3998,113 @@ split fails rather than passing on a message that reads as covering it.
 
 ---
 
+## 5c. The trail — a band at the head of a streaming run (§025, §026, `R-MOT-004`, `R-MOT-005`, `R-MOT-012`)
+
+**Two facts, two carriers** (`R-BLK-184`): the *trail* says what just arrived and
+the *mark* says more is coming. They are separate because they stop at different
+moments — the trail is a property of a character's position in the stream and
+survives the pause; the mark is a property of the stream itself and goes the
+instant it ends, with nothing replacing it.
+
+### What the terminal cannot do, and what that leaves
+
+§026 rules out two implementations by cost, and the rulings are the design's own:
+
+- **A per-character fade over time.** There is no per-cell timeline — a terminal
+  is repainted — so an age-based fade repaints every character of the trail on
+  every frame. At a 100 ms window that is ten repaints per character, and a
+  500-character reply is 5,000 cell writes a second.
+- **A glyph rising into its cell.** There is no sub-cell position to animate
+  toward. A character is at a cell or it is not. `R-MOT-005` says the same thing
+  as a rule: an animation may change a cell's glyph, colour, opacity or
+  brightness and nothing else.
+
+What is affordable is **a fixed band at the head**: only the cells entering and
+leaving it are repainted, so the cost is a function of the band's width and not
+of the reply's length — about two repaints per cell at a one-cell band and four
+at three.
+
+### The fact is the block's; the band is C09's
+
+**`Panel.live`'s precedent, and it is the one the design argues for.** A panel
+names the fact and C09 derives the mark (C09 I38), because a glyph on the block
+is a producer deciding an appearance. The same holds here: a block says it is
+**streaming**, and C09 derives which cells are in the band and what they take.
+A producer writing the band itself would be writing a span whose offsets depend
+on the terminal's width, which the producer cannot see.
+
+`streaming` is therefore a fact and `trail` is a choice among five forms the
+design names, defaulting to `hotEdge`. Absent `streaming`, `trail` does nothing
+— the band is what streaming means, and a settled block has no head.
+
+### The five, and what each is when the mechanism is a ramp
+
+| form | the head | the target | at 1-bit |
+|---|---|---|---|
+| **`hotEdge`** (default) | `accent` | **the run's own ink** | nothing |
+| `fade` | the surface the run lands on | the run's own ink | nothing |
+| `hue` | `accent` | the block's **body tone** | nothing |
+| `ripple` | — | the band animates `ripple`, the one non-monotonic trail | nothing |
+| `weight` | bold | one hard step to normal | **the only survivor** |
+
+**`hotEdge` and `hue` are not the same rule, and the difference is the target.**
+§026 gives `hotEdge` *it cools to the ink rather than to a second tone* and
+`hue` *cools to the body tone*; they coincide exactly when a run has no ink of
+its own, and separate the moment one does — which is the case `R-BLK-196` is
+written about.
+
+**A run keeps its own ink as the trail's target** (`R-BLK-194`, `R-BLK-196`).
+The reasoning block is dim, so its trail cools to dim and not to the body
+colour: *a trail whose target is fixed repaints every run to white, which is a
+bug that looks like a styling choice.*
+
+**Stated blind spot: the overshoot is not expressible.** `hotEdge` *overshoots
+the accent at the head, holds, then cools*; a `gradient` ramp is a straight
+sample from `from` to `to` and has no curve. What lands is the hold's endpoints
+and not its shape. The distinction that carries meaning — which colour the band
+cools **to** — is expressible and is what separates the forms; the easing is
+not, and is recorded rather than approximated with a second ramp fill.
+
+### Chrome is never revealed
+
+`R-BLK-198`: the head mark and the reasoning header appear **whole**. *The
+reveal is a property of the stream; the trail is a property of a character's
+position in it. A header has no position in the stream, so it exists complete or
+not at all.* So the band is taken over the block's **text** and never over a
+glyph, a header or a border — which is a statement about where C09 measures the
+band from, and it is asserted rather than left to follow.
+
+### 5c.1 The hot edge's overshoot — a ramp stop, and where it is refused (I148; review batch 4 M13.4, D5)
+
+**The profile is the design's demo, and nothing in the type could say it.** §026's
+script, for `d = (head − i) / 14`: below `d = 0.35` the accent is **lifted**, channel by channel,
+by `1 + (1 − d / 0.35) × 0.35`; from there it mixes to the run's ink over `(d − 0.35) / 0.65`. A
+`Ramp` is closed to `Tone` (I106), so *brighter than the accent* had no seam, and `TRAIL_HEAD`
+drew a plain gradient.
+
+**Ruled (D5): a stop on the ramp.** `overshoot: { lift, share }` on a gradient over a slot pair:
+over the last `share` of the axis `to` is lifted from ×1 up to ×`lift` at `t = 1`, and `from`
+mixes to `to` over the rest. The band's positions are `t = 1 − d`, so `{ lift: 1.35, share: 0.35 }`
+reproduces the demo exactly — at `d = 4/14` the demo's factor is `1.064` and the stop's is
+`1 + ((10/14 − 0.65) / 0.35) × 0.35 = 1.064`.
+
+| ramp | `overshoot` | which rules meet | ruling |
+|---|---|---|---|
+| `gradient`, slot pair | `{ lift, share }` in range | I106's closed type × the demo's profile | **accepted** |
+| `gradient`, colormap | any | I106 × C10 I31 | **refused** — a map's end is a map stop, and a lift is a colour the map does not hold |
+| `palette` | any | I106: a palette names nothing | **refused** |
+| `centred` or `step` | any | I106: a fold has no end to lift, and a quantiser would step the lift away | **refused** |
+| on a span | any | I107: the floor is proven per slot, and a lifted `to` is no slot | **refused.** The trail's own band is C09's derivation and never a document (I122), so the refusal does not reach it |
+| `lift` | `≤ 1`, `> 2` or not finite | — | **refused** — `≤ 1` is no overshoot; 2 bounds a channel doubling |
+| `share` | `≤ 0`, `≥ 1` or not finite | — | **refused** — 0 is no stop, 1 leaves nothing to mix |
+| a member other than `lift` and `share` | any | I106's closed keys | **refused** |
+
+**Per depth, on C10 I36's ladder:** the lifted hex at 24-bit, its `nearestAnsi256` at 8-bit, and
+nothing at 4-bit and 1-bit — the step of two draws `from` or `to` and has no colour brighter than
+`to`, and the 1-bit class is `from`'s. A channel is clamped at 255, the demo's `Math.min`.
+
+---
+
 ## 6. Invariants
 
 - **I1** — `ViewDocument` and every `Block` are deeply immutable. All mutation is `applyPatch` returning a new value. **The walk that establishes it remembers what it has already walked, and the reason is a measurement rather than tidiness** (F1065). `applyPatch` deep-freezes the document it returns, so a streaming entry re-froze its whole block on every tick: with a `logs` block held at a fixed **8 000** lines and the same array re-sent, a thousand patches cost **1 140 ms**, against **5.7 ms** once the walk is memoised — 200×, and flat where it was linear in the block. What is memoised is *this function's own* completed walks, held in a `WeakSet`, **not `Object.isFrozen`**: the tree shallow-freezes objects in a dozen places and a shallow freeze says nothing about depth, so reading one as a memo hit would leave `blocks[0].rows[2]` mutable — which is the exact failure this invariant opens with, reintroduced by the optimisation for it. The entry is recorded **after** the freeze rather than before, because it is a claim that the subtree is done and a walk that threw part-way would otherwise leave that claim standing over an unfrozen tree; the cycle guard stays a per-call set, since it has to be added to first. **A second cost was the walk's own allocation**: `Object.getOwnPropertyNames` on an n-element array builds an n-string array to iterate, once per array node per walk, and a document of blocks and lines is mostly array nodes. Arrays walk by index instead — 2 069 ms to **496 ms** over the same 8 000 ticks, **9×** from where it started. Its one narrowing is stated rather than assumed: an array's own *non-index* property is no longer walked. It is still frozen with the array, so it cannot be replaced; what is no longer reached is its interior, and nothing in a `ViewDocument` has one because `JSON.parse` cannot produce one (T1.41). **What neither fixes is the shape**: a block that genuinely grows still costs a walk of its own spine per tick, so a whole-block `replace` remains O(lines) and a growing log remains quadratic. That residue is inherent to deep immutability over plain arrays — an immutable append **is** a copy — which is why the operation F1065 asks for would buy the producer's copy and nothing else: 36 ms across 8 000 ticks, against the 496 ms the rest of the tick costs.
@@ -3294,7 +4112,7 @@ split fails rather than passing on a message that reads as covering it.
 - **I3** — `error` is present iff `status === "error"`. Enforced by `validateDocument`, not by convention.
 - **I4** — `validateDocument` and `validateBlock` are total: any input yields a result, never a throw.
 - **I5** — No block carries a colour. Lint: no hex literal, no ANSI code, no colour name in `viewmodel/`.
-- **I6** — Any `Notice` or `Cell` toned `error` or `warn` carries a glyph, and every glyph is a member of `Glyph` — a slot, never a character. Lint over block construction, satisfying D29 at the source rather than at the renderer. The type carries the second half: a literal in a glyph position does not compile.
+- **I6** — Any `Notice` or `Cell` toned `error` or `warn` carries a glyph — **unless the cell is in a column that declares a closed vocabulary** (`ColumnDef.vocabulary`, ruling 44) — and every glyph is a member of `Glyph` — a slot, never a character. **A rule over the document, held at both doors** (ruling 77, F1284): `block()` throws on a violation and `validateDocument` / `validateBlock` refuse one, each naming C04 I6, so a document has one verdict whichever door it arrives by — satisfying D29 at the source rather than at the renderer, which has no way to invent a glyph. *As it stood:* ~~Lint over block construction~~ — enforced in `block()` alone, so the wire accepted a colour-only `warn` cell or notice the builder refused, and the far side is the producer D29 exists for. **Measured before the wire closed**: every document the docker and plots examples produce, the adapter registry's own documents, `test/support`'s fixtures and far sides, and the golden corpus — none newly refused; the only documents that met the new refusal were tests' deliberately invalid ones, already refused on other grounds. The type carries the second half: a literal in a glyph position does not compile. **The exemption counts carriers per fact** (tie-break 4, parked 44): a word drawn from a declared, closed set — `env`, `flag` — carries its own fact, so the tone is its second carrier and D29's *colour alone* is not the case. **By declaration, never by text**: the vocabulary is a non-empty list of distinct non-empty words, and a cell in its column whose text is not one of them is refused at construction and at the wire — so the set is closed in fact and not only in name, and a cell's text cannot opt itself out. A column without the field, and every `Notice`, is held to the glyph exactly as before.
 - **I7** — `measure` is pure, total, and equals rendered height (§5).
 - **I8** — `applyPatch` is pure. Given the same document and patch, the result is deeply equal.
 - **I9** — `merge` carries **data only**. View state — `expanded`, focus, selection — is always taken from the existing row, never from the incoming one, whether or not the row is touched. A `--watch` tick cannot collapse a row the user opened.
@@ -3305,7 +4123,7 @@ split fails rather than passing on a message that reads as covering it.
 - **I14** — Block ids are unique within a document, nested children included. Checked by `validateDocument`; `applyPatch` fails rather than guessing (§4a).
 - **I15** — `applyPatch` is fallible in its type and never throws. Every one of the four failure cases in §4 returns `{ok: false}` with an `ErrorLike`, and the input document is returned untouched and still frozen.
 - **I16** — A `merge` payload cannot carry view state. Structural, via `MergeRow`, not remembered: I9 holds because the field does not exist to be set.
-- **I17** — Every measurer returns at least 1 for a present block (§5). Only an empty container measures 0.
+- **I17** — Every measurer returns at least 1 for a present block (§5). Only an empty container measures 0 — ~~only~~ **and a finished `progress` whose quantity is `progress` or `count` (I145; review batch 4 M16.2)**, whose content is gone rather than empty.
 - **I18** — Any view state that affects height is a field of the block. Nothing outside the document can change how tall it is, which is what makes `measure` a pure function of block and width (I7) rather than of block, width and wherever the expansion flag happened to live.
 - **I19** — `fill` is the default action and `exec` is reserved for reversible operations. An action a user has not read before it runs is the one thing this vocabulary will not produce by default, and D52's approval story is that default rather than a mechanism built on top of it.
 - **I20** — A `pills` block is exactly one logical row, and **that is a claim about who chooses the breaks rather than about height** (F928). The author writes one sequence of chips; the width decides where it wraps, so a multi-row pill *layout* is multiple blocks — the only way to put a chip on a chosen line. The height is the row count of a first-fit packing at the width (§3), and the sentence this replaces said it *stays declared rather than emerging from how many pills happened to fit*, which is exactly what it does: `Pills` has no height field, and six 10-wide chips are two rows at 40 and six at 20. **Measure and render read one layout** — `chipRows`, called by both — which is the half that was always true and the half I7 depends on.
@@ -3323,12 +4141,12 @@ split fails rather than passing on a message that reads as covering it.
 - **I31** — Row ids are unique within a table, checked by `validateDocument` alongside I14's block ids. Three things address a row by id — `merge` upserts by it (I9), C16's focus names it, and a rendered row is keyed by it — so a duplicate is ambiguous in three ways at once. It is a separate invariant from I14 because the namespaces are separate: two tables may each hold a row `r1`, and a row id never collides with a block id. Raised from C11, the first component to depend on it.
 - **I32** — `ColumnDef.role` declares presentation intent, not view state. A surface names the column whose content a renderer supplies; the flag never changes with what the user does, so it is part of the schema `merge` carries and not part of what I9 protects.
 - **I33** — `patch` and `comparison` are distinct kinds and never merge. One is rows of field comparisons, the other hunks of text with line numbers and two palettes; a merged kind's height would depend on which mode it was in, and I7 — measured height equals rendered height — is the invariant that cannot bend (D50).
-- **I34** — A `view` action's `target` denotes a block id **within the document the action fired from**, and denotes nothing else. The kind carries no content of its own, so a target resolved against a wider scope would let one entry's action fill the screen with another entry's data. C04 owns what the field means; C23 owns refusing one that does not resolve (C23 I31).
+- **I34** — An `expand` action's `target` denotes **a row or a block id within the document the action fired from**, and denotes nothing else. The kind carries no content of its own, so a target resolved against a wider scope would let one entry's action act on another entry's data. C04 owns what the field means; C23 owns refusing one that does not resolve (C23 I31). **It read `view` and named a block alone until the design deleted the pushed view** (R-EXA-082); `expand` took the subject and the field widened by one word. The old wording's argument — *would let one entry's action fill the screen with another entry's data* — is unchanged in force and weaker only in consequence: the wrong entry's row unfolding is quieter than the wrong entry's diff filling the screen, and is the same defect.
 - **I35** — A categorical axis other than `Tone` is never carried by colour. A block names the fact — a marker, a word, or a closed union a renderer maps — and the renderer derives any tone from it; no producer supplies a colour for such an axis, and none is representable. This is why `Tone` stays a judgement axis: the alternative is not a second palette but a distinction that survives `colourDepth: 1` because nothing else was ever available to carry it. Four surfaces reached the boundary independently (F30, F49, F51, F81) and three of them found it correctly by hand.
 - **I36** — `Comparison`'s row carries `change` and `verdict` as separate optional fields, never one union. `comparisonTone` has always coloured the verdict half and left the change half neutral, so one union names two axes that already render differently — and `added`/`removed` have no member of it to join (I35, F30).
 - **I37** — A block kind exempted from D29's sweep is exempted by the *fields it carries*, not by its name. Adding a meaning-bearing field to an exempted kind removes the exemption; the compile-time guard on `KINDS_WITH_NOTHING_TO_CHECK` catches a new kind and cannot catch a new field, so the reason is recorded per kind and re-read when the kind changes (F102).
 - **I38** — A mark is derived from a fact the block names, never invented by the renderer and never demanded of a producer that has already named the fact. `ComparisonRow.verdict` and `Panel.live` are named facts and carry no glyph slot; `Cell` and `Notice` supply one because the fact *is* the glyph. A shape carrying a tone and nothing else has nothing to derive from, and a glyph slot is its only remedy — added when a surface needs one, never speculatively, because MG24 refuses a published member nothing consumes (I35, F18, F34).
-- **I39** — `Panel.live` names whether a region is refreshing; C09 draws the `live` glyph from it. The block names the fact and the renderer owns the mark, so a live panel differs from a static one under ASCII and at one bit, where a character written into the title would not (F18, → C09 I5).
+- **I39** — `Panel.live` names whether a region is refreshing; **C09 draws a spinner frame from it, in the title.** The block names the fact and the renderer owns the mark, so a live panel differs from a static one under ASCII and at one bit, where a character written into the title would not (F18, → C09 I5). **Amended in M4: the mark was `Glyph.live`'s `▌`, and that token is retired.** Two reasons and both are the design's. The design carries no static live mark — liveness is the spinner (§030: *the duration spinner is the liveness carrier*) — and `▌` is the design's **selection rail and caret** (§017, R-BLK-129, 34 rules), so a repository token was standing on a design character for a fact the design draws another way. Retiring it also frees `|` for `Glyph.quote`'s rail, which is ASCII's own quote bar and which `focus` had displaced off `>` (R-GLY-003, SS64). The field is untouched: it was always *a fact, not a character*, and this is that sentence being taken at its word.
 - **I40** — `Comparison.labels` names what the two columns are, and their absence means positional. `a`/`b` is right about the *type* — S07 compares two runs and neither is "before" — and was never an answer to whether a consumer may say which side is which; both shipped consumers said it in a `keyValue` block above the block it explained (F33).
 - **I41** — **`yFormat` names the unit the value arrives in.** `fraction` takes `0.84`, `percent` takes `100.2`, and both render a per-cent sign — so the rendered form cannot distinguish them and naming them by it produced a member whose obvious use was wrong by a factor of 100 (F31). The arm that multiplies is `fraction`; it is the old `percent` renamed, and it carries the surprising name because it is the surprising arm. **The value is not appearance**: `labelWidth` measures the rendered labels to size the gutter (C12 §3), so an arm that changes a label's width changes the block's geometry, and this rename moves both. An unknown arm is a validation error rather than a silent fall-through to `number`.
 - **I42** — **A `row` group divides its width by declared weights, and every rule the equal split made invisible is stated with it.** The gutter comes **off the top** before any share is computed, so equal weights reproduce the current arithmetic exactly and a separator never varies with its neighbours' sizes; the remainder after flooring is **unspent**, exactly as it is under the equal split — and **the leftover is a declared policy rather than a property of the arithmetic**: a group spends nothing, a mosaic tiles by largest remainder with ties by declaration order, and one function serves both because `divideShares` already does. **The first reason this clause carried is false and is corrected here** (F1219): *spending it would make `flex: [1, 1]` differ from no `flex`* is true of C11's leftmost rule, the alternative it was written against, and false of any rule applied **uniformly** — both arms resolve `flex ?? ones`, so a distribution rule that does not ask whether weights were written keeps them identical, measured. What rules is the second clause alone: a table's residual exists to be absorbed and **a group has no child that claims it**, so distributing it picks a child on the arithmetic's behalf. **And the cost of changing it is what settled the direction**: `[1, 1]` differs at 40, 60, 80, 120 and 200, so every frozen capture of the corpus's row group moves by one column at every width, and that oracle is unregenerable by construction (C09 I72, F1209). The row that pins the unspent cell is **T3.17**, not T3.16 — T3.16 asserts equal weights against the unweighted path and is invariant under every distribution rule; a weight of `0` is a **construction error**, because *not placed* is expressed by omitting the child and *placed at one cell* is what `1` means; and a length that does not match the children is one too, since there is no reading to fall back on. **Placement stays left to right and never by size** (§3): with an equal split, by-position and by-cost are the same rule, and under weights they are not — dropping by size would make the rendered set depend on a number rather than on the order the author stated. **The mechanism is not C11's `flex`**, which is a boolean over a content-derived minimum: a group knows `measure(block, width) → height` and no preferred width, so there is nothing to absorb residual from and a proportion is the only expressible allocation. A weight on a `column` group is **ignored** rather than refused, on the precedent `gapBefore` set before it was replaced (§3a), and it is knowingly vacuous.
@@ -3389,7 +4207,7 @@ split fails rather than passing on a message that reads as covering it.
 - **I63** — **A series may name individual samples, in an array parallel to `values`, and the member is refused where a sample is not drawn at its own value.** `pointLabels?: readonly (string | null)[]` — parallel rather than keyed, because `Series.values` is a bare array and the abscissa a sample has *is* its index, so a record would be a second way to say *which sample* and the two could disagree; `null` is *no label here*, so a sparse set needs neither a length nor a sentinel. **Longer than `values` is refused**: an entry past the last reading names a sample that does not exist, which is a document asserting something about nothing rather than a harmless extra. **Refused where `HAS_CALLOUT` is false, and that record is the right one rather than a convenient one** — it partitions the forms whose sample is drawn at *its own value*, and a `stackedarea` or `streamgraph` draws sample *j* at a cumulative height, so a label placed from `rowOf(value)` would name a row the sample is not on. That is the same fact the callout was excluded from those forms for, so this is a second consumer of one partition and not a record borrowed for a different question (C12 I55, §3ag).
 - **I64** — **A field that carries a shape is checked like one, and `hierarchy` was checked like nothing.** `validate.ts` did not contain the word: a node that is the number `42`, a `children` that is the string `"nope"`, a node with no `label` writing those nine letters into a frame as a tile's name — all accepted at both gates, and two of the six shapes measured reached `[plot failed to render]`, which is C09 I11's containment rather than luck (F221). **It survived because `hierarchy` is a shape and not a member**, which is I54's own argument — *one field for three forms rather than three shapes* — and a gate written member by member has nothing to hang a clause on. Every other typed field on `Plot` is a flat list or a small record, so its clause is one line and got written; a recursive shape needs a walk, and the type carries the whole claim while a document does not typecheck. **Every node is an object with a string `label`, `children` is an array where present, and `value` is a finite non-negative number exactly where the form's subject is magnitude** — `flame`, `icicle`, `treemap` — **and optional where it is not**. `value` becomes optional on `HierarchyNode` for `tree`, whose figure is placed by structure alone: a required number every caller of that form must invent is worse than a member that does nothing, because a member that does nothing can at least be left out. **The depth is bounded and the bound is not what this is for** — a chain 3200 deep satisfies every rule the type states and is refused by the stack, the treemap failing between 1600 and 3200 and the flame between 3200 and 6400, which is the two walks' frame sizes rather than anything about the data. 256 is an eighth of the lower figure and deeper than any call stack a profile prints, and the bound exists because **a gate that walks a recursion must terminate it** rather than because anybody's data is deep. **Breadth is not bounded**, and the asymmetry is the reason: a node with ten thousand children degrades to ten thousand zero-width strips, which is a figure saying *too many to draw* and not a throw.
 - **I65** — **A tree's layout is a member, and it was measured rather than reasoned about.** `treeLayout?: "auto" | "topDown" | "leftRight" | "outline"`, refused on every other form. **The three are not a ladder**: over four trees the top-down figure is the cheapest of the three in rows on a broad tree (3) and the dearest on a deep one (13) while its columns invert with it, so no ordering by budget exists — not even one depending only on the budget, since which layout is cheapest depends on the tree — and all three draw the same names and the same edges, which is C12 I34's own test for a rung failed three times in the same way. So `plotDetail` is refused on the form and this member carries the choice, on C12 §3w's ruling that a styling fork ships every option rather than asking which one. **A second member rather than one shared with a future `graph`**, because the value sets do not overlap: sharing would make a six-value union with two per-form refusal lists, which is a larger artefact and a worse message than two members each refused off everything but its own form. **`"auto"` is a fit**, the first whose natural size fits both axes and otherwise the one that keeps the most nodes; a named layout is honoured whatever the budget and the drawing is truncated rather than overflowing, exactly as an explicit `plotDetail: "full"` degrades (C12 I28). **And `hierarchy` stops being optional on this one form**: the three magnitude forms have something to fall back to — two draw their series and the third its empty message — and a form whose whole subject is the shape has nothing, so its absence is refused at both gates rather than drawn as an empty message. **The values are restated in `validate.ts` and held in `tree.ts`**, which is L1 and cannot be imported from L0, so the two must agree and a row asserts it rather than deriving one from the other.
-- **I66** — **`status` carries the state and the three numbers that describe it, and every one of them is supplied rather than derived.** The kind exists because only one of its three states is knowable where the block is drawn: L1 catches a throw and knows `error`, and *never fetched* and *backing off* are facts held by the builder and the refresh driver two layers up (C09 §3a). So the state travels in the block. `retryInMs`, `attempt` and `elapsedMs` are optional and **never computed from `ctx.tick`** — C03 coalesces and drops commits under load, so tick is not in a fixed ratio with wall-clock, and the layer that draws may not read a clock; `retryInMs` already arrives this way and the other two follow it rather than opening a second route. **`height` is required**, on `plot`'s argument: a box the framework sized by guess is silently wrong and nobody notices it is wrong. **An empty `message` and a non-positive `height` are construction errors naming their field** (I57) — a box that says something failed and not what is the objection C09 §3a's three-row rung already makes about dropping the rule.
+- **I66** — **`status` carries the state and the three numbers that describe it, and every one of them is supplied rather than derived.** The kind exists because only one of its three states is knowable where the block is drawn: L1 catches a throw and knows `error`, and *never fetched* and *backing off* are facts held by the builder and the refresh driver two layers up (C09 §3a). So the state travels in the block. `retryInMs`, `attempt` and `elapsedMs` are optional and **never computed from `ctx.tick`** — C03 coalesces and drops commits under load, so tick is not in a fixed ratio with wall-clock, and the layer that draws may not read a clock; `retryInMs` already arrives this way and the other two follow it rather than opening a second route. **`height` is optional, and its absence is a measurement rather than a guess** (C09 §3a-quater). Present, it is a committed measure and the box occupies it exactly; absent, the box is **fitted** — C09's `statusRowsFor` sizes it at the width the layout hands it, border, banner, wrapped message and detail included. This field was required on `plot`'s argument, *a box the framework sized by guess is silently wrong and nobody notices it is wrong*, and the argument is about a guess: the fitted height is the function `render` allocates with, at the width `render` is given, so it is not one. What the requirement bought in practice was the opposite of its reason — `b.status` had no width to fit at, so it declared 1 or 2, and every message longer than a row was cut and every `details` dropped whole, measured at `4099bb6e`. **An empty `message`, and a `height` that is present and not a positive integer, are construction errors naming their field** (I57) — a box that says something failed and not what is the objection C09 §3a's three-row rung already makes about dropping the rule.
 
 - **I67** — **`minHeight` is a floor a layer above sets, written only by `op: "reserve"`, and refused on an inbound document.** It is applied by the registry outside every definition — `max(definition.measure(b, w), b.minHeight ?? 0)` — so no kind reads it, C09 I2's purity is untouched, and `scroll`'s argument that its residue is a function of `(block, width)` and never of view state is not reopened (§3c, §3d). The render pads to the floor and never bounds it, so C09 I1 holds by construction rather than by the two sides agreeing. **An empty `group`'s legitimate zero gives way to a floor**, deliberately: a block that failed and shows nothing is absence indistinguishable from failure.
 
@@ -3398,7 +4216,7 @@ split fails rather than passing on a message that reads as covering it.
 - **I70** — **A graph's layout is a member whose choice arm is vacuous today and whose refusal arm is not.** `graphLayout?: "layered"`, default `"layered"`, refused on every form but `graph`. **One value and one default forbids nothing** — A03 §2's vacuity class in a field, stated rather than left to be noticed — and what is testable is the refusal on the other forms and the compile error it makes of `graphLayout: "force"`. **A second member rather than a widened `treeLayout`** is I65's ruling from the other side, and it was recorded there so this would not be re-opened. **The member exists before its second value because the alternative is worse at the moment it changes**: adding it with `force` widens a union that did not exist, and every exhaustive consumer becomes a compile error that says nothing about what moved. Its expiry is C12 §3ai's label pass, which is a symbol rather than a condition (§3e.2).
 - **I71** — **A mosaic is a grid named by a string, and it exists because nested rows and columns draw only slicing figures.** `areas` splits rows on `/`, one character per column, `.` a hole; the distinct regions in reading order map onto `children` positionally, and the field is **`children`** because `validate.ts`'s `childBlocksOf` recurses structurally on that name and skips any other in silence. **Four refusals at both gates**, each naming the part at fault: an empty grid, ragged rows, a region that is not a solid rectangle, and a region count differing from `children.length` — the third is the one a reader cannot see, since `"ABA"` names a region in two pieces and reads as ordinary. **`height` is required and positive**, because measured rather than argued a container of absolutely positioned children computes a content height of zero and draws **one blank row** (F244 §2) — `Scroll.height`'s precedent, with a sharper reason: a scroll without one is unbounded and a mosaic without one is empty. `measure` returns `height` at every width.
 - **I72** — **The grid's two axes divide by `Share`, and a spanning region takes the sum of what it spans.** `columns` and `rows` are one entry per grid line rather than per child, so a region covering two columns is weighted by both; absent is an equal split, a mismatched length is refused on `flex`'s precedent, and fixed `{cells: n}` shares come off the budget before the weights divide the remainder because any other order makes a cell count a suggestion (I44). **The arithmetic is extracted and not copied** — one `divideShares` for the group's widths and both of the mosaic's axes — which is the four-gutter hazard of `presentation/plot/` named where it can still be avoided. **The vertical axis is the new half**: a column group has no height to divide, because its height is what its children measure; a mosaic declares one, so `rows` divides a known budget with the same rule against a different total. **The remainder is distributed after the division and not inside it** — `facetWidths`' ruling, because a mosaic tiles and its lines must reach the edge, while a `row` group has a gutter and T3.16 pins its remainder where it is; the leftover goes one cell each to the earliest non-fixed lines, so a cell count stays a cell count. **A shared scale across cells is refused and `yMin`/`yMax` are the answer** (I29), because harmonising means measuring both children's data before laying either out — a pass over content this layer does not read — and the field that says it already exists.
-- **I73** — **An image is a block that declares rows and carries bytes, an identity and an `alt`.** It measures, scrolls, degrades and caches like every other kind, which F247 and F248 established before it was designed: `cells(placeholder)` is 1, the diacritics add 0, Ink lays out what `cells()` measures, Ink re-emits the full frame on a one-row change, and both `truncate` and the window leave the grid addressing correctly. **`path` is the builder's arm and `data` is the block's**, because `node:fs` appears nowhere in `src/presentation/` and a renderer reading a file would make `measure` and `render` disagree the moment the file changed between them. **The identity is a digest computed once at construction, never the data** — a megabyte of base64 in a cache key costs more than it saves, and the digest is what the protocol arm caches at a placement, so an unchanged picture transmits once — two blocks of one picture are one transmission with no placement scope and two once the shell scopes placements by entry (→ C09 I66). **The width is derived from `columnsForAspect` and clamped by `measure`**, which receives the width: over-drawing here is worse than wrong, because a placeholder outside its rectangle addresses part of an image the terminal is not drawing there (C09 I35, F245). **Refused at both gates**, each naming its part: neither `data` nor `path`, both together, a non-positive `height`, an empty `alt`, bytes that are not a PNG, and a decoded size past a cap. **`alt` is required rather than optional** because at `imageProtocol: "none"` with no dither it is the whole of what the reader receives.
+- **I73** — **An image is a block that declares rows and carries bytes, an identity and an `alt`.** It measures, scrolls, degrades and caches like every other kind, which F247 and F248 established before it was designed: `cells(placeholder)` is 1, the diacritics add 0, Ink lays out what `cells()` measures, Ink re-emits the full frame on a one-row change, and both `truncate` and the window leave the grid addressing correctly. **`path` is the builder's arm and `data` is the block's** — the block keeps the path as a record beside the bytes (I142), and nothing below the builder opens it — because `node:fs` appears nowhere in `src/presentation/` and a renderer reading a file would make `measure` and `render` disagree the moment the file changed between them. **The identity is a digest computed once at construction, never the data** — a megabyte of base64 in a cache key costs more than it saves, and the digest is what the protocol arm caches at a placement, so an unchanged picture transmits once — two blocks of one picture are one transmission with no placement scope and two once the shell scopes placements by entry (→ C09 I66). **The width is derived from `columnsForAspect` and clamped by `measure`**, which receives the width: over-drawing here is worse than wrong, because a placeholder outside its rectangle addresses part of an image the terminal is not drawing there (C09 I35, F245). **Refused at both gates**, each naming its part: neither `data` nor `path`, both together, a non-positive `height`, an empty `alt`, bytes that are not a PNG, and a decoded size past a cap. **`alt` is required rather than optional** because at `imageProtocol: "none"` with no dither it is the whole of what the reader receives.
 - **I74** — **An overlay is a scalar field over an image's cell rectangle, and its rendering differs by arm.** At the dither this framework owns the glyph and the colour, so the braille cell carries the picture and the foreground carries the field, with C10's colormap and its 8-bit floor applying unchanged and **no rung beneath it**: the cell's other axis is spent on the picture, and a threshold-to-tone fallback would put a binary mask on screen wearing a continuous field's clothes. At `kitty` the cell's rendering is the terminal's — the two diacritics are spent on position and the 24-bit foreground on the image id — so the overlay is **composited into the pixels before transmission**, which gives up the palette and the degradation at `kitty` specifically and loses nothing, because there is nothing below `kitty` for it to degrade *to*. **The values are the author's resolution and never the cell grid's**, since the rectangle is a function of the render width; the resample averages, because a point sample turns a gradient into a staircase and can lose a single hot cell entirely. **The scale is `yMin`/`yMax` — the plot family's members, resolved by the plot family's function** (I29, §3h.4): independently optional, replacing rather than widening, collapsing to a constant on a reversed pin, and drawn mid-ramp at a zero span. `heatmap.ts` had already ruled that a field form spends those two on the **value** range rather than on the ordinate, and an overlay is a field form over a picture. A derived range is right for a single overlay and wrong for a set: §3h.3 measures the residual that a per-panel extent draws as loud as the panels it is the difference of, and `sharedRange` is what a set is read on — computed by `b.samples` across its items, on C24's surface for every other composition, and **a caller's own bound always wins**. **The picture's identity is not the image's** — `digest` keys the decode and `imageKey` is what the transmission caches at a placement — and, with no placement scope, the placement's identity (→ C09 I66) — because two blocks of one image with different overlays otherwise transmit once and both draw the first, which is the wrong picture rather than none. **Refused at both gates from one function**: a non-rectangular or empty matrix, a non-finite value, an unknown colormap, a non-finite pin, and an alpha outside `0..1` (→ C09 I36, C10 I31, FINDINGS F251 · F252 · F253).
 - **I75** — **A plot's `camera` is the initial view, and the live one is not the block's.** It is admitted to `Plot` by the second arm of the widening test — the decision is the caller's alone, since no theme resolves a viewing angle and no renderer constant settles one — and **not** by the first, because `plotHeight` reads `form`, `height`, `axes`, `legend` and `xTitle` and a camera moves none of them (C12 I1). The member is `Partial<Camera>`, so a caller stating an elevation has not thereby stated a projection and the renderer completes it from one exported default; a partial view and the default carrying the same field are one view rather than two. **A block carrying the live camera would move its own `rev` under an orbit** — a document write per frame, an eviction per write, and C13's store paying for a rotation — so the live one is view state and reaches the renderer through `RenderContext` (→ C22 I71, C12 I83). The type is declared in this component and not beside the renderer, because `RenderContext` is L1 and a `Camera` in `presentation/` would make this member an upward import (A02 §1). **No `orbit` member**: `measure` never sees `tick` (C09 I8), so a block cannot declare that it animates, and whether the camera moves is L4's exactly as whether a spinner turns is (→ C22 I60).
 - **I76** — **A 3D scatter carries its geometry in `points3` and names the channel colour spends in `colourBy`.** Three coordinates have no spelling on `Series`, which is I61's wall at two numbers per cell one dimension along — so the form takes a new carrier and leaves `series` empty exactly as `quiver` does. **A record rather than a tuple**, because a sample has an optional fourth reading on a different axis and a tuple is bad at optional elements, where a vector has none. **No per-point `label`**, because it has no renderer. **A per-series `marker` names a column of the depth tier's row, and the tier still owns the row** (→ C12 I99, F486): the glyph table is 3 × 5, tier by name, so the member is an axis of the channel rather than a second writer on it — and an unknown name is refused rather than drawn as nothing, because the far side's `marker: "stra"` would otherwise be absence indistinguishable from failure. `colourBy` exists because three readings compete for one channel and a guessed default breaks C12 I6 by omission; it defaults to `"depth"`, the reading a projection creates. **`colourBy: "value"` with any point lacking a finite `value` is refused** — the point still has a position and would be drawn in some colour, and both dropping it silently and colouring it at the floor are claims the data does not support; it is the only refusal here that depends on a *combination* of members, and **the only one that is the validator's alone**, on `vectors`' own split: member rules at both gates, a walk over the data at the gate that reports rather than throws. Four refusals: `points3` off the form, the form with none, `colourBy` off the form, and `axes` on it — the last because three axes turn with the camera and are drawn inside the area, so `axes: true` would switch on furniture that does not exist (→ C12 I87, C12 I88, C12 I89, FINDINGS F207). **And the 2-D `Series` carries no `marker` at all.** The 3-D carrier has a glyph channel — the depth tier's row of a table a marker name indexes a column of (C12 I99) — so a marker there names something a renderer draws. No 2-D form has such a channel: measured across `src/`, the only `.marker` reader is `scatter3.ts` on `Point3Series`, and `validateBlock` checks `marker` only under `points3`. The `src` type carried an undocumented `marker?: string` on `Series` regardless, and `b.line(values, { marker: "star" })` compiled, validated and drew nothing — F207's member accepted and ignored, on the builder that is the public door. Removed on F85's argument: a member nothing reads is narrowed away rather than documented, so supplying one fails to compile rather than fails to matter.
@@ -3410,7 +4228,7 @@ split fails rather than passing on a message that reads as covering it.
 - **I82** — **`lineRange` is view state written only by `code`'s `window`, refused on an inbound document, and honoured by both halves of the definition.** The window keeps `text` whole — the same string, no copy — and sets the source-line range `[from, to)`; `measure` counts the lines in range and `render` tokenises the whole text and produces only those rows, so a block comment opening above the window still colours the rows inside it (C09 I25a, F426). Units are source lines and never rows, so a window never opens inside a wrapped line and the surplus is `skipRows`/`dropRows` (C09 I26). It is the third member of I67's refused set and the first whose writer is a definition rather than an op; `raw` windows by slicing `text` and carries no field (§3d, C14 §4a, C14 I23).
 - **I83** — **A span is a parallel decoration and never a second carrier of text.** `spans?: readonly TextSpan[]` sits beside `text` (or `label`) and addresses it by offset; the member's string is unchanged and every existing reader of it stays valid. A span carries no characters, so the measurer's input is the string it always was — §5's *independent of theme* clause holds by construction and no kind's `measure` reads `spans` (→ C09 I1, C09 I8). The union form `text: string | readonly Run[]` was measured against 17 readers and 57 writers and refused on that count; the run list is what a renderer *builds* and is C09's `Span`, not this type's (§3am).
 - **I84** — **Offsets are UTF-16 code units, half-open, and the gate refuses every malformation it can decide.** `from` and `to` are integers with `0 ≤ from < to ≤ text.length`; the array is sorted by `from` and no two spans overlap; a boundary between the halves of a surrogate pair is refused. Each fault is one error naming the span's index. What the gate cannot see — a boundary inside a grapheme cluster that is not a surrogate split — is snapped outward by the renderer — `from` to the cluster's start, `to` to its end — which preserves the width (→ C09). The unit is the one `Token`, `sliceTokens`, `truncateParts.kept.length` and `codeRows.start` already use, so the row-slicing mechanism is shared rather than reimplemented.
-- **I85** — **A span's attributes are `bold`, `italic`, `underline`, set by the renderer from the span and never resolved from a palette slot; its four other members are I89's, I90's, I105's and I107's.** No `tone`: it would collapse at 1-bit onto the attributes the span itself uses and its one consumer is ruled onto `underline` (C25 I10). No colour, no `dim`, no `inverse`, no `value` — each a deferral with a symbol, and each admitted only by a consumer appearing (F85's narrower type). At 1-bit a span's `bold` on a block whose tone already collapses to bold is **absorbed and not compensated**: no fallback onto `underline`, which is spoken for, and no return to literal markers, which the view model cannot decide because it never sees a capability (→ C10 I33).
+- **I85** — **A span's attributes are `bold`, `italic`, `underline`, set by the renderer from the span and never resolved from a palette slot; its five other members are I89's, I90's, I105's, I107's and I151's.** No `tone`: it would collapse at 1-bit onto the attributes the span itself uses and its one consumer is ruled onto `underline` (C25 I10). No colour, no `dim`, no `inverse`, no `value` — each a deferral with a symbol, and each admitted only by a consumer appearing (F85's narrower type). At 1-bit a span's `bold` on a block whose tone already collapses to bold is **absorbed and not compensated**: no fallback onto `underline`, which is spoken for, and no return to literal markers, which the view model cannot decide because it never sees a capability (→ C10 I33).
 - **I86** — **A span changes no geometry at any stage: it continues across a wrap, clips to the kept text at a cut, and follows a substituted cluster.** A wrapped span is carried by source offset — every wrapped row is an exact contiguous slice of the source from a known `start`, and `wrapCells` drops break spaces, so prefix sums of row lengths drift one unit per break and are the wrong arithmetic. A truncated span is clipped to `truncateParts.kept`; the marker and its padding are never inside a span. A cluster the wrapper replaces with `?` keeps its span. `measure` is the same number with and without `spans` at every width (→ C09 I1, I19).
 - **I87** — **A span travels with its text through every patch and stops at the copy buffer.** `replace` carries a whole `Block` and `merge` a whole `Cell`, so no `ViewPatch` arm can write `text` without its `spans`; a patch that widened to a text-only arm would reopen the class this closes. Copy takes `text` and drops `spans`, as it drops tone. A `TextSpan` is plain data and survives `JSON.parse(JSON.stringify(d))` (§5a). C17's `CellSpan` is a result in display cells over the editor's rows and shares a name only.
 - **I88** — **Four members carry spans in the first pass and `code` is refused one.** `Raw.text`, `Notice.text`, `Rule.label` and `Cell.text` — the four the markdown translator emits text into. A `code` block with `spans` is refused at the gate: its syntax tokens are a run stream over the same text, and two streams over one string is the collision the mechanism exists to prevent. Every other text member is deferred with its symbol (`CALCIUM_SPANS_DESIGN.md` §7) and admitted by a writer appearing, never by symmetry.
@@ -3420,7 +4238,7 @@ split fails rather than passing on a message that reads as covering it.
 - **I92** — **`GraphEdge.weight` is a flow: required on every edge of `form: "sankey"`, refused on `form: "graph"`, positive and finite.** `sankey` takes `graph` on `graph`'s own rule — required, `hierarchy` refused beside it — and shares its layering (C12 §3d, `graphLayers`); a zero or negative weight is refused because a ribbon of no width is an edge that is not there, and an ignored weight on `graph` is I77's accepted-and-ignored (→ C12 §3d).
 - **I93** — **`Image.data` carries PNG or GIF bytes and the codec tells them apart by signature; a GIF's frames are its own, and the frame shown is view state, never geometry.** `height` is declared, so every frame shares the logical screen and `measure` is the same number for a still and an animation. The frame index advances on the shell's animation wake and is read by the renderer through view state — `Cameras`' shape with `ScrollOffsets`' zero rule, frame 0 after a loop keying as untouched (C22 I77); at `imageProtocol: "kitty"` the terminal animates from one transmission and the shell holds no frame (C09 I39) (→ C09, §3g).
 - **I94** — **`Rule.level` names one of three drawn forms, absent is the second, and the six ATX levels collapse at the translator rather than in the type.** The axis is the **fill** and nothing else: heavy at tier 1, light at 2, blank at 3, with the lead at two cells and the label in the same column throughout — so `measure` is one row at every tier and no geometry is at stake. Case is not an axis, because upper-casing changes cell count for scripts that have no case and puts a capability decision inside a transform that cannot see one; indentation is not one either, because it moves the label off the column the rule exists to mark. **`HeadingLevel = 1 | 2 | 3` rather than `1..6`**: a fourth tier would be accepted and drawn as a third, which is F207's member one layer up from where that finding usually lives, and the type is where it is cheapest to refuse. **An empty label never takes the blank fill** — tier 3 falls back to tier 2's light rule there, because a rule with no label and no line is not a rule (I21) — and the fill is drawn as **spaces** rather than dropped, so `meta` stays right-aligned and the row is exactly the width at every tier (→ C09 I40, §3an).
-- **I95** — **`Glyph.quote` is a rail — drawn on every row of its block rather than on the first — and a blockquote's body is prose.** The reserved columns are `prefixCells`' own, so the geometry does not move and `measure` still needs no capability; only what fills rows 1..n changes, which is a property of the **token** exactly as `continuation`'s indent is, and the block schema learns nothing. **Not `live`'s `▌`**, on F161's argument about a shared mark and on a second the argument does not reach: `▌` and every box-drawing vertical are `East_Asian_Width=Ambiguous` — 1 narrow, 2 wide by the framework's own `cells()` — where `⎸` (U+23B8) is one cell under both, which is `continuation`'s measurement reaching a decision rather than a footnote. The ASCII half is `>`, plain text's own quotation mark. **The rail takes the block's tone**, since a second tone would be a colour distinction and colour is gone at 1-bit where the rail is not. **A quoted heading and a quoted list item are text**, and that is unexpressible rather than deferred: re-parsing a body would want a rail on a `rule`, a `code` and a `table`, and none of the three has a slot to hold one (→ C09 I41, §3an).
+- **I95** — **`Glyph.quote` is a rail — drawn on every row of its block rather than on the first — and a blockquote's body is prose.** The reserved columns are `prefixCells`' own, so the geometry does not move and `measure` still needs no capability; only what fills rows 1..n changes, which is a property of the **token** exactly as `continuation`'s indent is, and the block schema learns nothing. **The Unicode half stays `⎸` U+23B8 and the reason is a measurement, not F161's**: `▌` and every box-drawing vertical are `East_Asian_Width=Ambiguous` — 1 narrow, 2 wide by the framework's own `cells()` — where `⎸` is one cell under both, which is `continuation`'s measurement reaching a decision rather than a footnote. **The ASCII half is `|` since M4, and it was `>`.** `>` is plain text's own quotation mark and it is also the design's focus mark (R-GLY-003), and the two shared the row's lead — SS64's first real finding. `|` is the other plain-text quote bar, it is what every box-drawing vertical already degrades to, and it was held by `Glyph.live`, which M4 retires (C04 I39). F161's shared-mark argument is what made the swap available rather than what decided it. **The rail takes the block's tone**, since a second tone would be a colour distinction and colour is gone at 1-bit where the rail is not. **A quoted heading and a quoted list item are text**, and that is unexpressible rather than deferred: re-parsing a body would want a rail on a `rule`, a `code` and a `table`, and none of the three has a slot to hold one (→ C09 I41, §3an).
 - **I96** — **The list indent is bounded at three levels and `Glyph.nested` says which side of the bound an item is on.** The bound stays on a measurement rather than on its first reason: with the cap removed, at width 40 an item past about depth 15 loses its indent entirely — the leading spaces are the wrapper's break, the first row is the mark alone, and a deep item reads as depth 0 having spent a row saying nothing. A width-scaled cap is not available, because the indent is computed where no width exists and none may be read. **What the cap cost is a document that means two things**, so depth 0–3 take `bullet` and everything deeper takes `nested`; past it the frame says *at least this deep* and no more, which is what a bounded region says — a residue marker does not report how many characters it dropped either (I49). **The ordered arm takes the mark too**, because a number says which item and never how deep. `⁃` (U+2043) is Neutral where `◦`, `‣` and `▪` are Ambiguous; the ASCII half is `~`, §5's own bounded-region mark, and not `-`, which is `bullet`'s and would spend the distinction at the rung that needs it (→ C09 I41, §3an).
 - **I97** — **`Scroll.follow` is a producer's field and the tail is view state: the field says *start following*, the store says *still following*.** A streaming container opens at its tail because the producer said its content grows at the end — a property of the content, and the one thing about position a producer may say, where `lineRange`, `minHeight` and `capped` (I82) describe the *view* and are refused. Whether the reader is still there is derived from where the box ended up and never from which way they scrolled (C14 I5's rule, one level down): an offset at or past the ceiling **is** the tail; the store spells *stay there* as `TAIL` (`∞`) so the clamp at read keeps a following box at the bottom as its content grows **with nothing written on a patch** (§3c cell 4, C23 I47); a page up from the tail resolves the held value — `TAIL`, or the tail an untouched follow box implies, which the caller states because the store does not know the block — against the ceiling the caller measured, and the follow stops because the position is no longer the bottom; a page landing at or past the ceiling snaps to `TAIL` and it resumes, for a box that never declared `follow` too. `measure` never sees `follow` — the box is `height` rows at every offset, following or not, so the rows above it do not move when its content does. While following the hidden rows are above the box and I49's row reads *N above, 0 below*. Both `wasAtBottom` comparisons — the document view's and the store's — are one function (`atTail`), so `>=` cannot drift to `>` in one of them (§3c, the tail).
 - **I98** — **A scroll declaring `collapsed` has a collapsed form: zero interior rows and the residue row, which is the whole of what it draws.** *Declares* means the field is present, either value; a scroll without it has no collapsed form and carries no affordance. Collapsed, the box draws I49's row alone — *⋯ 0 above, N below*, the design's *+N more* sharing the residue's mechanism rather than a fourth count string — and `measure` is 1 at every width. Its elements are still one per child (I47) in content coordinates (§3c cell 8), and each carries `activate: { kind: "expand", target: <block id> }` so `⏎` on any of them toggles the fold. **The toggle is a shell-origin `replace` with `collapsed` inverted** (C13 §2) and never `op: "expand"`, whose arm names a row and refuses a scroll (C25). A block declaring a collapsed form is what `expand` widens to in the dispatcher: rows first, then blocks, **both at any depth**, from one walk read twice rather than two expressions listing the same containers (§3c S5, I115) — the sentence this replaces put *at any depth* on the block arm alone, and the row arm could not see a table inside the `panel` `b.live` produces (F1015). And from a settled entry it is C23 I18's one exception, because revealing held data is not acting on stale data (§3c S4).
@@ -3431,11 +4249,13 @@ split fails rather than passing on a message that reads as covering it.
 - **I103** — **A child's placement is computed once and read by the renderer and the element walk alike.** The offsets on both axes come from one function in `measure.ts`; the renderer applies them as margins and `elementsIn` lifts the child's elements by them, so an element sits where the frame drew it. F816 measured the alternative at HEAD: a `bottom` child drawn on row 3 whose chips answered `rows [0, 1)` (§3 *Both axes* R5, C09 I30, C26 §5).
 - **I104** — **The residue row's text is fixed by state and names no key: an open box reads `⋯ N above, M below`, a collapsed box reads `⋯ +N more`.** One mechanism for *what is hidden* (I49) and two texts, because the open box's direction was measured to matter (§3c T6) and the collapsed box has no direction to state — *0 above* on zero visible rows is a clause nothing can falsify (F826). No key name on either row: the affordance is `activate` and the footer shows its label (C16 I19).
 - **I105** — **`elide` is a span member marking the run a fitter shortens first, from its end; it is a boundary and never an appearance, and it is inert outside a fitted token.** `TEXT_SPAN_KEYS` admits it as the eighth member; `measure` reads it as it reads `from` and `to` (I83), so a `step` notice is one row with or without it and a wrapped notice wraps as it did. The consumer is the call's head, whose argument gives way before its verb, duration and outcome (C09 I46).
-- **I106** — **`Ramp` is a closed data type: three fills whose backing arity the gate checks, six keys in `RAMP_KEYS`, no member that can hold a colour value, and `palette` names nothing.** `gradient` and `step` take exactly one of a slot pair or a `colormap`; `palette` takes neither and no `bands`; `bands` is `step`'s alone, an integer in `2..8`. The type is closed to `Tone` and `ColormapName`, so §3's *never embeds a colour* holds by construction. A palette ramp cycles the theme's categorical slots and no other (C10 I16, F837).
+- **I106** — *(amended — R-MOT-012)* **`Ramp` is a closed data type: **four** fills whose backing arity the gate checks, ~~seven~~ **eight** keys in `RAMP_KEYS` (**`overshoot`**, I148), no member that can hold a colour value, and `palette` names nothing.** Every fill but `palette` takes exactly one of a slot pair or a `colormap`; `palette` takes neither and no `bands`; `bands` is `step`'s alone, an integer in `2..8`. **`centred` is the fourth** — §037's `gradient-centre`, *brightest in the middle* — and it is a **sampling** rather than a backing: it folds the argument to `1 − |2t − 1|` and hands it to whichever backing is declared, so it needs no arm at the gate and takes no `bands`. *The type carried three while the registry registered five static ramps, and the sentence that reconciled them — `centre` and `linear` are both `gradient` — was **true about the family and silent about the sampling**, so a linear ramp and a centred one were one value and one picture. Five records project onto four fills × two backings; the projection is what T2.117b compares.* The type is closed to `Tone` and `ColormapName`, so §3's *never embeds a colour* holds by construction. A palette ramp cycles the theme's categorical slots and no other (C10 I16, F837).
 - **I107** — **`TextSpan.ramp` is the ninth member and is appearance only: `measure` never reads it, it replaces the run's foreground colour and nothing else, it is refused beside `value`, and a colormap backing is refused on a span.** A slot pair is bounded by two colours whose floors C10 I26 proves; a sampled colour passes through no floor. The bar's ink reads by area (C10 I31), which is why the same backing is admitted there. The deferral's symbol is a floor-aware lift in `theme/contrast.ts`.
 - **I108** — **`Progress.ramp` is the one block-level carrier; `RAMP_EXTENT` is exhaustive over `BlockKind`, and a kind marked `none` has no member to carry a ramp.** The `on` cells take the ramp over the axis (→ C09), the `off` cells stay `muted`. Every other kind is a deferral with its symbol (`CALCIUM_INK_RAMPS_DESIGN.md` §7), admitted by a consumer appearing and never by symmetry.
-- **I109** — **`RampAnimation` is a closed union of five loops and `none`; period and easing are never members; absent is `none`, and the static frame is `tick = 0` of the same evaluation.** A one-shot is an event and needs a birth tick the render lacks; a position effect is a text window and not a colour. Timing lives in the effect (→ C09), as the spinner's lives in the set.
-- **I110** — **A `TerminalLine.text` carries no C0 or C1 control, and `validateDocument` refuses a document that breaks it, whatever the source.** The second of two gates — C27 I2 replaces controls at the cell walk — and the one that holds for a far-side envelope and a persisted row, neither of which passed through C27. The renderer does not strip, so this gate is what lets a terminal block carry colour at all: `raw`, which strips, cannot.
+- **I109** — *(amended — R-MOT-012, R-MOT-005)* **`RampAnimation` is a closed union of the registry's twenty-three effects and `none` — eighteen periodic and the five that end; period and easing are never members; absent is `none`, and the static frame is `tick = 0` of the same evaluation.** Timing lives in the effect (→ C09), as the spinner's lives in the set. **A one-shot reads `Ramp.since`**, the tick it began on, and holds its final frame once its duration is past — so `measure` is untouched and *appearance animates, geometry never does* still holds. **A producer need not supply it and usually cannot** — the tick is the session's counter and never leaves it — so the shell stamps an absent `since` at the first frame that draws the entry, once per identity (C22 I131, *amended — review batch 1, item 3*). `since` is refused on a periodic effect, because a stamp nothing reads is a field that looks like it does something. **The streaming trail's one-shot is stamped the same way and carried on the notice**, as `Notice.trailSince`, because its ramp is derived at render and has no address in the document (C09 I133; ruling 81, *amended — review batch 4, round 2*): the shell stamps it at the first frame that draws each new arrival, and it is refused on a notice whose `trail` names no one-shot, for the same reason. **Every effect is a value in `[0, 1]` the fill is sampled at** and none of them decides which clusters show, which is R-MOT-005 and is what retires the old *position effect* exclusion.
+
+  - **I109 (as first written)** — **`RampAnimation` is a closed union of five loops and `none`; period and easing are never members; absent is `none`, and the static frame is `tick = 0` of the same evaluation.** A one-shot is an event and needs a birth tick the render lacks; a position effect is a text window and not a colour. Timing lives in the effect (→ C09), as the spinner's lives in the set. *Both exclusions are false in this tree — the clock is injected and every effect is a colour — and the deferral named `RenderContext.since`, one value per frame, where a document may hold two one-shots begun at different moments.*
+- **I110** — **A `TerminalLine.text` carries no C0 or C1 control and no bidi format character, and `validateDocument` refuses a document that breaks it, whatever the source.** The bidi set is U+061C, U+200E, U+200F, U+202A–U+202E and U+2066–U+2069, widened by ruling 71 (review batch 4, M12): the renderer emits this kind's text without neutralising it (C09 I56), so an override here would reorder the frame around it exactly as an escape would repaint it. The second of two gates — C27 I2 replaces controls at the cell walk — and the one that holds for a far-side envelope and a persisted row, neither of which passed through C27. The renderer does not strip, so this gate is what lets a terminal block carry colour at all: `raw`, which strips, cannot.
 - **I111** — **A `terminal`'s runs are maximal, non-overlapping, ordered, and within the text; a default-styled cell is in no run.** `TextSpan`'s offset convention (I83) and its bounds gate, with one addition: two adjacent runs with equal styles are refused, because merging is the producer's job and a snapshot that fails to merge measures the same and diffs differently on every frame.
 - **I112** — **`cursor`, when present, indexes a line that exists and a column within `cols`; and `measure` never reads it.** Appearance, never geometry — the cursor moves on every keystroke the child receives and a height that moved with it would reflow the transcript.
 - **I113** — **`screen: "grid"` means the snapshot is the whole screen and `dropped` cannot be present; `dropped`, when present, is a positive integer.** The alternate screen has no scrollback to lose lines from, so the two fields are mutually exclusive by meaning rather than by convention, and the gate says so.
@@ -3470,6 +4290,39 @@ split fails rather than passing on a message that reads as covering it.
   **And the key must match the member.** `KnownBlockKind` derives from `KnownBlock["kind"]` rather than from `keyof KnownBlockKinds`, so a mistyped key would be invisible in the union it produces; the two are asserted equal at the type level (T2.129), which is the only place the mistake can be seen.
 
 - **I121** — **`childGap` is the container's space *between* its children, and it is charged per placed child.** A container spends `max(0, placed − 1) × childGap` on its own axis — `1` by default across and `0` down, which is `ROW_GUTTER`'s behaviour given a name (F1226) — and `padding` takes its edges outside all of them, so a container with both draws one gap above the first child rather than two (§3b). It is the container's and never the composer's (C09 I17): `sequenceHeight` adds nothing and a document's top level has no `childGap`, the row between entries being the entry's own closing run (C22 I85). A container with one child or none spends nothing, whatever the field says. A gapped container remains windowable, because the gap rows are the definition's rather than the registry's.
+
+- **I122** — *(§5c, §025, §026, `R-MOT-005`, `R-MOT-012`)* **A block says it is streaming; it never says which cells are in the trail.** `streaming?: boolean` is the fact and `trail?: TrailForm` is the form, defaulting to `hotEdge`; C09 derives the band. The band's offsets depend on the terminal's width and a producer cannot see one, so a producer writing the span would be writing a number it cannot compute — `Panel.live`'s precedent (C09 I38), applied to the one other place a block was about to be handed an appearance.
+- **I123** — *(§5c, §026, `R-BLK-194`, `R-BLK-196`)* **A trail's target is the run's own ink, never a fixed colour.** `hotEdge` and `fade` cool to the ink the run already has; `hue` cools to the block's body tone, and that is the whole difference between it and `hotEdge`. A trail whose target is fixed repaints a dim run to white, which is a defect that reads as a styling choice. `trail` with no `streaming` draws nothing — the band is what streaming means, and a settled block has no head.
+- **I124** — *(§3ao, §095, `R-BLK-758`–`764`)* **A tape slides its window; it never sheds a member.** Every member keeps its place and its element id, and the window is the run of them that is drawn — so `«n` and `n»` count what is offscreen rather than what was lost, and a focus inside a tape is never orphaned. That is the property `pills` does not have and does not need: a row of peers nobody walks can shed, because nothing is pointing at what went. The window's start is **state, not a field** — *the window moves only when the current leaves it* is a statement about the previous window — and it is one integer held where a scroll box's offset is held, for the same reason and one axis over. **A member's columns are the drawn ones, and they are asked of a pure helper** (§3ao.1; review batch 4 M14.2, D11): `tapeMemberCols(block, width, capabilities, held)` answers each member's `[from, to)` from the same `layout` `render` and `tapeStart` take — the current's lead is its own, a gap is nobody's, and a member off either end is empty at `0` or at the width. `elements` keeps `[0, width)`, because a column that moved with the held start would be geometry moving without `rev` (C26 I3); the shell asks the helper where it holds the start, and that reader is `elementAt`, at the held start and C26 I31's anchor. → T1.83, T6.113
+- **I125** — *(§3ao, §095)* **The window moves by the minimum that brings the current back into view, and the mark it costs is priced into that move.** *(Amended by C26 I31, ruling 80: while focus is in the tape, the focused member is what the window brings into view, and `current` is the anchor otherwise. One anchor, taken by `layout`, so the sentence below holds of either.)* Moving the window raises a residue mark, and the mark spends cells the window was spending on members, so a move of one can cost two. Pricing the mark into the test makes the answer a fixed point the first time it is asked; an implementation that moves and then re-prices is iterating towards the same number. **The two bounds are two questions.** The **end** is the longest run from the start that fits, taken as a maximum over the candidates, because the cost is not monotone there: a mark disappears when the run reaches the last member, so arriving can be worth more than it costs — measured over 200,000 random tapes, a greedy loop drew fewer members than fit in 233 of them. The **start** is the minimum *move*: the first start at or after the held one that reaches the current. A smaller start exists in most tapes and taking it would drag the window backwards to reach something ahead of it, which is what §095 separates a tape from. **And the held start has a ceiling, which is where the analogy with a scroll box is load-bearing rather than decorative.** `offsetOf` clamps a box's offset to `content − interior` at read, and the tape had no counterpart: a reader who narrowed the terminal, walked to the last member and widened it again kept a `«5` with the whole tape's worth of room beside it, because *the window moves only when the current leaves it* is true of a start that is too far along as well. The clamp is the same sentence in the tape's unit — **no start is held past the smallest one whose window still reaches the last member** — and it is taken at read, in `tapeWindow`, for the reason the box's is taken in the renderer: the store does not know the width. **And it is a minimum over candidates, not a walk back**, which is the end bound's own non-monotonicity arriving at the other end: backing up past the first member removes the `«n` the later starts were paying for, so a start that does not fit sits between two that do. Measured — widths `1 3 9 5` in a room of 24 from a held start of 2: `«1` costs four cells, so starting at 1 needs 25 and starting at 0 needs exactly 24, and a loop that stops at the first failure keeps a `«2` where the whole tape fits. That is `grow while it fits` one bound over, and it was written the same way the first time.
+- **I126** — *(§3ao, §095)* **An all-or-nothing group is shed before any single member goes offscreen, and it does not come back.** Every member's detail goes together or none does — a row with three clocks and two blanks says the blanks are still running — and once the window has slid, the details stay gone even where the few visible members would fit with them. Bringing them back trades a member for a clock, which is what rule 1 forbids and what keeps the ladder monotonic. The current is never shed: a member wider than the whole width **truncates**, because a tape with nothing in it says less than a tape with one truncated name.
+- **I127** — *(§047, R-HON-002)* **`Panel.staleForMs` names a stale reading and how old it is; C09 draws the notice from it.** Absent is fresh. Present, it is the age in milliseconds of the reading the panel's children show — a non-negative finite number, and anything else is a validation error rather than a notice about nothing. **A number and not words**, on I38's rule and `Status.elapsedMs`'s precedent: the block names the fact, the renderer owns *updated 4m ago*, and a producer never formats a duration the renderer would format again. It changes no measurement — the notice rides in the top border, which is drawn either way.
+- **I128** — *(§088 §4, §086, `R-COL-006`, `R-DEG-001`)* **A cell's trend is two readings, and the column says which way is good.** `Cell.trend` is `{ from, to }` — finite numbers, the earlier reading and the later — and the cell's `text` is what follows the arrow (`from 0.41`), so the producer keeps its own formatting. `ColumnDef.polarity` is `"higher" | "lower" | "neutral"`: which movement the metric wants, declared on the column because §086 homes a metric *inside a table cell* and a column is one metric; undeclared is neutral, so no adapter changes. **The direction and the tone are derived, never supplied**: the arrow is the sign of `to − from`, and its tone is `ok` when the movement runs with the declared polarity and `error` against it. So construction **refuses a trend cell that also carries `glyph`, `tone`, `spark` or `bar`** — a supplied glyph or tone would be a second answer to a question the rule gives one, and §088 says why that matters: *a trend that always paints DOWN as ok misleads on half of every ML metric.* The arrow's shape carries the direction at every rung, so it survives 1-bit (`R-DEG-001`); the tone carries the polarity. → T2.133
+- **I129** — *(§3ap, §105)* **A tree's node ids are unique within the block at any depth, and a node is visible exactly when every ancestor is expanded.** Validation refuses a duplicate anywhere in the block, because each visible node is a focusable element and C26 I6 addresses an element by its id within the declaration. **`children` present — even empty — is a node with a twisty; absent is a leaf**, whose `expanded` is ignored (§3ap L6, L7). Each node owns its flag, so a collapsed ancestor hides its descendants' flags without clearing them (L8). `op: "expand"` reaches a node at any depth of the tree it names, with the node's id as `rowId`.
+- **I130** — *(§3ap, §105, §094)* **The twisty is content and the guides are decoration: at narrow widths the guides go first and the names never do.** The ladder has four rungs in one order: guides at three-cell steps with every aside; no guides at two-cell steps with every aside; no asides, as one group; and the indent capped at `width − 2 − widest visible name`, so every name keeps its whole width while one can. A name wider than the row alone truncates with a mark and is never shed. The rows are one per visible node at every width, so the ladder moves cells and never the height.
+- **I131** — *(§3ap, §105)* **The twisty is the disclosure pair — `expand` collapsed, `collapse` expanded — never focus's `▸`.** A tree row can be focused and collapsed at once, so the two facts take two slots (§024, `R-BLK-928`), and §105's filled pair is read as predating that split.
+- **I132** — *(§3aq, §105)* **A split is two panes and a declared height.** Its `children` are exactly two blocks, its `height` is a positive integer, and its `divider` is a positive integer where present. `validateDocument` refuses each with the field named. `measure` is `height` at every width. There is no residue row, because the bars say where.
+- **I133** — *(§3aq S1–S5, §021, ruling 22)* **The divider is the left pane's bar, and it is never a second column.** At width `w ≥ 4` the left pane is `d = clamp(divider ?? ⌊(w − 2) / 2⌋, 1, w − 3)` wide, the divider is column `d`, column `d + 1` is blank, and the right pane starts at `d + 2`. It draws §021's bar for the left pane where that pane overflows `height`, and bare track where it does not. The right pane draws its own bar in its own last column by `barOf`'s one-step rule. The clamp is applied at read and never written back. Below four columns the left pane draws alone and the right is placed by neither `render` nor `elements`.
+- **I134** — *(§3aq S6, E1–E5)* **Focus crosses the divider only when asked.** Each pane contributes its block's elements, or one block-level element addressed `(split, pane's block)` where it declares none — lit with `focusGround` when focused, as a mosaic's pane is — and the walk records which pane each element is in. `↓` and `↑` skip the other pane of the split they are in, and enter a split from outside on its left pane. `←` and `→` move focus to the other pane's element nearest on screen. `⌥←` and `⌥→` move the divider one cell, and the pointer drags it. Both are a shell-origin `replace` of `divider`, and neither moves focus.
+- **I135** — *(§3ar, §105, S8–S10)* **A form is at least one field and any number of buttons, addressed by ids unique across both.** Every field has a string `id` and `label`, and `value`, `hint`, `error` and `flag` are strings where present, and `availability` one of I140's three words. Every button has a string `id` and `label`, at most one declares `default`, and one with `submit: true` carries a `fill` or an `exec`. `validateDocument` refuses each with the field named.
+- **I136** — *(§3ar S1–S7, §105, §094)* **The label is Fixed, the field Grows, the hint is decoration and the error is content.** Field rows start at column 0, flush with the button row (parked 47, C09 I87); the field starts four cells after the widest label and takes the rest, `F`. The hint is drawn whole where it fits in `F` and dropped with no mark where it does not; an error replaces it, as `✗`, a space and the text in `error` tone, wrapped in `F` and hung under its text. A value is one row, end-truncated with `…`. Below `F = 1` each label takes a row of its own and its field sits under it at column 2. After a blank row the buttons wrap as whole buttons, each a two-cell mark slot then its label two cells from the next, and the default's slot holds `›`. `measure` reads block data and the width only: the draft being edited is drawn on the field's one row, windowed round its caret, and never changes a height.
+- **I137** — *(§3ar F4, F8, §105, A01 D8)* **A field's value is block data, and a submit writes the values as its command's arguments.** The reader's value is written by a shell-origin `replace` of the form as the store holds it at the write, so a producer's other changes survive. A button with `submit: true` dispatches its `fill` or `exec` with the command extended, per field that is not disabled (I140) and has a non-empty value, in field order, by ` <flag> <value>` — `flag` `--<id>` when absent and nothing when `""`, the value quoted by C18's `quote`. The dispatch is C23's, so C23 I18's frozen-entry refusal holds.
+- **I138** — *(R-MOT-005, I109, registry `scatter`: *one glyph at a time, irregular*)* **`scatter` lights exactly one cell on each of the first `n` ticks of an `n + 3`-tick pass and none on the last three, every cell exactly once per pass, in an order that is a deterministic permutation drawn afresh for each pass.** **Measured, the defect**: each cell took its place by hashing its index into `[0, n + 3)` independently, which is not a permutation — over widths 2–80, three passes each, **76 of 79 widths put two cells on one tick, 2 487 of 10 428 frames lit more than one cell, and one lit six at once**. Coverage held only because each cell had exactly one place; *one at a time* held for none of the widths a bar has. **A permutation by construction**: a cell's place is its rank among the extent's cells ordered by `hash(i, pass)`, and for a fixed pass the hash is a bijection on the cell index — a multiply by an odd constant, an XOR with a constant and two xorshifts, each invertible on 32 bits — so no two cells share a key and no two share a tick. *This read "ties broken by index": a mechanism that cannot fire. The mutation pass removed it and nothing failed, and two million passes of 256 cells found no tie, because there is none to find.* **Drawn afresh per pass** because *irregular* is a claim about the reader — a fixed order repeats every `n + 3` ticks and is learned inside a few seconds — and **deterministic** because a frame must be reproducible (T2.117f): the same cell at the same tick is the same value on every run.
+- **I139** — *(R-MOT-012, I109, registry `drift`: *never repeating*)* **`drift` has no period: its second term's period is an irrational multiple of its first, so over integer ticks the whole row never returns to a frame it has drawn.** **Measured, the defect**: two sines at 37 and 53 ticks share no factor and still share a period — their product, 1 961 ticks — and the row at tick 1 961 equals the row at tick 0 to 5.8 × 10⁻¹⁵. *Never repeating* was true only of sessions shorter than about two and a half minutes at the spinner's cadence, and I109's table said so in its own period column. **The second period is `37 · φ`**: `φ` is irrational, so `k / (37 φ)` never lands on an integer again and the second sine's phase never repeats, whatever the first does. **What is not claimed**: a bounded deterministic sequence comes arbitrarily close to itself, and this one does — the closest return inside 100 000 ticks is at 95 608, differing by 2.7 × 10⁻⁴, under one step of an 8-bit channel. The invariant is the absence of a period, which is what *never repeating* can mean of a deterministic function; the near-return is the figure that says how long an eye would need.
+- **I140** — *(R-STA-001, R-STA-004, §017, §105)* **A field's availability is one of the registry's three values, and only `enabled` takes input.** `FormField.availability` is `"enabled" | "readonly" | "disabled"`, absent meaning enabled — the registry's `availability` axis word for word, and no generic `active` flag (R-STA-001). A `readonly` field is still an element: it can be focused and copied, and `⏎` does not enter it, so no editor is lent. A `disabled` field is **not an element**, which is how `⇥` skips it — R-STA-004's own reason for ranking it — and **its value is not submitted**, because it is not an input anyone can change (I137). The drawing is C09 I122's. → T2.134, T2.135
+- **I141** — *(R-BLK-214, R-BLK-220, R-GLY-003)* **A notice's `state` is a member of `CallState`, and a notice carrying one carries the tone and the glyph that state names.** The tone is `CALL_STATE_TONE[state]` — `queued` and `cancelled` `muted`, `running` `default`, `succeeded` `ok`, `failed` `error` — and the glyph is the toned rung's mark, `queued` for a queued call and `work-unit` for the other four — **or no glyph at all on a running head whose own walking mark leads its text**, which is an operation's (C23 I76, §036): *the spinner is the verb's own set* at the head of `Compacting conversation…`, and a gutter `●` beside it would be two marks on a line §036 draws with one. An absent glyph is admitted only there; a running call head, whose liveness is the duration spinner and not a lead mark, carries `work-unit`. **A disagreement is a construction error naming the field, never a correction** — the `trail` precedent (I123): a document saying `failed` in blue would otherwise render as something its own fields contradict, with nothing reporting it. `state` outside the union is refused at validation rather than at render, where it threw. The builders derive both from the state (C09 I45), so a producer states the state and never picks a colour for it. *Blocked on you* is R-BLK-214's sixth row and has no member (F1260). → T2.136, T2.137, T2.138
+- **I142** — *(§3g.1, `R-SEL-004`, C09 I86)* **`b.image({ path })` keeps the path it read as `Image.path`, and `b.image({ data })` sets none.** The path is a record of where the bytes came from and **never a source**: it sits beside `data` rather than replacing it, the digest is still the data's alone, and nothing in `src/presentation/` opens it — so two blocks of one picture read from two paths still decode once, and a path deleted after construction changes nothing drawn. Its reader is the copy (C09 I86), which answers `R-SEL-004`'s *an image as its alt text and its path* — the half the block could not answer while the builder read the path and dropped it. → T2.140, T6.107
+- **I143** — *(§3g.1)* **`path`, when present, is a non-empty string, refused at validation otherwise.** An `image` block carrying a number, `null` or `""` as its `path` is a validation error naming the field; absent is the bytes arm and is not an error. The builder refuses an empty path before reading it, so the two gates are one rule rather than a validator refusing what `readFileSync("")` happened to throw on. → T1.62
+- **I144** — *(§3ao.1, §095, C26 I6, I124, I141; review batch 4 M14.7)* **A tape's members are validated: each is a record carrying a non-empty string `id` unique among the members, a string `label`, an optional string `detail` and an optional `state` in `CALL_STATES`; and `current`, when present, is a string.** Every member is an element (I124), so an id is an address, and two members `x` are two targets for one name — I129's argument one kind over. **A `current` naming no member stays valid** (C5, T1.48): the gate's own comment records the moment it describes. The render's no-mark guard for an unknown state stays, for a tape built without the gate; the comment beside it that said the field *is not checked* is superseded. → T2.150, T6.108
+- **I145** — *(§3as, §035, `R-PRG-001`, `R-BLK-263`, I17, C09 I28; review batch 4 M16.2, D25)* **A finished `progress` whose `quantity` is `progress` or `count` measures and draws zero rows.** Finished is `total > 0` and `current ≥ total`. `capacity` persists at every fraction, and an **undeclared** quantity is never finished — `examples/docker`'s bars declare none and overshoot. Padding and the floor are the registry's (C09 I80) and apply to the zero as they apply to an empty container's. → T1.80, T6.109
+- **I146** — *(§3as, §035, C09 I96, C09 I97; review batch 4 M16.4)* **`painted` is a boolean; `quantity`, `granularity` and `liveness` are each in their union; `style` is a string — refused at validation otherwise.** `style` names no closed set and an unknown name is the default (roadmap 51), so only its type is checked. A misspelled `quantity` is refused rather than defaulted, on I123's precedent: `"progres"` would never finish (I145) and nothing would say why. → T2.151, T6.110
+- **I147** — *(§3ao.1, §095, C09 I42, C09 I44; review batch 4 M14.9, D17)* **A tape's `width` counts what its row draws at an unbounded width — every member's label, detail and state mark with the joins between them, the current's lead, and the gaps — each at its widest.** Labels and details at `wide`, a settled mark at its reservation (`glyphCells`), a running member's spinner at one cell. So a tape laid out at its own `width` draws no residue mark at either convention or rung; at `narrow` it answers wider than it needs, which is the safe direction. At 91842503 it counted labels at `narrow` and gaps and nothing else. → T1.81, T6.111
+- **I148** — *(§5c.1, §026, `R-BLK-191`, I106, I107, C10 I36; review batch 4 M13.4, D5)* **A gradient ramp over a slot pair may carry `overshoot: { lift, share }`: over the last `share` of the axis `to` is lifted, channel by channel and clamped at 255, from ×1 up to ×`lift` at `t = 1`, and `from` mixes to `to` over the rest.** `lift` is finite in `(1, 2]` and `share` in `(0, 1)`; the member is refused on a colormap, a palette, a centred or stepped fill, and on a span. C10 draws the lifted hex at 24-bit, quantises it at 8-bit and ignores it below. It is how `hotEdge` draws the design's own profile (C09 I133). → T2.152, T1.82, T6.112
+- **I149** — *(R-BLK-214, F1260, C23 I94, → I141)* **`CallState` has a sixth member, `waiting` — *blocked on you*.** Its tone is `warn` and its glyph is `work-unit`; I141's agreement check covers it like the other five. An approval's call head carries it while its question is open (C23 I94). R-BLK-214 draws the dot blinking; the blink is not built (C23 §7g ruling 8), and the word and the tone carry the state at every motion level. **Where tone cannot carry it — 1 bit and ASCII — its shape is `warn`, `▲`/`!`** (C09's `CALL_STATE_GLYPH`, §030's *each state takes its own mark*): `work-unit` there is `running`'s, and a waiting head drawn as a running one says the tool is working when it is waiting on the reader. Found implementing the spec; the six shape marks are distinct, as the five were. → T2.154
+- **I150** — *(§097, `R-BLK-775`, ruling 89, F1474, → C11 I33, C19 I29, I124)* **A table's `current` is a row id or absent, and nothing `measure` or the plan reads follows it.** A non-string is refused naming the field; a string naming no row is valid and draws no mark. Its presence reserves the `current` mark's cells in the first column on every row (C11 I33), so which row it names moves no label and no height: `measure(block, width)` is the same number with the field absent, naming any row, or naming none. → T2.155, C11 T1.43
+- **I151** — *(§3am.1, §101, F1522, C22 §6t, → C09 I139, C10 I51)* **A span's `ground` is `"pick"` or absent, and is refused beside `tone`, `value` or `ramp`, and on a hunk line.** `TEXT_SPAN_KEYS` takes it as its tenth member, so I85's gate names it. A tone beside it is an ink the ground's matched ink replaces, and `value` and `ramp` are a second background and a second ink. Appearance only: `measure` is the same number with and without it (I83). → T2.156
+- **I152** — *(§2, ruling 104 c, F1521, C17 I25, C17 I37, C22 I153, C23 I104)* **`meta.echo` is the submitted line's chips, as sorted, disjoint code-unit ranges into `command`, each with the parts a label is composed from, and nothing else.** `EchoChip` is `{ from, to, ordinal, kind, name, lines? }`, and `kind` is `ChipKind`, declared here and re-exported by C17, so the editor's union and the record's cannot drift. The content is the range of `command` and is not carried. Shell-owned: `ProducedMeta` refuses the key, so a producer cannot put a chip in an echo. Absent where the line held none. → T2.157
+
 
 ## 7. Commitments
 
@@ -3508,7 +4361,7 @@ split fails rather than passing on a message that reads as covering it.
 29. C04's constructors enforce the shape invariants and C24's `b` delegates to them. One enforcement point for I1 (I1).
 30. `validateDocument` terminates on a cyclic structure, via a path-scoped seen-set (I27).
 31. `Result` is declared once, in C04, and nowhere else in the tree (I26). Enforced by SS35, which existed before this commitment did — a build gate with no contract behind it, found by tracing the citation graph.
-32. A `view` action's `target` names a block within its own document and nothing wider; the refusal when it does not resolve is C23's (I34, → C23 I31).
+32. An `expand` action's `target` names a row or a block within its own document and nothing wider; the refusal when it does not resolve is C23's (I34, → C23 I31).
 33. A categorical axis other than `Tone` is a marker or a word with a renderer-derived tone, never a second palette and never a colour a producer supplies. Four surfaces found the boundary independently; three of them got it right unaided, which is the argument for naming the pattern rather than widening the vocabulary (I35).
 34. `Comparison` carries change and judgement in separate fields, because the renderer has always rendered them as separate axes (I36).
 35. D29's sweep exempts a kind for the fields it has, and the exemption is re-read when the fields change — the compile-time guard sees a new kind and is blind to a new field (I37).
@@ -3548,7 +4401,7 @@ split fails rather than passing on a message that reads as covering it.
 69. **A graph's layout is a member, and the half of it that forbids nothing says so** (I70). `graphLayout?: "layered"` — the refusal arm is testable on every other form, the choice arm is A03 §2's vacuity class in a field, and the member exists ahead of its second value because adding it later widens a union that did not exist.
 70. **A mosaic is a grid named by a string, refused four ways at both gates** (I71). It exists because every nesting of rows and columns is a slicing figure and the pinwheel is not one — measured, against a five-rectangle slicing control, so the difference is the figure and not the size. `height` is required because omitting it draws one blank row rather than a degenerate box, and `children` is the field name because the validator's recursion reads it structurally (→ FINDINGS F244).
 71. **The grid divides both axes by `Share`, with one arithmetic serving the group and the mosaic** (I72). A spanning region takes the sum of what it spans; fixed shares precede weights; a shared scale is refused with `yMin`/`yMax` named as the answer already built (→ I29, I44).
-72. **An image is a block, and the three things that make it one are the digest, the derived width and the builder's path** (I73). It measures before it draws, its identity is not its data, and its geometry is clamped rather than clipped — the mosaic's ruling one component over (→ C09 I35, I36, FINDINGS F247 · F248).
+72. **An image is a block, and the three things that make it one are the digest, the derived width and the builder's path** (I73, I142). It measures before it draws, its identity is not its data, and its geometry is clamped rather than clipped — the mosaic's ruling one component over (→ C09 I35, I36, FINDINGS F247 · F248).
 74. **A plot declares where the view starts and never where it is** (I75). `camera` is `Partial<Camera>`, admitted by the widening test's *caller alone* arm rather than by its area arm — a viewing angle changes no cell of the layout and nothing but the caller decides it. The live camera is view state through `RenderContext`, because a block holding it would move its own `rev` thirty times a second under an orbit (→ C22 I71, C12 I83). The type lives here because L0 may not import L1, and there is no `orbit` member because a block cannot declare that it animates (→ C09 I8, C22 I60).
 73. **An overlay is a field on the image whose rendering differs by arm** (I74). Placed at the dither, composited at `kitty`, and the split is a mechanism rather than an arrangement — the one thing in phase 2 that is. Its declared scale is what a set of panels shares, and its identity is the picture's rather than the image's (→ C09 I36, C10 I31, FINDINGS F251 · F252 · F253).
 76. **A reference frame is four members and two of them are two decisions** (I77). Where the axis lines are drawn and where coordinate zero sits are independent, and conflating them is how a signed field ends up with its frame in the wrong place; `origin3` is refused wherever it decides nothing. `box3` takes the form's suffix because `plotBox` is one letter away and means something else. There is no per-axis `scale`, and that is an omission with a reason — nothing would read it. **And I76's expiry condition for `axes` was wrong**: it named a renderer where the missing thing was a member, which is a deferral naming the wrong blocker one commit after it was written (→ C12 I90, C12 I91, C12 I92, FINDINGS F207).
@@ -3574,7 +4427,7 @@ split fails rather than passing on a message that reads as covering it.
 95. **One placement, both readers** (I103). The offset arithmetic lives in `measure.ts` beside `childWidths`, for the reason `childWidths` does: two halves that each compute it are two halves free to disagree, and F816 is the disagreement measured.
 96. **Two texts for one residue mechanism, and no key on either** (I104). The collapsed form's *0 above* was a sentence that could not be violated, and the design's `⏎ to expand` was a second keymap; the count survives from each and the rest does not (F826).
 97. **A span can say which run gives way first** (I105). `elide` is admitted by the call's head, the one consumer that knows which run is the argument; a boundary, read by `measure` as offsets are, inert wherever nothing is fitted.
-98. **An ink can be a function, and the function is data** (I106, I109). A `Ramp` is three fills, a backing the gate checks the arity of, and a closed set of loops with their timing in the effect; it carries no colour value, no period and no easing, so a far side can send one and the gate can refuse one (`CALCIUM_INK_RAMPS_DESIGN.md`).
+98. **An ink can be a function, and the function is data** (I106, I109). A `Ramp` is **four** fills — one of them a *sampling*, `centred`, rather than a backing — a backing the gate checks the arity of, and a closed set of loops with their timing in the effect; it carries no colour value, no period and no easing, so a far side can send one and the gate can refuse one (`CALCIUM_INK_RAMPS_DESIGN.md`).
 99. **Two carriers, each with an extent, and the rest refused by type** (I107, I108). A span's clusters and the bar's axis; a colormap on the bar and slot pairs on text, because a floor is proven per slot and a bar reads by area; every other kind is `none` in `RAMP_EXTENT` until a consumer appears.
 ---
 100. **A child's screen is a block, and its colours are its own** (I110, I111). The one kind carrying a literal `ColourValue`, on `image`'s argument that a child's bytes are data rather than the application's taste — with the containment gate that makes it safe to render without stripping.
@@ -3584,18 +4437,46 @@ split fails rather than passing on a message that reads as covering it.
 104. **A kind kept against removal states the reason that is still true** (I116). `logs`'s was replaced rather than added to: the windowing half was falsified by a commit in another component six days after it was written, and a reason the next reader checks and cannot reproduce is a reason they delete. What keeps the kind is the three-column record and `levelTone`; what keeps it *unconsumed* is that `ViewPatch` has no arm that appends a line (F141, F1055).
 105. **A ruling deferred on cost names the cost, and something watches the condition rather than the remedy** (I117). `bubble`'s size channel stayed a member of `series` for one more change, and the count of forms whose `series` carries a non-position was asserted at **one** — so a second form inheriting all four symptoms would fail a row where `FS3` would have stayed green. The fourth symptom was found by hiding a series and reading the frame, which is the instrument no assertion indexed by inputs reaches. **The deferral is spent and the record is the argument for the shape**: the cost named was eleven golden frames and a snapshot, and eleven golden frames and a snapshot moved. What the estimate could not name is what the change *reached* — a validation rule the move deleted, a builder MG27 refused to let it ship without, and an ASCII arm that had never run — so a cost estimate is a lower bound on the diff and never on the findings (F271, F1051, F1082, F1083).
 106. **A union is checked by the table that is the class, not by a clause per member** (I118). `PLOT_UNIONS` is what the gate loops and what MG31 compares to the type, so the twenty-fifth member is refused on the day it lands rather than on the day someone remembers — and the five clauses the finding asked for would have closed a third of twenty-four (F213, F1076).
-107. **A published union an app can join is a union it can be typed into** (I119, F405). The runtime accepted an app's kind from F1 and the types could not express one, so writing the kind `/rungs` needed **three** `as unknown as` casts — the finding says two, and the third is on the constructor. Proved before it was ruled: the shape compiles with no casts, and `declare module "@fmx/calcium"` resolves to the real declaration rather than opening a new module, which is the operation this ruling rests on and the one a walk is meant to check exists.
+107. **A published union an app can join is a union it can be typed into** (I119, F405). The runtime accepted an app's kind from F1 and the types could not express one, so writing the kind `/rungs` needed **three** `as unknown as` casts — the finding says two, and the third is on the constructor. Proved before it was ruled: the shape compiles with no casts, and `declare module "calcium-tui"` resolves to the real declaration rather than opening a new module, which is the operation this ruling rests on and the one a walk is meant to check exists.
 
 108. **A check reads as present in three ways and only behaviour tells them apart** (I120, F1082). *Absent* fails a grep; *read then skipped* passes one; *gated behind a sibling* passes a grep **and** carries a detailed refusal message. `yMin` is the second — the only line that touches its type uses `typeof` to skip rather than to refuse — and `startDate` is the third, with a good check sitting under `if (unit === undefined) return;`. Counting appearances in the file found fourteen where driving wrong values finds twenty, and it was wrong in both directions: six members it counted as present are unchecked and one it counted as absent is refused. The consequence is what settles the rule's shape — nothing escapes containment, three become an ERROR card, and **seven draw a different frame with no error at all**.
 
 109. **A stated blind spot has two halves and reading checks only one of them** (I118, F1085). MG31 named the two escapes a textual parse has, which is right, and then asserted the corpus reached neither. `xFormat?: Plot["yFormat"]` had been in the file for twenty-five days — not stale, **false when written** — and the assertion is what stopped anyone looking, because it converts a stated gap into a stated non-issue. Naming a limit is a claim about the rule and review can check it; claiming the corpus does not reach the limit is a claim about the corpus, and only a measurement can. It is *a negative claim inverts a resolver's verdict* one level up: **there is no such member** reads most convincingly the day it stops being true, because the gate is green either way. One grep over the body the rule already brace-matches.
+110. **A tape slides and a row of peers sheds, and the two are different kinds rather than two widths of one** (I124, §3ao, §095). The distinction is whether anything points into the row: a focus, a current, a key that walks it. `pills` keeps shedding on that rule and `steps`' refusal — *dropping a row orphans a C26 focus* — is **satisfied** by this kind rather than overturned by it.
+111. **The window's arithmetic is derived from §095's figure, and the one thing the walk got wrong was a symmetry it read as corroboration** (I125, §3ao). A residue mark that disappears at the end makes *grow while it fits* draw fewer members than fit — 233 cases in 200,000, with no exotic shape to them. The walk then measured the same thing at the left end, got 447, and wrote both down as one rule; the second figure was taken over a question the window never asks, and the implementation is what found it. The start is a **distance** and the end is an **extremum**, and they look alike because both turn on a mark that vanishes.
+112. **A tape's ladder is monotonic, which is a statement about what it does NOT do** (I126, §3ao, §095). The clocks do not come back when the window slides, and that clause exists because the natural implementation re-measures the visible members and puts them back — two correct rules disagreeing exactly once, which is the cell a classification table is for.
+113. **A tree is a kind because it holds three things no kind holds together** (I129, §3ap, §105): expansion a reader changes per node, guides that shed apart from the names, and one element per visible node. Each part is one the repository had — the disclosure pair, `vertical`, the `expand` op and §094's tiers — which is §105's *built from what already exists*, arriving as the kind's parts rather than as its absence.
+114. **A cap on indentation is one number for the block, not one per row** (I130, §3ap L4). A per-row cap is the natural implementation and it inverts depth — a deep short name drawn right of its shallow long parent — which the figure showed and no statement of the rule does. One cap loses the difference between rows past it and never reverses it.
+115. **A split's divider is its left pane's bar** (I133, §3aq S2, §105, ruling 22). The figure has one column between the panes and draws §021's thumb in it. Ruling 22 puts each box's bar in its own last column, and the left pane's last column is the divider. So the one column is both, and a second column beside it would be a bar the figure does not draw.
+116. **A position that sets widths is block data, even when a reader moves it** (I134, §3aq). The divider sets both panes' widths, and so their heights and their elements. A view store would hand the element walk a geometry it cannot see. The panes' offsets move rows inside a declared box and stay view state, for I48's reason.
+117. **A table can say which of its rows a chooser is on, and it is the producer's declaration rather than the reader's state** (I150, C11 I33, §097, ruling 89). The field is the table's `active`; C11 draws the mark, the ground and the weight, and no height or width follows it.
 
+
+110. A block names the fact that it is streaming and C09 derives the band; a producer cannot compute a span whose offsets depend on a width it cannot see (I122).
+111. A trail cools to the run's own ink. The five forms differ by where the band starts and what it cools to, and `weight` is the one that survives 1-bit (I123).
 
 ## 8. Tests
 
 Six tiers. No state machine, so no transition table.
 
 ### Tier 1 — unit
+- **T1.46** (I122, §5c): `streaming` and `trail` survive the round trip and the key gate; a ninth member on a block carrying them is still refused, so the two fields were added to the gate's list and not around it.
+- **T1.47** (I123, §5c): `trail` with no `streaming` validates and means nothing — a settled block has no head — and an unknown `trail` name is refused rather than defaulted, because a misspelled form drawn as `hotEdge` is a silent disagreement between the document and the screen.
+- **T1.48** (I124, §3ao, §095): a tape round-trips with its members, their details and its `current`; a `current` naming no member validates and draws no mark, because a tape nobody is in is still a tape; and the members' ids are asserted to survive every window the arithmetic produces — nothing is lost, only offscreen, is a claim about ids and not about pixels.
+- **T1.49** (I125, §3ao, §095): §095's own moves, reproduced — the window sliding by the minimum, the `«n` that appears costing it a member on top of the one it slid past, and the mark that disappears at an end giving a cell back. Then the property, over a sweep of member widths, widths, currents **and held starts**: the end is the maximum run that fits and the start is the first at or after the held one that reaches the current, against a reference that asks the same question exhaustively. **The held start is its own axis** — the first draft passed it equal to the current, so the current was inside the window in every case and two of the three branches were never taken: 700 assertions exercising one arm, which is A03 §2's vacuity class wearing a sweep. **And the ceiling**: a held start past the smallest one whose window still reaches the last member is clamped back to it, so widening the terminal after a walk to the end reveals the tape rather than keeping a `«n` beside empty room. Swept over the same axes, because the arm only shows where the room grew after the start was written — and the reference asks it as a minimum over candidates, which is what caught the walk-back the implementation landed with (`1 3 9 5` at 24 from 2).
+- **T1.50** (I126, §3ao, §095): the ladder, asserted as a ladder. Every detail present or none; once the window has slid the details stay gone even at a width where the visible members would fit with them; and a single member wider than the whole width truncates rather than vanishing. The middle arm is the one a re-measuring implementation fails, and it is the cell the classification table found.
+- **T1.51** (I127): `staleForMs` of `0` and `240000` validate; `-1`, `NaN` and `Infinity` are refused with the field named.
+- **T1.52** (I129, §3ap, §105): a tree round-trips through validation; a duplicate node id is refused at depth zero **and** at depth two, with the id named; `children: []` draws a twisty and `expanded: true` on a leaf draws none; and a collapsed node over an expanded child hides the child, and expanding the node again shows it expanded — the flag was kept, not rebuilt.
+- **T1.53** (I130, §3ap L1–L5, §105): §105's figure at 40 columns, asserted as rows, then the ladder asserted rung by rung at the widths where each change happens — guides present then absent with every aside still drawn; every aside gone together at the width where one no longer fits; the indent capped so the widest name is whole and **no row starts right of a deeper one's parent** (the per-row cap inverts it, §3ap L4); and a name wider than the row truncated with a mark. The row count is asserted equal to the visible nodes at every width.
+- **T1.54** (I131, §3ap): the twisty is `expand` collapsed and `collapse` expanded at both rungs, and never `focus` — asserted at Unicode and ASCII against `glyphFor`, not against literals, and with a row that is focused and collapsed at once.
+- **T1.55** (I129, §4, §3ap E1): `op: "expand"` toggles a node at depth zero and at depth two of one tree, refuses an id no node carries with the id named, and still refuses a kind with neither rows nor nodes.
+- **T1.56** (I132): a split with one child, with three, with `height: 0` and with `divider: 0` or `1.5` is refused with the field named, and §105's split validates. `measure` is `height` at 3, 4, 40 and 120 columns.
+- **T1.57** (I133, §3aq S1–S5, §105): §105's figure drawn back at 40 columns, asserted as literal rows, with the left pane overflowing so that the divider carries its thumb. Then S1's bare track with both panes fitting; S3's right bar in the last column with the right content one cell narrower; S4's `divider: 99` clamped to `w − 3` and `divider: 1` kept; and S5 at width 3, with the left pane alone. **The divider column is asserted to be the only column between the panes at every width**, which is the mutation a separate bar column fails.
+- **T1.59** (I135, §3ar S8–S10): §105's form validates; no fields, a duplicate id across a field and a button, two defaults, and `submit` on an `open` are each refused with the field named.
+- **T1.60** (I136, C09 I119, §3ar S1–S7, §105): §105's figure drawn back as literal rows — the error replacing `port`'s hint, `replicas`' hint under its field, `›` on `save` and `cancel` at column 10 — with `port` being edited and its caret after `80`. Then S1 at a width where `F < 1`, S3's long hint dropped whole, S4's long error wrapped and hung, S5's value cut with `…`, and `measure` equal to the rows drawn at every width with and without a draft.
+- **T1.62** (I143): an `image` whose `path` is `42`, `null` or `""` is refused naming `"path"`; the same block with no `path` and with `"a.png"` validates; `b.image({ path: "" })` throws naming I143 before any file is read.
+- **T1.61** (I137, §3ar): a submit's command — `serve --name prism-serve --port 80 --replicas 3` from §105's values, a value with a space quoted, an empty value omitted, a `flag: ""` field written positionally, and a `--p` flag honoured.
+- **T1.58** (I134, §3aq S6, S7): the elements at 40 columns — the left tree's rows then the right pane's one block-level element for its `code` block, addressed to the split, each record carrying its pane; that pane focused draws `focusGround` behind every row of its extent and the unfocused frame does not, and the right pane's `cols` starting two past the divider. Then S7: the divider in accent with focus in the left pane and muted with focus in the right, asserted on the column's SGR.
 
 - **T1.1** (I1): every constructor returns a frozen value; mutation attempts do not change it, at every nesting depth.
 - **T1.39** (I1, F1065): the memo — a subtree handed to `deepFreeze` twice is **walked once**, observed through an accessor that counts its own reads, and the value is frozen at depth either way. A count and not a duration, because a timing assertion on a shared runner measures the runner (F929).
@@ -3631,7 +4512,7 @@ Six tiers. No state machine, so no transition table.
 - **T1.24** (I84): each malformation is refused with **one error naming the span's index** — a non-integer `from`, a negative `from`, `from === to`, `from > to`, `to` past `text.length`, two spans out of `from` order, two spans that overlap by one unit, a boundary between the two halves of a surrogate pair, and an unknown attribute — nine documents, nine errors, and a tenth carrying all nine faults reports nine.
 - **T1.25** (I83): for every width in the golden sweep, `measure` of a `raw`, a `notice`, a `rule` and a one-column `table` is the **same number** with `spans` and with the same block stripped of them — the assertion is on the pair, so a measurer that started reading `spans` fails here before any frame does.
 - **T1.27** (I99): a two-series line plot measures the same height with `hidden: true` on one series, on both, and on neither, at widths 20, 40 and 80; an annotation `hidden` likewise. In `test/unit/plot-hidden.test.ts`.
-- **T1.29** (I106): the arity table at the gate — a `gradient` with a slot pair is admitted, with a `colormap` on `progress` is admitted, with both backings is refused, with neither is refused; a `palette` with a pair, with a `colormap`, or with `bands` is refused; a `step` with `bands` 1, 9 or 2.5 is refused and with 2 or 8 admitted; `bands` on a `gradient` is refused; each refusal's message names the rule it broke.
+- **T1.29** (I106): the arity table at the gate — a `gradient` with a slot pair is admitted, with a `colormap` on `progress` is admitted, with both backings is refused, with neither is refused; a `centred` takes the same five rows and refuses `bands`, which is what says the rule written over *every fill but `palette`* reaches a fourth member rather than merely intending to; a `palette` with a pair, with a `colormap`, or with `bands` is refused; a `step` with `bands` 1, 9 or 2.5 is refused and with 2 or 8 admitted; `bands` on a `gradient` is refused; each refusal's message names the rule it broke.
 - **T1.30** (I107, I108): a span carrying `value` and `ramp` is refused; a span whose ramp has a `colormap` backing is refused while the same ramp on a `progress` block is admitted; a `ramp` on a hunk line is refused; a `progress` without `ramp` validates as it did.
 - **T1.26** (I87): a document carrying spans on all four members satisfies §5a's round trip: `validateDocument(JSON.parse(JSON.stringify(d)))` is valid and structurally equal.
 - **T1.31** (I110): a `terminal` whose line text contains `\x1b[31m`, `\x07` or `\u009b` is refused by `validateDocument`, each naming the line index; the same text with those characters replaced by U+FFFD is admitted.
@@ -3642,6 +4523,10 @@ Six tiers. No state machine, so no transition table.
 - **T1.36** (I118): the control — every union's own values are accepted, and the three unions admitting `false` are exercised rather than assumed, because a reader that quoted `false` would refuse all three while looking correct. Without it T1.35 passes on a gate that refuses everything.
 - **T1.37** (I118, F213, F1076): the eight members no rule reached — `plotFrame`, `legend`, `orientation`, `layout`, `binning`, `box3`, `axes3`, `colourBy` — named rather than looped, so the row stays red if the table shrinks; and `orientation` on a `pie` is refused for its value rather than for a vertical arm the caller never asked for.
 - **T1.38** (I118): a form rule stays silent about a value the document does not contain — `treeLayout: "radial"` on a `line` is **one** fault, the value's.
+- **T1.80** (I145, §3as): the quantity × fraction table, measured and rendered. `progress` and `count` at 99/100 draw one row; at 100/100 and 150/100 they measure 0 and render no rows. `capacity` at 100/100 and 150/100 draws one row reading `100%` and `150%`; an undeclared quantity at 150/100 draws one row; `total: 0` draws one row. A finished `progress` with `padding: { t: 1 }` measures 1 and renders one blank row — the registry's padding, as an empty container takes it.
+- **T1.81** (I147, §3ao.1): the measured case first — `seams`, `arm` and `count` at their own `width` draw every member and no `«`, `»`, `[` or `]` — and then the property, over tapes with and without details, a running and a settled member, a current and none, and a label holding an East-Asian Ambiguous character: rendered at `width(block, 200)` at `narrow` and `wide`, and at the Unicode and ASCII rungs, no residue mark is drawn. And it is the least such width: one cell less at `wide` draws a different row, so an answer of the allocation — which draws no mark either — fails here (found by the mutation pass on landing).
+- **T1.82** (I148, C10 I36): the stop's sampling, at `{ lift: 1.35, share: 0.35 }` over `default` → `accent`. At 24-bit `t = 1` is the accent's channels ×1.35 each, clamped at 255; `t = 0.65` is the accent exactly; `t = 0.325` is the plain mix at one half. At 8-bit every sample is `nearestAnsi256` of the 24-bit hex. At 4-bit and at 1-bit every sample equals the same ramp's with no `overshoot`.
+- **T1.83** (I124, §3ao.1): `tapeMemberCols` is the drawn row. Over tapes, widths, held starts, currents and both rungs: each on-screen member's `[from, to)` holds exactly its drawn text in the rendered row with the SGR stripped — its lead included when it is the current — the ranges ascend and do not overlap, a member before the window is `[0, 0)` and one after it is `[w, w)`.
 
 ### Tier 2 — contract / interface
 
@@ -3683,26 +4568,53 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.111** (I102): `minRows: 6` constructs and the group measures 6 with two-row children; `minRows: 0`, `-1`, `2.5` and `"6"` are each refused naming the field.
 - **T2.112** (I100, I45): every one of the fifteen entries constructs on a one-child row, and each measures the same height as no `align` at all — the vertical half of T3.23 restated over the widened vocabulary.
 - **T2.113** (I104): a collapsed scroll of 392 children renders exactly `⋯ +392 more` in unicode and `~ +392 more` in ASCII at 80 and 20 cells; the same box expanded and paged to its middle renders `⋯ N above, M below` with `N + M + interior === 392`; neither row contains `⏎` or the word `expand`.
-- **T2.117** (I106, I109): `RAMP_KEYS` has six members and a seventh key is refused by name; `animate: "sweep"` is refused with a message naming the six; a document carrying a ramped span on every carrier and a ramped `progress` satisfies §5a's round trip.
+- **T2.117** (I106, I109, I148, R-MOT-012): `RAMP_KEYS` has ~~seven~~ **eight** members — `since` joins them, and `overshoot` (I148) — and a ninth is refused by name; the union is the registry's twenty-three animated effects and `none`; a document carrying a ramped span on every carrier and a ramped `progress` satisfies §5a's round trip. *(Rewritten — R-MOT-012. As first written it asserted six keys and that `animate: "sweep"` is refused, which the registry's one-shots overturned; the rows were rewritten with the code and this line was not, which is a repair stopping at its own sentence.)*
+- **T2.117a** (I109, R-MOT-012): the union is the registry's twenty-three `animated-tone` ramps and `none`, **compared by equality** against `calcium-registry.json` — the first row in the tree that reads the registry, so the union cannot drift from the design in either direction.
+- **T2.117b** (I106, I109, R-MOT-012): the registry's five `static-tone` ramps are `RampFill` values and not animations, and the two sets together are the registry's twenty-eight. The row that keeps a static ramp from being admitted as motion because both are called ramps. **The projection is asserted by name and not by count** — `linear`→`gradient`, `centre`→`centred`, `map`→`gradient` with a `colormap`, `step`→`step`, `palette`→`palette` — so a registered fill with nowhere to land fails here. *(Rewritten — R-MOT-012. As first written it asserted `RAMP_FILLS` equals the three the type then carried, above a comment saying `centre` and `linear` are both `gradient`: a **correct sentence justifying the wrong decision**, true about the family and silent about the sampling, which is the one shape review cannot catch because the justification reads as right. Five registered fills, four values, and `gradient-centre` was a picture nothing in the tree could draw while an equality assertion said the sets agreed.)*
+- **T2.117h** (I106, R-MOT-012): `centred` folds and `gradient` does not — over an extent of 24 a centred ramp is **symmetric about the middle** and reaches `to` there, a linear one reaches `to` at the end, and the two differ in at least half their cells; the fold runs **before** the backing, so a centred colormap and a centred slot pair are the same shape — the colormap's mirror to **within one channel unit**, because `2/24` and `1 − 22/24` are equal in arithmetic and an ulp apart in floats, and interpolation carries that where rounding a mix does not. And `bands` on a `centred` is refused at the gate, for `gradient`'s reason.
+- **T2.117c** (I106): `animateT` stays within `[0, 1]` over every effect × `n ∈ {1, 2, 3, 10, 40}` × 130 ticks. The bound is what every consumer assumes and no consumer checks.
+- **T2.117d** (I109): a one-shot with no stamp rests at `0`, runs over its ticks and holds its final frame; a periodic effect ignores `since` entirely, so the stamp is meaningful exactly where it is read.
+- **T2.117e** (I109): each effect's **defining** property — the one that distinguishes it from its neighbours — rather than a shared bound every effect satisfies, which would leave eighteen arms interchangeable.
+- **T2.117f** (I106): the same arguments give the same answer, so nothing in an arm reads a clock or a random source. `hash01` is deterministic by construction and this is what holds it so.
+- **T2.117i** (I106, I109, R-MOT-012, §037): the **ink census** — every registered effect drawn as a frame in `design-surfaces.test.ts`, on four axes because §037 makes four claims: the fills across an extent, the ladder from 24 bits to 1, the animations at a fixed tick, and the **same effects through time**. The fourth is not symmetry: six effects are constant across the extent by construction — `animateT`'s own table says so — and a census indexed by position draws each of them exactly as it draws an effect that does nothing. **Read as foreground *and attributes***, because at one bit the answer is `from`'s class rather than a colour, and a mask keyed on `fg` alone drew the whole bottom rung as unstyled while reading as a frame that confirmed R-MOT-012.
+- **T2.117j** (I138): over every width `n` from 2 to 80 and three passes each, every frame lights at most one cell; ticks `0 … n − 1` of a pass light exactly one and ticks `n … n + 2` none; the cells lit in a pass are all `n`; and for every `n ≥ 4`, the three passes do not all share one order.
+- **T2.117k** (I139): no shift `P` from 1 to 100 000 returns `drift`'s 12-cell row at ticks 0 and 5 to within 10⁻⁹ — the shipped 37 / 53 form returns at 1 961 to 5.8 × 10⁻¹⁵.
+- **T2.117g** (I109): **two one-shots in one document time independently.** Stamped four ticks apart, their frames are four ticks apart and the later one is exactly where the earlier one was — asserted for every member of `RAMP_ONE_SHOTS`. The row that says the clock is read **per effect** from its own stamp and not once per frame from the render context: a single `since` on the context would make both frames equal, and every other row here would still pass.
 - **T2.114** (I105, I107): `TEXT_SPAN_KEYS` has nine members and admits `elide` and `ramp`; a `notice` under `info` with an `elide` span measures and renders identically to the same block without it at every width of the sweep; on a `step` notice the marked run ends in the marker at a width that cannot hold the row, and the runs outside it are byte-identical to the unfitted text.
 - **T2.34** (§3am): the same translation on a list item and on a blockquote lands the spans on the `notice`, on a heading on the `rule`'s `label`, and on a pipe-table cell on the `Cell` — the four members of I88 — and on a fenced block **does not** run: `**` inside a fence is seven characters.
 - **T2.118** (I110, §5a): a `terminal` carrying every run field and both modes round-trips through `JSON.parse(JSON.stringify(...))` deep-equal, and `TERMINAL_KEYS` refuses a **tenth** block key and `TERMINAL_RUN_KEYS` an eleventh run key by name.
   The count was written as *a seventh* when the kind had six members and was three behind by the time the row
   was implemented — the row asserts the measured sizes (9 and 10) so the number cannot drift again unread.
-- **T2.119** (I18): every view-state field that changes a height is enumerated and each is shown to move the measurement — `TableRow.expanded` 3 → 4, `Scroll.collapsed` 5 → 1, `Floor.minHeight` 1 → 7, `Patch.collapsedAfter` 4 → 5 — compared **by equality**, so a fifth arriving outside the block fails here. With the complement measured rather than argued: the same block measured twice, an unrelated block measured between, gives the same number, so nothing accumulated anywhere else. `Gap.gapBefore` is deliberately not in the set — it is composition's, and `measure` returns 1 either way, which is what makes the list a measurement rather than a list of optional fields.
+- **T2.119** (I18): every view-state field that changes a height is enumerated and each is shown to move the measurement — `TableRow.expanded` 3 → 4, `Scroll.collapsed` 5 → 1, `Floor.minHeight` 1 → 7, `Patch.collapsedAfter` 4 → 5 — compared **by equality**, so a fifth arriving outside the block fails here. *(Amended, review batch 3: `Patch.expanded` under a `cap` and the four shedding kinds' `expanded` (C25 I14, C09 I124) join the set, each measured moving its height — the flags are fields of the block, which is the whole of I18.)* With the complement measured rather than argued: the same block measured twice, an unrelated block measured between, gives the same number, so nothing accumulated anywhere else. `Gap.gapBefore` is deliberately not in the set — it is composition's, and `measure` returns 1 either way, which is what makes the list a measurement rather than a list of optional fields.
 - **T2.120** (I20): six 10-wide chips are **two rows at `w = 40` and six at `w = 20`**, and `ceil(totalWidth / w)` says two and three — so the row is asserted against the packing and not against the formula this document used to carry (F928). A chip wider than the width gets its own row rather than being split, which is the observable difference between a packing and a wrap, and the frame is read beside the number so the two cannot drift.
 - **T2.121** (I21): a merge naming one row of two leaves the other **reference-identical**, and `MergeRow` is `Omit<TableRow, "expanded">` — no arm of it can remove a row. The structural half is what makes the behavioural half a rule rather than a sample: a delete marker would make a dropped row and an unmentioned row indistinguishable in the payload, and there is no marker to add.
 - **T2.122** (I22, I9): `replace` drops `expanded` and `merge` keeps it, asserted in one row because the pair **is** the update model and either alone reads as a sample. The merge arm also shows the incoming row cannot forge it: `stripViewState` removes `expanded` from the payload before it lands, so view state survives only where it already was.
 - **T2.123** (I24): a `form: "line"` plot with no `height` is refused **naming the field**, and the same block with `height: 6` validates — the second half is the non-vacuity guard, since a validator refusing both would pass the first assertion.
 - **T2.124** (I32): `role` is on `ColumnDef` and on no row type, and a merge leaves `columns` **reference-identical** — so it travels with the schema and is outside what I9 protects, which is the whole of the claim. Identity rather than deep equality: a rebuilt-but-equal column array is a second record of the schema, and the day it diverges nothing would say so.
 - **T2.125** (I33): neither kind validates as the other — a `comparison` carrying `patch`'s `path`/`language`/`hunks` is refused, and a `patch` carrying `comparison`'s `rows` is refused naming all three missing fields. The required sets are disjoint, which is what *never merge* means at the type level; a merged kind's height would depend on which mode it was in, and I7 cannot bend.
-- **T2.126** (I66): an empty `message` and a non-positive `height` are refused naming the field, an absent `height` the same, and the three numbers are optional — with a source scan that `status`'s renderer never reads `tick`, because *supplied rather than derived* is a claim about where the value comes from and no value assertion can see it.
+- **T2.126** (I66): an empty `message` and a non-positive or fractional `height` are refused naming the field, an **absent** `height` is accepted — it is the fitted box (C09 §3a-quater), and the row used to assert the opposite — and the three numbers are optional — with a source scan that `status`'s renderer never reads `tick`, because *supplied rather than derived* is a claim about where the value comes from and no value assertion can see it.
 - **T2.127** (I114, §5b, F995): **the class rather than the three instances, and driven by the corpus rather than by a list.** Every key of every `ONE_PER_KIND` fixture is deleted in turn and then replaced by a value of the wrong type; wherever deleting it draws a complaint the field is required, and the two complaints must differ, the absent one must not read *must be a …*, and the wrong one must name the type that arrived. **42 required keys** is asserted by equality, so a kind that gains a required field joins the sweep by discovery; `plot.height` is the single declared exemption, also by equality. The row finds sites no grep for a helper reaches — twelve of them on its first run.
 - **T2.128** (I118, MG31): the rule fires on a union in the type and not in the table, on a table entry naming no union, and on a values disagreement; is silent on agreement including `false`; reports rather than passes when it can parse neither side; and is clean over the real tree with the corpus asserted at 25. In `test/unit/enforce-rules.test.ts`.
 - **T2.129** (I119, F405): `keyof KnownBlockKinds` and `KnownBlock["kind"]` are equal in both directions. **The one place a mistyped key can be seen**: the union is built from the members' own `kind` fields, so a key spelt wrongly changes nothing about `Block` and everything about which table rows are demanded.
 - **T2.130** (I117, F271, F1051): **the size channel is not a series, and the count that says if one comes back.** The document is a `bubble` with one `series` and a `sizes`; hiding index 1 changes nothing because there is no index 1, hiding index 0 does change the frame — the fixture shown to respond, since the equality above is otherwise a fact about a hide request that never arrived — and no gutter caption is `0`, because nothing but a position sets the floor. The count of forms whose `series` carries a non-position is **zero**, and `definition.ts` holds **one** read of `series[1]`, which is `dumbbell`'s second position. **It watches the condition and not the remedy**: `FS3` asserts the bubble's own normalisation and would stay green on a second form gaining a channel. Numbered **T2.130 and not T2.128**, which is what it was called for one change while T2.128 was also I118's row — SP7 gates numbers a spec declares and nothing compares a test file's citations to them, so a collision inside one component reads as backed from both ends.
 - **T2.131** (I117): the three refusals and the check the move would have deleted. `sizes` on a form that is not `bubble` is refused naming the form; a `bubble` with no `sizes` is refused naming the move — *the second series was the size channel* — a `bubble` with two `series` is refused on the count, and a `sizes` holding a non-finite number is refused by `requireFiniteNumbers`, which is the rule the channel had while it was a member of `series` and which nothing would have carried over. **A short `sizes` is legal** and means what a trailing `null` means: both renderers read it positionally and both already draw a missing reading as no size, so a length rule would refuse a document they draw correctly.
 - **T2.132** (I118, MG31, F1085): the rule resolves a member declared by reference. `xFormat?: Plot["yFormat"]` is required to be in `PLOT_UNIONS` with the referent's values, and fires when it is absent, when its values disagree, and when the referent it names is not itself a union. **The corpus is counted, not asserted absent** — the number of by-reference members `Plot` declares is read and pinned, so the arm cannot pass by having nothing to resolve, which is the exact way the sentence this row replaces was true and useless.
+- **T2.133** (I128, R-COL-006): `block()` refuses a trend cell carrying `glyph`, `tone`, `spark` or `bar`, and one whose `from` or `to` is not finite; a trend cell with text alone is accepted, and so is a column declaring each of the three polarities. The control is the same cell with no trend, which accepts `glyph` and `tone`.
+- **T2.134** (I140, R-STA-001): `availability` is one of `enabled`, `readonly` and `disabled` by both doors, and absent is a field that takes input.
+- **T2.135** (I137, I140): a submit writes a readonly field's value and not a disabled one's, and `formElements` lists the readonly field without `viewState` and the disabled field not at all.
+- **T2.136** (I141): `validateDocument` refuses a notice whose `state` is outside `CallState`, and one whose tone or glyph disagrees with its state, each naming the field; a notice with each of the five states and its own tone and glyph validates. **The refusal is at validation and not at render** — `state: "bogus"` validated and threw inside `headMark`, which is the failure the row exists to move.
+- **T2.139** (I6, ruling 44): a table whose `source` column declares `vocabulary: ["default", "config", "env", "flag"]` constructs with `env` toned `warn` and `flag` toned `error` and **no glyph**, and passes `validateDocument`. **Three refusals**: a cell `envx` in that column is refused at both doors naming C04 I6 and the column (the set is closed); a vocabulary that is empty, holds an empty word or holds a word twice is refused at both doors. **Two controls, at both doors** (ruling 77): the same `warn` cell with no glyph in a column declaring no vocabulary still throws *requires a non-empty glyph*, and so does a `warn` notice with no glyph — and `validateBlock` refuses each naming C04 I6, while the same cell and notice carrying `glyph: "warn"` validate. So the row is about the declaration and not a rule that stopped firing, and a document the builder refuses is not one the wire accepts.
+- **T2.140** (I142, C09 I86): `b.image({ path })` over a PNG on disk carries `path` equal to the argument and `data` equal to the file's base64; `copyOf` gives `alt` + `\n` + `path` — one newline, no blank line even when `alt` ends in one; `b.image({ data })` carries no `path` and copies as `alt` alone; and the path is neutralised with the rest of the block (C09 I127).
+- **T2.137** (I141, C09 I45): `b.notice` with a `state` writes that state's tone and glyph, and refuses a stated tone that disagrees; `callHead` writes both from the state it derives. Asserted on the built block, so a builder picking its own tone fails here before any frame is drawn.
+- **T2.138** (I141, I6, question 57): `validateDocument` accepts `glyph: "work-unit"` on a notice in each of the five states that are not `queued` (four until `waiting`, I149), and refuses `glyph: "running"` on a plain notice as outside the vocabulary, naming the field. `running` is a `CallState` member and no longer a `Glyph` one, and a validator that took the one for the other would admit a head the renderer's table has no row for.
+- **T2.150** (I144, §3ao.1): refused — a member that is not a record; an `id` absent, `7` or `""`; two members with one `id`, the message naming it and its count; a `label` absent or `3`; a `detail` of `4`; a `state` of `"ok"`, the message naming `CALL_STATES`; a `current` of `0`. Accepted — the same tape with each fixed; a `current` naming no member; a member with no `detail` and no `state`.
+- **T2.151** (I146, §3as): refused — `painted: "yes"`, `quantity: "progres"`, `granularity: "stepped"`, `liveness: "moving"`, `style: 3`. Accepted — each field's every member, and `style: "no-such-style"`, which renders as the default.
+- **T2.152** (I148, §5c.1): accepted — `{ fill: "gradient", from: "default", to: "accent", overshoot: { lift: 1.35, share: 0.35 } }` on `Progress.ramp`. Refused — the same `overshoot` on a colormap gradient, a palette, a `centred` and a `step` fill, and on a span's ramp; `lift` of `1`, `2.5` and `NaN`; `share` of `0`, `1` and `-0.1`; an `overshoot` carrying a third member; an `overshoot` that is not a record.
+- **T2.153** (I109, §5c; ruling 81): accepted — `trailSince: 0` and `trailSince: 12` on a notice with `trail: "ripple"`, streaming and not. Refused — `trailSince` on a notice with no `trail`, with `trail: "hotEdge"` and with `trail: "weight"`, the message naming the forms that read it; `trailSince` of `-1`, `NaN` and `"3"`.
+- **T2.154** (I149, I141): `CALL_STATE_TONE.waiting` is `warn` and `CALL_HEAD_GLYPH.waiting` is `work-unit`; `headMark("waiting")` at 1 bit and in ASCII is `warn` and differs from every other state's; a notice claiming `state: "waiting"` in another tone is refused naming the field.
+- **T2.155** (I150): refused — `current: 3` on a table, naming the field; accepted — `current: "r1"` naming a row and `current: "gone"` naming none; and `measure` over one table at 40 and 80 columns is one number with `current` absent, naming each row in turn, and naming none.
+- **T2.156** (I151): accepted — `ground: "pick"` on a raw span, with `bold`. Refused, each naming the member — `ground: "bgDeep"`; `ground` beside `tone`, beside `value` (on a block with a `colormap`) and beside `ramp`; `ground` on a hunk line's span. `measure` over one raw block at 20 and 80 columns is the same number with the ground and without it.
+- **T2.157** (I152): `ProducedMeta` naming `echo` does not type-check (a `@ts-expect-error` row), and a `DocumentMeta` with `echo` does; `ChipKind` from C17's index and from C04's is one type — each of the three values assigns through both, and C17's `layout.ts` declares no union of its own.
 
 ### Tier 3 — edge cases
 
@@ -3801,6 +4713,11 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.5** (I1): returning a mutable block from any constructor → T1.1 fails.
 - **T6.101** (I119, F405): the three tables returned to `Record<BlockKind, …>` → **this repository's own build fails**, three errors, because `test/` declares `banner` (T4.2) and `gauge` (T1.42) by augmenting `BlockKinds` and a table keyed on the open union then demands rows for them. **The first draft of this row said the *example's* build fails; measured, it does not** — `examples/plots` compiles clean against the reverted table, because an app type-checks its own sources against emitted declarations and never re-checks `src/`. That is the same fact I119's last paragraph rests on, and it cuts the other way here: the augmentations inside this program are the only live consumer the framework has, which is why they are in `test/` and not only in an example.
 - **T6.102** (I120): seven mutations, run by hand, and **the sixth is the one that mattered**. The table reduced to the twenty-five unions — I120's subject narrowed back to I118's — → T1.43's equality fires naming **43** members with no row, which is the direction that has to be loud. `plotMemberErrors` dropped from the `plot:` arm → T1.43 and T1.45 both fail. `requireOrderedEdges`' `a < z` loosened to `a <= z` → T1.45's *range of no height* fails and nothing else does, which is what separates the relation from the two member checks beside it. `checkAnnotations`' refusal returned to `if (!isRecord(a)) continue;` → T1.43's `annotations` row fails. A member moved from the table to the exemption list → **T1.43's exemption assertion** fails, not T1.44: moving a member drops it out of both loops, so the list has to be driven or it is an unchecked way to silence a member. MG31's `declared.set(member, values)` removed → T2.132 fails twice **and `make enforce` goes red over the real tree in the other direction**, `xFormat` in the table naming no union, which is the pair that stops the entry and the resolution drifting apart.
+- **T6.103** (I138): each cell's place hashed independently into `[0, n + 3)` — the shipped form — → **T2.117j** fails at `n = 5` on a frame lighting two cells; the pass dropped from the hash, one fixed order → **T2.117j** fails on the orders.
+- **T6.105** (I6, ruling 44): dropping the membership check, so a column's vocabulary exempts every cell under it → T2.139 fails on `envx`, which then carries a `warn` with no glyph and no word from the set — free text opting itself out, the case the ruling says must not happen.
+- **T6.106** (I6, ruling 77, F1284): dropping the wire's glyph check — `validateBlock` no longer asking a `warn` or `error` notice, or a cell in a column declaring no vocabulary, for its glyph → T2.139 fails on its controls at the wire, and the builder's refusal stands alone again: one document, two verdicts.
+- **T6.107** (I142): the builder dropping the path it read → **T2.140** fails on `path` and on the copy, which falls back to `alt` alone — the state this invariant replaced, and the one a reader cannot tell from a picture built from bytes.
+- **T6.104** (I139): the second period rational again — `53` in place of `37 · φ` → **T2.117k** fails at `P = 1 961`.
 
   **The survivor, and what it indicted.** Removing the `facets` arm from `childBlocksOf` left all three rows green: the table's own wrong value for `facets` is `["__unlikely__"]`, refused by the member check for not being a record, which says nothing about whether anything descends. The recursion — the half F1082 named, *every rule in the file stops at the first nesting* — was untested, and nothing but the mutation asked. What separates the two is a **well-formed facet with a bad member inside**; T1.43 now carries that, a facet reusing its parent's id, and the control that the same facet with nothing wrong is accepted.
 - **T6.100** (I1, F1065): dropping the memo → **T1.39** fails and nothing else does, which is why it exists — the suite was green over the unmemoised walk for the whole of the component's life. Replacing the memo with `Object.isFrozen` → **T1.40** fails while T1.39 still passes, so the two rows separate the optimisation from the one wrong way to write it. Restoring `Object.getOwnPropertyNames` for arrays → **T1.41** fails, which is a stated limit reporting that it has moved rather than a test breaking.
@@ -3847,13 +4764,20 @@ The generic suite. **These run against every registered block kind, including ap
 - **T6.91** (I105): `validate.ts` refusing `elide` → T2.114 fails at construction; the fitter reading `elide` as an appearance and skipping it in `measure` → T2.114's `info` arm still passes and its `step` arm fails on the row count, which is why the row has both arms.
 - **T6.92** (I106): dropping the arity check from `validate.ts` → T1.29's both-backings row admits a ramp with two answers; admitting a `bands` of 1 → T1.29's bands row passes a step with one band, which is a gradient wearing a different name.
 - **T6.93** (I107): the validator admitting a `colormap` on a span → T1.30 fails at construction; `measure` reading `ramp` → T3.77 fails on the height while every render row still passes, which is why the row compares heights and not frames.
-- **T6.94** (I109): widening `RampAnimation` with `sweep` → T2.117's refusal row admits an event the render cannot time.
+- **T6.94** (I109, R-MOT-012): narrowing `RampAnimation` back to six → T2.117a's equality against the registry fails and a design effect is refused at the gate. *(Inverted — R-MOT-012. As first written it was the widening that failed, on I109's retired reason that a one-shot is an event the render cannot time; the clock is injected and a one-shot that stores its start is timeable, so the revert worth watching is the narrowing.)*
+- **T6.94a** (I109): taking the one-shot's elapsed time from a single `RenderContext.since` per frame rather than from each ramp's own stamp → **nothing in the suite fails but this row, T2.117g included**. Measured by making the change: T2.117g calls `animateT` directly and is handed two stamps by construction, so it answers twice however the renderer reads them — a row that calls the mechanism cannot see the wiring. This one puts two one-shots in one document and goes through the public render, which is the only place the difference is observable; two one-shots in lockstep read as correct in any frame holding only one.
 - **T6.95** (I108): the `progress` arm of `validate.ts` dropping its `checkRamp` call → T1.29's bar half admits every ramp the span half refuses, **measured** on landing — the mechanism is a call and not a key list, which is why the row runs the table on both carriers; adding `ramp` to `rule` → the `RAMP_EXTENT` exhaustiveness check names a kind marked `none` with a carrier (→ C09).
 - **T6.85** (§3am): reverting the translator to literal markers → T2.33 fails on `text`; adding a text-only `ViewPatch` arm → T1.26 still passes and **nothing fails**, which is the row that says the closure in I87 is by type and the day the union widens this row wants a test.
 - **T6.96** (I110): dropping the control check from the gate → T1.31 admits `\x1b[31m` and the golden frame for T4.7 gains a real escape.
 - **T6.97** (I111): admitting adjacent equal-styled runs → T1.32's last row passes and two snapshots of one screen stop comparing equal.
 - **T6.98** (I113): allowing `dropped: 0` → T1.33 admits it and the marker row draws *0 lines dropped*.
 - **T6.99** (I118): dropping the `plotUnionErrors` call from the `plot:` arm → T1.35 fails on all 25 members and T1.37 on the eight; giving a form rule back its own membership check beside the table → T1.38 counts two faults where one is asserted; deleting a member from `PLOT_UNIONS` → T2.128's equality fires **and** T1.35's corpus count of 25 fails, which is the pair that stops the table shrinking quietly. `isKnownPlotValue` returning `true` for every value → four of the five rows fail and T1.36 stays green; returning `false` → **T1.36 alone** fails, which is why the control exists: a gate that refuses everything satisfies every row that asserts a refusal.
+- **T6.108** (I144): the `tape:` arm reverted to `requireArray` alone → **T2.150** fails on every refusal.
+- **T6.109** (I145): `progress`'s `measure` answering 1 at every fraction → **T1.80** fails at 100/100.
+- **T6.110** (I146): the `progress:` arm without the four field checks → **T2.151** fails.
+- **T6.111** (I147): `width` counting labels and gaps only → **T1.81** fails on the measured case, which draws `«1`.
+- **T6.112** (I148): the sampler ignoring `overshoot` → **T1.82** fails at `t = 1`.
+- **T6.113** (I124): `tapeMemberCols` leaving the current's lead out of its range → **T1.83** fails on every tape with a current.
 
 ---
 

@@ -73,6 +73,16 @@ describe("the screen model", () => {
     expect(screen.text[0]).toBe("red");
   });
 
+  it("draws nothing for an OSC or a bell, and keeps the text around them", () => {
+    // C22 T4.105 read a screen between two frames and found `]9;prism: …` on
+    // the prompt row — the model drawing a payload the terminal never does.
+    const screen = screenFrom(
+      [`${CURSOR_HOME}ab\u0007\u001b]9;prism: entry 4\u0007\u001b]2;title\u001b\\cd${" ".repeat(6)}`],
+      SIZE,
+    );
+    expect(screen.text[0]).toBe("abcd");
+  });
+
   it("starts blank, and a short write leaves the rest of the screen blank", () => {
     const screen = screenFrom([`${CURSOR_HOME}${pad("only")}`], SIZE);
     expect(screen.text).toEqual(["only", "", "", ""]);

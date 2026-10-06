@@ -1,0 +1,33 @@
+a resize is not a redraw — three things have to survive it
+
+  the SCROLL   by anchor: the top visible entry stays the top
+               visible entry, whatever its new height is
+  the FOCUS    by id, falling forward to the nearest survivor —
+               the element list is a function of width, so the
+               element you were on may not exist at 60 columns
+  the CARET    by character index, not by column — a rewrapped
+               line puts the same character somewhere else
+
+  none of the three is a position on screen. All three are
+  identities, and the position is recomputed — which is why a resize
+  does not feel like losing your place.
+
+what a resize is allowed to change
+
+  how much is visible, the wrapping, a plot's sample count, a
+  table's columns, whether the label on the prompt's rule fits.
+
+what it is NOT allowed to change
+
+  the scope. A resize while you are inside a block leaves you inside
+  it — and if the block lost its rows entirely, you land on the block
+  rather than at the prompt.
+
+  a resize that dumps you back to the prompt is a resize that made
+  you start again.
+
+and it coalesces
+
+  a drag is thirty events. One frame at the end of the window, not
+  thirty — which is measured, not assumed: this tree once spent
+  544ms on a 30-event drag before the window was added.

@@ -229,6 +229,13 @@ function faultStatus(block: Image, fault: string, height: number): Status {
 export const imageDefinition: BlockDefinition<Image> = {
   kind: "image",
 
+  // §7a — *an image as its alt text and its path* (I86, `R-SEL-004`). The path
+  // is the one the builder read (C04 I142), and a block built from bytes has
+  // none, so it copies as its alt alone — a digest is not a path. **Runs of
+  // newlines collapse to one**: an image is one entry, and a blank line — an
+  // `alt` ending in a newline, say — is the separator that would split it.
+  copy: (block) => [block.alt, block.path ?? ""].filter((part) => part !== "").join("\n").replace(/\n{2,}/gu, "\n"),
+
   /** The clamped row count — never the declared one when the width bites. */
   measure(block: Image, width: number, _measureChild: MeasureFn, probe?: Probe): number {
     return imageCells(block, width, probe).rows;

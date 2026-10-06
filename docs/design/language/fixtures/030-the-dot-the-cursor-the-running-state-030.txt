@@ -1,0 +1,44 @@
+the dot is a MARK, and it carries the state of the thing beside it.
+
+  ✦   the AGENT is working        accent, and it walks
+  ●   a TOOL CALL is running      white, STILL — the spinner is the liveness
+  ●   a call SUCCEEDED           ok, still
+  ●   the agent SAID something   white, still — prose has no outcome
+  ●   blocked on YOU             warn, blinking
+  ●   cancelled                  muted, still — it did not finish
+  ●   failed                     error, still
+  ○   queued, not started        hollow, muted, still
+
+a CALL has an outcome and its mark carries it. AGENT PROSE has no
+outcome — it is just the agent talking — so its mark stays white.
+
+cancelled is MUTED, not warn — nothing went wrong, it just did not
+finish. Warn is for something you should act on, and a stopped call
+is already dealt with.
+
+and the two running states are different on purpose
+
+  ✦  updating the tests  12s · 1.4k tok
+  the agent: accent, walking, with a ramp on its text
+
+  ●  pytest tests/unit · ✦ 4s
+  a tool: white and still, with a spinner in the duration slot
+
+  one is THINKING and one is WAITING — and a reader who is not
+  looking directly at the line can still tell them apart.
+
+a running call's ● is white and still. The duration spinner carries
+liveness. The work mark never moves or blinks; in a call-lifecycle gutter,
+○ is reserved for queued.
+
+the cursor blinks when idle and is solid while typing
+
+  ❯ ▌          idle
+  ❯ /prof▌     typing
+
+every call enters its running state — a minimum, not a threshold
+
+  t=0      ●  pytest · ✦
+  t=1s     ●  pytest · ✦ 1s
+  t=4.2s   ● pytest · 4.2s · 47 passed
+  20ms     ● git rev-parse · 0.02s · a3f9b21

@@ -14,7 +14,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { Block, KeyValue, Notice, Table } from "@fmx/calcium";
+import type { Block, KeyValue, Notice, Table } from "calcium-tui";
 import {
   changeRow,
   createDiffAdapter,
@@ -145,7 +145,7 @@ describe("/diff — the filesystem change list", () => {
   it("D5 (A3): no changes renders words, not an empty block", () => {
     // Measured against an `alpine sleep`: zero lines, exit 0 — indistinguishable
     // from a failed fetch unless the document says which. Fourth instance of the
-    // empty-block class, after /drift, /config and /logs.
+    // empty-block class, after /drift, /filediff and /logs.
     const doc = createDiffAdapter().adapt(result({ stdoutRaw: "" }), ctx);
     expect(doc.status).toBe("ok");
     expect(textOf(doc)).toContain("no filesystem changes");

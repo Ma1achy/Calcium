@@ -11,6 +11,7 @@ import type { MeasureFn } from "../../src/data/viewmodel/index.js";
 import { degradeColour } from "../../src/presentation/theme/colormap.js";
 import { b } from "../../src/shell/builders/index.js";
 import { pipelineHarness, settled } from "../support/execution.js";
+import { BODY_INDENT } from "../../src/shell/entry-layout.js";
 import { createProcessRunner } from "../../src/data/process/runner.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 
@@ -218,6 +219,21 @@ describe("C27 terminal emulator — tier 1", () => {
     expect(term.snapshot("t").cursor).toEqual({ line: 1, col: 0 });
     await feed(term, "\u001b[?1049h\u001b[3;5H");
     expect(term.snapshot("t").cursor).toEqual({ line: 2, col: 4 });
+    term.dispose();
+  });
+
+  it("T1.13 (C27 I2, C27 I6, C04 I110): a bidi character follows its cell — dropped where it joined one, ? where it took one — and the snapshot validates", async () => {
+    // **Measured before the rule was written**: the dependency joins U+200F and
+    // U+202E to the cell before them at no width, and gives U+2067 and U+061C a
+    // cell of their own. A walk that replaced all four would draw two cells the
+    // child never painted; one that dropped all four would lose two it did.
+    const term = createEmulator({ cols: 20, rows: 4 });
+    await feed(term, "a\u200fb\u202ec\u2067d\u061ce");
+    const block = term.snapshot("t");
+    const [line] = block.lines;
+    expect(line?.text).toBe("abc?d?e");
+    expect(cells(line?.text ?? ""), "the painted width, which cells() now agrees with").toBe(7);
+    expect(validateDocument(documentWith(block)).ok, "the snapshot validates under C04 I110").toBe(true);
     term.dispose();
   });
 
@@ -695,7 +711,7 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
     // calls have returned (F852).
     //
     // What is left is the figure, and it is the one that can be wrong: the
-    // region is 60 and the body's inner width is 56.
+    // region is 60 and the body's inner width is 55 (60 − BODY_INDENT).
     let width = 80;
     const told: number[] = [];
     let emit: ((c: string) => void) | null = null;
@@ -735,8 +751,8 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
 
     const scroll = h.transcript.entries[0]?.doc.blocks[0] as { children: readonly Block[] };
     const screen = scroll.children[0] as { cols: number };
-    expect(told, "the child was told once").toEqual([56]);
-    expect(screen.cols, "and the emulator holds the same number").toBe(56);
-    expect(screen.cols, "which is the body's inner width, not the region's").toBe(60 - 4);
+    expect(told, "the child was told once").toEqual([60 - BODY_INDENT]);
+    expect(screen.cols, "and the emulator holds the same number").toBe(60 - BODY_INDENT);
+    expect(screen.cols, "which is the body's inner width, not the region's").toBe(55);
   });
 });

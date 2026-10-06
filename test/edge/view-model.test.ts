@@ -204,7 +204,7 @@ describe("C04 width arithmetic at the boundaries", () => {
     // `DOCKER_TUI_BANNER.md` calls *the top pad already in the document*.
     //
     // Framework-side as well as in the consumer, and the mutation pass is why:
-    // the example's rows import `@fmx/calcium` and run against `dist/`, so a
+    // the example's rows import `calcium-tui` and run against `dist/`, so a
     // mutation to `src/` cannot reach them. A row that a mutation cannot touch
     // is a row that reports nothing about the code under it.
     const kit = measurable({});
@@ -1031,6 +1031,8 @@ describe("C04 §4a — every op that names a block finds it wherever it lives", 
   });
 
   it("T3.83 (C04 I98, §3c S5, F1015): the dispatcher finds the block holding a row at any depth", () => {
+    // The registry's fold hook, which the fold arm reads since C23 I84.
+    const kit = measurable({});
     // **The dispatcher's half of the same rule, and it lives here because C04
     // I98 is the invariant that states the search** — rows first, then blocks,
     // both at any depth. Driven through a real `TranscriptStore`, so the
@@ -1044,6 +1046,19 @@ describe("C04 §4a — every op that names a block finds it wherever it lives", 
       children: [tableOf(3, "tbl")],
     });
     const store = createTranscriptStore();
+    // **A second entry carrying the same row ids, appended FIRST** (C04 I34,
+    // C23 I31). *Deeper* and *wider* are different directions and only one of
+    // them lets an action act on another entry's data — and the wider revert
+    // survived this row until the decoy existed, because a store with one entry
+    // cannot tell *this entry's blocks* from *every entry's blocks*. Measured
+    // in M9b's mutation pass; before the decoy the run reported a kill it had
+    // not earned.
+    // **Top-level in the decoy, nested in the subject, and that asymmetry is the
+    // whole of the row.** A decoy that nested its table too is unreachable under
+    // the widening as well — the descendants half is built from `entry.doc.blocks`
+    // either way — so the mutation survived with the decoy present and the row
+    // reading as coverage. Measured twice in M9b's pass.
+    const decoy = store.append(doc({ blocks: [tableOf(3, "tbl")] }));
     const id = store.append(doc({ blocks: [wrapped] }));
 
     const said: string[] = [];
@@ -1055,7 +1070,7 @@ describe("C04 §4a — every op that names a block finds it wherever it lives", 
       submit: () => undefined,
       refuse: (_from, text) => said.push(text),
       notify: (text) => said.push(text),
-      pushView: () => null,
+      fold: (b) => kit.registry.fold(b),
     });
 
     dispatch({ kind: "expand", label: "open", target: "r1" }, id);
@@ -1067,6 +1082,16 @@ describe("C04 §4a — every op that names a block finds it wherever it lives", 
     expect(said, "nothing was refused or notified").toEqual([]);
     expect(table?.rows[0]?.expanded, "the nested row opened").toBe(true);
     expect(table?.rows[1]?.expanded, "and only that one").toBeUndefined();
+
+    // **And the other entry was not touched**, which is the *wider* direction.
+    const other = store.entries.find((e) => e.id === decoy)?.doc;
+    const otherTable = [...(other?.blocks ?? [])]
+      .flatMap((x) => [x, ...descendants(x)])
+      .find((x): x is Table => x.kind === "table" && x.id === "tbl");
+    expect(
+      otherTable?.rows.every((r) => r.expanded === undefined),
+      "another entry's rows are not this action's to open",
+    ).toBe(true);
 
     // The fold arm reads the same `reachable`, so the row asserts both halves of
     // the search rather than the one it was written for — one walk read twice is
@@ -1090,7 +1115,7 @@ describe("C04 §4a — every op that names a block finds it wherever it lives", 
       submit: () => undefined,
       refuse: () => undefined,
       notify: (text) => said.push(text),
-      pushView: () => null,
+      fold: (b) => kit.registry.fold(b),
     });
     dispatch2({ kind: "expand", label: "open", target: "fold" }, id2);
     const after = store2.entries.find((e) => e.id === id2)?.doc;

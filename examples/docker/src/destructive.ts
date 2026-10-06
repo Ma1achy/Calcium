@@ -32,8 +32,8 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { b } from "@fmx/calcium";
-import type { LocalDocument, Block, LocalContext } from "@fmx/calcium";
+import { b } from "calcium-tui";
+import type { LocalDocument, Block, LocalContext } from "calcium-tui";
 import type { Runner } from "./mutation.ts";
 import { inspectState } from "./mutation.ts";
 
@@ -88,7 +88,7 @@ export function createRmHandler(
           { key: "n", label: "no", default: true },
         ],
       });
-      if (answer !== "y") {
+      if (answer.key !== "y") {
         return okDoc(ctx.command, ["rm", ref], [b.notice.warn(`not removed — ${state.name} is unchanged`)]);
       }
     }
@@ -137,7 +137,7 @@ export function createRmiHandler(
           { key: "n", label: "no", default: true },
         ],
       });
-      if (answer !== "y") {
+      if (answer.key !== "y") {
         return okDoc(ctx.command, ["rmi", ref], [b.notice.warn(`not removed — ${ref} is unchanged`)]);
       }
     }
@@ -274,7 +274,7 @@ export function createPruneHandler(
           { key: "n", label: "no", default: true },
         ],
       });
-      if (answer !== "y") {
+      if (answer.key !== "y") {
         return okDoc(ctx.command, [...verb], [b.notice.warn("nothing removed")]);
       }
     }

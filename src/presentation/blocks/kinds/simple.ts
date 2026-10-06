@@ -7,15 +7,15 @@
  * one of them and not the call.
  */
 import type { AmbiguousWidth } from "../../text.js";
-import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
-import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip } from "../../../data/viewmodel/index.js";
-import { cells, stripControl, truncate, truncateParts, wrapCells } from "../../text.js";
+import { atLeastOne, normaliseWidth, RAMP_ONE_SHOTS, TRAIL_ANIMATION } from "../../../data/viewmodel/index.js";
+import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip, Tone } from "../../../data/viewmodel/index.js";
+import { cells, graphemes, stripControl, truncate, truncateParts, wrapCells } from "../../text.js";
 import type { Run } from "../../runs.js";
 import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE, rampStyle } from "../../theme/index.js";
-import { animateT, effectiveTick, extentT } from "../ramp.js";
-import { barStyle, glyphFor, glyphCells, glyphs } from "../glyphs.js";
-import { clampSpans, pad, paint, paintRuns, rows, selectionStyle, tone, type Span } from "../paint.js";
+import { animateT, effectiveAnimation, effectiveTick, extentT, glyphTick } from "../ramp.js";
+import { barStyle, glyphFor, glyphCells, glyphs, headMark, spinnerFrameAt } from "../glyphs.js";
+import { background, clampSpans, focusShapeStyle, isBand, pad, paint, paintRuns, rows, selectionStyle, slot as surface, tone, withBackground, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Windowed, Rendered } from "../types.js";
 
 /** Chips in a `pills` row are separated by two spaces — one is too close to read. */
@@ -91,27 +91,32 @@ const GLYPH_INDENT: ReadonlyMap<Glyph, number> = new Map<Glyph, number>([
 const GLYPH_RAIL: ReadonlySet<Glyph> = new Set<Glyph>(["quote"]);
 
 /**
- * The tokens whose notice is one block-level element with or without an
- * `action` (C09 I47, F831). A call's head is the line a reader acts on — `⏎`
+ * Whether this notice is a call's head — one block-level element with or
+ * without an `action` (C09 I47, F831). A call's head is the line a reader acts on — `⏎`
  * folds its body, `y` copies its invocation — and `noticeElements`' gate,
- * *no action, no element*, is right for every other token: a muted status line
- * is not a place to stand. One member, and a property of the token as the
- * indent and the rail are.
+ * *no action, no element*, is right for every other notice: a muted status line
+ * is not a place to stand.
+ *
+ * **The test is the call state, not the glyph token.** It used to be
+ * `glyph === "step"`, and that slot is gone: above the monochrome rung the head
+ * mark is `work-unit`'s `●` for every state, which a muted `work-unit` notice could
+ * also hold, and at 1 bit it is five different tokens. A predicate over the
+ * character would have answered differently at different capabilities, which is
+ * a focus ring that changes shape when the terminal does. `state` is on the
+ * block, is capability-free, and is present on exactly the notices that are
+ * call heads.
+ *
+ * It is also **one committed row, fitted rather than wrapped** (C09 I46), for
+ * the same reason and by the same test: a head that wraps is two heads to a
+ * reader skimming the gutter, so the run its spans mark `elide` gives way
+ * first, from its end, and the whole row last. `measure` answers 1 without a
+ * capability; the fitting happens where the capabilities are, in `render`.
  */
-const GLYPH_ELEMENT: ReadonlySet<Glyph> = new Set<Glyph>(["step"]);
+const isCallHead = (block: Notice): boolean => block.state !== undefined;
 
-/**
- * The tokens whose notice is **one committed row, fitted rather than wrapped**
- * (C09 I46). A head that wraps is two heads to a reader skimming the gutter, so
- * the run its spans mark `elide` gives way first, from its end, and the whole
- * row last. `measure` answers 1 without a capability; the fitting happens where
- * the capabilities are, in `render`. The kind's wrap policy is untouched.
- */
-const GLYPH_ONE_ROW: ReadonlySet<Glyph> = new Set<Glyph>(["step"]);
-
-/** Whether a notice stands in the focus ring (I47): an action, or a token in `GLYPH_ELEMENT`. */
+/** Whether a notice stands in the focus ring (I47): an action, or a call state. */
 function declaresElement(block: Notice): boolean {
-  return block.action !== undefined || (block.glyph !== undefined && GLYPH_ELEMENT.has(block.glyph));
+  return block.action !== undefined || isCallHead(block);
 }
 
 /**
@@ -123,7 +128,15 @@ function declaresElement(block: Notice): boolean {
  * reverse, and both are frames that measure correctly and are wrong.
  */
 function glyphLead(glyph: Glyph, caps: RenderContext["capabilities"]): string {
-  return `${" ".repeat(GLYPH_INDENT.get(glyph) ?? 0)}${glyphFor(glyph, caps)} `;
+  // **Padded to the token's reservation** (C09 I5, R-GLY-003): `⎿` is one cell
+  // of `continuation`'s two, and the blank after it is what keeps the text in
+  // the column `` `- `` puts it in. `prefixCells` counts the reservation, so
+  // the two agree by construction rather than by every mark being one cell.
+  const drawn = glyphFor(glyph, caps);
+  // `glyphFor` hands back the ASCII half at `wide` (I48), so the mark drawn is
+  // never Ambiguous and its narrow width is its width.
+  const pad = " ".repeat(Math.max(0, glyphCells(glyph) - cells(drawn))); // narrow-ok
+  return `${" ".repeat(GLYPH_INDENT.get(glyph) ?? 0)}${drawn}${pad} `;
 }
 
 /**
@@ -230,14 +243,53 @@ export const ruleDefinition: BlockDefinition<Rule> = {
  * `wrapCells`, or the two halves would disagree by a row exactly where a token
  * moved.
  */
+/**
+ * The head mark's two cells — a space and one spinner frame (C09 I101, §026).
+ *
+ * **Reserved rather than appended**, and that is the whole of why it is here:
+ * a mark added past the wrap pushes the last row over the width, the compositor
+ * wraps it, and the frame gains a row `measure` never counted. So the cells come
+ * off the prose budget, where both halves already meet.
+ *
+ * **Two at every rung, because a frame is one cell at every rung** (T2.75,
+ * T2.70) — which is what keeps the tick out of the geometry. Not streaming is
+ * no reservation at all (`R-BLK-188`), so a settled notice wraps exactly as it
+ * did before this existed.
+ */
+const MARK_CELLS = 2;
+
+const markCells = (block: Notice): number => (block.streaming === true ? MARK_CELLS : 0);
+
+/**
+ * A button's chrome, in cells (C09 I102, §073).
+ *
+ * **Four at every rung, and the measurement invariant is why.** The drawn chrome
+ * differs — ` Approve ` is two cells, `[ Approve ]` is four — and `measure` is a
+ * function of `(block, width)` alone (I2), so it cannot see which rung applies:
+ * the rung is the theme's and the terminal's. A budget that varied with it would
+ * be `measure` reading a capability, which is the one carve-out the design does
+ * not override. So the budget takes the maximum and the ground rungs carry two
+ * cells of slack — a wrap two cells early, never an overflow, which is the safe
+ * direction of a width disagreement.
+ */
+const BUTTON_CELLS = 4;
+
+// **A call head is never a button, even carrying an action** (I102, I47). A
+// tool-call header does both — it heads a call *and* offers a retry — and
+// painting it would put a second affordance in a gutter that already has a mark.
+// The first draft asked `action !== undefined` alone and put a cell of padding
+// into every call header in the tree; T2.48 read it as `●  run_command`.
+const buttonCells = (block: Notice): number =>
+  block.action === undefined || isCallHead(block) ? 0 : BUTTON_CELLS;
+
 function noticeRows(
   block: Notice,
   width: number,
   caps?: RenderContext["capabilities"],
 ): readonly (readonly Run[])[] {
   const runs = runsOf(block.text, block.spans);
-  const budget = proseWidth(width, prefixCells(block.glyph));
-  if (block.glyph !== undefined && GLYPH_ONE_ROW.has(block.glyph)) {
+  const budget = proseWidth(width, prefixCells(block.glyph) + markCells(block) + buttonCells(block));
+  if (isCallHead(block)) {
     // One row by construction (I46). Without capabilities — the measurer's
     // call — the runs are returned unfitted: a row count of one is the whole of
     // what `measure` needs, and the marker's width is a capability's to say.
@@ -263,7 +315,11 @@ function fitRuns(runs: readonly Run[], budget: number, caps: RenderContext["capa
     const have = width(run);
     // At least the marker: an argument reduced to `…` still says *there was
     // one*, where an empty run leaves two separators touching.
-    const shortened = { ...run, text: truncate(run.text, Math.max(1, have - excess), caps, "end") };
+    // **From the MIDDLE** (I103, §099): an elided argument is a path, and *the
+    // head says where and the tail says what*. This read `"end"`, so
+    // `read_file(src/integration/parser/parse.ts)` kept *where* and threw *what*
+    // away — the one cut the section names as wrong.
+    const shortened = { ...run, text: truncate(run.text, Math.max(1, have - excess), caps, "middle") };
     out[i] = shortened;
     excess -= have - width(shortened);
   }
@@ -283,7 +339,7 @@ function fitRuns(runs: readonly Run[], budget: number, caps: RenderContext["capa
  * The rows are `noticeRows`' own, so the element is where the block is drawn.
  */
 function noticeElements(block: Notice, width: number): readonly NavElement[] {
-  // **Or its token is in `GLYPH_ELEMENT`** (I47): a call's head stands in the
+  // **Or it is a call head** (I47): a call's head stands in the
   // ring whether or not the composer gave it a fold to toggle; `activate` is
   // the action when there is one and absent otherwise.
   if (!declaresElement(block)) return Object.freeze([]);
@@ -300,8 +356,260 @@ function noticeElements(block: Notice, width: number): readonly NavElement[] {
   ]);
 }
 
+/**
+ * How many cells of the head a trail covers (C09 I90, §7e).
+ *
+ * **Fourteen, from the design's own figure** (parked 8). §026's prose names no
+ * band; its streaming demo sets `const trail=14`, over narrow text where a
+ * character is a cell. It was three while the prose was the only source.
+ */
+const TRAIL_CELLS = 14;
+
+/**
+ * The head colour each form arrives in (C04 §5c, C04 I123).
+ *
+ * **`fade`'s head is `muted`, below the text floor, and that is ruled** (parked
+ * 34, tie-break 4). §026 says *the newest character IS the ground and emerges
+ * toward the ink*, and `R-MOT-004` forbids a frame that is the sole carrier of
+ * meaningful text below the floor. A streaming head is not that: the stream is
+ * carried by the head's spinner and the elapsed count, so the trail may be
+ * ground-only. `muted` rather than the ground itself because a `Ramp` is closed
+ * to `Tone` (C10 I16) and no tone names the surface — the dimmest legal head.
+ */
+const TRAIL_HEAD: Readonly<Record<"hotEdge" | "fade" | "hue" | "ripple", Tone>> = Object.freeze({
+  hotEdge: "accent",
+  fade: "muted",
+  hue: "accent",
+  ripple: "accent",
+});
+
+/**
+ * `hotEdge`'s overshoot, the design's own profile (C09 I133, C04 I148, §026).
+ *
+ * The demo lifts the accent by `1 + (1 − d / 0.35) × 0.35` below `d = 0.35`
+ * and mixes to the ink over the rest; as a ramp stop that is `{ lift: 1.35,
+ * share: 0.35 }` exactly. `TRAIL_HEAD` alone drew a plain gradient, so the
+ * newest cluster sat at the accent and never above it.
+ */
+const TRAIL_OVERSHOOT = Object.freeze({ lift: 1.35, share: 0.35 });
+
+/**
+ * The trail's band, laid over the head of a streaming notice (C09 I90, I91, §7e).
+ *
+ * **Derived here because only here knows the width** (C04 I122). The block says
+ * it is streaming; which cells are in the band is this layer's arithmetic, and
+ * a producer writing the span would be writing an offset it cannot compute.
+ *
+ * **Over the text, so chrome is whole by construction** (`R-BLK-198`). The rows
+ * handed in are the wrapped *text*; the head mark is added by the caller after
+ * this runs, so there is no rule for the renderer to remember — a header has no
+ * position in the stream, so it exists complete or not at all.
+ *
+ * **The target is the run's own ink** (C04 I123, `R-BLK-196`): `hotEdge` and
+ * `fade` cool to whatever tone the run already carries, `hue` to the block's
+ * body tone. A trail whose target is fixed repaints a dim run to white, which
+ * is a defect that reads as a styling choice.
+ *
+ * **Geometry is untouched**: this restyles cells that are drawn anyway, so
+ * `measure` is the same number with a trail and without one.
+ */
+function withTrail(
+  wrapped: readonly (readonly Run[])[],
+  block: Notice,
+  ambiguous: AmbiguousWidth,
+  colourDepth: number,
+): readonly (readonly Run[])[] {
+  if (block.streaming !== true) return wrapped;
+  const form = block.trail ?? "hotEdge";
+  const effect = TRAIL_ANIMATION[form];
+  // **At 1-bit the four colour forms draw nothing rather than something else**
+  // (I91). Substituting a mark would spend a cell the block never reserved, and
+  // substituting bold for every form would make four names one.
+  if (colourDepth === 1 && form !== "weight") return wrapped;
+
+  // Where the band starts: walk back from the end of the text, **across wrapped
+  // rows**, until the tail is `TRAIL_CELLS` wide (I90, parked 8). The design's
+  // demo indexes the whole stream, and *the last cells of the text* says the
+  // same; stopping at the last row was invisible at three cells and is on every
+  // short last row at fourteen. A row wholly inside the band passes the walk to
+  // the one above; a row it enters part-way ends it. The cells a break
+  // consumed are not in any row and so not in the band. A whole band on a short
+  // text is the whole text — "never reaching further than the text".
+  //
+  // **Walked back by grapheme cluster** (I134). It stepped one UTF-16 code unit
+  // at a time, so a zero-width combining mark was a step of its own: the walk
+  // stopped between it and its base, the cut split the cluster, and the mark
+  // fell out of the frame. A cluster is wholly in the band or wholly out.
+  const cuts: { row: number; start: number }[] = [];
+  let left = TRAIL_CELLS;
+  for (let row = wrapped.length - 1; row >= 0 && left > 0; row -= 1) { // cells-ok — an array index
+    const text = runsText(wrapped[row] ?? []);
+    const clusters = graphemes(text);
+    let start = text.length; // cells-ok — a code-unit cursor
+    for (let k = clusters.length - 1; k >= 0; k -= 1) { // cells-ok — a cluster index
+      const w = cells(clusters[k] ?? "", ambiguous);
+      if (w > left) break;
+      left -= w;
+      start -= (clusters[k] ?? "").length; // cells-ok — a code-unit cursor
+    }
+    if (start < text.length) cuts.unshift({ row, start }); // cells-ok — a code-unit comparison
+    if (start > 0) break;
+  }
+  if (cuts.length === 0) return wrapped; // cells-ok — a row count
+
+  // One ramp over the whole band, so a band crossing a break is one gradient
+  // and not two: `at` and `of` count clusters from the band's first cell.
+  const bands = cuts.map(({ row, start }) => {
+    const line = wrapped[row] ?? [];
+    const length = runsText(line).length - start; // cells-ok — a code-unit length
+    return { row, head: sliceRuns(line, 0, start), band: sliceRuns(line, start, length) };
+  });
+  const of = bands.reduce(
+    (n, b) => n + b.band.reduce((m, r) => m + graphemes(r.text).length, 0), // cells-ok — a cluster count, the unit `paintRuns` indexes (I134)
+    0,
+  );
+  const out = [...wrapped];
+  let at = 0; // graphemes-ok — the run's place in its ramped span
+  for (const { row, head, band } of bands) {
+    const banded: Run[] = [];
+    for (const run of band) {
+      if (form === "weight") {
+        banded.push({ ...run, attrs: { ...run.attrs, bold: true } });
+        continue;
+      }
+      const target = form === "hue" ? block.tone : (run.tone ?? block.tone);
+      // **The head colour at `to`**, because a gradient's `to` sits at `t = 1`
+      // and the band's last cluster is the newest (I90, §026's `d = (head − i)
+      // / trail`). It was `from`, which put the accent on the oldest cell.
+      const ramp = {
+        fill: "gradient" as const,
+        from: target,
+        to: TRAIL_HEAD[form],
+        // **The effect from the one table, and a one-shot's stamp with it**
+        // (I133, C04 I109; ruling 81). The band's ramp is derived here and has
+        // no address in the document, so its `since` travels on the notice —
+        // stamped by the shell at the arrival the band follows. Without it the
+        // ripple held its not-started frame for the life of the stream.
+        ...(effect !== undefined ? { animate: effect } : {}),
+        ...(effect !== undefined && block.trailSince !== undefined && RAMP_ONE_SHOTS.has(effect) ? { since: block.trailSince } : {}),
+        ...(form === "hotEdge" ? { overshoot: TRAIL_OVERSHOOT } : {}),
+      };
+      const count = graphemes(run.text).length; // cells-ok — a cluster count (I134)
+      // **Over `of + 1` positions, with the band at the top `of`**, so the
+      // oldest cell is one step off the ink and not on it: `d = (head − i) /
+      // trail` tints all fourteen and leaves the fifteenth plain. At `of`
+      // positions the oldest sat at `t = 0`, exactly the ink, and the band
+      // showed thirteen.
+      banded.push({ ...run, ramp: { ramp, at: at + 1, of: of + 1, ordinal: 0 } });
+      at += count; // graphemes-ok — a cluster cursor
+    }
+    out[row] = [...head, ...banded];
+  }
+  return out;
+}
+
+/**
+ * The agent's mark, one space past the last character that has arrived (C09
+ * I101, §026, `R-BLK-182`, `R-MOT-008`).
+ *
+ * **After the trail and not inside it**, which is `withTrail`'s own note: the
+ * band is laid over the *text*, and a mark inside it would be a cell of chrome
+ * the ramp had to be told to skip. Two carriers, two passes.
+ *
+ * **The `agent` spinner and not a static glyph**, because the registry draws it
+ * as an empty `sp-agent` span — a set rendered by CSS — and the plain-text
+ * fixture holds one frame of it. `accent` is the class that span carries.
+ *
+ * **It spends the cells `noticeRows` reserved**, so the wrap the reader sees is
+ * the one `measure` counted; not streaming, there is neither mark nor
+ * reservation (`R-BLK-188`).
+ */
+function headMarked(
+  wrapped: readonly (readonly Run[])[],
+  block: Notice,
+  ctx: RenderContext,
+): readonly (readonly Run[])[] {
+  // **One predicate for both halves.** The mark is drawn exactly when its cells
+  // were reserved, so a change to `markCells` moves the reservation and the draw
+  // together — they cannot disagree about which blocks have a head.
+  if (markCells(block) === 0) return wrapped;
+  const frame = spinnerFrameAt(ctx.capabilities, glyphTick(ctx.tick, ctx.motion), "agent");
+  if (frame === "") return wrapped;
+  const last = wrapped.length - 1; // cells-ok — an array index
+  const line = wrapped[last];
+  if (line === undefined) return wrapped;
+  const out = [...wrapped];
+  out[last] = [...line, { text: " " }, { text: frame, tone: "accent" }];
+  return out;
+}
+
+/**
+ * A button's three rungs (C09 I102, §073 `R-BLK-730`, C10 I51).
+ *
+ * **The predicate is `action`, not `declaresElement`** (I47): a call head stands
+ * in the ring without being something you press, and painting it would put a
+ * second affordance in a gutter that already has a mark.
+ *
+ * **One question chooses the rung** — does a ground resolve — so a theme that
+ * declares no `pick` and a one-bit terminal take the same path, which is C09
+ * I96's shape. The brackets are the carrier that survives there; without them a
+ * button at one bit carries none, which is what this tree drew.
+ *
+ * **The mark and the padding sit inside the wash**, as §082's `▸` does: outside
+ * it, the ground would appear to begin after the affordance. `›` is within its
+ * recorded domains (`chooser-row`, `tape`), so no glyph is chosen here.
+ *
+ * **Both halves of the pair are resolved together**, exactly as C10 checks them
+ * and as `status`'s error tag already does: a ground taken without its matched
+ * ink borrows a foreground nothing measured against it.
+ */
+function buttonSpans(
+  line: readonly Run[],
+  block: Notice,
+  ctx: RenderContext,
+  focused: boolean,
+  base: NonNullable<Span["style"]>,
+  paintCtx: Parameters<typeof paintRuns>[2],
+): readonly Span[] | null {
+  if (buttonCells(block) === 0) return null;
+  const ref = focused ? "surface.pick" : "surface.bgElev";
+  const ground = background(ref, ctx.theme, ctx.capabilities);
+  // **The ground OR the alphabet**, and §073 says both in its own words —
+  // *1-bit and ascii — brackets carry it*. A painted button at `ascii` would be
+  // legible and is not what the design draws: `›` has no ASCII form that reads
+  // as a chooser (`*`, which is the running head mark), so the mark and the
+  // ground go together rather than the ground outliving the mark.
+  if (ground.background === undefined || ctx.capabilities.unicode === "ascii") {
+    // **The bracket rung**, and the brackets are plain: a tone on them would be
+    // a second fact in a place that already carries one.
+    return [
+      { text: "[ ", style: base },
+      ...paintRuns(line, base, paintCtx),
+      { text: " ]", style: base },
+    ];
+  }
+  const style: NonNullable<Span["style"]> = focused
+    ? {
+        ...withBackground(surface("surface.pickInk", ctx.theme, ctx.capabilities), ground),
+        bold: true,
+      }
+    : withBackground(tone(block.tone, ctx.theme, ctx.capabilities, "bgElev"), ground);
+  const mark = focused ? `${glyphFor("current", ctx.capabilities)} ` : "";
+  return [
+    { text: ` ${mark}`, style },
+    ...paintRuns(line, style, paintCtx).map((sp) => ({ ...sp, style })),
+    { text: " ", style },
+  ];
+}
+
 export const noticeDefinition: BlockDefinition<Notice> = {
   kind: "notice",
+  // C09 I137 — an actionable notice is a button (I102).
+  focusShape: "box",
+
+  // §7a — prose copies as its text (I86, `R-SEL-004`). The tone is a
+  // rendering and the wrap is the frame's; neither reaches the source.
+  copy: (block) => block.text,
 
   measure: (block: Notice, width: number): number => atLeastOne(noticeRows(block, width).length), // cells-ok
 
@@ -311,27 +619,50 @@ export const noticeDefinition: BlockDefinition<Notice> = {
     const w = normaliseWidth(width);
     let longest = 0;
     for (const row of noticeRows(block, w)) longest = Math.max(longest, cells(runsText(row))); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
-    return Math.max(1, Math.min(w, prefixCells(block.glyph) + longest));
+    // **Plus the mark's cells**, which `noticeRows` took off the budget (I101):
+    // the natural width is what the block would like, and it would like room for
+    // its head.
+    return Math.max(1, Math.min(w, prefixCells(block.glyph) + markCells(block) + buttonCells(block) + longest));
   },
 
   elements: noticeElements,
 
   render(block: Notice, ctx: RenderContext): Rendered {
-    // **Focused: `accent` over the selection ground, the `pills` head's rule**
-    // (C26 §7). `accent` is a legal notice tone, so `accent` alone would draw a
-    // focused `info` notice as an unfocused `accent` one; the ground is the
-    // channel no notice datum uses. The tone is dropped under focus as a table
-    // row drops its cell tones (C11 I14) and the glyph keeps its character. The
+    // **Focused: the notice's own tone over the FOCUS ground** (C09 I83, C10
+    // I47, R-SEL-006). This was `accent` over the *selection* ground, which
+    // dropped the notice's tone to avoid drawing a focused `info` notice as an
+    // unfocused `accent` one — a workaround for focus and selection sharing one
+    // ground. They no longer do: `focusGround` is focus's own channel, so the
+    // tone stays the notice's, which is the design's *colour is declared, not
+    // inherited* (§017). **The geometry does not move** — no column is reserved
+    // here, because a notice has no rows to point at and the mark belongs to the
+    // block that does (C11 I15, §5b), and a reservation here shifted a head two
+    // cells while leaving its `⎿` body behind (T1.48). The
     // id tested is the one the session writes — the element's, which is the
     // block's (`noticeElements`, `focusFor`) — and only a notice that declares
-    // an element (an action, or a `GLYPH_ELEMENT` token — I47) can reach this arm.
+    // an element (an action, or a call state — I47) can reach this arm.
     const focused =
       declaresElement(block) && ctx.focus !== null && ctx.focus.blockId === block.id && ctx.focus.rowId === block.id;
+    // **The ink is resolved against the ground it lands on** (C10 I48): a
+    // focused notice keeps its own tone and takes the value the theme composed
+    // for `focusGround`, which on a banded theme is the band's single ink.
     const style = focused
-      ? { ...tone("accent", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }
+      ? { ...tone(block.tone, ctx.theme, ctx.capabilities, "focusGround"), ...focusShapeStyle(ctx.theme, ctx.capabilities) }
       : tone(block.tone, ctx.theme, ctx.capabilities);
     const prefix = prefixCells(block.glyph);
-    const wrapped = noticeRows(block, ctx.width, ctx.capabilities);
+    // **The band, over the wrapped text and before the glyph is added** (I90,
+    // §7e): chrome is composed whole, and putting the derivation here is what
+    // makes that structural rather than a rule the row below has to remember.
+    const wrapped = headMarked(
+      withTrail(
+        noticeRows(block, ctx.width, ctx.capabilities),
+        block,
+        ctx.capabilities.ambiguousWidth,
+        ctx.capabilities.colourDepth,
+      ),
+      block,
+      ctx,
+    );
     // **The wrapped rows, not the text's length** (C28 I45). `noticeRows` is
     // what the cost is in and `wrapped` is already here, so the gauge is free —
     // and it is the number that moves when a notice gets slow, because the wrap
@@ -343,7 +674,7 @@ export const noticeDefinition: BlockDefinition<Notice> = {
     ctx.probe?.gauge("notice.spans", block.spans?.length ?? 0); // cells-ok — a count of runs
     // The block's colormap reaches the painter by name; a valued run reads it
     // there and nowhere else (C04 I90).
-    const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, tick: ctx.tick, ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
+    const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, tick: ctx.tick, ...(ctx.motion === undefined ? {} : { motion: ctx.motion }), ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
 
     // A hanging indent: the glyph sits on the first row and the continuation
     // aligns under the text rather than under the glyph. That alignment is why
@@ -358,11 +689,31 @@ export const noticeDefinition: BlockDefinition<Notice> = {
           {
             text:
               (index === 0 || rail) && block.glyph !== undefined
-                ? glyphLead(block.glyph, ctx.capabilities)
+                ? glyphLead(
+                    // **The head mark is resolved here and nowhere else** (I45):
+                    // the block carries the call's state and the character is a
+                    // function of whether tone can carry it. Geometry is
+                    // untouched — every candidate is one cell with no indent.
+                    // On a band the tone is spent per cell (C10 I45), so a focused
+                    // head in a high-contrast theme takes the 1-bit rung's mark —
+                    // where the band is painted at this depth (C10 I66). And on a
+                    // receded panel it is spent per panel (I110, question 56):
+                    // every ink there is `dim`, so five states would be one.
+                    block.state !== undefined
+                      ? headMark(
+                          block.state,
+                          ctx.capabilities,
+                          (focused && isBand(ctx.theme, "focusGround", ctx.capabilities)) ||
+                            (ctx.washed?.has(block.id) === true && isBand(ctx.theme, "selection", ctx.capabilities)) ||
+                            ctx.theme.recedes !== undefined,
+                        )
+                      : block.glyph,
+                    ctx.capabilities,
+                  )
                 : " ".repeat(prefix),
             style,
           },
-          ...paintRuns(line, style, paintCtx),
+          ...(index === 0 ? (buttonSpans(line, block, ctx, focused, style, paintCtx) ?? paintRuns(line, style, paintCtx)) : paintRuns(line, style, paintCtx)),
         ]),
       ),
     );
@@ -384,6 +735,9 @@ function tipText(block: Tip): string {
 export const tipDefinition: BlockDefinition<Tip> = {
   kind: "tip",
 
+  // §7a — as `notice` (I86).
+  copy: (block) => block.text,
+
   measure: (block: Tip, width: number): number =>
     atLeastOne(wrapCells(tipText(block), normaliseWidth(width)).length), // cells-ok
 
@@ -403,14 +757,34 @@ export const tipDefinition: BlockDefinition<Tip> = {
 export const progressDefinition: BlockDefinition<Progress> = {
   kind: "progress",
 
-  measure: () => 1,
+  // **A finished bar is gone** (C04 I145, §3as). Zero rows, where every other
+  // leaf answers at least one: `Progress.quantity`'s own comment described this
+  // as built while `measure` answered 1 at every fraction. The registry's
+  // padding and floor still apply to the zero, as they do to an empty container.
+  measure: (block: Progress) => (finished(block) ? 0 : 1),
 
   render(block: Progress, ctx: RenderContext): Rendered {
+    if (finished(block)) return [];
     const width = normaliseWidth(ctx.width);
     // **Resolved here, per render, and never stored on the block** — the same
     // rule `glyphs()` follows: a block names a style and the terminal decides
     // which arm of it is drawn, so one document is correct on both terminals.
-    const bar = barStyle(ctx.capabilities, block.style);
+    // **The alphabet, with granularity as the default and `style` outranking
+    // it** (I97, §035). The registry's placement text is the deferral this
+    // implements — *use only when its texture is declared by the component* —
+    // so a block that names a style has declared its texture and granularity
+    // says nothing more; a block that names none takes the alphabet the design
+    // draws for its granularity, `block` for continuous and `slant` for
+    // segmented.
+    //
+    // **Counted work draws posts, and the rule normalises** (C09 I136, §7j,
+    // `R-PRG-002`, ruling 32). `segmented` drew `slant` from §035's specimens;
+    // the registry's rule is *discrete steps use posts, sub-cell progress uses
+    // braille*, so a declared style the rule gives to the other granularity is
+    // mapped at render (D26) — braille's eighths on a count claim a part of a
+    // unit that does not exist, and posts on continuous work claim steps.
+    const alphabet = alphabetOf(block.style, block.granularity);
+    const bar = barStyle(ctx.capabilities, alphabet);
     // **The bar clamps and the number does not** (I28). `100/100` and `150/100`
     // drawing identically is the same defect `examples/docker`'s CPU bar was
     // built around — a bar that stops at its ceiling draws a busy thing exactly
@@ -422,23 +796,51 @@ export const progressDefinition: BlockDefinition<Progress> = {
     const total = block.total > 0 ? block.total : 0;
     const fraction = total === 0 ? 0 : Math.max(0, block.current / total);
     const fill = Math.min(1, fraction);
-    const percent = `${Math.round(fraction * 100)}%`;
+    // **The readout is the quantity's** (I97, §035). A capacity is glanced at,
+    // so it carries the pair as well as the share; a count has units, so it
+    // carries the pair alone and no percentage at all — *the unit is what tells
+    // you whether 44% is nearly done or nowhere near*. `progress`, and an
+    // undeclared quantity, read as they always did.
+    const share = `${Math.round(fraction * 100)}%`;
+    const pair = `${String(block.current)}/${String(block.total)}`;
+    const percent =
+      block.quantity === "capacity" ? `${share}  ${pair}`
+      : block.quantity === "count" ? `${String(block.current)} of ${String(block.total)}`
+      : share;
 
     // The same clamp and the same reason as `rule` (C28 I45): `stripControl`
     // walks the whole label, `truncate` throws most of it away, and `measure`
     // is 1 either way.
     ctx.probe?.gauge("progress.label", block.label.length); // cells-ok — an input size, not a display width
-    const labelRoom = Math.max(0, Math.floor(width / 3));
-    const labelColumn = pad(
-      truncate(stripControl(block.label), labelRoom, ctx.capabilities),
-      labelRoom,
-    );
+    // **No label, no column** (I104, §036, C23 I76). The third of the row was
+    // unconditional, so §036's operation bar — which carries no label, the verb
+    // being on the head above it — spent nineteen cells of fifty-six on blank
+    // and drew a bar nineteen cells short. The predicate is the label's text
+    // rather than a flag: a caller that wants no column omits the label, which
+    // is the thing it already does, and the block needs no second member.
+    // **The label's own width, clamped by a third of the row** (I104, §065). The
+    // third was a *reservation* and is a *ceiling*: `ctx` in a 56-cell row took
+    // eighteen cells for three, where §065 draws the label, one gap and the bar.
+    // A block cannot see its siblings, so the column `ctx` and `disk` share is
+    // the container's (C22 `entryLayout`); what a meter alone can hold is this.
+    const labelCap = Math.max(0, Math.floor(width / 3));
+    const labelRoom =
+      block.label === ""
+        ? 0
+        : Math.min(labelCap, cells(stripControl(block.label), ctx.capabilities.ambiguousWidth));
+    const labelColumn =
+      labelRoom === 0
+        ? ""
+        : pad(truncate(stripControl(block.label), labelRoom, ctx.capabilities), labelRoom);
 
     // The bar takes the residual (\u00a73), which is what makes this one row at any
     // width rather than one row at most widths. It can reach zero, and a bar of
     // no cells is still a row: the label and the percentage carry the meaning.
-    const barWidth = Math.max(0, width - cells(labelColumn, ctx.capabilities.ambiguousWidth) - cells(percent, ctx.capabilities.ambiguousWidth) - 2);
-    const filled = Math.round(fill * barWidth);
+    // **The gaps are counted, not assumed** (I104). There were always two — one
+    // after the label and one before the readout — and with the column gone
+    // there is one, so a bar with no label starts at the row's own first cell.
+    const gaps = labelRoom === 0 ? 1 : 2;
+    const barWidth = Math.max(0, width - cells(labelColumn, ctx.capabilities.ambiguousWidth) - cells(percent, ctx.capabilities.ambiguousWidth) - gaps);
 
     // **The ramp varies over the axis, and only the `on` cells take it** (I52).
     // Cell `i` samples `i / (barWidth − 1)` whether or not it is filled, so a
@@ -446,26 +848,97 @@ export const progressDefinition: BlockDefinition<Progress> = {
     // keeps its colour as the bar fills. The other answer — the filled length —
     // moves every painted cell on every patch for no information (C04 I108).
     const accent = tone("accent", ctx.theme, ctx.capabilities);
+
+    // **The painted rung, and the predicate is the ground rather than the
+    // depth** (I96, §034, `R-BLK-234`). §034 draws the same 62% twice and says
+    // which is which: *the ground is the extent and the glyphs are the 1-bit
+    // rung*. So `painted` is a channel choice over the alphabet `style` already
+    // named, and it falls back **into** that alphabet — `resolveBackground`
+    // answers `NO_STYLE` without colour (C10 I8), so a 1-bit terminal and a
+    // theme carrying no `meterFill` reach the glyphs by one predicate rather
+    // than by a number compared in two places.
+    //
+    // **Both surfaces are structural**, which is why a bar may take them at all:
+    // §072 forbids mixing structural and semantic grounds, and a bar drawn in
+    // `ok` or `warn` would be a status painted as an extent.
+    const meter = background("surface.meterFill", ctx.theme, ctx.capabilities);
+    const well = background("surface.bgDeep", ctx.theme, ctx.capabilities);
+    const painted = block.painted === true && meter.background !== undefined;
+
+    // **The `on` cells, whole or in eighths** (C09 I136, §7j). With `e =
+    // round(f × n × 8)` a sub-cell alphabet draws `floor(e / 8)` full cells and
+    // then `steps[e mod 8 − 1]`; the partial cell is an `on` cell, so the ramp
+    // samples it at its own index (I52). A ground cannot be an eighth (I96), so
+    // the painted rung steps whole cells like every other alphabet.
+    const steps = painted ? undefined : bar.steps;
+    const eighths = steps === undefined ? 0 : Math.round(fill * barWidth * 8);
+    const partial = steps === undefined ? undefined : steps[(eighths % 8) - 1];
+    const filled = steps === undefined ? Math.round(fill * barWidth) : Math.floor(eighths / 8) + (partial === undefined ? 0 : 1);
+    const glyphAt = (i: number, whole: string): string => (partial !== undefined && i === filled - 1 ? partial : whole);
+    const onGlyph = painted ? " " : bar.on;
+    const onInk = painted ? withBackground(accent, meter) : accent;
+    const muted = tone("muted", ctx.theme, ctx.capabilities);
+    const offInk = painted
+      ? withBackground(tone("default", ctx.theme, ctx.capabilities), well)
+      : muted;
+
+    // **Liveness sets the motion on a ramp that exists, and never invents one**
+    // (I97, §035). A bar with no ink has nothing to animate, and choosing a
+    // `fill` for it would be choosing a value the design never names — §035
+    // puts that carrier outside the bar, on a spinner or a text status. A
+    // declared `animate` outranks the axis.
+    // **The ramp is read once, and that is what makes the rule breakable.**
+    // The two branches below both asked `block.ramp === undefined` and produced
+    // byte-identical output when it was — adjacent spans with one style
+    // coalesce — so a mutation that let liveness reach the sampled branch
+    // changed nothing and survived. One binding is the site where *liveness
+    // never invents a ramp* can be violated (I97).
+    const ramp = block.ramp;
+    const animation =
+      ramp?.animate ??
+      (block.liveness === "active" ? "shimmer"
+        : block.liveness === "stalled" ? "pulse"
+        : undefined);
+
     const onCells: Span[] =
-      block.ramp === undefined
-        ? [{ text: bar.on.repeat(filled), style: accent }]
+      ramp === undefined
+        ? [{ text: onGlyph.repeat(partial === undefined ? filled : filled - 1) + (partial ?? ""), style: onInk }]
         : Array.from({ length: filled }, (_, i) => {
-            const t = animateT(block.ramp?.animate, extentT(i, barWidth), effectiveTick(ctx.tick, ctx.capabilities), barWidth, i);
-            const sampled = block.ramp === undefined ? undefined : rampStyle(block.ramp, t, i, ctx.theme, ctx.capabilities);
-            return { text: bar.on, style: sampled === undefined ? accent : { ...accent, ...sampled } };
+            const t = animateT(
+              effectiveAnimation(animation, ctx.motion),
+              extentT(i, barWidth),
+              effectiveTick(ctx.tick, ctx.capabilities),
+              barWidth,
+              i,
+              // **The stamp, which this call never passed** (C09 I120): a bar's
+              // one-shot drew frame 0 for ever while a span's played.
+              ramp?.since,
+            );
+            const sampled = ramp === undefined ? undefined : rampStyle(ramp, t, i, ctx.theme, ctx.capabilities);
+            // **The ramp survives the rung and I52 is untouched**: the ink still
+            // varies along the axis and still takes the `on` cells only. What
+            // moves is that the cell beneath it is a space — and the ground is
+            // merged *under* the sample rather than over it, so a ramp does not
+            // lose the track it is painted on. §034 carries `rmp-sweepbar` on
+            // the painted bar, so the pairing is the design's.
+            const ink = sampled === undefined ? onInk : { ...onInk, ...sampled };
+            return { text: glyphAt(i, onGlyph), style: painted ? withBackground(ink, meter) : ink };
           });
 
     return rows([
       paint(
         clampSpans(
           [
-            { text: `${labelColumn} `, style: tone("default", ctx.theme, ctx.capabilities) },
+            { text: labelRoom === 0 ? "" : `${labelColumn} `, style: tone("default", ctx.theme, ctx.capabilities) },
             ...onCells,
             {
-              text: bar.off.repeat(barWidth - filled),
-              style: tone("muted", ctx.theme, ctx.capabilities),
+              text: (painted ? " " : bar.off).repeat(barWidth - filled),
+              style: offInk,
             },
-            { text: ` ${percent}`, style: tone("meta", ctx.theme, ctx.capabilities) },
+            // **`muted`, and it was `meta`** (I96). All five of §034's bars read
+            // their percent in `c-muted`, painted and drawn alike; the tree drew
+            // `meta` from the day the kind landed and no row named the tone.
+            { text: ` ${percent}`, style: muted },
           ],
           width,
           ctx.capabilities,
@@ -474,6 +947,27 @@ export const progressDefinition: BlockDefinition<Progress> = {
     ]);
   },
 };
+
+/**
+ * Whether a bar has finished and is gone (C04 I145, §3as): a **declared**
+ * `progress` or `count` with a proportion, at or past its total. `capacity`
+ * persists, an undeclared quantity never finishes (D25 — `examples/docker`'s
+ * bars declare none and overshoot), and `total: 0` has no proportion at all.
+ */
+function finished(block: Progress): boolean {
+  return (block.quantity === "progress" || block.quantity === "count") && block.total > 0 && block.current >= block.total;
+}
+
+/**
+ * The alphabet a bar draws, from its declared style and granularity (C09 I97,
+ * I136, §7j). A declared texture stands except where `R-PRG-002` gives it to
+ * the other granularity; with none declared, granularity picks.
+ */
+function alphabetOf(style: string | undefined, granularity: Progress["granularity"]): string | undefined {
+  if (granularity === "segmented") return style === undefined || style === "braille" ? "posts" : style;
+  if (granularity === "continuous") return style === undefined || style === "posts" ? "block" : style;
+  return style;
+}
 
 // --- pills -----------------------------------------------------------------
 
@@ -576,6 +1070,12 @@ function pillsElements(block: Pills, width: number): readonly NavElement[] {
 
 export const pillsDefinition: BlockDefinition<Pills> = {
   kind: "pills",
+  // C09 I137 — a chip (I121).
+  focusShape: "box",
+
+  // §7a — the labels, space-joined (I86). A row of peers is a row of words;
+  // the shedding, the active mark and the tones are all this component's.
+  copy: (block) => block.chips.map((c) => c.label).join(" "),
 
   measure: (block: Pills, width: number): number =>
     atLeastOne(chipRows(block, width).length), // cells-ok
@@ -627,11 +1127,28 @@ export const pillsDefinition: BlockDefinition<Pills> = {
           // chip datum uses. A selected chip is `default` over the same ground,
           // so head and extent differ by ink; at 1-bit both are reverse video
           // and the head is bold.
+          // **Selection wins the ground where both facts hold** (R-SEL-006,
+          // C10 I47): a head inside a real extent takes the wash and keeps
+          // `accent` as the ink. `has` and never a size — `selected` absent is
+          // C26 I16's head-alone sentinel, and any present extent is a real
+          // selection, one element included (C11 I14).
+          // **The ground is named once and the ink resolves against it**
+          // (C10 I48, F1240). `accent` stays the head's ink here and is not
+          // C11 I14's drop-to-one-ink rule wearing the same shape: a pill row
+          // has no reserved gutter, so accent **is** focus's carrier rather
+          // than a tone spent to say *selected*. What changes is that a
+          // selected pill keeps its own tone instead of being forced to
+          // `default`, and every one of these inks is now the value the theme
+          // composed for the ground underneath it.
+          const on = id === head && !selected.has(id) ? "focusGround" : selected.has(id) ? "selection" : undefined;
           const style =
             id === head
-              ? { ...tone("accent", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }
+              ? {
+                  ...tone("accent", ctx.theme, ctx.capabilities, on),
+                  ...(selected.has(id) ? selectionStyle : focusShapeStyle)(ctx.theme, ctx.capabilities),
+                }
               : selected.has(id)
-                ? { ...tone("default", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }
+                ? { ...tone(name, ctx.theme, ctx.capabilities, on), ...selectionStyle(ctx.theme, ctx.capabilities) }
                 : tone(name, ctx.theme, ctx.capabilities);
           spans.push({ text, style });
         }
@@ -657,6 +1174,11 @@ function rawLines(block: Raw): readonly string[] {
 
 export const rawDefinition: BlockDefinition<Raw> = {
   kind: "raw",
+
+  // §7a — verbatim, which is what `raw` means (I86). This is also the
+  // fallback every unregistered kind resolves through, and carrying the JSON
+  // is the honest degradation there for the reason §6's fallback gives.
+  copy: (block) => block.text,
 
   measure: (block: Raw): number => atLeastOne(rawLines(block).length), // cells-ok
 
@@ -698,7 +1220,7 @@ export const rawDefinition: BlockDefinition<Raw> = {
     // marker outside every span (C04 I86); `raw` carries no tone, so the pieces
     // differ only where a span says so and a plain line is the bytes it was.
     const lines = runLines(runsOf(block.text, block.spans));
-    const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, tick: ctx.tick, ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
+    const paintCtx = { theme: ctx.theme, capabilities: ctx.capabilities, tick: ctx.tick, ...(ctx.motion === undefined ? {} : { motion: ctx.motion }), ...(block.colormap === undefined ? {} : { colormap: block.colormap }) };
     return rows(
       rawLines(block).map((line, i) => {
         const { kept, suffix } = truncateParts(line, width, ctx.capabilities);

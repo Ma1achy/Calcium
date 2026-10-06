@@ -47,6 +47,35 @@ const results = runPass({
   },
   mutations: [
     {
+      // **C27 I8, the link half** (T6.11): without the consuming handler the
+      // dependency's own OSC 8 marks the linked cells `underline: true`.
+      name: "the OSC 8 handler is not registered",
+      file: EMULATOR,
+      from: "  term.parser.registerOscHandler(8, () => true);\n",
+      to: "",
+      expect: "T2.7",
+    },
+    {
+      // **C27 I8, the clipboard half, fabricated** (T6.11): the headless build
+      // has no OSC 52 handler, so the violation is written — a handler that
+      // puts the payload on the screen, as a forwarding one would put it on
+      // the reader's clipboard.
+      name: "an OSC 52 handler that acts on the payload",
+      file: EMULATOR,
+      from: "  term.parser.registerOscHandler(8, () => true);\n",
+      to: "  term.parser.registerOscHandler(8, () => true);\n  term.parser.registerOscHandler(52, (data: string) => { term.write(data); return true; });\n",
+      expect: "T2.7",
+    },
+    {
+      // **C27 I2's bidi clause** (T6.12): a cell's bidi character kept, which
+      // `cells()` and the emulator measure differently.
+      name: "containText keeps bidi format characters",
+      file: SNAPSHOT,
+      from: "  for (const ch of text) if (!isBidiFormat(ch.codePointAt(0) ?? 0)) bare += ch;",
+      to: "  for (const ch of text) bare += ch;",
+      expect: "T1.13",
+    },
+    {
       // C27 I7 (T1.6, T5.2, T6.5) — the wording the spec first had: *lines lost
       // at the cap*, which a feed count satisfies while reading as correct.
       name: "dropped counts line feeds",

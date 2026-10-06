@@ -15,7 +15,7 @@
  * block, so a rows block beside an element block pays nothing for its neighbour.
  */
 export type Rendered = readonly string[];
-import type { Action, Block, BlockKind, Camera, Measure, MeasureFn, Probe, WidthFn } from "../../data/viewmodel/index.js";
+import type { Action, Block, BlockKind, Camera, CopyFn, Measure, MeasureFn, Probe, WidthFn } from "../../data/viewmodel/index.js";
 import type { ResolvedTheme } from "../theme/index.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -90,6 +90,34 @@ export type FocusState = Readonly<{
    * `anchor: null`; this is the render side of the same measurement (C26 §5c).
    */
   selected?: readonly Readonly<{ blockId: string; rowId: string }>[];
+  /**
+   * The reader is **inside** the focused element rather than beside it (C09
+   * I106, §018, C16's `inside` rung).
+   *
+   * **The rung has existed since the ladder landed and the renderer could not
+   * see it.** `interaction` answers for `inside` in `RUNG_OF`, so the router has
+   * always known; this is the render side, and without it §018's third state —
+   * *weight plus a painted handle* — had no way to be drawn. A flag rather than
+   * a target, because a renderer that knows *which* owner is inside knows more
+   * than it can use: the only question a kind asks is *am I the one being
+   * driven*, and `blockId` and `rowId` already answer *which*.
+   *
+   * Read only by kinds that have an inside to be in. For every other kind it is
+   * absent and means nothing, which is why it is not a third value of a state
+   * enum: *at rest*, *focused* and *inside* is a ladder for a control and a
+   * category error for a table row.
+   */
+  inside?: boolean;
+  /**
+   * The borrowed editor's line while the focused element is a form field being
+   * edited (C09 I119, C22 I118), and absent otherwise.
+   *
+   * **Appearance and never geometry**: the field draws it on its one row,
+   * windowed round the caret, so `measure` — which never sees a focus — and the
+   * rows drawn agree with or without it (C04 I136). `cursor` is in code units,
+   * the editor's own measure.
+   */
+  draft?: Readonly<{ text: string; cursor: number }>;
 }>;
 
 /**
@@ -114,10 +142,37 @@ export type RenderScratch = Readonly<{
   set: (owner: object, key: string, value: unknown) => void;
 }>;
 
+/**
+ * How much motion this reader wants (C09 I99, `R-MOT-001`, §038).
+ *
+ * **A preference and never a capability**, which is `R-BLK-702`'s own framing —
+ * *mouse: off already exists; motion joins it as an independent preference* —
+ * and is why it is here rather than on `TerminalCapabilities`. C02 detects what
+ * a terminal can do; this is what a person asked for, and the two are
+ * independent: *a 1-bit display may animate and a 24-bit display may be still*.
+ */
+export type Motion = "full" | "reduced" | "off";
+
 export type RenderContext = Readonly<{
   width: number;
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /**
+   * The reader's motion preference (C09 I99, `R-MOT-001`). Absent is `"full"`.
+   *
+   * **`off` costs nothing to read**, because the three carriers `R-MOT-002`
+   * names — the mark, the label and the elapsed text — never moved: *the mark's
+   * job is one bit and a static mark still carries it*. **`reduced` stops the
+   * ambient ramps alone** — `glint drift tide`, the registry's own
+   * `rampPolicy.attentionGroups.ambient` — and leaves every group a reader is
+   * meant to act on.
+   *
+   * Optional and not required, on `scrollOffsets`' precedent: a preference
+   * absent from a context is the default rather than a missing argument, and
+   * making it required would move every construction site in the tree for a
+   * field almost all of them would pass the default to.
+   */
+  motion?: Motion;
   /**
    * Where a renderer reports what it spent time on (C28 I30).
    *
@@ -246,6 +301,15 @@ export type RenderContext = Readonly<{
   scratch?: RenderScratch;
   focus: FocusState | null;
   /**
+   * The ids of this entry's blocks under the selection band (C14 I54,
+   * R-THM-005). **Present only on a theme that bands its selection**: there the
+   * band spends every cell's tone, so a call head under it takes its state's
+   * own mark (C09 I45), and the renderer cannot learn that from the wash, which
+   * is laid after the cache (C14 I40). Absent everywhere else, and absent keys
+   * nothing, so a theme without a band renders and caches exactly as before.
+   */
+  washed?: ReadonlySet<string>;
+  /**
    * A monotonic counter, incremented by C03's spinner commit. A renderer
    * computes `frames[tick % frames.length]`; nothing else reads it, and
    * `measure` never receives it at all (I8) — animation changes appearance,
@@ -266,8 +330,33 @@ export type RenderContext = Readonly<{
   measureChild: MeasureFn;
   /** The registry's `width` (§2c) — a container asks a child's content width through this and never imports the registry. */
   widthChild: WidthFn;
-  /** The registry's `render` of a child (I72): rows, or an element — `elementOf` lifts either into a container's tree. */
-  renderChild: (block: Block, width: number) => Rendered;
+  /**
+   * The registry's `render` of a child (I72): rows, or an element — `elementOf`
+   * lifts either into a container's tree.
+   *
+   * **`theme` draws the subtree in another theme** (I110): a stale panel hands
+   * its children `recede(ctx.theme)` so their content dims while its own chrome
+   * does not. Absent is the caller's theme, which is every other caller.
+   *
+   * **`focus` draws the child as if focus were on it** (I137): a pane whose
+   * child declares `frame` forwards `{ …focus, blockId: child.id, rowId:
+   * child.id }` — the child's own block element (I85) — so its frame answers
+   * with the child's own predicate. Absent is the caller's focus.
+   */
+  renderChild: (block: Block, width: number, theme?: ResolvedTheme, focus?: FocusState | null) => Rendered;
+  /**
+   * The shape a child's kind declares for focus, or `null` where it declares
+   * none (I137, §7k) — the registry's answer, supplied as `measureChild` is.
+   *
+   * **What lets a container light a pane without knowing what is in it.** A
+   * `mosaic` pane and a `split` pane are regions, and I100 gave them
+   * `focusGround` — which is right behind text and wrong across a picture,
+   * whose background is half of what braille draws with (`R-FOC-004`). The
+   * container cannot tell the two apart by kind without a switch over kinds,
+   * which is the class `copyChild` was written to end; the kind says what it
+   * is, and a `frame` child is lit through `renderChild`'s `focus` instead.
+   */
+  focusShapeOf: (block: Block) => FocusShape | null;
   /**
    * The registry's slice of a child, or `null` when it cannot take one (I58, §6b).
    *
@@ -314,7 +403,7 @@ export type RenderContext = Readonly<{
  * honours three — which is what says it generalises past one surface.
  * FINDINGS F85.
  */
-export type RenderContextInput = Omit<RenderContext, "measureChild" | "widthChild" | "renderChild" | "windowChild">;
+export type RenderContextInput = Omit<RenderContext, "measureChild" | "widthChild" | "renderChild" | "windowChild" | "focusShapeOf">;
 
 /**
  * A block reduced to a smaller one, plus the leading rows of it the caller drops
@@ -388,6 +477,23 @@ export type Windowed = Readonly<{
  * that knows where the block starts knows where the element is without the block
  * knowing where it was placed.
  */
+/**
+ * The split pane an element sits in — the innermost, where splits nest
+ * (C04 I134, C26 I28). `side` is `0` for the left pane and `1` for the right.
+ *
+ * **`top` and `left` are the split's origin, in the element's own
+ * coordinates** and lifted with it, so a caller finds a pane-local row as
+ * `rows.from − top` without asking the walk a second time (C26 I8).
+ */
+export type PaneRef = Readonly<{ split: string; side: number; top: number; left: number }>;
+
+/**
+ * An element as the walk places it: the block that declared it, the element in
+ * sequence coordinates, and **the split pane it is in, where it is in one** —
+ * which is what lets `↓` keep to a pane (C26 I28) without a second walk.
+ */
+export type PlacedElement = Readonly<{ blockId: string; element: NavElement; pane?: PaneRef }>;
+
 export type NavElement = Readonly<{
   /**
    * Unique within the block's own declaration (C26 I6).
@@ -419,6 +525,25 @@ export type NavElement = Readonly<{
    * that gives them a consumer.
    */
   activate?: Action;
+  /**
+   * The element has an **inside** — §102's *a block declares whether it has
+   * VIEW STATE* (C26 I26, I27, `R-INT-005`).
+   *
+   * **Per element and not per kind**, which §102's own table makes easy to get
+   * wrong: every row of it — *a 3D plot · a camera*, *a table · sort + scroll* —
+   * is a figure that fills its block, so kind and element coincide there.
+   * §018's row 2 does not: *arrowing down a document past three sliders* is
+   * three insides in one page. The element is what one is entered on, so it is
+   * where the declaration sits, and a kind whose figure fills its block declares
+   * it on the element it produces.
+   *
+   * **Disjoint from `activate`**, and that is a ruling rather than a
+   * precedence: §018 says *direct-action toggles and choices act without an
+   * inside state*, so a control either has an inside or acts, and `⏎` never has
+   * to choose between them. Declaring both is the block author contradicting
+   * the design and is a construction error.
+   */
+  viewState?: boolean;
   /**
    * What `y` copies here — the element's **source**, never its rendering (C26 §5c).
    *
@@ -552,7 +677,21 @@ export interface BlockDefinition<B extends Block = Block> {
    * `rev` moving and C14's cache could not invalidate it. Focus is not a
    * parameter here, so the violation is unrepresentable rather than forbidden.
    */
-  elements?: (block: B, width: number, measureChild: MeasureFn) => readonly NavElement[];
+  /**
+   * **`copyChild`, on the same argument and for the same reason as
+   * `measureChild`** (§7a, I86). A container fills its child elements' `copy`,
+   * and the only other way to answer that is a switch over kinds inside the
+   * container — which is what `containers.ts` held, and it answered six kinds
+   * and `""` for the rest while calling itself *the source and never the
+   * rendering*. The registry supplies this so a kind cannot reach for its own,
+   * which is the sentence `measureChild` already carries.
+   */
+  elements?: (
+    block: B,
+    width: number,
+    measureChild: MeasureFn,
+    copyChild: CopyFn,
+  ) => readonly NavElement[];
   /**
    * The keys this block binds while focus is on it (A01 D4, C16 I27, C22 I78).
    *
@@ -576,7 +715,85 @@ export interface BlockDefinition<B extends Block = Block> {
    */
   width?: (block: B, width: number, widthChild: WidthFn) => number;
   keymap?: (block: B) => readonly BlockKeyBinding[];
+  /**
+   * §7a — what this kind copies as, **source and never rendering** (I86,
+   * `R-SEL-004`).
+   *
+   * The block-level pair of `NavElement.copy` above, carrying the same rule one
+   * level up: *a table as TSV with its header, a patch as unified diff rather
+   * than the rendered two-column view, an image as its alt text and its path.*
+   * Pure in the block, as `measure` is — no width and no context, because a
+   * copy that varied with the frame would be one a reader could not predict, and
+   * the columns a width dropped are exactly what this exists to keep.
+   *
+   * **`copyChild`, for the containers.** A `scroll` and a `steps` copy as their
+   * children do, and a container reaching for its own switch is how five kinds
+   * came to copy blank: the private `copyTextOf` answered six and `""` for the
+   * rest. Same shape `measure` and `elements` take, supplied by the registry.
+   *
+   * **Optional, and an absent member means *omit me from the join*, not
+   * *contribute nothing*.** The two differ by exactly one blank line, and a
+   * blank line is `R-SEL-004`'s **entry** separator — so a kind answering `""`
+   * forges an entry boundary inside an entry. A `rule` and a `spacer` are
+   * genuinely uncopyable and declare nothing.
+   */
+  copy?: (block: B, copyChild: CopyFn) => string;
+  /**
+   * The block with its fold toggled, or `null` where it declares none (I124,
+   * C23 I84, ruling 42).
+   *
+   * **What lets `actions.ts` name no kind.** `expand` resolves a row first and
+   * a block's fold second, and the second arm was a `kind === "scroll"` test —
+   * a patch's cap and four shedding kinds would have been four more, and an
+   * app kind with a fold would have needed an edit to L4 to be reachable. The
+   * fold is the kind's to declare, so it is declared here.
+   *
+   * **`null` rather than an absent member for a block that has no fold today**,
+   * because whether it has one is a property of the block: a `scroll` folds only
+   * where it declares `collapsed` (C04 I98) and a `patch` only where it carries
+   * a `cap` (C25 I14). **No width**: a fold is a document edit, not a layout, so
+   * the four shedding kinds fold at every width and draw nothing where they
+   * shed nothing. Pure — the result is a new block, and the caller writes it as
+   * a shell-origin `replace`.
+   *
+   * **`Block` and not `B` in the result**, for `window`'s reason above: `B`
+   * sits in parameter position only, or a `BlockDefinition<Table>` stops being
+   * a member of `AnyBlockDefinition`'s registration surface.
+   */
+  fold?: (block: B) => Block | null;
+  /**
+   * What focus on this kind's elements paints (I137, §7k, §017, `R-COL-005`).
+   *
+   * **Declared by every kind that declares `elements`, and by no other** —
+   * T2.228 compares the two sets by equality over a constructed session's
+   * registry. I121's treatments existed and the partition did not: five kinds
+   * were a list in a test, and a kind that drew nothing (the four shedding
+   * kinds) or the wrong thing (`form`) was a kind nobody had listed.
+   *
+   * **Optional for the reason the other members are**, and an app kind with
+   * `elements` and no shape is not refused: a container reads it as `null`,
+   * which is *not a picture*.
+   */
+  focusShape?: FocusShape;
 }
+
+/**
+ * `R-COL-005`'s partition (§7k, I137), less its two members no kind here is —
+ * a RUN (a link) and a painted identity chip (C17's chips). A kind that is one
+ * adds the member with its first consumer.
+ *
+ *   - `box` — `R-FOC-001`: the focus ground where it carries, whole-shape
+ *     inversion where it does not (`focusShapeStyle`).
+ *   - `control` — `R-FOC-002`, `R-FOC-003`: the same function, as a wash over
+ *     the whole control — label, mark or track, and value.
+ *   - `row` — `R-SEL-006`: a selectable row. `focusGround`, and a carrier that
+ *     is **not** inversion — `▸` where the kind has the column, weight where it
+ *     has not — because at 1-bit inversion is selection's.
+ *   - `frame` — `R-FOC-004`: the furniture takes it (a border, axes, a bar) and
+ *     no ground is painted behind the content.
+ */
+export type FocusShape = "box" | "control" | "row" | "frame";
+
 
 /**
  * A measure memo a caller owns and the registry reads and writes as its own
@@ -611,6 +828,10 @@ export interface BlockRegistry {
    * (C26 §5). `measureChild` is supplied here, never by the caller.
    */
   elementsOf(block: Block, width: number): readonly NavElement[];
+  /** §7a — a block's copy text, or `null` when its kind declines (I86, `R-SEL-004`). No width: a copy is the source. */
+  copyOf(block: Block): string | null;
+  /** §7a — a sequence's copy text, the blocks that answered joined by **one** newline (I86). Two is the entry separator. */
+  copySequence(blocks: readonly Block[]): string;
   /**
    * Every element in a sequence, with block-local rows lifted into
    * sequence-local ones and **children walked** (C26 §5, §8b.5).
@@ -618,10 +839,14 @@ export interface BlockRegistry {
    * The pairing with `blockId` is what C09 I14's renderer needs and what stops
    * two blocks' element ids sharing one namespace.
    */
-  elementsIn(
-    blocks: readonly Block[],
-    width: number,
-  ): readonly Readonly<{ blockId: string; element: NavElement }>[];
+  elementsIn(blocks: readonly Block[], width: number): readonly PlacedElement[];
+  /**
+   * The widths a container's children are drawn at, `[]` for a leaf (I126).
+   * `width` is the container's own, padding included; the answer is after
+   * every narrowing its renderer takes — a scroll's bar, a right pane's bar, a
+   * cell aligned off `left`. The shell asks this and never re-derives it.
+   */
+  childWidthsOf(block: Block, width: number): readonly number[];
   /**
    * Rows `[from, to)` of a *sequence*, as a smaller sequence plus an offset
    * (C09 §2a, I25).
@@ -651,6 +876,12 @@ export interface BlockRegistry {
    * causes.
    */
   windowChild(block: Block, width: number, from: number, to: number): Windowed | null;
+  /**
+   * The kind's `fold` of this block, or `null` where the kind declares none or
+   * the block has nothing to fold (I124). C23's `expand` reads this and nothing
+   * else (C23 I84).
+   */
+  fold(block: Block): Block | null;
   readonly kinds: readonly string[];
   readonly sealed: boolean;
 }

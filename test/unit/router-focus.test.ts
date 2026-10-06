@@ -11,13 +11,15 @@ import {
   resolveFocus,
   type FocusInputs,
 } from "../../src/interaction/router/focus.js";
-import type { FocusTarget } from "../../src/interaction/router/types.js";
+import { RUNG_OF, type FocusTarget } from "../../src/interaction/router/types.js";
 import { readdirSync, readFileSync } from "node:fs";
 import { addr, placed } from "../support/focus.js";
 
 const base: FocusInputs = {
   overlayTop: null,
-  copyMode: false,
+  nativeSelection: false,
+  semanticSelection: false,
+  attachedChild: false,
   liveEntry: { id: "e1" },
   stored: { at: "prompt" },
 };
@@ -26,16 +28,44 @@ const at = (over: Partial<FocusInputs> = {}): FocusTarget =>
   activeTarget({ ...base, ...over });
 
 describe("C16 §3 — activeTarget", () => {
-  it("T1.3 (I15): each of the seven conditions resolves to its documented target", () => {
+  it("T1.3 (I15, R-COR-002): each condition resolves to its documented target", () => {
     expect(at({ overlayTop: { kind: "overlay" } })).toBe("overlay");
-    expect(at({ copyMode: true })).toBe("copyMode");
-    expect(at({ overlayTop: { kind: "view" } })).toBe("pushedView");
+    expect(at({ nativeSelection: true })).toBe("nativeSelection");
+    // **The `pushedView` row is gone with the target** (R-EXA-082, F1254);
+    // `panel` is the only other layer kind that takes keys and it holds
+    // `substate` alone.
+    expect(at({ overlayTop: { kind: "panel" } })).toBe("panel");
     expect(at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" } })).toBe("interaction");
     expect(at()).toBe("prompt");
     expect(at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "navigate" } })).toBe("liveBlock");
+    // **`liveBlock` and not `global`, amended in M5** (R-COR-002, C16 §3a W1).
+    // The row read `global`, so with focus stored in the transcript the owner was
+    // `global` while nothing ran and `liveBlock` the moment an entry appeared —
+    // a content arrival moving the keyboard's owner, which is the one thing
+    // R-COR-002 forbids. Standing in the transcript is not a thing that stops
+    // being true because the last command finished.
     expect(
       at({ stored: { at: "liveBlock", entryId: "e1", element: null, anchor: null, mode: "navigate" }, liveEntry: null }),
-    ).toBe("global");
+    ).toBe("liveBlock");
+  });
+
+  it("T1.3g (R-COR-002, C16 §3a W1): an arrival changes the drawing and never the owner", () => {
+    // **The row the ladder had no shape for.** Every assertion above names the
+    // owner for a *state*; this names it across a *transition*, which is the only
+    // way a rule about what an arrival may not do can be checked at all. The two
+    // calls differ on `liveEntry` alone.
+    const inTranscript = { at: "liveBlock", entryId: "e1", element: null, anchor: null, mode: "navigate" } as const;
+    const quiet = at({ stored: inTranscript, liveEntry: null });
+    const arrived = at({ stored: inTranscript, liveEntry: { id: "e2" } });
+    expect(arrived, "content arrived and the owner did not move").toBe(quiet);
+
+    // **And the control, which is the other half of R-COR-002**: a *question*
+    // arriving is an ownership request and must raise the rung, so an arrival
+    // that is one does move the owner. A row asserting only the first half would
+    // pass on an `activeTarget` that ignored its inputs entirely.
+    expect(at({ stored: inTranscript, overlayTop: { kind: "overlay" } }), "a question is an ownership request").toBe(
+      "overlay",
+    );
   });
 
   it("T1.3d (C26 I2): interaction outranks the prompt and yields to every layer", () => {
@@ -48,11 +78,11 @@ describe("C16 §3 — activeTarget", () => {
       at({ stored: interacting, overlayTop: { kind: "overlay" } }),
       "under an overlay that must be answered",
     ).toBe("overlay");
-    expect(at({ stored: interacting, copyMode: true }), "under copy mode").toBe("copyMode");
+    expect(at({ stored: interacting, nativeSelection: true }), "under native selection").toBe("nativeSelection");
     expect(
-      at({ stored: interacting, overlayTop: { kind: "view" } }),
-      "under a view, which covers the region",
-    ).toBe("pushedView");
+      at({ stored: interacting, overlayTop: { kind: "panel" } }),
+      "under a panel, which is the prompt's substate",
+    ).toBe("panel");
   });
 
   it("T1.3f (C26 I14): moving between rows leaves interaction", () => {
@@ -87,40 +117,44 @@ describe("C16 §3 — activeTarget", () => {
     expect(store.current, "no way in through setMode").toEqual({ at: "prompt" });
   });
 
-  it("T1.3e (C26 I2): a frozen entry is not interactable, however the mode was left", () => {
-    // **Freezing is a mode exit nobody signals** (C26 §8a, the live-block
-    // freeze). The mode is stored, so it outlives the entry; answering
-    // `interaction` here would hand every key to a block the reader cannot act
-    // on and the prompt would stop receiving them. The gate is `liveEntry`, and
-    // it is the same gate the `liveBlock` row already had.
+  it("T1.3e (C26 I2, §8b.9, §102): a settled entry is still interactable — view state is not liveness", () => {
+    // **Inverted, and the design is what inverted it.** The row read *a frozen
+    // entry is not interactable, however the mode was left*, on C26 §4g row d's
+    // ground that A01 D4 withdraws a block's keys on freeze. §102's heading is
+    // *VIEW STATE IS NOT LIVENESS* and its starred line answers that sentence:
+    // *A 3D PLOT IS INTERACTIVE BECAUSE IT HAS A CAMERA, not because it is
+    // live. Settled an hour ago, from a call that finished — it STILL ORBITS.*
+    //
+    // The old row was right that D4 withdraws something and wrong about what:
+    // the adapter's bindings go, and the camera the block declared does not.
     expect(
       at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" }, liveEntry: null }),
-    ).toBe("global");
+    ).toBe("interaction");
   });
 
   it("the priority holds where two conditions are true at once", () => {
     // Each row of A02 §2 beating the one below it, which is the only thing
     // "first match wins" actually claims. Asserting the six conditions
     // separately, as T1.3 does, cannot see an order at all.
-    expect(at({ overlayTop: { kind: "overlay" }, copyMode: true }), "overlay over copy").toBe(
+    expect(at({ overlayTop: { kind: "overlay" }, nativeSelection: true }), "overlay over copy").toBe(
       "overlay",
     );
     expect(
-      at({ copyMode: true, overlayTop: { kind: "view" } }),
-      "copy mode over a pushed view",
-    ).toBe("copyMode");
+      at({ nativeSelection: true, overlayTop: { kind: "panel" } }),
+      "native selection over a panel",
+    ).toBe("nativeSelection");
     expect(
-      at({ overlayTop: { kind: "view" }, stored: { at: "prompt" } }),
-      "a pushed view over the prompt",
-    ).toBe("pushedView");
+      at({ overlayTop: { kind: "panel" }, stored: { at: "prompt" } }),
+      "a panel over the prompt",
+    ).toBe("panel");
   });
 
-  it("a confirm over copy mode resolves to the overlay, not to copy mode", () => {
+  it("a confirm over native selection resolves to the overlay, not to native selection", () => {
     // The pair C16 §5's reorder turns on: with the ladder's rungs registered on
     // these targets, this single result is what makes both overlay rungs sit
-    // above copy mode. If this flips, the ladder flips with it — which is the
+    // above native selection. If this flips, the ladder flips with it — which is the
     // point of there being one ordering.
-    expect(at({ overlayTop: { kind: "overlay" }, copyMode: true })).toBe("overlay");
+    expect(at({ overlayTop: { kind: "overlay" }, nativeSelection: true })).toBe("overlay");
   });
 
   it("T2.2 (I15): pure and total — same inputs, same answer, no I/O", () => {
@@ -148,27 +182,67 @@ describe("C16 §3 — activeTarget", () => {
     // the union that no input can reach is a rung the ladder registers and never
     // runs — the shape `pushedView` held for four components. The row below has
     // to *produce* it, not name it.
+    //
+    // **`global` is reachable by dispatch and not by `activeTarget`, and M5 is
+    // where those stopped being the same claim.** They were one while the fall
+    // through the bottom of `activeTarget` was how `global` got its turn; now
+    // `dispatch` runs it explicitly below the ladder, and R-COR-002 took the fall
+    // away (W1). The vacuity the row exists to catch is unchanged — a target no
+    // input can reach — so the assertion keeps its shape and names the one member
+    // whose reachability is dispatch's rather than derivation's.
     const reached = new Set<FocusTarget>([
+      // **`child` is produced, not named** — the rule above, applied to the rung
+      // M5 added. An attached child is the top of the ladder, and a member added
+      // to the union without a state that answers it is the vacuity this row
+      // exists to catch.
+      at({ attachedChild: true }),
       at({ overlayTop: { kind: "overlay" } }),
-      at({ copyMode: true }),
-      at({ overlayTop: { kind: "view" } }),
+      at({ nativeSelection: true }),
+      // **The second target at `copy`, produced rather than named** (I50). The
+      // rule above applied to M10b's rung-sharing: a member added beside
+      // `nativeSelection` with no state that answers it would be the vacuity
+      // this row catches, and sharing a rung is exactly the shape in which that
+      // is easy to miss — `RUNG_OF` would agree and nothing would reach it.
+      at({ semanticSelection: true }),
+      at({ overlayTop: { kind: "panel" } }),
       at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "interact" } }),
       at(),
       at({ stored: { at: "liveBlock", entryId: "e1", element: addr("r1"), anchor: null, mode: "navigate" } }),
       at({ stored: { at: "liveBlock", entryId: "e1", element: null, anchor: null, mode: "navigate" }, liveEntry: null }),
+      // **The watch row, produced from its stored location** (C16 I76) — a
+      // third position of `scope`, and the rule above applied to it.
+      at({ stored: { at: "watches", id: "w", index: 0 } }),
     ]);
-    expect([...FOCUS_ORDER].sort()).toEqual([...reached].sort());
-    expect(FOCUS_ORDER[0], "overlay is highest").toBe("overlay");
+    expect([...FOCUS_ORDER].filter((t) => t !== "global").sort()).toEqual([...reached].sort());
+    expect(reached.has("global"), "no derivation answers `global` any more").toBe(false);
+    // And it is dispatched, which is what stops the line above retiring a rung
+    // rather than re-homing one: `run("global", e)` is in `dispatch`'s tail.
+    expect(
+      readFileSync("src/interaction/router/router.ts", "utf8"),
+      "`global` is run below the ladder, by name",
+    ).toContain('run("global", e)');
+    // **`child` is highest, amended in M5.** §103's ladder reads
+    // `child · copy · question · substate · inside · scope`, and a captured child
+    // sits above the question rung because the keys are not the host's to route:
+    // an overlay the host raised over an attached PTY does not take that PTY's
+    // keyboard. `overlay` keeps its place as the highest *host* rung.
+    expect(FOCUS_ORDER[0], "an attached child is highest (§103)").toBe("child");
+    expect(FOCUS_ORDER[1], "overlay is the highest host rung").toBe("overlay");
     expect(FOCUS_ORDER[FOCUS_ORDER.length - 1], "global is the fallback").toBe("global");
   });
 
-  it("pushedView needs no separate hasView input", () => {
-    // Overlays always sit above views (C15 I2), so a view is the top exactly
+  it("the substate rung needs no second input beside `overlayTop`", () => {
+    // Overlays always sit above panels (C15 I23), so a panel is the top exactly
     // when no overlay is open. Asserted because the obvious reading is that
     // `activeTarget` is missing an input, and a second input could disagree
     // with the one beside it.
-    expect(at({ overlayTop: { kind: "overlay" } }), "view beneath is irrelevant").toBe("overlay");
-    expect(at({ overlayTop: { kind: "view" } })).toBe("pushedView");
+    //
+    // **It was `hasView` and there is no view** (R-EXA-082, F1254). The member
+    // is gone from `OverlayManager`; what the row was about is that the stack's
+    // own ordering already answers the question, which is as true of the band
+    // that replaced it.
+    expect(at({ overlayTop: { kind: "overlay" } }), "the panel beneath is irrelevant").toBe("overlay");
+    expect(at({ overlayTop: { kind: "panel" } })).toBe("panel");
   });
 });
 
@@ -258,20 +332,18 @@ describe("C16 §3 — the stored location", () => {
     expect(resolveFocus(null, []), "and still null with nothing there").toBeNull();
   });
 
-  it("T1.3j (C26 §4e row 5, §8b.8): nothing in `src/` can put focus into interact", () => {
-    // **The vacuity, asserted rather than described.** §10 promises this row and
-    // every other row here *constructs* `mode: "interact"` on the store shape —
-    // which tests `activeTarget`'s ordering correctly and says nothing about
-    // whether the state is reachable. It is not: `setMode` has one caller, the
-    // `⌃c` rung, and it passes `"navigate"`.
+  it("T1.3j (C26 I26, §8b.9, §102): the entry exists, and it is ⏎ on an element declaring view state", () => {
+    // **The row expired by itself, which is what it was written to do.** It read
+    // *nothing in `src/` can put focus into interact* and asserted the vacuity
+    // rather than describing it: `setMode` had one caller, the `⌃c` rung,
+    // passing `"navigate"`, so the `interaction` rung was dead code and §018's
+    // third state had never appeared in a frame.
     //
-    // So the `interaction` rung of the ladder is dead code, `⏎`'s entry arm is
-    // uncommitted for a measured reason (§8b.8), and the mode indicator's second
-    // value has nothing to display (roadmap 29).
-    //
-    // **It expires by itself.** The day anything sets `"interact"`, this fails
-    // and the prose that rests on the vacuity has to be re-derived rather than
-    // quietly surviving.
+    // §102 built the entry — *focused — the way IN — ⏎ enter* — so the row
+    // inverts rather than retires, and the thing worth pinning is the same one:
+    // **how many ways in there are.** One, because a second would be a second
+    // answer to *when is the reader inside*, and the mode decides what every
+    // key means.
     const dir = new URL("../../src/", import.meta.url);
     const files: string[] = [];
     const walk = (at: URL): void => {
@@ -285,12 +357,84 @@ describe("C16 §3 — the stored location", () => {
 
     const entering = files.filter((text) => /setMode\(\s*["']interact["']/u.test(text));
 
-    expect(entering, "no caller puts the store into interact").toEqual([]);
+    expect(entering.length, "exactly one caller puts the store into interact").toBe(1); // cells-ok — a file count, not a width
+    // And it is `rowActivate`'s, gated on the element's declaration — without
+    // this the count passes against an entry wired anywhere at all.
+    expect(entering[0]).toMatch(/viewState === true[\s\S]{0,120}setMode\(\s*"interact"/u);
   });
 
   it("the stored value is frozen, so a consumer cannot move focus by mutation", () => {
     const focus = createFocusStore();
     focus.enterLiveBlock("e1", addr("r1"));
     expect(Object.isFrozen(focus.current)).toBe(true);
+  });
+});
+
+describe("C16 §5d — semantic copy mode is the second target at the `copy` rung (M10b)", () => {
+  it("T1.41 (I50, §5d): the mode is a target, and `copy` is the rung it and the handoff share", () => {
+    // **The control first.** With both flags false the same inputs answer
+    // `prompt`, so this row is about the flag rather than about an empty stack
+    // — which is what a target row passes without when the resolution it claims
+    // to exercise never ran.
+    expect(at()).toBe("prompt");
+
+    expect(at({ semanticSelection: true })).toBe("semanticSelection");
+    expect(at({ nativeSelection: true })).toBe("nativeSelection");
+
+    // **One rung, two targets** (I50). Every rule written over the ladder — a
+    // confirm dominating, an intercept's verdict, the footer's owner line —
+    // reads `RUNG_OF`, so it answers once for both and cannot drift between
+    // them.
+    expect(RUNG_OF.semanticSelection).toBe("copy");
+    expect(RUNG_OF.semanticSelection).toBe(RUNG_OF.nativeSelection);
+  });
+
+  it("a confirm over semantic copy mode resolves to the overlay, not to the mode", () => {
+    // The pair to `nativeSelection`'s row above: the `copy` rung sits below
+    // `question`, and a mode that takes every key still loses to a question
+    // raised over it (A02 §2). Asserted rather than inferred from the rung,
+    // because a target placed wrongly in `FOCUS_ORDER` satisfies `RUNG_OF` and
+    // fails this.
+    expect(at({ semanticSelection: true, overlayTop: { kind: "overlay" } })).toBe("overlay");
+  });
+});
+
+// C26 I26, I27 — §102's inside chain and the commit gate.
+describe("the inside — declared, entered, reflected (C26 I26, I27, §102, §018)", () => {
+  const inside = {
+    at: "liveBlock",
+    entryId: "e9",
+    element: addr("r1"),
+    anchor: null,
+    mode: "interact",
+  } as const;
+
+  it("T1.162 (C26 I26, §8b.9, §102): a settled entry with the mode stored answers interaction", () => {
+    // **The state that used to be unreachable** (C26 I2, §4g row d). The gate
+    // read `liveEntry !== null && stored.entryId === liveEntry.id`, on the
+    // ground that A01 D4 withdraws a block's keys on freeze; §102's heading is
+    // *VIEW STATE IS NOT LIVENESS* and its starred line answers it — *Settled
+    // an hour ago, from a call that finished — it STILL ORBITS.*
+    expect(at({ stored: inside, liveEntry: { id: "e1" } })).toBe("interaction");
+    // And with nothing live at all, which is the stronger arm: the old gate
+    // failed this one on `liveEntry !== null` before it reached the entry ids,
+    // so a row asserting only the mismatch above passes against half a fix.
+    expect(at({ stored: inside, liveEntry: null })).toBe("interaction");
+  });
+
+  it("T1.162b (C26 I26): the mode is still what decides, and it cannot arrive by drift", () => {
+    // **The control.** Without it the row above passes against a build that
+    // answers `interaction` for any stored location in the transcript.
+    expect(at({ stored: { ...inside, mode: "navigate" }, liveEntry: null })).toBe("liveBlock");
+
+    // `focusRow` clears the mode on every move between rows, so the one way in
+    // is `⏎` on an element declaring view state — asserted here because the
+    // withdrawn gate was the only other thing keeping a stale mode harmless.
+    const store = createFocusStore();
+    store.enterLiveBlock("e9", addr("r1"));
+    store.setMode("interact");
+    expect(at({ stored: store.current, liveEntry: null })).toBe("interaction");
+    store.focusRow("e9", addr("r2"));
+    expect(at({ stored: store.current, liveEntry: null })).toBe("liveBlock");
   });
 });

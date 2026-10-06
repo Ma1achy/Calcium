@@ -13,15 +13,17 @@
  * forgot would be indistinguishable from the ones that meant it.
  */
 
-import { block, document } from "../data/viewmodel/index.js";
-import { usageBlocks } from "../data/adapters/index.js";
+import { CALL_HEAD_GLYPH, CALL_STATE_TONE, block, document } from "../data/viewmodel/index.js";
+import { cancelledNotice, usageBlocks } from "../data/adapters/index.js";
 import { elapsed, glyphs, spinnerFrames } from "../presentation/blocks/index.js";
 import type { AskOptions, Choice } from "./local/registry.js";
+import { defaultStart } from "./choice-selection.js";
 import { defaulted } from "./builders/seq.js";
 import type { ToolDef } from "../data/manifest/index.js";
 import type {
   LocalDocument,
   Block,
+  CallState,
   DocumentMeta,
   DocumentStatus,
   ErrorLike,
@@ -64,12 +66,18 @@ export type MetaSpec = Readonly<{
 /**
  * Defaults for everything except `origin`, which is the field this exists to
  * make unforgettable.
+ *
+ * **The code's default is the status's** (C23 I100, ruling 98, F1491): 1 for an
+ * `error` document, 0 otherwise — what `completeLocal` derives and what
+ * `errorDoc` used to restate by hand. A flat 0 gave every `noticeDoc` at
+ * `error` — F15's fault notice, ruling 93's failed key action — a document
+ * saying failed with exit 0.
  */
-export function meta(spec: MetaSpec): ViewDocument["meta"] {
+export function meta(spec: MetaSpec, status: DocumentStatus = "ok"): ViewDocument["meta"] {
   return {
     verb: spec.verb ?? null,
     adapter: spec.adapter ?? "none",
-    exitCode: spec.exitCode ?? 0,
+    exitCode: spec.exitCode ?? (status === "error" ? 1 : 0),
     durationMs: spec.durationMs ?? 0,
     truncated: spec.truncated ?? false,
     argv: spec.argv ?? [],
@@ -102,7 +110,7 @@ export function compose(spec: DocSpec): ViewDocument {
     status: spec.status ?? "ok",
     blocks: spec.blocks,
     ...(spec.error === undefined ? {} : { error: spec.error }),
-    meta: meta(spec.meta ?? { origin: "user" }),
+    meta: meta(spec.meta ?? { origin: "user" }, spec.status ?? "ok"),
   });
 }
 
@@ -182,6 +190,9 @@ const GLYPH_OF = Object.freeze({
  * rather than at the two call sites is the class rather than the instances: the
  * message is the notice's own text, which is what an `ErrorLike` carrying
  * anything else would be paraphrasing.
+ *
+ * A cancel is not composed here: its notice carries a state's mark rather than
+ * the tone's, and `cancelledDoc` below is the one place it is built.
  */
 export function noticeDoc(
   command: string,
@@ -208,8 +219,7 @@ export function noticeDoc(
   // F15's fault notice is exactly that fifth case and it is already here: it
   // is `error`, so the tone alone would have spared it — but only by accident,
   // and its own `command` is `""`.
-  const glyph =
-    tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone];
+  const glyph = tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone];
   return compose({
     command,
     status,
@@ -222,6 +232,67 @@ export function noticeDoc(
         text,
         ...(glyph === undefined ? {} : { glyph }),
       }),
+    ],
+    meta: metaSpec,
+  });
+}
+
+/**
+ * A cancel as a whole document: the notice alone, on `partial` (C23 I10, I96).
+ * **Never `error`**: a stopped child says nothing about whether it would have
+ * worked (C23 I81), and C04 I3 then admits no `error` field — so there is no
+ * `code` to carry, and `meta.exitCode` is where a consumer reads the ending.
+ */
+export function cancelledDoc(command: string, text: string, metaSpec: MetaSpec): ViewDocument {
+  return compose({
+    command,
+    status: "partial",
+    blocks: [cancelledNotice(text, blockId("notice"))],
+    meta: metaSpec,
+  });
+}
+
+/**
+ * **An app-route cancel, as the document the shell writes** (C23 I98, ruling 97).
+ *
+ * The card as it stood — its head, already reading `cancelled` (I54), and every
+ * block the entry streamed under it — with the cancelled notice after them, on
+ * `partial`, and 130 in `meta.exitCode`: the code C20 records for the same
+ * settlement (I29), and C01 I17's 128 + `SIGINT`. It was `settle(id)` with no
+ * document, which can change no status, so the entry stayed `ok` with 0 beside a
+ * record of 130 (F1490).
+ *
+ * **The rest of `meta` is the card's own**, because the card was composed by
+ * this route at step 3 with the verb, the transport and the argv it spawned;
+ * nothing about a cancel changes them. `held` never carries `error` — a pending
+ * card is `ok` until it settles — so there is none to drop for C04 I3.
+ */
+export function cancelledCard(held: ViewDocument): ViewDocument {
+  return {
+    ...held,
+    status: "partial",
+    blocks: [...held.blocks, cancelledNotice("Cancelled.", blockId("cancelled"))],
+    meta: { ...held.meta, exitCode: 130 },
+  };
+}
+
+/**
+ * A count and what it counted, as one entry — C23 I86's ledger notice.
+ *
+ * **A `work-unit` head and one `continuation` line per item**: the head is a
+ * fact for the reader in `info`, and each line is subordinate to it inside the
+ * same entry, which is the one place the continuation mark's condition (see
+ * `noticeDoc`) is met without a command line — the line above is this entry's
+ * own head. No command, so nothing that counts command entries counts it.
+ */
+export function settledDoc(head: string, lines: readonly string[], metaSpec: MetaSpec): ViewDocument {
+  return compose({
+    command: "",
+    blocks: [
+      block({ kind: "notice", id: blockId("notice"), tone: "info", glyph: "work-unit", text: head }),
+      ...lines.map((text) =>
+        block({ kind: "notice", id: blockId("notice"), tone: "muted", glyph: "continuation", text }),
+      ),
     ],
     meta: metaSpec,
   });
@@ -274,6 +345,12 @@ export type ToolCallSpec = Readonly<{
    * the spinner a settled call no longer has.
    */
   settled?: boolean;
+  /**
+   * The lifecycle state, stated rather than derived (C23 I59). Only `queued`
+   * and `cancelled` need it: a header cannot tell *not started* from *running*,
+   * and a cancelled call has an outcome like any other settlement.
+   */
+  state?: CallState;
   /** Awaiting a decision (C23 I60): the duration slot reads `⠋ waiting`, and no figure. */
   waiting?: boolean;
   /**
@@ -301,7 +378,13 @@ function invocation(call: Pick<ToolCallSpec, "name" | "args">): string {
 
 /** Whether a call's head is a settled one: said so, or carrying a word (C23 I59). */
 function isSettled(call: ToolCallSpec): boolean {
-  return call.settled === true || (call.outcome !== undefined && call.outcome !== "");
+  // **Read from the state, not beside it** (C23 I81): a stated `cancelled` with
+  // no outcome is settled, and a stated `running` with one is not — the rollup
+  // and the child's body reached the opposite answers when this read the
+  // outcome while the head read the state.
+  const state = callState(call);
+  // `waiting` has not started either (C04 I149): it is unsettled.
+  return state !== "queued" && state !== "waiting" && state !== "running";
 }
 
 /**
@@ -334,9 +417,12 @@ export function toolCallHeader(call: ToolCallSpec, caps: Caps, tick = 0): string
   const since = call.elapsedMs === undefined ? "" : elapsed(call.elapsedMs);
   if (call.waiting === true) {
     parts.push(`${spin(caps, tick)} waiting`);
-  } else if (!isSettled(call)) {
+  } else if (callState(call) === "running") {
+    // **`running`'s alone, not *unsettled*'s** (C23 I81): a queued call has not
+    // started and R-BLK-214 draws it still, so its slot is empty (F1261).
     parts.push(since === "" ? spin(caps, tick) : `${spin(caps, tick)} ${since}`);
-  } else if (since !== "") {
+  } else if (since !== "" && isSettled(call)) {
+    // Settled, the duration it took. Queued, nothing has started, so there is none.
     parts.push(since);
   }
   const outcome =
@@ -350,6 +436,52 @@ export function toolCallHeader(call: ToolCallSpec, caps: Caps, tick = 0): string
 }
 
 /**
+ * The call's lifecycle state (C23 I59).
+ *
+ * **Derived where it is not stated**, from the two facts the composer already
+ * reads for the spinner: a call with an outcome or an explicit `settled` has
+ * finished, and a failure word in the outcome says how. `queued` and
+ * `cancelled` cannot be inferred from a header — nothing in `ToolCallSpec`
+ * distinguishes *not started* from *started a moment ago* — so a caller that
+ * knows states them.
+ */
+function callState(call: ToolCallSpec): CallState {
+  if (call.state !== undefined) return call.state;
+  const settled = call.settled === true || (call.outcome !== undefined && call.outcome !== "");
+  // **Awaiting a decision is `waiting`, not `running`** (C04 I149, C23 I94):
+  // the tool has not started, and R-BLK-214's *blocked on YOU* is warn.
+  if (!settled) return call.waiting === true ? "waiting" : "running";
+  // **`cancelled` is its own state and not a kind of failure**, which is the
+  // whole reason the design keeps `⊘` apart from `✗`: a call that was stopped
+  // says nothing about whether it would have worked. `FAILURE_WORDS` counts it
+  // against a parent's rollup (C23 I62) and that is a different question.
+  //
+  // **`expired` is the same state** (C23 I94, `R-BLK-881`): an approval nobody
+  // answered did not run, which is what `cancelled` draws — not `failed`.
+  //
+  // **And so is `denied`** (C23 I60, ruling 103 a, F1518). A denial is the
+  // reader's decision and it ran nothing; §047 draws a refusal *never red*, and
+  // this drew it `failed` — `error` and ✗ — against the reason ruling 100 (a)
+  // gave for keeping its status `ok`.
+  if (call.outcome !== undefined && STOPPED_WORDS.has(call.outcome)) return "cancelled";
+  return failureWord(call.outcome) === null ? "succeeded" : "failed";
+}
+
+/**
+ * What an outcome says went wrong, or `null` (C23 I81): `failed` for a far
+ * side's non-zero `exit N`, the word itself for a member of `FAILURE_WORDS`.
+ *
+ * **The one classifier.** `rollUp` matched `exit N` and `callState` did not, so
+ * a call ending `exit 1` counted against its parent while its own head drew
+ * `succeeded`.
+ */
+function failureWord(outcome: string | undefined): string | null {
+  if (outcome === undefined) return null;
+  if (/^exit [1-9]/u.test(outcome)) return "failed";
+  return FAILURE_WORDS.has(outcome) ? outcome : null;
+}
+
+/**
  * The head block (C09 I46, I47): a `step` notice carrying the header, its
  * argument marked `elide` so the fitter shortens it before the verb, duration or
  * outcome, and the call's id so a readout can replace it in place (C23 I54).
@@ -358,7 +490,24 @@ export function callHead(call: ToolCallSpec, caps: Caps, tick = 0, foldTarget?: 
   const text = toolCallHeader(call, caps, tick);
   const from = call.name.length + 1; // cells-ok — a code-unit offset into the text
   const spans = call.args === "" ? [] : [{ from, to: from + call.args.length, elide: true }]; // cells-ok — code-unit offsets
-  const base = { kind: "notice" as const, id: call.id ?? blockId("step"), tone: "info" as const, glyph: "step" as const, text };
+  // **The head carries a state, not a character** (C09 I45, C23 I59): which
+  // mark it draws is a question about the terminal, and a producer has never
+  // seen one. `glyph` is the answer for the rung where tone carries — one `●`
+  // for every state, §030's collapse — and the renderer substitutes the state's
+  // own mark where it does not. Both are one cell with no indent, so `measure`
+  // reads `glyph` alone and is right at every rung.
+  const state = callState(call);
+  // **The tone and the mark are the state's** (C04 I141): above 1 bit the tone
+  // is the only thing saying which state the `●` is in, and this wrote `info`
+  // for all five.
+  const base = {
+    kind: "notice" as const,
+    id: call.id ?? blockId("call"),
+    tone: CALL_STATE_TONE[state],
+    glyph: CALL_HEAD_GLYPH[state],
+    state,
+    text,
+  };
   const marked = spans.length === 0 ? base : { ...base, spans }; // cells-ok — a span count
   // **`⏎` on the head folds the body** (C09 I47, C26 §5): the action is the
   // block's `expand` aimed at the body's scroll, when there is one. Re-run
@@ -367,8 +516,195 @@ export function callHead(call: ToolCallSpec, caps: Caps, tick = 0, foldTarget?: 
   return block(foldTarget === undefined ? marked : { ...marked, action: { kind: "expand" as const, label: "expand", target: foldTarget } });
 }
 
-/** The words a settled child can carry that count against the parent (C23 I62). */
-const FAILURE_WORDS: ReadonlySet<string> = new Set(["failed", "denied", "cancelled", "truncated"]);
+/**
+ * An operation — a process rather than a call (C23 I76, §036).
+ *
+ * **The verb is the caller's and the grammar is this file's.** *The head names
+ * what is HAPPENING, not a tool — a gerund, because an operation is a process
+ * rather than a call*; nothing here can compose a gerund and nothing here needs
+ * to. What this owns is the bracket, the separator inside it, the flattening at
+ * settlement and the bar's disappearance.
+ *
+ * `verb` changes at settlement and the caller supplies both — §036 draws
+ * `Compacting conversation…` running and `compacted` settled, which is a
+ * different word and not a tense this file could derive.
+ */
+export type OperationSpec = Readonly<{
+  /** What is happening, as the caller says it. */
+  verb: string;
+  /** The head block's id, so a readout can replace it in place (C23 I54). */
+  id?: string;
+  /** Since it started, in milliseconds. */
+  elapsedMs?: number;
+  /**
+   * What it has ACHIEVED so far, in the operation's own units — `↓ 8.0k tokens`,
+   * `4,102 of 9,318 files`. A string, because *a percentage is the same word for
+   * all four, and the unit is what tells you whether 44% is nearly done*.
+   */
+  delta?: string;
+  /** The settled summary — the delta FINISHED, `41k → 12k tokens`, never `done`. */
+  outcome?: string;
+  /** Running unless said otherwise. `succeeded`, `cancelled` and `failed` all stop it. */
+  state?: CallState;
+  /** How far through. Both, or neither: a bar with no total is not a bar (`R-PRG-002`). */
+  current?: number;
+  total?: number;
+}>;
+
+/** Is the operation still going? The one predicate the bar and the bracket both read (C23 I76). */
+function operationRunning(op: OperationSpec): boolean {
+  return (op.state ?? "running") === "running";
+}
+
+/**
+ * The running mark: the `agent` set's own frame, indexed by the readout's tick
+ * exactly as the duration slot's is (C23 I58).
+ *
+ * **It is composed into the text rather than left to the gutter**, and that is
+ * a fact about this tree rather than a reading of §036. The glyph slot draws
+ * one character chosen from a state, which is what a stopped operation wants —
+ * `●`, muted or error — and there is no slot that animates. The duration
+ * spinner has always been composed this way and re-drawn by the readout
+ * replacing the head by id; a second mechanism for the same job would be a
+ * second timer, which C23 I58 exists to refuse.
+ */
+function operationSpin(caps: Caps, tick: number): string {
+  const frames = spinnerFrames(caps, "agent");
+  return frames[tick % frames.length] ?? ""; // cells-ok — a frame count
+}
+
+/**
+ * The operation's header line (C23 I76, §036).
+ *
+ * **Bracketed while it runs and flat once it stops**, and those are not the same
+ * line: *the parentheses group the two as an aside, so the eye reads the VERB
+ * first and the numbers second*, and §036's settled head — `● compacted · 6m 12s
+ * · 41k → 12k tokens · 18 turns summarised` — puts every field on one level.
+ * **An empty group is not drawn**, and a group of one takes no separator:
+ * parentheses around nothing say *these are the numbers* about no numbers.
+ */
+export function operationHeader(op: OperationSpec, caps: Caps, tick = 0): string {
+  const sep = ` ${glyphs(caps).separator} `;
+  const since = op.elapsedMs === undefined ? "" : elapsed(op.elapsedMs);
+  const numbers = [since, op.delta ?? ""].filter((n) => n !== "");
+  if (operationRunning(op)) {
+    const mark = operationSpin(caps, tick);
+    const head = mark === "" ? op.verb : `${mark} ${op.verb}`;
+    return numbers.length === 0 ? head : `${head} (${numbers.join(sep)})`; // cells-ok — a field count
+  }
+  const outcome = op.outcome === undefined || op.outcome === "" ? [] : [op.outcome];
+  return [op.verb, ...numbers, ...outcome].join(sep);
+}
+
+/** Muted for cancelled, error for failed, and info for the rest (§036, `R-BLK-265`). */
+/**
+ * The operation's head block (C23 I76): a notice carrying the header, the
+ * state's mark in the gutter once it has stopped and the walking one in the
+ * text while it has not.
+ */
+export function operationHead(op: OperationSpec, caps: Caps, tick = 0): Block {
+  const running = operationRunning(op);
+  const base = {
+    kind: "notice" as const,
+    id: op.id ?? blockId("operation"),
+    // **The state's tone, the one map a call head reads** (C23 I76, C04 I141):
+    // R-BLK-265's *muted for cancelled, error for failed* is that map's two rows.
+    // This was `info` running and settled — the call head's constant again.
+    tone: CALL_STATE_TONE[running ? "running" : (op.state ?? "succeeded")],
+    text: operationHeader(op, caps, tick),
+  };
+  // **A state at both ends, and a glyph at only one.** `state` is what makes a
+  // notice a head (C09 I46's `isCallHead`), and a head is **one committed row,
+  // fitted rather than wrapped** — *a head that wraps is two heads to a reader
+  // skimming the gutter*. The running arm had no state on its first draft and
+  // the frame said so: at 28 cells the aside fell onto a second row at column
+  // zero, where it reads as a line of its own rather than as the verb's
+  // numbers. `glyph` stays off while it runs, because the walking mark is
+  // already at the head of the text and §036's running line carries one mark.
+  return block(
+    running
+      ? { ...base, state: "running" as const }
+      : { ...base, glyph: CALL_HEAD_GLYPH[op.state ?? "succeeded"], state: op.state ?? "succeeded" },
+  );
+}
+
+/**
+ * The operation's rows: the head, and the bar **only while it is running**
+ * (C23 I76, §036).
+ *
+ * **Two arguments end with no bar and neither substitutes for the other.** *A
+ * 100% bar on a finished thing is a row spent on nothing* is settlement's; *a
+ * stopped bar is a claim about progress that is not being made any more* is
+ * cancellation's and failure's. So the predicate is `operationRunning`, asked
+ * once — a rule written about settlement alone leaves a cancelled operation
+ * drawing its frozen fill, which is the state that lies.
+ *
+ * The bar carries no label (C09 I104): the verb is on the head above it, and a
+ * meter that reserved a column regardless made §036's row unreachable.
+ */
+export function operationRows(op: OperationSpec, caps: Caps, tick = 0): readonly Block[] {
+  const head = operationHead(op, caps, tick);
+  if (!operationRunning(op) || op.current === undefined || op.total === undefined) return [head];
+  return [
+    head,
+    block({
+      kind: "progress",
+      id: blockId("operation-bar"),
+      label: "",
+      current: op.current,
+      total: op.total,
+      // §036's OPERATION preset — *progress · segmented · active* (C09 I97).
+      quantity: "progress",
+      granularity: "segmented",
+      liveness: "active",
+    }),
+  ];
+}
+
+/**
+ * The words a settled child can carry that count against the parent (C23 I62).
+ *
+ * **They are also every word the shell writes into a head** — `finishCard`'s
+ * outcomes besides `exit N` and the empty one — which is what `shellWord` reads
+ * them as (C22 I152).
+ */
+const FAILURE_WORDS: ReadonlySet<string> = new Set(["failed", "denied", "cancelled", "expired", "truncated"]);
+
+/**
+ * The words of a call that did not run, and so is `cancelled` (C23 I81, ruling
+ * 103 a): stopped, expired unanswered, or refused. A parent counts each under
+ * its own word, so the rollup says what the child's head says.
+ */
+const STOPPED_WORDS: ReadonlySet<string> = new Set(["cancelled", "expired", "denied"]);
+
+/** The slot's separator in each alphabet — the only two `toolCallHeader` joins with (F834). */
+const SEPARATORS: readonly string[] = [
+  glyphs({ unicode: "full", ambiguousWidth: "narrow" }).separator,
+  glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }).separator,
+];
+
+/**
+ * The word the shell wrote as a settled head's outcome, or `null` (C22 I152,
+ * ruling 103 b): the text's last part after the slot's separator, when it is one
+ * of `FAILURE_WORDS`.
+ *
+ * **The code cannot say this and neither can the state.** 126 and 130 are codes
+ * the shell chose and a child can return on its own (C23 §8a A6.9 row 16), and
+ * `denied`, `expired` and `cancelled` share one state. The head's word is the
+ * one field that names the ending, so the completion line reads it here, from
+ * the file that writes it. `text` is the model's field, not a painted row; the
+ * blind spot is a far side's head whose own text ends in one of these words
+ * after a separator (C22 §6m.1).
+ */
+export function shellWord(text: string): string | null {
+  for (const sep of SEPARATORS) {
+    const at = text.lastIndexOf(` ${sep} `);
+    if (at < 0) continue;
+    const word = text.slice(at + sep.length + 2); // cells-ok — code-unit offsets into the text
+    if (FAILURE_WORDS.has(word)) return word;
+  }
+  return null;
+}
 
 /**
  * A parent's outcome, derived from its children on every settlement (C23 I62).
@@ -387,7 +723,15 @@ export function rollUp(children: readonly ToolCallSpec[]): readonly string[] {
   let succeeded = 0;
   for (const child of settled) {
     const outcome = child.outcome ?? "";
-    const word = /^exit [1-9]/u.test(outcome) ? "failed" : FAILURE_WORDS.has(outcome) ? outcome : null;
+    // **By the child's state, which its own head draws** (C23 I81) — a stated
+    // state wins over the outcome here exactly as it does there.
+    const state = callState(child);
+    const said = failureWord(child.outcome);
+    // A stopped child under its own word (C23 I81, ruling 103 a): `1 denied`,
+    // `1 expired`, as its head reads — `cancelled` for a stated state.
+    const stopped = child.outcome !== undefined && STOPPED_WORDS.has(child.outcome) ? child.outcome : "cancelled";
+    const word =
+      state === "succeeded" ? null : state === "cancelled" ? stopped : said === null || said === "cancelled" ? "failed" : said;
     if (word !== null) {
       failures.set(word, (failures.get(word) ?? 0) + 1);
       continue;
@@ -462,18 +806,23 @@ export function questionNotice(text: string, id: string): Block {
   return warnBlock(text, id);
 }
 
-/** A document view's rows past the screen (C22 §6h): the count, and why `n`/`p` cannot reach them. */
-export function hiddenRowsNotice(hidden: number, id: string): Block {
-  return warnBlock(
-    `${String(hidden)} more rows — this block is taller than the screen, and n/p move by block so they cannot reach them`,
-    id,
-  );
-}
+// **`hiddenRowsNotice` went with the pushed view** (C22 §13a, R-EXA-082, F1253). It
+// stated a block's rows past the screen and why `n`/`p` could not reach them, which was
+// C22 I47's half of a pair: a window that emitted at least one block whatever its height
+// left a tall block shown, cut, and with no second offset to move to. An entry is as tall
+// as it is and C14 scrolls past it by row, so there is nothing to report. The class the
+// notice guarded — content stopping mid-object reads as content ending — is C04 I49's
+// residue row, which is built.
 
 /** The two answers every approval offers (C23 I60); a caller may widen them — `always allow` is a row like any other. */
+//
+// **`deny` first and marked default** (C23 I94, `R-BLK-348`): *the SAFE answer
+// opens · no is first and focused · esc resolves to it · dismissing is answering
+// no*. It was `allow` marked default, so `esc` — which resolves with the default
+// (C23 I36) — approved and ran the tool.
 const APPROVAL_CHOICES: readonly Choice[] = Object.freeze([
-  { key: "y", label: "allow", default: true },
-  { key: DENY_KEY, label: "deny" },
+  { key: DENY_KEY, label: "deny", default: true },
+  { key: "y", label: "allow" },
 ]);
 
 /**
@@ -487,6 +836,17 @@ export function approvalPrompt(
   consequence?: string,
   choices: readonly Choice[] = APPROVAL_CHOICES,
 ): AskOptions {
+  // **`esc` must deny** (C23 I94, F1495, `R-BLK-348` *dismissing is answering
+  // no*). A record's `choices` replace these whole, and `esc` resolves with the
+  // set's default — so a set with no `deny`, or with `allow` marked default,
+  // made `esc` an answer that ran the tool (§8a A6.11 row 6). Refused as `ask`
+  // refuses I93's sets: a construction error, before anything is pushed.
+  const safe = choices.length > 0 ? choices[defaultStart(choices)] : undefined; // cells-ok — a choice count
+  if (safe?.key !== DENY_KEY) {
+    throw new Error(
+      `approvalPrompt(): esc resolves "${safe?.key ?? ""}", and an approval's esc must resolve "${DENY_KEY}" (C23 I94)`,
+    );
+  }
   return {
     question: invocation(call),
     ...(consequence === undefined ? {} : { detail: warnNotice(consequence, "confirm-consequence") }),
@@ -673,6 +1033,6 @@ export function errorDoc(
     status: "error",
     blocks,
     error,
-    meta: { exitCode: 1, ...metaSpec },
+    meta: metaSpec,
   });
 }

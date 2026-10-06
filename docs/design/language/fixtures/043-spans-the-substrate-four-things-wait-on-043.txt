@@ -1,0 +1,19 @@
+a span carries bold, italic and underline. Nothing else.
+
+  the fix is probably a depth counter — see parse.ts:41
+             bold       italic           underline
+
+  colour is NOT a span attribute — C10 owns colour, and a span that
+  carried one would be a second palette nobody could theme.
+
+four consumers, one mechanism, and none of them can ship without it
+
+  inline emphasis   **bold** and _italic_ inside a paragraph
+  structured diff   const rows = measureWindow(blocks);
+  token rendering   The cat sat on the mat   per-token logprob
+  ink ramps         a gradient over a run
+
+storage ranges retain SOURCE OFFSETS; editing and painting use GRAPHEMES
+  a source boundary inside é or 👍 snaps out to the cluster's edge for display
+byte/code-unit offsets, grapheme indexes and display cells are converted,
+never treated as interchangeable coordinate systems.

@@ -98,8 +98,13 @@ const results = runPass({
       // row that says so is the one asserting a leaning `bgDeep` still loads.
       name: "`bgDeep` joins the text surfaces",
       file: CONTRAST,
-      from: '    ["bgElev", tokens.surfaces.bgElev],\n  ];',
-      to: '    ["bgElev", tokens.surfaces.bgElev],\n    ["bgDeep", tokens.surfaces.bgDeep],\n  ];',
+      // **Re-anchored twice.** The first anchor reached the closing bracket and
+      // rotted when `focusGround` joined the list (R-THM-004); the second was a
+      // list entry, and the list became the registry's table (C10 I60, review
+      // batch 1 item 21). The subject is unchanged — `textSurfaces` answers with
+      // `bgDeep` among its grounds — so the mutation appends it to the answer.
+      from: '  return rowsOf("page", tokens).map(([row, hex]) => [row.ground, hex] as const);',
+      to: '  return [...rowsOf("page", tokens).map(([row, hex]) => [row.ground, hex] as const), ["bgDeep", tokens.surfaces.bgDeep] as const];',
       expect: "T3.34",
     },
   ],

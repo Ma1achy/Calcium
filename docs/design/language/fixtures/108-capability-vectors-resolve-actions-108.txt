@@ -1,0 +1,46 @@
+A TERMINAL IS NOT CAPABLE OR INCAPABLE. IT HAS A VECTOR.
+
+  keyboard   legacy · modified keys · press/repeat · release
+  colour     1 · 4 · 8 · 24 bit
+  glyphs     ascii · unicode · ambiguous width · emoji width
+  pointer    none · buttons · motion · wheel
+  surface    cursor-addressed · linear
+  motion     full · reduced · off
+  links      OSC 8 · text destination
+  clipboard  OSC 52 · ordinary copy
+  notify     OSC 9 / 777 · bell · none
+  title      OSC 2 · unchanged
+  output     ordinary · synchronised
+
+each field carries a value and provenance: detected, configured, inherited
+or fallback. /capabilities records the vector, its evidence and every
+fallback it caused. A remote hop or multiplexer may change fields independently.
+
+BINDINGS BEGIN WITH ACTIONS, NOT CHORDS.
+
+  action      focus.next
+  candidates  ⇥ · platform alternative · /focus-next
+  owner       the scope allowed to handle it
+  repeat      none · OS · DAS/ARR pair
+
+resolution is deterministic
+  1  take a valid reader override
+  2  remove chords owned by the OS or terminal
+  3  remove chords the protocol cannot distinguish
+  4  remove collisions inside one owner
+  5  choose the first remaining platform candidate
+  6  keep the named command for non-capture actions; keep a base-terminal
+     host-escape chord for captured owners
+
+A CAPABILITY MAKES AN ACTION BETTER, NEVER POSSIBLE.
+Shift+Enter, modified arrows, clipboard chords and direct watch jumps are
+enhancements. /doctor keys verifies what reaches the app. The footer shows
+the chord that works in this session, not a preferred chord that does not.
+
+a captured child reserves one host.detach action because a /command cannot
+reach the host while capture is active. Its base candidate is ⌃]; ⌥esc is an
+enhancement. Resolution collision-tests and may rebind the base candidate,
+but may never leave capture without a visible, reachable host escape.
+
+re-resolution is a render event. It records changed bindings; it never moves
+focus, changes a value, replays input or takes the keyboard from its owner.

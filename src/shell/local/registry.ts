@@ -21,7 +21,69 @@ import type { Manifest } from "../../data/manifest/index.js";
 import type { Block, LocalDocument } from "../../data/viewmodel/index.js";
 import type { ProducerContext } from "../../data/adapters/types.js";
 
-export type Choice = Readonly<{ key: string; label: string; default?: true }>;
+/**
+ * What a question resolves with (C23 I36, I73, §101).
+ *
+ * **A record because a question can be answered two ways at once.** Which
+ * choice was picked and what was typed under it are two facts, and one string
+ * holds one of them — a caller whose free text happens to equal one of its own
+ * accelerators cannot tell which it got.
+ *
+ * `text` is **absent** rather than empty when no reply was composed, and that
+ * is the distinction the floating state exists to create: *the reader typed
+ * nothing* and *the reader never got the chance* must not be one value.
+ */
+export type AskAnswer = Readonly<{
+  key: string;
+  text?: string;
+  /**
+   * How the question ended (C23 I92, C24 I42, `R-QST-002`).
+   *
+   * `cancelled` and `expired` resolve with the **default's** key and no `text`,
+   * so a caller reading `key` alone is handed the safe answer and never one
+   * nobody chose; a caller for whom the difference matters — an approval, which
+   * runs nothing unless `answered` — reads this.
+   */
+  outcome: QuestionOutcome;
+}>;
+
+/** How a question ended (C23 I92, C24 I42): chosen by the reader, withdrawn by its owner, or timed out. */
+export type QuestionOutcome = "answered" | "cancelled" | "expired";
+
+export type Choice = Readonly<{
+  key: string;
+  label: string;
+  default?: true;
+  /**
+   * This choice opens a **typed reply** (C23 I73, §101).
+   *
+   * §101 draws it as a third peer — `approve  deny  reply…` — rather than as a
+   * field beside the choices, because it is one of the things the reader picks
+   * and picking it is what changes the question's state. Choosing it moves the
+   * question from replacing the prompt to floating above a live one, with the
+   * same id and the same handler still awaiting: the answer resolves with this
+   * choice's `key` and the text the reader composed.
+   */
+  reply?: true;
+  /**
+   * This choice opens an **inspection** — it suspends, it does not answer
+   * (C23 I75, §051, `R-QST-002`, `R-QST-004`).
+   *
+   * §051 draws it as a third peer — `no  yes  show full diff` — because the
+   * payload of a question that does not fit is **replaced** rather than
+   * marked, and without a way to it a reader approves a change they cannot
+   * see. Choosing this shows the payload bounded, on the same question with
+   * the same id and the same handler awaiting; `Esc` inside it leaves the
+   * inspection and not the request.
+   *
+   * **The label is the caller's and the route is this field.** There is no
+   * second key-only path (`R-QST-004`): a chord that opened the evidence
+   * without appearing among the choices is invisible at exactly the moment it
+   * matters, because a reader who cannot see the payload also cannot see that
+   * there is a way to.
+   */
+  inspect?: true;
+}>;
 
 /**
  * C23 §2's question — a choice list, never a yes/no box.
@@ -51,6 +113,19 @@ export type AskOptions = Readonly<{
    * is.
    */
   placement?: "centred" | "anchored";
+  /**
+   * Withdraws the question (C23 I92, C24 I43). Aborted while it is open or
+   * waiting, it resolves `cancelled` with the default's key; already aborted at
+   * `ask`, it resolves so at once and nothing is pushed.
+   */
+  signal?: AbortSignal;
+  /**
+   * How long the question stays open before it resolves `expired` with the
+   * default's key (C23 I92, `R-BLK-881`), in milliseconds, counted from when it
+   * is **shown** — a question waiting behind another has not been put to the
+   * reader yet. Absent is never.
+   */
+  expiresAfterMs?: number;
 }>;
 
 /**
@@ -72,8 +147,13 @@ export type LocalContext = ProducerContext & Readonly<{
    * the choice marked `default`, and `Esc` and `⌃c` resolve with it too — so
    * there is no second representation of *nothing happened* for a caller to
    * handle and no path by which it could tell the two apart if there were.
+   *
+   * `key` is that choice. `text` is present only when the reader composed a
+   * typed reply (`Choice.reply`), and its absence is a fact: *nothing was
+   * typed* and *there was nothing to type into* are the same for a caller, and
+   * an empty string would claim the reader replied with nothing.
    */
-  ask: (opts: AskOptions) => Promise<string>;
+  ask: (opts: AskOptions) => Promise<AskAnswer>;
   /**
    * C28's report, or absent — and absent is the overwhelming case.
    *

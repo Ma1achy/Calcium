@@ -8,26 +8,35 @@
 // the table claims: every binding appears exactly once, the marked keys are
 // exactly the ones bound at two or more targets, and the columns are
 // `FOCUS_ORDER`.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
   KEYS_DOC,
+  keysDocument,
   LADDER_MARK,
   liveTable,
   renderKeymapTable,
   tabulate,
 } from "../../tools/keymap-table.mjs";
-import { defaultKeymap, keyText } from "../../src/interaction/router/keymap.js";
+import { chordText, defaultKeymap } from "../../src/interaction/router/keymap.js";
 import { FOCUS_ORDER } from "../../src/interaction/router/focus.js";
 import type { BuiltinBinding } from "../../src/interaction/router/types.js";
 
 describe("tools/keymap-table.mjs — the ladder as a table", () => {
-  it("KT1: docs/KEYS.md is the live keymap rendered — the table cannot drift", () => {
+  it("KT1 (C16 §6a clause 5): docs/KEYS.md is the registry's table then the live ladder — one file, neither half can drift", () => {
     const onDisk = readFileSync(KEYS_DOC, "utf8");
-    expect(onDisk, `${KEYS_DOC} is stale; run \`npx tsx tools/keymap-table.mjs\``).toBe(
-      liveTable(),
-    );
+    expect(onDisk, `${KEYS_DOC} is stale; run \`npx tsx tools/keymap-table.mjs\``).toBe(keysDocument());
+    // Both halves, in order — a document that dropped either would still equal
+    // a renderer that dropped it, so the halves are named.
+    expect(onDisk.indexOf("# Calcium keys"), "the registry's table first").toBeGreaterThanOrEqual(0);
+    expect(onDisk.indexOf("# Key ladder"), "the ladder after it").toBeGreaterThan(onDisk.indexOf("# Calcium keys"));
+    expect(onDisk.endsWith(liveTable()), "the ladder is the live keymap").toBe(true);
+  });
+
+  it("KT1a (C16 §6a clause 5): the registry names the file and it resolves from the repository root — no second keymap", () => {
+    expect(KEYS_DOC).toBe("docs/KEYS.md");
+    expect(existsSync("docs/design/language/docs/KEYS.md"), "the builder's old copy").toBe(false);
   });
 
   it("KT2 (fabricated violation): a binding added to a copy of the keymap → the check fires and names the key", () => {
@@ -59,9 +68,15 @@ describe("tools/keymap-table.mjs — the ladder as a table", () => {
   });
 
   it("KT4: the marked keys are exactly those bound at two or more targets", () => {
+    // **Keyed by the chord, because the table's key column is the chord** (C16
+    // §6a clause 6). `keySlot` is the identity used for the duplicate check and
+    // `chordText` is what a reader sees, and this row compares *what is
+    // rendered* — so it groups the way the table groups. The two spellings are
+    // 1:1 over this keymap, so the set is the same; keying by the slot here
+    // would compare a slot list against a chord column and report all twenty.
     const targetsOf = new Map<string, Set<string>>();
     for (const b of defaultKeymap) {
-      const k = keyText(b.key);
+      const k = chordText(b.key);
       targetsOf.set(k, (targetsOf.get(k) ?? new Set()).add(b.target));
     }
     const expected = [...targetsOf.entries()]
@@ -78,13 +93,21 @@ describe("tools/keymap-table.mjs — the ladder as a table", () => {
     expect(rendered).toEqual(expected);
     // **The set is not empty**, or the row is vacuous: C16 §6 names three
     // collisions the ladder resolves and the table must hold at least those.
-    expect(expected).toEqual(expect.arrayContaining(["pageup", "pagedown", "tab", "m+v"]));
+    // Named in the chord, because that is what the column holds now — `⇥` was
+    // `tab` and `⌥v` was `m+v` until the key column moved to the design's
+    // notation (C16 §6a clause 6).
+    expect(expected).toEqual(expect.arrayContaining(["pageup", "pagedown", "⇥", "⌥v"]));
   });
 
   it("KT5: the columns are FOCUS_ORDER, in order", () => {
     const header = liveTable()
       .split("\n")
       .find((l) => l.startsWith("| key |"));
-    expect(header).toBe(`| key | ${FOCUS_ORDER.join(" | ")} |`);
+    // **`profile` sits between the key and the ladder** (M6, §6a). It is a
+    // property of the route rather than of a target, so it cannot be a column in
+    // `FOCUS_ORDER` — and putting it first would read as a ninth rung. The
+    // claim this row makes is unchanged: the target columns are `FOCUS_ORDER`,
+    // in order, so a target added without a column fails here.
+    expect(header).toBe(`| key | profile | ${FOCUS_ORDER.join(" | ")} |`);
   });
 });

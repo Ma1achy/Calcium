@@ -10,6 +10,8 @@ import { markerEntry, sweep } from "../../src/viewport/transcript/cap.js";
 import { appendPatch, docOf } from "../support/transcript.js";
 import { doc } from "../support/blocks.js";
 import type { Change } from "../../src/viewport/transcript/index.js";
+import { withoutStreaming } from "../../src/data/viewmodel/index.js";
+import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
 
 describe("C13 fail-on-revert", () => {
   it("T6.1 (I4): stopping a stream on freeze → T1.8 and T5.2 fail, and a watch dies on every keystroke", () => {
@@ -181,5 +183,28 @@ describe("C13 fail-on-revert", () => {
     // whose failure loses the outcome. A `Result` invites handling that cannot help.
     expect(() => s.append({ ...doc(), schema: "nope" } as never)).toThrow(TranscriptError);
     expect(s.entries).toEqual([]);
+  });
+});
+
+describe("C13 I22 — tier 6 (review batch 4)", () => {
+  it("T6.15 (C13 I22): settle without the strip → T1.41 fails at row 3a", () => {
+    // **The state the old settle left**: the entry's flag flipped and the
+    // document kept as it was, so the notice still said it was streaming and
+    // C09 I101 drew the agent's mark beside a finished reply. The row builds
+    // that document and the one `settle` now leaves, and asserts they differ in
+    // exactly the property T1.41 reads — so dropping the strip makes the store
+    // hand back the first, and row 3a's `[]` becomes `["n"]`.
+    const streams = (d: ViewDocument): readonly string[] =>
+      d.blocks.filter((b) => (b as { readonly streaming?: unknown }).streaming === true).map((b) => b.id);
+    const running = doc({
+      blocks: [{ kind: "notice", id: "n", tone: "default", text: "partial", streaming: true } as unknown as Block],
+    });
+    const s = createTranscriptStore();
+    const id = s.append(running, { streaming: true });
+    s.settle(id);
+
+    expect(streams(running), "the document the old settle kept streams").toEqual(["n"]);
+    expect(streams(s.entries[0]!.doc), "the one settle leaves does not").toEqual([]);
+    expect(withoutStreaming(running), "and the strip is what separates them").toEqual(s.entries[0]!.doc);
   });
 });

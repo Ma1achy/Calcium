@@ -71,7 +71,7 @@ Display order is the declared order below; priority governs survival only (C11 I
 
 | Width | Drops |
 |---|---|
-| 160 · 120 · 100 | none — all eleven, summing to 93 cells with gaps |
+| 160 · 120 · 100 | none — all eleven, summing to 93 cells with gaps, 95 with the disclosure reservation wherever a row hides something (C11 I32) |
 | 80 | `age`, `p50` |
 | 60 | `age`, `p50`, `req/s`, `p99`, `version` |
 
@@ -93,7 +93,7 @@ At 60 the table is name, replicas, status, errors — which still answers "what 
 ▌   health          ▲ degraded
 ▌   endpoint        http://volatility-estimator.prism-serving.svc.cluster.local
 ▌   namespace       prism-serving
-▌   image           registry.fmx/prism/modelserver:v0.2.1
+▌   image           registry.example/prism/modelserver:v0.2.1
 ▌   age             12d
 ▌
 ▌ ── request rate · last 30 minutes ─────────────────────────────────────────────

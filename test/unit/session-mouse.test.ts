@@ -47,11 +47,20 @@ const press = (name: string): InputEvent => ({
   key: { name, ctrl: false, meta: false, shift: false, sequence: name },
 });
 
-/** A press at a terminal (row, col); `over` sets the fields a drag or a release differ in. */
+/**
+ * A press at a terminal row and a **transcript** column; `over` sets the fields
+ * a drag or a release differ in.
+ *
+ * The column is the transcript's because every row here derives it from one —
+ * an element's `cols`, a sample's centre — and the harness frame puts the
+ * transcript at terminal column `REGION.left`, past the rail's column 0 (C14
+ * I57). Translated once here, as `term()` translates the row; a prompt or header
+ * row reads no column, so the shift is nothing there.
+ */
 const mouse = (row: number, col = 0, over: Partial<Mouse> = {}): InputEvent => ({
   kind: "mouse",
   row,
-  col,
+  col: REGION.left + col,
   button: "button0",
   press: true,
   shift: false,
@@ -60,6 +69,23 @@ const mouse = (row: number, col = 0, over: Partial<Mouse> = {}): InputEvent => (
   motion: false,
   ...over,
 });
+
+/**
+ * A whole click — press then release at the same cell (C16 I45, §4a's release
+ * row, M7).
+ *
+ * **The gesture is two events and it always was; the table used to act on the
+ * first.** Since the design reserved the release — *press arms a stable
+ * identity; release commits only when that same identity is still armed* — a
+ * row that dispatches a press alone asserts half a gesture, so the helper is
+ * what keeps the rows reading as clicks. Returns whether either half was
+ * consumed, which is what a single dispatch used to answer.
+ */
+const click = (router: { dispatch(e: InputEvent): boolean }, row: number, col = 0): boolean => {
+  const a = router.dispatch(mouse(row, col));
+  const b = router.dispatch(mouse(row, col, { press: false }));
+  return a || b;
+};
 
 const META = {
   verb: "rows",
@@ -119,8 +145,8 @@ const AT = (entryId: string, elementId: string, blockId: string, anchor: ReturnT
   mode: "navigate",
 });
 
-/** The harness's frame: a 20-row region starting at terminal row 1 (`test/support/session.ts`). */
-const REGION = { top: 1, height: 20 };
+/** The harness's frame: a 20-row region starting at terminal row 1 and column 1 (`test/support/session.ts`). */
+const REGION = { top: 1, left: 1, height: 20 };
 
 /**
  * A graph whose viewport is the region's height — `buildGraph` never renders, so
@@ -242,13 +268,18 @@ describe("C16 §4a — a click lands where the keys would", () => {
     const a1 = term(2);
 
     // Live entry, row `a2`: focus, then activate — the `fill` lands in the prompt.
-    graph.router.dispatch(mouse(a2, 2));
+    click(graph.router, a2, 2);
     expect(graph.focus.current).toEqual(AT(live, "a2", "t2"));
-    expect(graph.editor.text).toBe("");
+    expect(graph.editor.text, "the first click focuses and its release commits nothing").toBe("");
+    // **The press arms and the release commits** (C16 I45, M7). The control is
+    // the press on its own, which must leave the prompt empty — without it the
+    // row is equally passed by a table that still acts on the press.
     graph.router.dispatch(mouse(a2, 2));
-    expect(graph.editor.text, "the second click is ⏎").toBe("pick 2");
+    expect(graph.editor.text, "the press arms and does not act").toBe("");
+    graph.router.dispatch(mouse(a2, 2, { press: false }));
+    expect(graph.editor.text, "the second click is ⏎, on its release").toBe("pick 2");
     // A third click is the same state test: it fills again, as `⏎ ⏎` does.
-    graph.router.dispatch(mouse(a2, 2));
+    click(graph.router, a2, 2);
     expect(graph.editor.text).toBe("pick 2");
     expect(graph.focus.current, "activation does not move focus").toEqual(AT(live, "a2", "t2"));
 
@@ -257,15 +288,83 @@ describe("C16 §4a — a click lands where the keys would", () => {
     const revBefore = (id: string): number => graph.transcript.entries.find((e) => e.id === id)?.rev ?? -1;
     const settledRev = revBefore(settled);
     const liveRev = revBefore(live);
-    graph.router.dispatch(mouse(a1, 2));
+    click(graph.router, a1, 2);
     expect(graph.focus.current).toEqual(AT(settled, "a1", "t1"));
-    graph.router.dispatch(mouse(a1, 2));
+    click(graph.router, a1, 2);
     expect(graph.editor.text, "the frozen entry's fill did not run").toBe("");
     expect(revBefore(settled), "the refusal was patched into the settled entry").toBeGreaterThan(settledRev);
     expect(revBefore(live), "and not into the live one").toBe(liveRev);
     const refused = graph.transcript.entries.find((e) => e.id === settled);
     expect(JSON.stringify(refused?.doc.blocks)).toMatch(/frozen entry/);
     expect(graph.focus.current, "focus survives the refusal").toEqual(AT(settled, "a1", "t1"));
+  });
+
+  it("T4.75 (C16 I43, I46, I73, R-OWN-002): a question raised between press and release commits nothing, and nor does one raised and answered between them", async () => {
+    const YES_NO = [
+      { key: "y", label: "yes" },
+      { key: "n", label: "no", default: true as const },
+    ];
+    // Trace 16: raised between the halves, and still open at the release.
+    {
+      const { graph, term } = await twoEntries(true);
+      const a2 = term(10); // T4.64's geometry
+      click(graph.router, a2, 2);
+      graph.router.dispatch(mouse(a2, 2));
+      void graph.confirm.ask({ question: "stop it?", choices: YES_NO });
+      await new Promise((r) => setTimeout(r, 0));
+      graph.router.dispatch(mouse(a2, 2, { press: false }));
+      expect(graph.editor.text, "nothing activated").toBe("");
+      expect(graph.confirm.open, "and the question is open and unanswered").toBe(true);
+    }
+    // §3c S9: raised **and answered** between them — the rung the same at both
+    // ends, so only the owner generation can see it (C16 I73).
+    {
+      const { graph, term, clock } = await twoEntries(true);
+      const a2 = term(10);
+      click(graph.router, a2, 2);
+      const rung = graph.router.rung;
+      graph.router.dispatch(mouse(a2, 2));
+      const answer = graph.confirm.ask({ question: "stop it?", choices: YES_NO });
+      await new Promise((r) => setTimeout(r, 0));
+      clock.advance(1_000); // past the arrival guard (C16 I69)
+      graph.router.dispatch(press("y"));
+      await expect(answer).resolves.toEqual({ key: "y", outcome: "answered" });
+      expect(graph.router.rung, "the same owner at both ends").toBe(rung);
+      graph.router.dispatch(mouse(a2, 2, { press: false }));
+      expect(graph.editor.text, "the arm died with the owners between").toBe("");
+    }
+    // The control: the same pair with nothing between activates.
+    {
+      const { graph, term } = await twoEntries(true);
+      const a2 = term(10);
+      click(graph.router, a2, 2);
+      click(graph.router, a2, 2);
+      expect(graph.editor.text).toBe("pick 2");
+    }
+  });
+
+  it("T4.90 (C16 I71, §3c): press on row A, ↓ to row B with the button down, release over A — A's action fires and B's does not", async () => {
+    const { graph, term } = await graphAt80();
+    const both = {
+      kind: "table",
+      id: "t",
+      columns: [{ key: "name", label: "Name", align: "left", priority: 10, minWidth: 12, sortable: false }],
+      rows: [
+        { id: "a", cells: { name: { text: "alpha" } }, actions: [{ kind: "fill", label: "pick a", command: "pick a" }] },
+        { id: "b", cells: { name: { text: "beta" } }, actions: [{ kind: "fill", label: "pick b", command: "pick b" }] },
+      ],
+    };
+    const live = graph.transcript.append(doc("/rows", [both]) as never);
+    // Command line 0, header 1, `a` 2, `b` 3 — shown before it is asserted.
+    const a = term(2);
+    click(graph.router, a, 2);
+    expect(graph.focus.current).toEqual(AT(live, "a", "t"));
+
+    graph.router.dispatch(mouse(a, 2));
+    graph.router.dispatch(press("down"));
+    expect(graph.focus.current, "focus moved under the held button").toEqual(AT(live, "b", "t"));
+    graph.router.dispatch(mouse(a, 2, { press: false }));
+    expect(graph.editor.text, "what was pressed is what fires").toBe("pick a");
   });
 
   it("T4.64b (C16 I31, §4a trace 3; C26 I14): in interaction the second click is the block's, and the framework fires nothing", async () => {
@@ -447,6 +546,82 @@ describe("C16 §4a — the wheel scrolls the box under it, or else the transcrip
     expect(graph.router.dispatch(mouse(5, 2))).toBe(false);
     expect(graph.focus.current).toEqual(AT(boxed, "n5", "s"));
   });
+
+  /**
+   * A three-row inner box inside a five-row outer one, with prose above the
+   * inner so the outer has rows of its own to be pointed at.
+   *
+   * Outer content rows, unscrolled: 0 `o1`, 1–3 the inner box, 4 `o5`, and
+   * `o6`/`o7` past the window. The inner's content is four one-row children in
+   * a three-row window, so its ceiling is 1; the outer's is 2. **Both boxes can
+   * move**, which is what makes the control a control: with an outer ceiling of
+   * zero the row would be satisfied by an implementation that moves nothing.
+   */
+  const NESTED = {
+    kind: "scroll",
+    id: "outer",
+    height: 5,
+    children: [
+      { kind: "raw", id: "o1", text: "OUTER ONE" },
+      {
+        kind: "scroll",
+        id: "inner",
+        height: 3,
+        children: [
+          { kind: "raw", id: "i1", text: "INNER ONE" },
+          { kind: "raw", id: "i2", text: "INNER TWO" },
+          { kind: "raw", id: "i3", text: "INNER THREE" },
+          { kind: "raw", id: "i4", text: "INNER FOUR" },
+        ],
+      },
+      { kind: "raw", id: "o5", text: "OUTER FIVE" },
+      { kind: "raw", id: "o6", text: "OUTER SIX" },
+      { kind: "raw", id: "o7", text: "OUTER SEVEN" },
+    ],
+  };
+
+  /** Resolved against the ceiling, as T4.66 reads the single box's (C04 I97). */
+  const INNER_CEILING = 1; // four one-row children in a three-row window
+  const OUTER_CEILING = 2; // 1 + 3 + 1 + 1 + 1 content rows in a five-row window
+
+  it("T1.105 (C16 I48, R-SEL-012): a scroll inside a scroll takes the wheel at the depth the pointer is in", async () => {
+    // **`elementAt` stops at the outermost box and that is right for focus.**
+    // A scroll owns one element per child and the element walk does not descend
+    // past it, so the deepest *element* under the pointer belongs to the outer
+    // box however deeply they nest — which made every wheel the outer's. The
+    // reader's hand was inside the inner box and the outer one moved.
+    const { graph } = await graphAt80();
+    const nested = graph.transcript.append(doc("/nested", [NESTED]) as never);
+    const lines = Array.from({ length: 60 }, (_, i) => `line ${String(i)}`).join("\n");
+    graph.transcript.append(doc("/filler", [{ kind: "raw", id: "f", text: lines }]) as never);
+    graph.viewport.scrollToTop();
+
+    // **Resolved, not raw** (C04 I97, F770): the store spells *past the end* as
+    // `TAIL = ∞` and clamps at read against the ceiling the caller measured.
+    const inner = (): number => Math.min(graph.scrollOffsets.get(nested, "inner"), INNER_CEILING);
+    const outer = (): number => Math.min(graph.scrollOffsets.get(nested, "outer"), OUTER_CEILING);
+    const top = (): number => graph.viewport.scroll.topRow;
+    // **All three counters after every step**, because a version that moved two
+    // of them passes any assertion written about one.
+    expect([inner(), outer(), top()]).toEqual([0, 0, 0]);
+
+    // Terminal row 3 is outer content row 1 — the inner box's first row.
+    expect(graph.router.dispatch(mouse(3, 2, { button: "wheelDown" })), "consumed").toBe(true);
+    expect([inner(), outer(), top()], "the inner moved and nothing else did").toEqual([
+      INNER_CEILING,
+      0,
+      0,
+    ]);
+
+    // **The control, and it is the row above.** Terminal row 2 is outer content
+    // row 0 — `o1`, the outer's own prose — so the wheel is the outer's.
+    expect(graph.router.dispatch(mouse(2, 2, { button: "wheelDown" })), "consumed").toBe(true);
+    expect([inner(), outer(), top()], "this time the outer, and only it").toEqual([
+      INNER_CEILING,
+      OUTER_CEILING,
+      0,
+    ]);
+  });
 });
 
 describe("C16 §4a — chrome, the release and the other buttons", () => {
@@ -499,7 +674,16 @@ const lastFocus = (
 };
 
 /** SGR 1006, as the terminal sends it: 1-based column and row. */
-const sgrClick = (row0: number, col0: number): string => `[<0;${String(col0 + 1)};${String(row0 + 1)}M`;
+/**
+ * A whole click on the wire — press then release at the same cell (C16 I45, M7).
+ *
+ * **Two reports, because that is what a click is and what the design now reads.**
+ * `…M` is the press and `…m` the release (I30), and since the release commits
+ * an activation the press armed, a byte string carrying only the press is half a
+ * gesture. Every row here says *click*, so the helper sends one.
+ */
+const sgrClick = (row0: number, col0: number): string =>
+  `[<0;${String(col0 + 1)};${String(row0 + 1)}M[<0;${String(col0 + 1)};${String(row0 + 1)}m`;
 
 describe("C16 §4a — the frame side", () => {
   it("T4.62c (C16 I31): the click's highlight is on the settled entry's second row, read from the painted frame", async () => {
@@ -549,8 +733,9 @@ describe("C16 §4a — the frame side", () => {
     expect(lastFocus(w.seen(), "q1"), "nothing is highlighted before the click").toBeNull();
     expect(lastFocus(w.seen(), "q2")).toBeNull();
 
-    // Column 5, inside the table: it is a card's body, four cells in (C22 I84).
-    await type(sgrClick(betaRow, 5));
+    // Column 6, inside the table: it is a card's body, BODY_INDENT cells into
+    // a transcript that starts at the terminal's column 1 (C22 I84, C14 I57).
+    await type(sgrClick(betaRow, 6));
     expect(lastFocus(w.seen(), "q1"), "the settled entry's second row, on screen").toEqual({
       blockId: "t1",
       rowId: "b1",
@@ -558,7 +743,7 @@ describe("C16 §4a — the frame side", () => {
     expect(lastFocus(w.seen(), "q2"), "and the live entry drew no highlight").toBeNull();
 
     // The row above, in the same frame's coordinates, is the first row.
-    await type(sgrClick(betaRow - 1, 5));
+    await type(sgrClick(betaRow - 1, 6));
     expect(lastFocus(w.seen(), "q1")).toEqual({ blockId: "t1", rowId: "a1" });
   });
 });
@@ -668,7 +853,11 @@ describe("C16 §4a — the pointer sets the crosshair (C12 §3s, C22 I76)", () =
     // The release leaves nothing and is unconsumed.
     expect(graph.router.dispatch(mouse(term(4), 78, { press: false }))).toBe(false);
     expect(graph.cursorPositions.get(live, "p")).toBe(4);
-    // **Two writers, one store**: `←` continues from where the pointer left it.
+    // **Two writers, one store**: `←` continues from where the pointer left it
+    // — from **inside**, because §102 gives the pointer the preview and the
+    // keyboard the commit (C26 I27). The plot already holds focus here, so `⏎`
+    // is the whole of the way in.
+    graph.router.dispatch(press("enter"));
     graph.router.dispatch(press("left"));
     expect(graph.cursorPositions.get(live, "p"), "← from the pointer's 4").toBe(3);
     graph.router.dispatch(mouse(term(3), 4));
@@ -740,11 +929,14 @@ describe("C16 §4a — the crosshair, read from the painted frame", () => {
     expect(ruleRow(), "no mark before the click").not.toContain("▲");
     expect(text().join("\n")).not.toMatch(/train: \d/u);
 
-    // The plot is a card's body, four cells in (C22 I83, I84), so its tick
-    // centres sit at 26, 43, 61, 78 (measured from the frame); the pointer goes
-    // to a centre.
-    await type(sgrClick(areaRow, 43));
-    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(43);
+    // The plot is a card's body, BODY_INDENT cells in (C22 I83, I84, C09 I5),
+    // and the pointer goes to a sample's centre — 44 for the third and 27 for
+    // the first, both measured from the frame by where the mark lands. **Each
+    // moved right by one with the rail** (C14 I57): the transcript starts at
+    // column 1 and is a column narrower, and the centres, probed from 15 to 80,
+    // are 10, 27, 44, 60 and 77.
+    await type(sgrClick(areaRow, 44));
+    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(44);
     expect(text().join("\n"), "and the readout names the third sample").toMatch(/train: 30/u);
 
     // A second click at sample 1's centre, eighteen cells left — the mark
@@ -755,8 +947,10 @@ describe("C16 §4a — the crosshair, read from the painted frame", () => {
     // centre shifts left. The input moves with it rather than the expectation,
     // because the claim is *the mark is under the pointer at a centre* and an
     // expectation edited alone turns that into *the mark is near the pointer*.
-    await type(sgrClick(areaRow, 25));
-    expect(ruleRow().indexOf("▲")).toBe(25);
+    // **And back by one with C09 I5**: the body moved from four cells in to
+    // five, and a click at 25 drew the mark at 26, which is the centre now.
+    await type(sgrClick(areaRow, 27));
+    expect(ruleRow().indexOf("▲")).toBe(27);
     expect(text().join("\n")).toMatch(/train: 20/u);
     expect(text().join("\n")).not.toMatch(/train: 30/u);
   });
@@ -819,9 +1013,12 @@ describe("C16 §4a — a hover aims and moves nothing else (C01 I21, C12 §3s)",
     expect(graph.cursorPositions.get(live, "p"), "still 1").toBe(1);
     expect(graph.focus.current).toEqual({ at: "prompt" });
 
-    // `↓` then `→` continues from where the hover left it: one store, three writers.
+    // `↓`, `⏎`, then `→` continues from where the hover left it: one store,
+    // three writers — and §102's split between them, *pointer preview moves the
+    // readout without entering* against *keyboard controls appear only inside*.
     graph.router.dispatch(press("down"));
     expect(graph.focus.current).toEqual(AT(live, "p", "p"));
+    graph.router.dispatch(press("enter"));
     graph.router.dispatch(press("right"));
     expect(graph.cursorPositions.get(live, "p")).toBe(2);
   });
@@ -907,8 +1104,8 @@ describe("C16 §4a — the hover, read from the painted frame", () => {
     expect(cursorRow(), "focus at the prompt: the cursor is on its row").toBe(promptRow);
     expect(ruleRow()).not.toContain("▲");
 
-    await type(sgrHover(areaRow, 43)); // a tick centre under the indent (C22 I83, I84)
-    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(43);
+    await type(sgrHover(areaRow, 44)); // a tick centre under the indent (C22 I83, I84), one right for the rail (C14 I57)
+    expect(ruleRow().indexOf("▲"), "the mark is under the pointer").toBe(44);
     expect(text().join("\n"), "and the readout names the third sample").toMatch(/train: 30/u);
     expect(cursorRow(), "and the cursor is still on the prompt row — focus did not move").toBe(promptRow);
 
@@ -990,18 +1187,54 @@ describe("C16 §4a — the legend clicks (C12 I117, C22 I78)", () => {
     expect(plotRows()).toBe(hidden);
   });
 
+  it("T4.77 (C16 I45, I71, §4a's legend row): a legend press focuses an unfocused plot and its release toggles; a drag off, and off and back, toggle nothing", async () => {
+    const { row, col } = secondEntryAt(80);
+    /** One plot entry, and the legend entry's terminal cell. */
+    const plot = async () => {
+      const built = await graphAt80();
+      const entry = built.graph.transcript.append(doc("/plot", [TWO()]) as never);
+      return { ...built, entry, at: built.term(1 + row) };
+    };
+    const off = col - 6; // inside the area, clear of the legend
+
+    // Press, then release on the entry: the press focuses and shows; the release toggles.
+    {
+      const { graph, entry, at } = await plot();
+      graph.router.dispatch(mouse(at, col));
+      expect(graph.focus.current, "the press focuses the plot").toEqual(AT(entry, "p", "p"));
+      expect(graph.seriesVisibility.get(entry, "p", 1) === true, "and leaves the series shown").toBe(false);
+      graph.router.dispatch(mouse(at, col, { press: false }));
+      expect(graph.seriesVisibility.get(entry, "p", 1) === true, "the release toggles it").toBe(true);
+    }
+    // The control: the pointer leaves the entry before the release.
+    const { graph, entry, at } = await plot();
+    graph.router.dispatch(mouse(at, col));
+    graph.router.dispatch(mouse(at, off, { motion: true }));
+    graph.router.dispatch(mouse(at, off, { press: false }));
+    expect(graph.focus.current).toEqual(AT(entry, "p", "p"));
+    expect(graph.seriesVisibility.get(entry, "p", 1) === true, "still shown").toBe(false);
+
+    // **Off and back** (§3c S2), on the plot the control just focused: the drag
+    // cancelled the arm, and motion over the legend does not restore it.
+    graph.router.dispatch(mouse(at, col));
+    graph.router.dispatch(mouse(at, off, { motion: true }));
+    graph.router.dispatch(mouse(at, col, { motion: true }));
+    graph.router.dispatch(mouse(at, col, { press: false }));
+    expect(graph.seriesVisibility.get(entry, "p", 1) === true, "only a press arms").toBe(false);
+  });
+
   it("T4.73b (C16 §4a row y; C23 I47): through the graph — a settled entry's legend writes that entry's store; the live entry's is untouched", async () => {
     const { graph, term } = await graphAt80();
     const { row, col } = secondEntryAt(80);
     const settled = graph.transcript.append(doc("/plot", [TWO()]) as never);
     const live = graph.transcript.append(doc("/plot", [TWO()]) as never);
     // Entry 1: command line at row 0, block rows 1–8; the legend's rows are the area's.
-    expect(graph.router.dispatch(mouse(term(1 + row), col))).toBe(true);
+    expect(click(graph.router, term(1 + row), col)).toBe(true);
     expect(graph.seriesVisibility.get(settled, "p", 1), "series 2 of the settled plot hidden").toBe(true);
     expect(graph.seriesVisibility.forEntry(live), "nothing written for the live entry").toEqual({});
     expect(graph.focus.current, "and the click focused the settled plot, as any click does").toEqual(AT(settled, "p", "p"));
     // Again on the same cell — the plot is focused, so this is row m's shape: a toggle, not `⏎`.
-    graph.router.dispatch(mouse(term(1 + row), col));
+    click(graph.router, term(1 + row), col);
     expect(graph.seriesVisibility.get(settled, "p", 1)).toBe(false);
     // A hover over the legend is nothing (the hover row): no sample, no toggle.
     expect(graph.router.dispatch(hover(term(1 + row), col))).toBe(false);

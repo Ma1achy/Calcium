@@ -87,7 +87,7 @@ describe("C24 T2.3 (I8) — testing and fixtures are dev-only", () => {
     const runtime = code("src/index.ts");
     // Type-only imports erase, so the claim is about value imports. C08's
     // `WorldDriver` comes from `data/fixtures/` — L0 — and not from the
-    // `@fmx/calcium/fixtures` entry, which is the distinction that keeps this true.
+    // `calcium-tui/fixtures` entry, which is the distinction that keeps this true.
     const valueImports = [...runtime.matchAll(/^import\s+(?!type)[^;]*from\s+"([^"]+)"/gm)].map(
       (m) => m[1] ?? "",
     );
@@ -347,7 +347,7 @@ describe("C24 §7 — the published surface answers for itself", () => {
     // falls back to the *last* choice because a destructive verb offers the safe
     // option last; this fake said *first*, so a consumer's handler tested here
     // deleted where a user pressing `Esc` would have cancelled.
-    await expect(local.ask({ question: "Delete?", choices: YES_NO } as never)).resolves.toBe("no");
+    await expect(local.ask({ question: "Delete?", choices: YES_NO } as never)).resolves.toEqual({ key: "no", outcome: "answered" });
 
     // And a marked one wins, so the row above is reading the fallback rather
     // than the ordering.
@@ -356,7 +356,7 @@ describe("C24 §7 — the published surface answers for itself", () => {
         question: "Delete?",
         choices: [{ key: "yes", label: "Delete", default: true }, { key: "no", label: "Cancel" }],
       } as never),
-    ).resolves.toBe("yes");
+    ).resolves.toEqual({ key: "yes", outcome: "answered" });
 
     // The failed-validation arm: `args` is empty unless a test says what was
     // parsed, so a handler tested without one takes the path a malformed
@@ -401,5 +401,37 @@ describe("C24 §7 — the published surface answers for itself", () => {
     for (const forbidden of ["pause", "retry", "backoff", "whenHidden", "eager", "poll"]) {
       expect(fields, forbidden).not.toContain(forbidden);
     }
+  });
+});
+
+describe("C24 I39 — a reserved key's handler is registered by the design's id", () => {
+  it("T2.23 (C24 I39): ReservedKeyAction's members, as the keymap's reserved map holds them, equal the registry ids of the reserved actions and nothing else — and the runtime entry exports the type", async () => {
+    const { RESERVED_ACTIONS, defaultKeymap } = await import("../../src/interaction/router/keymap.js");
+    const registry = JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as {
+      bindings: readonly { id: string; actionId: string; status: string }[];
+    };
+    // **Which actions are reserved is `keys.ts`'s declaration**, read from the
+    // other side: the executors that are the named no-op. A fifteenth
+    // reservation the type does not name fails here, by equality.
+    const effects = readFileSync("src/shell/keys.ts", "utf8");
+    const declared = [...effects.matchAll(/\n\s*(\w+): reserved,/gu)].map((m) => m[1]).sort();
+    expect(declared.length, "the corpus: keys.ts declares reservations").toBeGreaterThan(10);
+    expect(Object.values(RESERVED_ACTIONS).sort(), "the map's actions are the declared reservations").toEqual(declared);
+
+    // And each key is the registry's id for its action's rows — the spelling
+    // an application reads in `/help`, KEYS.md and the design.
+    const idOf = new Map(registry.bindings.filter((b) => b.status === "current").map((b) => [b.id, b.actionId]));
+    for (const [id, action] of Object.entries(RESERVED_ACTIONS)) {
+      const ids = new Set(
+        defaultKeymap.filter((b) => b.action === action && b.registry !== undefined).map((b) => idOf.get(b.registry!)),
+      );
+      expect([...ids], `${action}'s rows spell the record ${id}`).toEqual([id]);
+    }
+
+    // The runtime entry exports the type: the import below is checked by `tsc`
+    // over this file, and the value is a member of it.
+    const one: import("../../src/index.js").ReservedKeyAction = "queue.drop";
+    expect(Object.keys(RESERVED_ACTIONS)).toContain(one);
+    expect(readFileSync("src/index.ts", "utf8")).toMatch(/export type \{ ReservedKeyAction \}/u);
   });
 });

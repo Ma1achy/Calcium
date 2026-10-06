@@ -30,7 +30,7 @@ import { doc, localDoc } from "./blocks.js";
 import { result } from "./transport.js";
 import type { RefreshHost } from "../../src/shell/refresh.js";
 import type { ConfirmHost } from "../../src/shell/confirm.js";
-import type { ProfileView } from "../../src/shell/profile-view.js";
+import type { ProfileReport } from "../../src/shell/profiling/types.js";
 import type { Pipeline, PipelineDeps } from "../../src/shell/types.js";
 import type { RawPatch, RawResult } from "../../src/data/transport/index.js";
 import type { ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
@@ -58,6 +58,16 @@ export type PipelineScript = Readonly<{
   /** C23 I60's test consumer: which calls need a decision, and what the layer says. */
   approval?: PipelineDeps["approval"];
   /**
+   * **A stand-in `ask` for the route, over the real host** (C23 I94, F1527).
+   *
+   * The real host resolves every withdrawal and expiry with the default's key,
+   * and an approval's default is `deny`, so no real `ask` can show the route's
+   * `outcome` clause deciding anything alone. This is the seam that can: the
+   * route asks through it, and everything else — the answer handler, the
+   * layers — is still the real host's.
+   */
+  ask?: ConfirmHost["ask"];
+  /**
    * The PTY arm (C21 I18, C23 I63). `hasPty` is separate from `spawnPty` on
    * purpose: the route reads the flag and never the method's absence, so a row
    * can set the flag true with a factory that throws and reach T3.63.
@@ -78,12 +88,16 @@ export type PipelineScript = Readonly<{
   /** The region the body is measured against, for the resize rows (C23 I65). */
   region?: () => Readonly<{ width: number; height: number }>;
   /**
-   * C28 §3c's view, for `/profile` (C23 I68). Defaults to a view with no
-   * recorder behind it — the one every session built without `TuiConfig.profile`
-   * gets — whose `open` refuses naming that option, so a row that wants the
-   * accepting arm hands its own in (C23 T4.66).
+   * C28's reader, for `/profile` (C23 I68). Absent by default — the state every
+   * session built without `TuiConfig.profile` is in, and the one whose every
+   * arm answers in a warn notice naming that option, so a row that wants the
+   * accepting arm hands its own report in (C23 T4.66).
+   *
+   * **The reader and not a view** (C28 §3c, R-EXA-082, F1254). There is no
+   * pushed view to hand over: the section's cards are a transcript entry, so
+   * the seam the harness fills is the one `PipelineDeps` actually has.
    */
-  profileView?: ProfileView;
+  profile?: () => ProfileReport;
 }>;
 
 export type PipelineHarness = Readonly<{
@@ -168,24 +182,6 @@ export const settled = async (p?: { readonly inFlight: unknown }): Promise<void>
   await turn();
 };
 
-/**
- * The view a session with no profiler gets: `open` refuses with C28 T1.97's
- * string and nothing is ever open. What `construct.ts` builds when
- * `TuiConfig.profile` is absent, reduced to the seam `/profile` reaches.
- */
-const refusingProfileView = (): ProfileView => ({
-  open: () => "no profiler to show — this session was built without `TuiConfig.profile`",
-  nextCard: () => false,
-  sectionNext: () => false,
-  sectionPrev: () => false,
-  move: () => false,
-  pop: () => false,
-  dispose: () => undefined,
-  get section() {
-    return null;
-  },
-});
-
 export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   const transcript = createTranscriptStore();
   const session = createSessionStore({ cwd: "/work", env: {}, cluster: "c", version: "1" });
@@ -223,7 +219,23 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
   const timers: { fn: () => void; at: number; live: boolean }[] = [];
 
   const harnessOverlays = createOverlayManager({ registry: overlayRegistry });
-  const harnessConfirm = createConfirmHost({ overlays: harnessOverlays, anchor: () => ({ row: 0, rows: 1 }), overlayRegion: () => ({ width: 80, height: 24 }), invalidate: () => undefined });
+  /** One timer list for the pipeline and the confirm host, both driven by `tick`. */
+  const schedule = (fn: () => void, ms: number): Disposable => {
+    const t = { fn, at: now + ms, live: true };
+    timers.push(t);
+    return {
+      [Symbol.dispose]: () => {
+        t.live = false;
+      },
+    };
+  };
+  /**
+   * **The confirm host takes the harness's timer** (C23 I92), so an approval's
+   * `expiresAfterMs` expires on `tick`. It had none, and a question built here
+   * never expired: no row could reach the expired approval's settlement, which
+   * is C23 I101's fifth route (F1510).
+   */
+  const harnessConfirm = createConfirmHost({ overlays: harnessOverlays, anchor: () => ({ row: 0, rows: 1 }), draft: () => "", holdDraft: () => undefined, restoreDraft: () => undefined, overlayRegion: () => ({ width: 80, height: 24 }), invalidate: () => undefined, schedule });
   const deps = {
     session: () => session.snapshot,
     writes: session.execution,
@@ -313,7 +325,10 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
      * answer, so a handler that asks and ignores the reply would pass — and the
      * one test that matters is whether declining stops the command.
      */
-    confirm: harnessConfirm,
+    confirm:
+      script.ask === undefined
+        ? harnessConfirm
+        : Object.assign(Object.create(harnessConfirm) as ConfirmHost, { ask: script.ask }),
     ...(script.approval === undefined ? {} : { approval: script.approval }),
     theme,
     // `append` is real, because C23 I29 records every settled submission
@@ -384,17 +399,10 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     },
     clock: () => now,
     elapsed: () => mono,
-    schedule: (fn: () => void, ms: number) => {
-      const t = { fn, at: now + ms, live: true };
-      timers.push(t);
-      return {
-        [Symbol.dispose]: () => {
-          t.live = false;
-        },
-      };
-    },
+    schedule,
     openUrl: () => Promise.resolve(),
-    bindings: () => [{ keys: "c+c", does: "global: cancel" }],
+    bindings: () => [{ keys: "c+c", does: "cancel", target: "global" }],
+    currentScope: () => "prompt",
     // **Added because a row called it and the cast below could not** (C22 I66).
     // `/theme`'s handler writes this, so T4.4 failed the moment it existed —
     // which is the README's *anything added to `PipelineDeps` will be silently
@@ -402,8 +410,11 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
     setSuppressBackground: (next: boolean) => void suppressed.push(next),
     binary: "widget",
     commandPolicy: slashPolicy,
-    // Required since the seventh row landed: C23 I27 refuses `profile` without a handler.
-    profileView: script.profileView ?? refusingProfileView(),
+    // Required since the seventh row landed: C23 I27 refuses `profile` without a
+    // handler. **Omitted rather than stubbed** where a script names no profiler:
+    // `profile?` is optional on `PipelineDeps` and `execution.ts` folds an absent
+    // one to `() => null`, which is the state the refusal arm reads.
+    ...(script.profile === undefined ? {} : { profile: script.profile }),
   } as unknown as PipelineDeps;
 
   const pipeline = createExecutionPipeline(deps);

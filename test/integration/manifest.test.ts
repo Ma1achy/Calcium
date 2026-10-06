@@ -18,6 +18,8 @@ import {
   flagValueSource,
 } from "../../src/interaction/completion/index.js";
 import { parseManifest, type Manifest } from "../../src/data/manifest/index.js";
+import { FRAMEWORK_TOOLS, RESERVED_VERBS } from "../../src/data/manifest/framework.js";
+import { buildGraph } from "../support/session.js";
 
 /** The fixture as a `Manifest`, or the parse error as a failure here. */
 const parsedOrThrow = (source: Record<string, unknown>): Manifest => {
@@ -208,5 +210,46 @@ describe("C05 integration", () => {
     const keys = JSON.stringify(h.transcript.entries.at(-1)?.doc.blocks);
     expect(keys, "bindings come from the same table dispatch uses").toContain("c+c");
     expect(keys, "and the verb list is not repeated there").not.toContain("/promote");
+  });
+});
+
+describe("C05 §3 — `/config`, the ninth verb", () => {
+  it("T4.9 (C05 §3, C23 I80, ruling 43): /config is a framework row, the name collides as a shipped verb, and it draws the resolved record", async () => {
+    // **The row.** Local, no arguments, offered — the name left
+    // `RESERVED_VERBS` when the verb was built, so it is refused now as a verb
+    // Calcium ships and never as a reservation.
+    const row = FRAMEWORK_TOOLS.find((t) => t.name === "config");
+    expect(row, "the ninth row").toBeDefined();
+    expect([row?.local, row?.args.length, row?.hidden], "local, no arguments, not hidden").toEqual([true, 0, undefined]);
+    expect(Object.hasOwn(RESERVED_VERBS, "config"), "and no longer reserved").toBe(false);
+
+    const source = raw();
+    (source["tools"] as Record<string, unknown>[]).push({ name: "config", local: false, summary: "mine", args: [], flags: [] });
+    const refused = parseManifest(source);
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+    expect(refused.error.map((e) => `${e.path}: ${e.message}`)).toEqual([
+      expect.stringMatching(/^tools\[9\]\.name: "config" is a verb Calcium ships \(C05 §3\)/u),
+    ]);
+
+    // **The handler, in a real session.** `reduced` is not `motion`'s framework
+    // default, so a handler drawing a table of defaults rather than the record
+    // the session was built from fails on that cell — the control is the value.
+    const { graph } = await buildGraph({ motion: "reduced" });
+    const before = graph.transcript.entries.length;
+    graph.pipeline.submit("/config");
+    await settled(graph.pipeline);
+
+    expect(graph.transcript.entries.length, "one entry").toBe(before + 1);
+    const doc = graph.transcript.entries.at(-1)?.doc;
+    expect(doc?.command).toBe("/config");
+    // The head is C23's, on every entry; the handler's answer is the one table.
+    expect(doc?.blocks.map((b) => b.kind), "the call's head, then C23 I80's table").toEqual(["notice", "table"]);
+    const table = doc?.blocks[1];
+    if (table?.kind !== "table") return;
+    expect(table.columns.map((c) => c.key)).toEqual(["key", "value", "source"]);
+    const rows = table.rows.map((r) => [r.cells["key"]?.text, r.cells["value"]?.text, r.cells["source"]?.text]);
+    expect(rows.map((r) => r[0]), "every setting, in the record's order").toEqual(["motion", "hover", "maxBlockRows", "stateDir"]);
+    expect(rows[0], "the resolved value, not the framework's default").toEqual(["motion", "reduced", "default"]);
   });
 });

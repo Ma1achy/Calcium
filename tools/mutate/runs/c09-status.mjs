@@ -40,7 +40,8 @@ const results = runPass({
   run,
   control: {
     file: SRC,
-    from: "  measure: (block: Status): number => Math.max(1, Math.floor(block.height)), // cells-ok — a row count",
+    // Re-anchored 2026-09-27 (C09 I31, §3a-quater): the declared height or the fit.
+    from: "  measure: (block: Status, width: number): number => statusHeight(block, width),",
     to: "  measure: (): number => 1,",
     why: "every box collapses to one row, which T3.38 asserts across seven heights and three states",
   },
@@ -80,8 +81,8 @@ const results = runPass({
       // row on nothing while its message is truncated.
       name: "a dropped tag row is left blank rather than given to the message",
       file: SRC,
-      from: '    const tagRows = frame.tag && tagFit !== "none" ? 1 : 0;',
-      to: "    const tagRows = frame.tag ? 1 : 0;",
+      from: '    const tagRows = frame.tag && tagFit !== "none" && block.state !== "empty" ? 1 : 0;',
+      to: '    const tagRows = frame.tag && block.state !== "empty" ? 1 : 0;',
       expect: "T3.41",
     },
     {
@@ -120,8 +121,8 @@ const results = runPass({
       // count and part company only in the contents.
       name: "the message floor puts it back and lets the clamp choose",
       file: SRC,
-      from: "    const forMessage = Math.max(0, interior - tagRows - lineRows); // cells-ok — a row count",
-      to: "    const forMessage = Math.max(1, interior - tagRows - lineRows); // cells-ok — a row count",
+      from: "    const content = Math.max(0, interior - tagRows - lineRows); // cells-ok — a row count",
+      to: "    const content = Math.max(1, interior - tagRows - lineRows); // cells-ok — a row count",
       expect: "T3.42c",
     },
     {
@@ -131,8 +132,12 @@ const results = runPass({
       // after.
       name: "the block's spinner set is ignored and the default is always used",
       file: SRC,
-      from: "activityLine(block, spinnerFrames(ctx.capabilities, block.spinner), ctx.tick)",
-      to: "activityLine(block, spinnerFrames(ctx.capabilities), ctx.tick)",
+      // Anchored on the `spinnerFrames` call alone, which is what this mutation
+      // strips the set from. Holding the whole `activityLine` call rotted the
+      // day I99 wrapped the tick in `glyphTick`, for a reason that had nothing
+      // to do with the set — the anchor is on what changes and no more.
+      from: "glyphTick(ctx.tick, ctx.motion), block.spinner)",
+      to: "glyphTick(ctx.tick, ctx.motion))",
       expect: "T3.44",
     },
   ],

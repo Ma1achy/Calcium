@@ -1,6 +1,14 @@
 /**
  * The landing dashboard (S1). Every ruling here is DASHBOARD_WALK.md's.
  *
+ * **A verb that settles, not a place you live in** (DASHBOARD_WALK §E, the
+ * design's §085). It was a framed panel nesting a framed live part nesting a
+ * heatmap of every container's history — three of the four pieces of chrome
+ * §080 deletes. It is now one entry of rows: a summary, the table, the stopped
+ * as pills. Typed as `/dashboard`, the shell's call head goes above it; at
+ * launch it is the greeting, which has no head (§E E4). The paragraphs below
+ * about polling describe the fetch, which still runs once per invocation.
+ *
  * **Behind `/dashboard` rather than on launch, and that is deliberate.** S1's
  * claim is *live block on launch, frozen into the transcript by the first
  * command*, and Calcium has no seam for a first entry at all — FINDINGS F9. The
@@ -8,33 +16,34 @@
  * works rather than against S02's drawing, which is F4's lesson pointed at the
  * most expensive place to be wrong.
  *
- * **It polls; it does not stream.** `docker stats --format json` interleaves
- * cursor control with the JSON and redraws a region — consuming it would put a
- * terminal emulator on the far-side boundary (F10). `b.live`'s `fetch` arm on an
- * interval, against `--no-stream`.
+ * **It reads once; it does not stream.** `docker stats --format json`
+ * interleaves cursor control with the JSON and redraws a region — consuming it
+ * would put a terminal emulator on the far-side boundary (F10). So `--no-stream`,
+ * once per invocation.
  *
- * **The fetch runs docker directly, with no adapter and no transport.** That is
- * what `LiveSpec` is: `fetch` returns data and `render` returns a block, and
- * there is no seam between them for C06 or C07 to occupy. Worth noticing rather
- * than working around — a live part is the one route in the framework where the
- * app talks to the far side itself.
+ * **The fetch runs docker directly, with no adapter and no transport**, because
+ * this is a local verb and its handler is the app's.
  */
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { b } from "@fmx/calcium";
+import { b } from "calcium-tui";
 import { bannerRow } from "./banner.ts";
-import type { LocalDocument, Block, ColumnDef, Glyph, TableRow, Tone } from "@fmx/calcium";
+import type { LocalDocument, Block, ColumnDef, Glyph, TableRow, Tone } from "calcium-tui";
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
 import { stateOf } from "./ps.ts";
-import { capFor, createRingSet, historyBlock } from "./history.ts";
+import type { Runner } from "./mutation.ts";
 
-import type { LocalContext, ProducerContext } from "@fmx/calcium";
+import type { LocalContext, ProducerContext } from "calcium-tui";
 const run = promisify(execFile);
 
-/** How often the panel re-reads. */
-export const EVERY_MS = 2000;
+/**
+ * The far side by default, and a parameter so the demo world can stand in for it
+ * (`world.ts`). Every function below that reaches docker takes one and passes it
+ * down; nothing here chooses between the two.
+ */
+const realRunner: Runner = async (args) => await run("docker", [...args], { maxBuffer: 8 << 20 });
 
 /** Walk A7 — five rows, then a count of what is not shown. */
 export const SHOWN = 5;
@@ -50,10 +59,10 @@ export const SHOWN = 5;
  */
 export type Snapshot = Readonly<{ containers: Row[]; stats: Row[]; skipped: number }>;
 
-export async function fetchSnapshot(): Promise<Snapshot> {
+export async function fetchSnapshot(docker: Runner = realRunner): Promise<Snapshot> {
   const [ps, stats] = await Promise.all([
-    run("docker", ["ps", "-a", "--format", "json"], { maxBuffer: 8 << 20 }),
-    run("docker", ["stats", "--no-stream", "--format", "json"], { maxBuffer: 8 << 20 }),
+    docker(["ps", "-a", "--format", "json"]),
+    docker(["stats", "--no-stream", "--format", "json"]),
   ]);
   const a = parseNdjson(ps.stdout);
   const c = parseNdjson(stats.stdout);
@@ -102,19 +111,6 @@ export const percent = (raw: string): number | null => {
  * a *live* one moves a row out from under a reader mid-glance, and the fault
  * would be invisible in every test because the observed order is stable.
  */
-/**
- * A container's name for the history's row label, or its short id.
- *
- * **The id is the fallback rather than the label**, because a row outlives the
- * container it names: `createRingSet` keeps a ring for every id it has seen, so
- * a stopped container's row is still drawn and `join` no longer has a name for
- * it. Dropping the row instead would renumber the ordinate under the reader,
- * which is the thing the set's own header refuses.
- */
-function nameOf(live: readonly Joined[], id: string): string {
-  return live.find((c) => c.id === id)?.name ?? id.slice(0, 12);
-}
-
 export function join(snap: Snapshot): Joined[] {
   const byId = new Map(snap.stats.map((s) => [str(s, "Container"), s] as const));
   return snap.containers
@@ -281,7 +277,7 @@ export const COLUMNS: readonly ColumnDef[] = [
 export const BUSY = 60;
 export const HOT = 85;
 
-function loadTone(value: number | null): { tone: Tone; glyph?: Glyph } {
+export function loadTone(value: number | null): { tone: Tone; glyph?: Glyph } {
   if (value === null) return { tone: "muted" };
   if (value >= HOT) return { tone: "error", glyph: "warn" };
   if (value >= BUSY) return { tone: "warn", glyph: "warn" };
@@ -306,28 +302,30 @@ function rowOf(c: Joined, unicode: boolean): TableRow {
 }
 
 /**
- * The live panel's body: the table, plus the collapsed tail.
+ * The running containers as rows: the table, plus the collapsed tail.
  *
  * **Walk A7's boundary is `N = 1`.** `… 1 more running` costs exactly the line it
  * saves, so the rule is *collapse when it saves at least two lines*, not
  * *collapse when there are more than five*. Two correct statements — show five,
  * say how many are hidden — whose overlap at the boundary is a line that buys
  * nothing.
+ *
+ * **A sequence, not a group** (DASHBOARD_WALK §E E2). The shell's call head
+ * counts the rows of a table at document level (`outcomeOf`), so the table has
+ * to be one of the document's own blocks for `/dashboard` to say `6 rows`.
  */
-export function livePanelBody(live: readonly Joined[], unicode = true): Block {
+export function runningRows(live: readonly Joined[], unicode = true): readonly Block[] {
   // **Selection and display order are different jobs, and conflating them hid
   // the wrong containers.**
   //
-  // Walk A8 sorts by name so a live block does not move rows under a reader.
-  // Walk A7 shows the first five. Both correct; the cell where they meet is
-  // *which* five, and neither row owns it — so the frame showed `dtui-api`
-  // through `dtui-extra2` and collapsed the rest, including the busiest
-  // container on the machine. A dashboard that hides by alphabet is showing an
-  // arbitrary five and looking authoritative about it.
+  // Walk A8 sorts by name so rows do not move between two readings. Walk A7
+  // shows the first five. Both correct; the cell where they meet is *which*
+  // five, and neither row owns it — so the frame showed `dtui-api` through
+  // `dtui-extra2` and collapsed the rest, including the busiest container on
+  // the machine. A dashboard that hides by alphabet is showing an arbitrary five
+  // and looking authoritative about it.
   //
-  // So: choose by significance, display by name. The chosen set is stable
-  // because CPU is stable-ish and the tie-break is the name; the *order* within
-  // it never depends on the measurements at all.
+  // So: choose by significance, display by name.
   const collapse = live.length > SHOWN + 1;
   const chosen = collapse
     ? [...live].sort((x, y) => (y.cpu ?? -1) - (x.cpu ?? -1) || x.name.localeCompare(y.name)).slice(0, SHOWN)
@@ -335,26 +333,11 @@ export function livePanelBody(live: readonly Joined[], unicode = true): Block {
   const shown = [...chosen].sort((x, y) => x.name.localeCompare(y.name));
   const hidden = live.length - shown.length;
 
-  return b.group("column", [
-    // **The summary is in the body because the title cannot hold it** (F16).
-    //
-    // It was in the title, where S1 draws it and where it obviously belongs. The
-    // driver re-renders only the part's *child*: `titleOf` returns the string
-    // captured at declaration, plus the framework's own staleness suffix. So the
-    // counts and totals froze at the first fetch and stayed there while every row
-    // beneath them ticked — a panel whose header describes a moment that has
-    // passed, which is worse than no header at all.
-    //
-    // Invisible in a single frame, and invisible in the tests: it was found by
-    // replaying prefixes of one capture and noticing the one line that never
-    // moved.
-    b.notice("muted", summaryLine(live, unicode)),
+  return [
     b.table({
-      // **Not `running`.** That is the live panel's id, and C04 I14 refuses a
-      // document with two blocks sharing one — `ViewPatch` addresses by id, so a
-      // duplicate has no correct target. The panel and the table it contains are
-      // the easiest pair in the world to name the same thing.
       id: "running-rows",
+      // The table sits on the summary it counts, with no row between them.
+      gapBefore: false,
       columns: COLUMNS,
       // **Not `shown.map(rowOf)`** — the point-free form silently handed the
       // array index in as `blocks`, so every row but the first would have drawn
@@ -364,7 +347,7 @@ export function livePanelBody(live: readonly Joined[], unicode = true): Block {
       emptyMessage: `nothing running ${dot(unicode)} every container is stopped`,
     }),
     ...(hidden === 0 ? [] : [b.notice("muted", `… ${String(hidden)} more`)]),
-  ]);
+  ];
 }
 
 /**
@@ -386,40 +369,44 @@ export function totals(live: readonly Joined[]): { cpu: string; mem: string } {
 }
 
 /**
- * The counts and the totals, recomputed every tick.
+ * The counts and the totals — and the engine, which the deleted panel's title
+ * carried (DASHBOARD_WALK §E E5).
  *
  * Separate counts for running and paused, because one number over a mixed set is
  * the kind of summary that is never wrong enough to notice (walk A1) — and
- * `stats` includes paused containers, so a panel headed `RUNNING (5)` would be
+ * `stats` includes paused containers, so a summary saying `5 running` would be
  * describing five containers of which one is not running.
  */
-export function summaryLine(live: readonly Joined[], unicode = true): string {
+export function summaryLine(
+  all: readonly Joined[],
+  live: readonly Joined[],
+  engine: string,
+  unicode = true,
+): string {
+  const sep = ` ${dot(unicode)} `;
   const running = live.filter((c) => c.state === "running").length;
   const paused = live.length - running;
-  const counts =
-    paused === 0
-      ? `${String(running)} running`
-      : `${String(running)} running ${dot(unicode)} ${String(paused)} paused`;
   const t = totals(live);
-  return `${counts}   CPU ${t.cpu} ${dot(unicode)} MEM ${t.mem}`;
+  return [
+    `${String(all.length)} containers`,
+    `${String(running)} running`,
+    ...(paused === 0 ? [] : [`${String(paused)} paused`]),
+    `CPU ${t.cpu}`,
+    `MEM ${t.mem}`,
+    `engine ${engine}`,
+  ].join(sep);
 }
-
-/**
- * The live panel's title — **static, and it has to be** (F16).
- *
- * Everything that varies moved to `summaryLine`. What is left is a label and the
- * room C23 needs: the driver appends `· 14s ago` when the part goes stale and
- * `· unavailable` when it fails (C23 I34, I35), onto a title this app cannot see
- * the rendered length of. Short is the only way to guarantee the suffix fits.
- */
-export const LIVE_TITLE = "RUNNING";
 
 // ── The document ────────────────────────────────────────────────────────────
 
 /**
- * Walk A9 — a panel that vanishes reads as a failure to fetch, and this is the
- * one case where the fetch succeeded perfectly. So zero running renders the
- * panel with its empty message, never no panel.
+ * The entry: a summary row, the running containers, the stopped as pills.
+ *
+ * **No frame anywhere in it, and no live part** (DASHBOARD_WALK §E). §085: *the
+ * dashboard is a verb — it emits one as an entry, and it settles like any other.*
+ * Walk A9 survives as *never nothing*: zero running renders the table and its
+ * empty message, because a block that vanishes reads as a failure to fetch and
+ * this is the one case where the fetch succeeded perfectly.
  */
 export function dashboard(
   snap: Snapshot,
@@ -432,35 +419,9 @@ export function dashboard(
   const stopped = all.filter((c) => !isLive(c));
 
   /**
-   * **The history the panel does not keep** — gap 1, on the surface that sees
-   * every container rather than the one that sees a single one.
-   *
-   * Built **inside this call** for `container.ts`'s reason (walk A1): at module
-   * scope the buffer outlives the view, and a second `/dashboard` would inherit
-   * the first's history as its own — silently, with every assertion passing.
-   *
-   * Fed from `render`, which is the only place a tick is observable. `fetch`
-   * returns data and `render` turns it into a block; there is no seam between
-   * them, so the fold lives in the one that runs per tick.
-   */
-  const rings = createRingSet(capFor(width));
-  const takeTick = (s: Snapshot): void => {
-    // **Every joined container, not every measured one.** `stats` cannot see a
-    // stopped container at all, so keying off it would drop a row the moment its
-    // container stopped — walk A3's ruling, and the reason a row of absences is
-    // the honest picture rather than a missing row (C12 §6a B1).
-    rings.tick(new Map(join(s).map((c) => [c.id, c.cpu] as const)));
-  };
-  takeTick(snap);
-
-  /**
-   * **The banner is chrome and is chosen here**, at document-build time, from a
-   * width the app had to read itself and a capability the app had to decide
-   * itself (F14, F43).
-   *
-   * It is above the panel rather than inside it: inside, its 103 cells would
-   * set the panel's minimum width and a narrow terminal would get a bordered
-   * box sized for art it is not showing.
+   * **The banner is chrome and is chosen here**, at document-build time, from
+   * the width and capability the producer context hands over (F14, F43). Kept
+   * by ruling (§E E7): art, carrying none of the surface's information.
    */
   // **A row container, since the framework has one** (C04 I44, roadmap 38).
   // `bannerRow` declares the whale's cells and lets the wordmark take what is
@@ -471,52 +432,14 @@ export function dashboard(
 
   return [
     ...(art === null ? [] : [art]),
-    b.panel(
-      `docker-tui ${dot(unicode)} engine ${engine} ${dot(unicode)} ${String(all.length)} containers`,
-      [
-      b.live({
-        id: "running",
-        title: LIVE_TITLE,
-        every: EVERY_MS,
-        fetch: fetchSnapshot,
-        render: (data) => {
-          const s = data as Snapshot;
-          // **The side effect is here and it is deliberate.** A tick is only
-          // observable at the moment the part re-renders, so the accumulation
-          // hangs off the one function that runs per tick — the same shape
-          // `cpuFold` has, and the same reason: one shared `fetch` between two
-          // parts would stop the ring silently.
-          takeTick(s);
-          const live = join(s).filter(isLive);
-          // **The history, finally drawn** (C12 §3a). `createRingSet` has been
-          // filling a rectangular matrix since it landed and nothing rendered
-          // it: the table says which container is busy *now*, and the matrix is
-          // the only thing that says which has *been*.
-          const history = historyBlock(rings, (id) => nameOf(live, id), unicode);
-          return history === null
-            ? livePanelBody(live, unicode)
-            : b.group("column", [livePanelBody(live, unicode), history], { id: "live-body" });
-        },
-        // **Without this the first frame says `loading…` for two seconds**, and
-        // the handler is holding a snapshot the whole time. `b.live` returns its
-        // loading state — that is the documented shape, and C23 has no
-        // `renderLoading` of its own precisely because the block exists before
-        // the driver runs — so a part whose data is already in hand must say so
-        // or the opening shot of the application is a placeholder.
-        //
-        // It also makes the panel honest across the gap: the driver's first tick
-        // is one interval away, so between them the only truthful thing to show
-        // is the data the document was built from.
-        renderLoading: () => livePanelBody(live, unicode),
-      }),
-      b.pills(
-        stopped.map((c) => ({ label: c.name, tone: "muted" as Tone })),
-        { gapBefore: true },
-      ),
-      ...(snap.skipped === 0
-        ? []
-        : [b.notice.warn(`${String(snap.skipped)} unreadable line${snap.skipped === 1 ? "" : "s"}`)]),
-    ]),
+    b.notice("muted", summaryLine(all, live, engine, unicode), undefined, { id: "dashboard-summary" }),
+    ...runningRows(live, unicode),
+    ...(stopped.length === 0
+      ? []
+      : [b.pills(stopped.map((c) => ({ label: c.name, tone: "muted" as Tone })), { gapBefore: true })]),
+    ...(snap.skipped === 0
+      ? []
+      : [b.notice.warn(`${String(snap.skipped)} unreadable line${snap.skipped === 1 ? "" : "s"}`)]),
   ];
 }
 
@@ -545,12 +468,15 @@ export function dashboard(
 export async function dashboardBlocks(
   ctx: ProducerContext,
   engine: string,
+  docker: Runner = realRunner,
 ): Promise<readonly Block[]> {
-  return dashboard(await fetchSnapshot(), ctx.width, engine, ctx.capabilities.unicode !== "ascii");
+  const unicode = ctx.capabilities.unicode !== "ascii";
+  return dashboard(await fetchSnapshot(docker), ctx.width, engine, unicode);
 }
 
 export function createDashboardHandler(
   engine: string,
+  docker: Runner = realRunner,
 ): (argv: readonly string[], ctx: LocalContext) => Promise<LocalDocument> {
   /**
    * **Two injected parameters gone, and both were findings** (F14, F43).
@@ -570,6 +496,6 @@ export function createDashboardHandler(
     meta: { adapter: "dashboard" },
     command: ctx.command,
     status: "ok",
-    blocks: await dashboardBlocks(ctx, engine),
+    blocks: await dashboardBlocks(ctx, engine, docker),
   });
 }

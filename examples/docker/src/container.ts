@@ -1,10 +1,10 @@
 /**
  * S3 — the live single-container view. Every ruling here is S3_WALK.md's.
  *
- * The demo's headline and the surface C22 §13a was ruled for: a verb whose
- * result is a **pushed view** rather than a transcript entry, holding live parts
- * that the refresh driver ticks against a `{ kind: "view" }` host. Gap 7's
- * three questions all land here at once.
+ * The demo's headline. It was a pushed view, and then an entry of three framed
+ * live parts around a boxed plot; it is **one live part of five rows** now
+ * (S3_WALK §6, the design's §085: *five rows, not a dashboard*), patched in
+ * place on every tick.
  *
  * **The verb is `container stats <id>`, and the name is load-bearing twice.**
  * S02 drew it as `ps <uuid> --watch`, which cannot be spawned — `docker ps`
@@ -14,37 +14,27 @@
  * which S02 reserves for a **transcript entry**: a tool-level `view` on `stats`
  * would have pushed S4 as well.
  *
- * **The parts fetch docker themselves, as the dashboard's do.** That is what
- * `LiveSpec` is — `fetch` returns data, `render` returns a block, and there is no
- * seam between them for C06 or C07 to occupy. The verb's own result seeds the
- * document; everything after the first frame comes from these closures.
+ * **The part fetches docker itself.** That is what `LiveSpec` is — `fetch`
+ * returns data, `render` returns a block, and there is no seam between them for
+ * C06 or C07 to occupy. The verb's own result seeds the document; everything
+ * after the first frame comes from these closures.
  */
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { b } from "@fmx/calcium";
-import type { AdapterDocument, Adapter, Block, ErrorLike } from "@fmx/calcium";
-import { BUSY, HOT, percent } from "./dashboard.ts";
-
-/**
- * The cells `MEM`'s bar occupies (C04 I51).
- *
- * **Declared here rather than taken from `CPU_WIDTH`**, which is the table's
- * column and a different geometry — reaching for it is how this component's two
- * ramp defects both happened. Fifteen is the run plus a space plus `100.0%`,
- * which walk A4 permits to exceed its ceiling, and it leaves the value column's
- * remainder to `MemUsage`.
- */
-const MEM_BAR_WIDTH = 15;
-import { axisCaption, capFor, createRing, TICK_MS } from "./history.ts";
+import { b } from "calcium-tui";
+import type { AdapterDocument, Adapter, Block, ColumnDef, ErrorLike } from "calcium-tui";
+import { loadTone, percent } from "./dashboard.ts";
+import { axisCaption, createRing, TICK_MS } from "./history.ts";
 import type { Ring } from "./history.ts";
 import { parseNdjson, str } from "./ndjson.ts";
 import type { Row } from "./ndjson.ts";
+import type { Runner } from "./mutation.ts";
 
 const run = promisify(execFile);
 
-/** The plot's body. Eight rows of curve, plus C12's axes. */
-const PLOT_HEIGHT = 8;
+/** The far side by default; the demo world stands in through the adapter's parameter. */
+const realRunner: Runner = async (args) => await run("docker", [...args], { maxBuffer: 1 << 20 });
 
 // ── The far side ────────────────────────────────────────────────────────────
 
@@ -55,359 +45,292 @@ const PLOT_HEIGHT = 8;
  * this verb, and the parts supply it themselves because they are not going
  * through the shim at all.
  */
-async function readStats(id: string): Promise<Row | null> {
-  const { stdout } = await run(
-    "docker",
-    ["container", "stats", "--no-stream", "--format", "json", id],
-    { maxBuffer: 1 << 20 },
-  );
+async function readStats(docker: Runner, id: string): Promise<Row | null> {
+  const { stdout } = await docker(["container", "stats", "--no-stream", "--format", "json", id]);
   return parseNdjson(stdout).rows[0] ?? null;
 }
 
 /**
  * The things `stats` does not carry: image, state, ports, mounts.
  *
- * Fetched once, through a **one-shot** live part (`every` omitted). The drawing
- * calls this block static and it behaves that way — a one-shot renders once and
- * is marked done, so staleness never re-titles it and it costs no further
- * frames. It is a part rather than adapter output because an adapter is handed a
- * result and cannot make a second call, and these four fields are not in the
- * one it was handed.
+ * Read on every tick beside the measurements (S3_WALK §6 C5). It is the part's
+ * rather than adapter output because an adapter is handed a result and cannot
+ * make a second call, and these four fields are not in the one it was handed.
  */
-async function readDetails(id: string): Promise<Row | null> {
-  const { stdout } = await run(
-    "docker",
-    ["ps", "-a", "--no-trunc", "--filter", `id=${id}`, "--format", "json"],
-    { maxBuffer: 1 << 20 },
-  );
+async function readDetails(docker: Runner, id: string): Promise<Row | null> {
+  const { stdout } = await docker(["ps", "-a", "--no-trunc", "--filter", `id=${id}`, "--format", "json"]);
   return parseNdjson(stdout).rows[0] ?? null;
 }
 
 // ── The blocks ──────────────────────────────────────────────────────────────
 
+/** What one tick reads: the measurements, and the record `stats` does not carry. */
+export type Reading = Readonly<{ stats: Row | null; details: Row | null }>;
+
 /**
- * The CPU plot and the caption that says what its horizontal axis is.
+ * The tick's two reads, together (S3_WALK §6 C5).
  *
- * **One block, not two, and walk B1 is why.** C22 I46 windows a view at block
- * boundaries, so a caption authored as a document-level sibling can be separated
- * from the plot it explains — a frame that looks complete while missing the only
- * thing that says what the axis measures. `render` returns one block (C23 I34),
- * so the group is free here; a surface that puts the caption at document level
- * instead inherits the hazard rather than rediscovering it.
- *
- * **It draws from the ring, not from `data`.** The part's subject is the
- * history, and the history is the thing `b.live` does not keep (gap 1). The
- * fetch's return value is what put the newest sample *into* the ring, and by the
- * time this runs the ring is the whole answer.
+ * The details were a one-shot part of their own — a second frame — because an
+ * adapter is handed one result and cannot make a second call. One live part
+ * reads both, so the image and state row ticks with the measurements and a
+ * container that stops says so on the tick that reports the miss (§3 B3).
  */
-export function cpuBlock(ring: Ring, trouble?: Block, unicode = true): Block {
-  return b.group(
-    "column",
-    [
-      b.plot({
-        id: "cpu-plot",
-        series: [{ values: [...ring.values], label: "CPU %", tone: "ok" }],
-        height: PLOT_HEIGHT,
-        axes: true,
-        /**
-         * **The floor is pinned and the ceiling is not** (F27, C04 I29).
-         *
-         * Without `yMin` the range is the data's, and a container pinned at 100%
-         * drew a 0.2% wobble as a full-height mountain range — the plot at its
-         * least trustworthy in exactly the case a reader most wants to trust it.
-         *
-         * **And `yMax: 100` would be the opposite error.** DASHBOARD_WALK A4:
-         * `CPUPerc` is per-core-normalised, so `780%` is an ordinary reading on
-         * an eight-core host, and I29 clamps to the edge rather than dropping —
-         * a ceiling would render a busy container identically to a saturated
-         * one, which is the finding walk A4 already ruled against for the bar.
-         */
-        yMin: 0,
-        /**
-         * **The thresholds the table already classifies by, on the axis** (C04
-         * I52). `loadTone` turns 60 and 85 into a cell's tone and glyph, so the
-         * *numbers* were already the app's judgement and the plot was the one
-         * surface that could not show them: a reader watching the curve had no
-         * way to see where busy begins.
-         *
-         * A band rather than two lines because it is one statement, and dashed
-         * rather than toned because at one bit the tone is all that would be
-         * left — F34, and the reason annotations are cheap in a terminal.
-         *
-         * **The ceiling is still unpinned**, so on an eight-core host running at
-         * 780% the band sits low and correctly says so. An annotation outside
-         * the range is dropped rather than clamped, which is why this is safe to
-         * declare unconditionally.
-         */
-        annotations: [{ kind: "band", from: BUSY, to: HOT, tone: "warn" }],
-      }),
-      b.notice("muted", axisCaption(ring, unicode), undefined, { id: "cpu-axis" }),
-      ...(trouble === undefined ? [] : [trouble]),
-    ],
-    { id: "cpu-body" },
-  );
+async function readBoth(docker: Runner, id: string): Promise<Reading> {
+  const [stats, details] = await Promise.all([readStats(docker, id), readDetails(docker, id)]);
+  return { stats, details };
 }
 
 /**
- * The failure, drawn **beside** the history rather than instead of it.
+ * The cells a spark draws in, and therefore the ring's cap (S3_WALK §6 C1).
  *
- * **The frame-read is what forced this, and the walk had ruled the opposite
- * without noticing.** A03 §2's shape: `renderError` replaces a part's whole
- * child, so a stall wiped the plot and the caption together — and the caption is
- * the one thing built to report a stall. Trace row A2 named the effect ("the
- * caption reports the misses") and assumed a mechanism that would still be on
- * screen when it mattered. It was not; the ruling was right about the
- * interaction and wrong about a mechanism it assumed existed, which is C23
- * §8a A4's lesson arriving in this app.
- *
- * Nothing in either artefact could have caught it. A trace indexes what happens
- * *between* rules and this is a rule about what a frame contains — and the
- * containment only becomes visible when something replaces the container.
+ * **The ring holds what the row draws.** A `spark` cell is exactly its column's
+ * width and shows the last that-many positions (C12 I13), so a ring sized from
+ * the terminal — F24's `capFor` — held a hundred samples for a row showing
+ * twenty-four. The column does not move with the terminal, which also retires
+ * F24's hazard: there is no density for a resize to get wrong.
  */
-export function cpuErrorBlock(
+export const SPARK_CELLS = 24;
+
+const LABEL_CELLS = 6;
+
+/**
+ * Label, figure, value — **a headerless table, because the rows are a list of
+ * named readings** and §086 puts a metric in a row as a sparkline in a table
+ * cell. Only the value flexes: it holds the long strings (an image reference, a
+ * ports list), and the other two are their declared widths.
+ */
+const COLUMNS: readonly ColumnDef[] = [
+  b.col("label", { label: "", minWidth: LABEL_CELLS }),
+  b.col("figure", { label: "", minWidth: SPARK_CELLS }),
+  b.col("value", { label: "", flex: true }),
+];
+
+/** The window's lowest and highest reading, or `null` with none. */
+function rangeOf(values: readonly (number | null)[]): readonly [number, number] | null {
+  const readings = values.filter((v): v is number => v !== null && Number.isFinite(v));
+  return readings.length === 0 ? null : [Math.min(...readings), Math.max(...readings)];
+}
+
+/**
+ * The CPU row's value: the reading, the window's range, and the caption.
+ *
+ * **The range is here because the sparkline cannot pin a floor** (S3_WALK §6
+ * C2, F27). A sparkline normalises over its window (C12 sparkline §2), so a
+ * container held at 100% wobbling by 0.2% draws a full-height line — the
+ * mountain range `yMin: 0` was pinned against on the plot. The shape stays a
+ * shape and the level is said in numbers beside it.
+ *
+ * **The caption rides in the same row** (S3_WALK §6 C3): a spark cell draws no
+ * text, and the row is one block with its figure, which is walk B1's ruling held
+ * by construction rather than by a group.
+ */
+export function cpuValue(ring: Ring, unicode = true): string {
+  const dot = unicode ? "·" : "-";
+  const dash = unicode ? "–" : "-";
+  const absent = unicode ? "—" : "-";
+  const latest = ring.values[ring.values.length - 1] ?? null;
+  const range = rangeOf(ring.values);
+  return [
+    latest === null ? absent : `${latest.toFixed(1)}%`,
+    ...(range === null ? [] : [`${range[0].toFixed(1)}${dash}${range[1].toFixed(1)}%`]),
+    axisCaption(ring, unicode),
+  ].join(` ${dot} `);
+}
+
+const label = (text: string) => ({ text, tone: "muted" as const });
+
+/**
+ * The five rows (S3_WALK §6, §085): cpu, mem, io, image, ports.
+ *
+ * `reading` is `null` while the part waits for its first tick — the verb's own
+ * `stats` row seeds the measurements, and the record is said to be on its way
+ * rather than absent, because it is not absent.
+ *
+ * **Absent is not zero, and not blank either** (walk A8): a row with no reading
+ * draws the absent mark in its value, and a spark over a ring of gaps draws
+ * nothing in its figure.
+ */
+export function statsBlock(ring: Ring, reading: Reading, unicode = true, loading = false): Block {
+  const dot = unicode ? "·" : "-";
+  const absent = unicode ? "—" : "-";
+  const { stats, details } = reading;
+  const latest = ring.values[ring.values.length - 1] ?? null;
+  const memPerc = stats === null ? null : percent(str(stats, "MemPerc"));
+  const join = (...parts: readonly string[]): string => parts.join(` ${dot} `);
+  const or = (v: string): string => (v.trim() === "" ? absent : v);
+
+  const rows = [
+    b.row("cpu", {
+      label: label("cpu"),
+      // A copy, not the ring's own array — a series the next tick mutates under
+      // the renderer is a block whose content changes after it was measured.
+      figure: { text: "", spark: [...ring.values], ...loadTone(latest) },
+      value: { text: cpuValue(ring, unicode), ...loadTone(latest) },
+    }),
+    b.row("mem", {
+      label: label("mem"),
+      // `MemUsage` verbatim, and the bar is the framework's (C04 I51): docker's
+      // string carries two values with unequal units, and converting them is the
+      // parser R01 commitment 5 forbids.
+      figure: { text: "", bar: { value: memPerc, max: 100, format: "percent" as const } },
+      value: { text: stats === null ? absent : or(str(stats, "MemUsage")) },
+    }),
+    b.row("io", {
+      label: label("io"),
+      figure: { text: "" },
+      value: {
+        text:
+          stats === null
+            ? "no measurements — the container is not running"
+            : join(`net ${or(str(stats, "NetIO"))}`, `block ${or(str(stats, "BlockIO"))}`, `${or(str(stats, "PIDs"))} pids`),
+        ...(stats === null ? { tone: "muted" as const } : {}),
+      },
+    }),
+    b.row("image", {
+      label: label("image"),
+      figure: { text: "" },
+      value: loading
+        ? { text: unicode ? "reading the container's record…" : "reading the container's record", tone: "muted" }
+        : details === null
+          ? { text: "no details — the container has gone", tone: "muted" }
+          : { text: join(or(str(details, "Image")), or(str(details, "Status") || str(details, "State"))) },
+    }),
+    b.row("ports", {
+      label: label("ports"),
+      figure: { text: "" },
+      // `Ports` and `Mounts` are docker's strings and stay docker's strings (R01
+      // commitment 5). Condensing `0.0.0.0:8080->80/tcp` would lose the bind
+      // address, and `0.0.0.0` versus `127.0.0.1` is whether the port faces the
+      // network. Only runs of whitespace are collapsed.
+      value: {
+        text:
+          details === null
+            ? absent
+            : join(or(str(details, "Ports").trim().replace(/\s+/gu, " ")), `mounts ${or(str(details, "Mounts").trim())}`),
+      },
+    }),
+  ];
+  // No gap above: the rows open the part, as a call's body opens under its head.
+  return b.table({ id: "stats-rows", columns: COLUMNS, rows, showHeader: false, gapBefore: false });
+}
+
+/**
+ * The failure, drawn **under** the history rather than instead of it (§5, B5,
+ * S3_WALK §6 C4).
+ *
+ * `renderError` replaces a part's whole child, so the framework's default would
+ * wipe the sparkline and its caption together — and the caption is the one
+ * thing built to report a stall. So the rows are drawn from the ring, with the
+ * measurements absent, and the framework's own box goes beneath them (F406).
+ */
+export function statsErrorBlock(
   ring: Ring,
   err: ErrorLike,
   retryInMs: number | null,
   attempt: number,
+  unicode = true,
 ): Block {
-  // **The framework's own box, composed under the history** (F406). It was a
-  // `b.notice.error` with the countdown written into the string by hand, which
-  // is what an override could reach for before `b.status` existed — and the
-  // hand-written countdown said `— retrying in 6s` where the framework's says
-  // `⠋ retrying in 6s (attempt 2)`, so the same failure read two ways in one
-  // frame depending on which panel it was in.
-  return cpuBlock(ring, b.status(err, retryInMs, attempt, { id: "cpu-error" }));
-}
-
-/**
- * MEM, NET, BLK and PIDS.
- *
- * **The bar carries no tone, and that is not an omission.** C04 I6 wants a
- * non-colour channel on anything severe, and a `keyValue` row has no glyph field
- * to put one in — the framework offers `label`, `value` and `tone` and nothing
- * else. Rather than colour a row that cannot carry the mark beside it, the bar's
- * own run is the channel: it survives 1-bit and it survives a colour-blind
- * reader, which is the whole of what the rule is protecting.
- *
- * **S12 measured the sentence above and found half of it.** The run does survive
- * one bit — the frame at `colourDepth: 1` still shows it and the meaning moves
- * to bold and dim. It does **not** survive `unicode: ascii`: `█` and `░` are
- * adapter text, and capability substitution covers the glyphs C09 picks. At
- * `LANG=C` the frame kept `░░░░░░░░` beside a plot that had correctly become
- * `.::-==++**##@@`. So the alphabet is chosen by the caller, from a flag the app
- * computes itself because `AdapterContext` carries no capabilities (F43, F54).
- */
-export function ioBlock(row: Row | null, unicode = true): Block {
-  if (row === null) {
-    return b.notice("muted", "no measurements — the container is not running", undefined, {
-      id: "io-body",
-    });
-  }
-  const memPerc = percent(str(row, "MemPerc"));
-  const absent = unicode ? "—" : "-";
-  return b.kv(
-    {
-      // **The interpolated bar, gone** — C04 I51. It was the same workaround
-      // `Cell.bar` closed one level along: a run drawn by the app into a string,
-      // sized by the *table's* CPU column constants, with the alphabet chosen
-      // from a flag the app computes because `AdapterContext` carries none.
-      //
-      // The framework now draws it and reads the capability itself, so the
-      // `unicode` argument no longer reaches this row. `barWidth` is the row's
-      // because a `keyValue` value is a remainder — 74 cells at a terminal width
-      // of 80, where an undeclared bar would run for 68 of them.
-      MEM: {
-        text: str(row, "MemUsage"),
-        bar: { value: memPerc, max: 100, format: "percent" as const },
-        barWidth: MEM_BAR_WIDTH,
-      },
-      NET: str(row, "NetIO") || absent,
-      BLK: str(row, "BlockIO") || absent,
-      PIDS: str(row, "PIDs") || absent,
-    },
-    { id: "io-body" },
-  );
-}
-
-/**
- * Image, state, ports and mounts — verbatim.
- *
- * `Ports` and `Mounts` are docker's strings and stay docker's strings (R01
- * commitment 5). Condensing `0.0.0.0:8080->80/tcp` would lose the bind address,
- * and `0.0.0.0` versus `127.0.0.1` is whether the port faces the network.
- */
-export function detailsBlock(row: Row | null): Block {
-  if (row === null) {
-    return b.notice("muted", "no details — the container has gone", undefined, {
-      id: "details-body",
-    });
-  }
-  const ports = str(row, "Ports").trim().replace(/\s+/gu, " ");
-  const mounts = str(row, "Mounts").trim();
-  return b.kv(
-    {
-      IMAGE: str(row, "Image") || "—",
-      STATE: str(row, "Status") || str(row, "State") || "—",
-      PORTS: ports === "" ? "—" : ports,
-      MOUNTS: mounts === "" ? "—" : mounts,
-    },
-    { id: "details-body" },
+  return b.group(
+    "column",
+    [
+      statsBlock(ring, { stats: null, details: null }, unicode),
+      b.status(err, retryInMs, attempt, { id: "stats-error" }),
+    ],
+    { id: "stats-body" },
   );
 }
 
 /**
  * One tick of CPU, as the driver's **derivation** (C23 I47).
  *
- * **It used to be the `fetch`, and moving it is the whole of this app's share of
- * F91.** `cpu` and `io` both ran `docker container stats --no-stream <id>` every
- * two seconds — the identical argv, twice, each holding a different sample of
- * the same instant. They could not share one poll while this function *was* the
- * poll: its side effect on the ring is what the sibling's fetch does not have,
- * so one shared `fetch` would have stopped the ring silently. Calcium's rule is
- * the general form of that:
- *
  * > Per-part state is view state only. Anything that accumulates belongs in a
  * > derivation.
  *
- * **`began` first, `took` after** (walk A2), unchanged in meaning: the attempt is
- * counted before anything can go wrong with reading it.
+ * **`began` first, `took` after** (walk A2): the attempt is counted before
+ * anything can go wrong with reading it. **And the sample lands here, not in
+ * `render`** (walk A3): a derivation runs once per source version and a
+ * `render` once per part.
  *
- * **And the sample lands here, not in `render`** (walk A3), which the fold makes
- * structural rather than a discipline: a derivation runs once per source version
- * and a `render` runs once per part, so a sample recorded in `render` would be
- * pushed twice the moment a second part read the same source.
+ * **What the fold cannot see** (FINDINGS F137): a fold runs on a *version*, and
+ * a version exists only when the fetch resolved — so a tick that failed at the
+ * transport is not counted. A container that has stopped still resolves and
+ * still reaches `took(null)`, which is the common miss and is unchanged; `docker`
+ * itself failing is drawn by the error arm, which says so outright.
  *
- * **What the fold cannot see, and it is a real loss** (FINDINGS F137). A fold
- * runs on a *version*, and a version exists only when the fetch resolved — so a
- * tick that failed at the transport is no longer counted as an attempt. The two
- * misses are not the same: a container that has stopped still resolves and still
- * reaches `took(null)`, which is the common one and is unchanged. What is gone is
- * `docker` itself failing, and there the driver renders the error arm and the
- * panel says so outright, so the caption's divergence was the weaker of two
- * signals for one event.
- *
- * **Extracted, and the reason is a finding.** `b.live` holds its declaration in
- * a `WeakMap` beside the document and exports neither the map nor
- * `liveDeclarations`, so an app cannot reach what it just declared. Without this
- * seam walks A2, A3 and A8 would be assertable only through the whole driver —
- * the shape that made every one of this branch's four wiring defects invisible.
- * FINDINGS F28.
+ * It returns the reading beside the ring because a derivation's result is what
+ * `render` receives in the fetched data's place — the ring alone would leave the
+ * other four rows nothing to draw.
  */
-export function cpuFold(ring: Ring): (data: unknown) => Ring {
+export function cpuFold(ring: Ring): (data: unknown) => Readonly<{ ring: Ring; reading: Reading }> {
   return (data) => {
     ring.began();
-    const measured = data as Row | null;
+    const reading = data as Reading;
     // `--` for a container that has stopped. Absent is not zero (walk A8,
     // DASHBOARD_WALK A3): zero would draw it idling, and it is not idling.
-    ring.took(measured === null ? null : percent(str(measured, "CPUPerc")));
-    return ring;
+    ring.took(reading.stats === null ? null : percent(str(reading.stats, "CPUPerc")));
+    return { ring, reading };
   };
 }
 
 // ── The document ────────────────────────────────────────────────────────────
 
 /**
- * The four blocks a drill-in pushes.
+ * The ring a drill-in opens with: the spark column's width, seeded by the
+ * verb's own result. A function rather than two lines inside `containerView`
+ * because the closure holding the ring is unreachable (F28) and a cap nobody can
+ * read is a cap no row can assert (S3_WALK §6 C1).
+ */
+export function seedRing(row: Row): Ring {
+  const ring = createRing(SPARK_CELLS);
+  ring.began();
+  ring.took(percent(str(row, "CPUPerc")));
+  return ring;
+}
+
+/**
+ * The one block a drill-in returns: a live part holding the five rows.
+ *
+ * **One frame, and it is the framework's** (S3_WALK §6). `b.live` is a panel by
+ * construction — its border is where staleness is said (C24 §5, §047) — so the
+ * three framed parts and the plot's box became this one. The title is the
+ * container's name and id, which do not change; everything that does is a row.
  *
  * **The ring is built here, inside the call** (walk A1). At module scope the
  * second drill-in would open holding the first container's samples and draw them
- * as its own — silently, with every assertion about the plot passing. Its
- * lifetime is the invocation's, and the pop drops it with the closures that hold
- * it.
- *
- * The verb's own result seeds the first sample, so the opening frame draws a
- * point rather than an empty axis.
+ * as its own. The verb's own result seeds the first sample, so the opening frame
+ * draws a point rather than an empty row.
  */
-export function containerView(row: Row, width: number, unicode = true): readonly Block[] {
+export function containerView(row: Row, unicode = true, docker: Runner = realRunner): readonly Block[] {
   /**
    * **`ID`, not `Container` — and the frame is what said so.**
    *
    * `docker stats` reports `Container` as *the argument it was given*, so a view
    * opened by name has `Container: "dtui-busy"` and `ID: "0e624f2f5f90"`. Read
-   * the wrong way round the header showed the name twice and, worse, the details
-   * part filtered `docker ps` on `id=dtui-busy`, matched nothing, and rendered
-   * its empty arm: **"no details — the container has gone"**. A sentence about
-   * the far side, produced by a bug on this side, in a frame where every
-   * assertion passed.
-   *
-   * The lesson is about the empty arm rather than the field: a block whose
-   * absent state is phrased as a fact about the world will misattribute this
-   * app's own faults to it, and nothing in the frame separates the two.
+   * the wrong way round, the details read filtered `docker ps` on
+   * `id=dtui-busy`, matched nothing, and rendered its empty arm: **"no details —
+   * the container has gone"**. A sentence about the far side, produced by a bug
+   * on this side, in a frame where every assertion passed.
    */
   const id = str(row, "ID") || str(row, "Container");
   const name = str(row, "Name") || str(row, "Container");
-  const ring = createRing(capFor(width));
-  ring.began();
-  ring.took(percent(str(row, "CPUPerc")));
-
-  /**
-   * **One key, and it carries the container id** (C24 I27, F91).
-   *
-   * The two parts below read one `docker container stats --no-stream <id>` where
-   * they used to run two — the same command, twice, two seconds apart, each
-   * drawing a different sample of the same instant. Parametrised by `id` because
-   * the sameness being claimed is *this container's stats*: two drill-ins share
-   * nothing, which is what `createRing` inside this call already says about the
-   * history.
-   */
-  const source = `container-stats:${id}`;
-  const fetch = (): Promise<Row | null> => readStats(id);
+  const ring = seedRing(row);
 
   return [
-    b.kv({ CONTAINER: name || id, ID: id }, { id: "container-head" }),
     b.live({
-      id: "cpu",
-      title: "CPU",
+      id: "stats",
+      title: `${name || id} ${unicode ? "·" : "-"} ${id}`,
       every: TICK_MS,
-      source,
-      fetch,
-      // The accumulation, folded once per poll and shared — not a side effect of
-      // this part's own fetch, which is what stopped these two sharing one.
+      fetch: () => readBoth(docker, id),
+      // The accumulation, folded once per poll — not a side effect of the fetch.
       derive: { key: `cpu-ring:${id}`, compute: cpuFold(ring) },
-      render: () => cpuBlock(ring, undefined, unicode),
-      renderLoading: () => cpuBlock(ring, undefined, unicode),
+      render: (data) => {
+        const d = data as { ring: Ring; reading: Reading };
+        return statsBlock(d.ring, d.reading, unicode);
+      },
+      renderLoading: () => statsBlock(ring, { stats: row, details: null }, unicode, true),
       // Overridden so the history survives the failure that made it
-      // interesting. The framework's default replaces the child outright, which
-      // is right for a part whose block *is* its latest fetch and wrong for one
-      // accumulating across ticks.
-      //
-      // **The failure beside the ring is `b.status` now, not a notice** (F406,
-      // C24 I30). Until the builder existed, an override's only vocabulary was a
-      // red line of text — so this app composed one under its history while the
-      // framework drew a bordered box with a painted tag two panels away, and
-      // the two failure presentations in one frame were the same failure. The
-      // other three parts here take the default and get the box; this one keeps
-      // its data and gets the same box under it.
-      renderError: (err, retryInMs, attempt) => cpuErrorBlock(ring, err, retryInMs, attempt),
-    }),
-    b.live({
-      id: "io",
-      title: unicode ? "MEMORY · NETWORK · BLOCK" : "MEMORY - NETWORK - BLOCK",
-      every: TICK_MS,
-      source,
-      fetch,
-      render: (data) => ioBlock(data as Row | null, unicode),
-      renderLoading: () => ioBlock(row, unicode),
-    }),
-    b.live({
-      // No `every` — one-shot. Rendered once, never retried, never re-titled.
-      id: "details",
-      title: "DETAILS",
-      fetch: () => readDetails(id),
-      render: (data) => detailsBlock(data as Row | null),
-      // **Supplied, and the reason is an ellipsis.** Left out, C24's default
-      // renders `loading…` — U+2026, a framework string constant with no
-      // capability substitution behind it, which reaches an ASCII terminal
-      // whole. The app can replace its own; it cannot replace the prompt, which
-      // is the other instance and the one that made this a finding (F55).
-      //
-      // It also says something truer: this part is one-shot, so what is
-      // happening is a single `docker ps` filtered by id, and naming it beats
-      // a participle.
-      renderLoading: () =>
-        b.notice("muted", unicode ? "reading the container's record…" : "reading the container's record", undefined, {
-          id: "details-loading",
-        }),
+      // interesting (B5, S3_WALK §6 C4).
+      renderError: (err, retryInMs, attempt) => statsErrorBlock(ring, err, retryInMs, attempt, unicode),
     }),
   ];
 }
@@ -426,7 +349,7 @@ export function containerView(row: Row, width: number, unicode = true): readonly
  * no capabilities; `ctx.capabilities` is the resolved record now, so the adapter
  * asks rather than being told by an app that computed it wrongly.
  */
-export function createContainerAdapter(): Adapter {
+export function createContainerAdapter(docker: Runner = realRunner): Adapter {
   return {
     schema: "tui.view/1",
     adapt(result, ctx): AdapterDocument {
@@ -442,7 +365,7 @@ export function createContainerAdapter(): Adapter {
       const blocks: readonly Block[] =
         row === null
           ? [b.notice.error(failure)]
-          : containerView(row, ctx.width, ctx.capabilities.unicode !== "ascii");
+          : containerView(row, ctx.capabilities.unicode !== "ascii", docker);
 
       return {
         schema: "tui.view/1",

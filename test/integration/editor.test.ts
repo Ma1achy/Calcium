@@ -28,7 +28,7 @@ const enc = new TextEncoder();
 function plainTerminal(): ReturnType<typeof createDecoder> {
   let t = 0;
   return createDecoder({
-    capabilities: { bracketedPaste: true, mouse: false },
+    capabilities: { bracketedPaste: true, mouse: false, keyboardProtocol: "none" },
     now: () => (t += 1000),
   });
 }
@@ -44,13 +44,24 @@ function wire(editor: LineEditor): {
   const keymap = createKeymap(defaultKeymap);
   const focus = createFocusStore();
   const deps: RouterDeps = {
+    keyReleasesReported: () => false,
+    // **The `child` rung's second source** (C16 I49). Required rather than
+    // optional, so a harness that means to attach one has to say so.
+    childAttached: () => false,
+    // C16 I73 — no stack and no surface host, so nothing is ever raised.
+    // C16 I74 — no layer here has anything to scroll.
+    scrollLayer: () => false,
+    // C16 I75 — the escape's detach; nothing here attaches a child.
+    detachChild: () => undefined,
+    ownerGeneration: () => 0,
+    overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,
     overlayTop: () => null,
     overlayRegion: () => ({ width: 80, height: 24 }),
     placed: () => [],
     popLayer: () => {},
-    copyMode: () => false,
-    exitCopyMode: () => {},
+    nativeSelection: () => false,
+    semanticSelection: () => false,
     liveEntry: () => null,
     entryAtRow: () => null,
     inFlight: () => null,
@@ -66,6 +77,7 @@ function wire(editor: LineEditor): {
     promptHasText: () => editor.text !== "",
     clearPrompt: () => editor.clear(),
     raiseExitConfirm: () => {},
+    refused: () => undefined,
   };
   const router = createRouter({ focus, keymap, now: () => 0, deps });
 
@@ -295,8 +307,11 @@ it("T4.7 (C17 §2, C22 I13): the prompt's rendered height equals displayRows, on
   const paintedRows = (): number => {
     const frame = frameRows();
     const first = frame.findIndex((r, i) => i > 0 && r.trimStart().startsWith("❯"));
-    // Below the prompt: the lower rule and the one-row default footer (C22 I81, §6l.4 E).
-    return first === -1 ? 0 : frame.length - 2 - first;
+    // Below the prompt: the lower rule and the **two**-row default footer (C22
+    // I81, §6l.4 E) — the facts-and-directory row, and M5's owner line beneath
+    // it (R-KEY-004, §103). A live session always has an owner, so the second
+    // row is not conditional here: with nothing raised the owner is `scope`.
+    return first === -1 ? 0 : frame.length - 3 - first;
   };
 
   // **Three heights, because one cannot tell the two readings apart.** A prompt

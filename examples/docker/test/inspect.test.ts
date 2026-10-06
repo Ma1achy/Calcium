@@ -12,9 +12,9 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { AdapterContext } from "@fmx/calcium";
+import type { AdapterContext } from "calcium-tui";
 // F37: no public measurer. Resolved through the package — see `deep.ts`.
-import type { Block, Code, KeyValue, Notice } from "@fmx/calcium";
+import type { Block, Code, KeyValue, Notice } from "calcium-tui";
 import { SPLIT_FLOOR, createInspectAdapter, splitRaw, structuredBlocks } from "../src/inspect.ts";
 
 /**
@@ -26,7 +26,7 @@ const codeRows = (text: string, width: number): number =>
   measure({ kind: "code", id: "m", language: "json", text, wrap: true } as Code, width);
 import type { Row } from "../src/ndjson.ts";
 
-import { producerContext } from "@fmx/calcium/testing";
+import { producerContext } from "calcium-tui/testing";
 const read = (name: string): string =>
   readFileSync(new URL(`./corpus/${name}`, import.meta.url), "utf8");
 
@@ -128,10 +128,12 @@ describe("splitRaw", () => {
   });
 
   it("I7b (F37's ruling, F1008): the region is the floor where the context has one", () => {
-    // **The walk ruled *the region* and the code could not reach one.** It can:
-    // `ProducerContext.height` is non-null iff the document is bound, and
-    // `inspect` is declared `view: true`, so a real `/inspect --raw` always has
-    // a region and `SPLIT_FLOOR` is the fallback rather than the ordinary case.
+    // **The walk ruled *the region*; the view route supplied one and is gone**
+    // (C23 I41, C22 §13a, R-EXA-082). `ProducerContext.height` is `null` on every
+    // route now, so `SPLIT_FLOOR` is the answer a real `/inspect --raw` gets — and
+    // the row stays, because the **call site** is what it asserts: a producer
+    // handed a bound must use it, and the day one is threaded again this is the
+    // only thing that says whether it is read.
     //
     // Asserted through `adapt` rather than through `splitRaw`, because the seam
     // that was missing is the **call site** reading `ctx.height` — a row calling

@@ -18,7 +18,7 @@ import {
   createRmHandler,
   createRmiHandler,
 } from "../src/destructive.ts";
-import type { AskOptions, LocalContext } from "@fmx/calcium";
+import type { AskOptions, LocalContext } from "calcium-tui";
 
 const RUNNING = "/api-gateway\tnginx:alpine\trunning\ttrue\tfalse";
 const STOPPED = "/api-gateway\tnginx:alpine\texited\tfalse\tfalse";
@@ -30,7 +30,9 @@ function ctxWith(answer: string): LocalContext & { asked: AskOptions[] } {
     asked,
     ask: (opts: AskOptions) => {
       asked.push(opts);
-      return Promise.resolve(answer);
+      // A key and no text: none of these questions carries a `reply…`, so
+      // `text` being absent is the record that nothing was composed.
+      return Promise.resolve({ key: answer });
     },
   } as LocalContext & { asked: AskOptions[] };
 }

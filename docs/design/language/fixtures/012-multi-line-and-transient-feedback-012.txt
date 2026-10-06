@@ -1,0 +1,24 @@
+you pressed a key and something happened. What says so?
+
+this framework has no FLOATING, RECORDLESS toast. A transient notice that
+appears and vanishes away from its action is unreachable by keyboard and
+unreadable by anyone who looked away. Feedback stays where the action was,
+and any consequential fact is also written to the record.
+
+IN THE FOOTER, for something with no place on screen
+  » auto   ✦ qwen3-coder-next       copied 47 lines   22:13
+  it replaces the footer's own tail for ~2s, then the tail returns.
+
+ON THE THING, for something that has one
+  ▸ ● a3f9b21  digit-classifier  running   0.0372   copied
+  the row itself says it, in the column where its own state lives.
+
+AS AN ENTRY, for anything undoable
+  ● reverted · parse.ts · +2 −2 undone  ↺ redo
+  because an undo you cannot see is an undo you will do twice.
+
+the rule: a confirmation's LIFETIME matches its consequence
+
+  nothing changed        the footer, briefly
+  a selection changed    on the thing, until focus moves
+  the document changed   an entry, forever — it is history now

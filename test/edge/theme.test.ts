@@ -1,20 +1,29 @@
 // C10 tier 3 — edge cases. The overrides an app can legitimately write that have
 // no sensible reading, and the moments a switch could be observed half-done.
 import { describe, expect, it } from "vitest";
-import { defaultTheme, loadTheme, ratio, resolve, resolveTone } from "../../src/presentation/theme/index.js";
+import { defaultTheme, floorFor, loadTheme, ratio, resolve, resolveTone } from "../../src/presentation/theme/index.js";
 import { caps, store, withTone } from "../support/theme.js";
 
 describe("C10 edges", () => {
-  it("T3.34 (I34, §4f.1): a theme whose `bgDeep` leans toward its tones still loads", () => {
-    // The shipped light theme *is* this case — `tone.muted` measures 2.44 there
-    // against its own 2.5 floor — and it must load, because `bgDeep` carries no
-    // text and is not checked. The row exists so a later widening of
+  it("T3.34 (I34, \u00a74f.1): a theme whose `bgDeep` leans toward its tones still loads", () => {
+    // The shipped light theme *is* this case and it must load, because `bgDeep`
+    // carries no text and is not checked. The row exists so a later widening of
     // `textSurfaces` fails **here**, where the reason is written down, rather
     // than in the token files where it would read as a bad colour.
+    //
+    // **The slot it names moved when `light` came from the registry.** It was
+    // `tone.muted` at 2.44 against a 2.5 floor; the registry's `light` darkens
+    // `muted` and it now clears. `syntax.comment` is the case now, at 2.89
+    // against its own floor of 3 — the same fact one slot over, and the whole
+    // set of eleven is held by C10 T1.34. Named as a pair with its floor rather
+    // than as a bare figure, so the row cannot be read as *comment is dark*.
     const light = defaultTheme["light"];
     expect(light, "the shipped set has a light theme").toBeDefined();
-    expect(ratio(light!.palettes["tone"]!.slots["muted"]!, light!.surfaces.bgDeep))
-      .toBeLessThan(2.5);
+    const comment = light!.palettes["syntax"]!.slots["comment"]!;
+    expect(ratio(comment, light!.surfaces.bgDeep), "under its floor on the surface nothing checks")
+      .toBeLessThan(floorFor("comment"));
+    expect(ratio(comment, light!.surfaces.bg), "and over it on the surface that is checked")
+      .toBeGreaterThanOrEqual(floorFor("comment"));
     expect(loadTheme(defaultTheme, "light").ok, "and it loads regardless").toBe(true);
   });
 

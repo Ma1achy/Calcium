@@ -12,6 +12,8 @@ import {
   resolveTone,
   validateTokens,
 } from "../../src/presentation/theme/index.js";
+import { inkOn } from "../../src/presentation/theme/contrast.js";
+import { runStyle } from "../../src/presentation/blocks/paint.js";
 import { SCANS } from "../../tools/enforce/source-scans.mjs";
 import { caps, store, SURFACES, SYNTAX_SLOTS, TONES, withTone } from "../support/theme.js";
 
@@ -303,8 +305,18 @@ describe("C10 fail-on-revert", () => {
 
   it("T6.21 (I22): a diff background too strong for syntax → the theme is rejected at load", () => {
     // The check doing what it is for, shown rather than trusted. A `diffAdd`
-    // lifted to where a real tool would put it on a dark theme breaks `comment`
-    // and `muted` first — the two recessive slots that bound the whole budget.
+    // lifted to where a real tool would put it on a dark theme breaks five
+    // slots, and **which five is the row's subject**, asserted as a set rather
+    // than by naming two of them.
+    //
+    // **The pair it used to name is half wrong now.** It said `comment` and
+    // `muted` break first — *the two recessive slots that bound the whole
+    // budget* — and that was a true reading of the repository's old dark theme.
+    // The registry's `dark` lifts `tone.muted` to `#8c8c8c`, which clears this
+    // ground, so the recessive pair does not bound the budget: `syntax.keyword`
+    // and `tone.error` do, and they are not recessive at all. The old sentence
+    // was an explanation for a measurement, and when the measurement moved the
+    // explanation was what turned out to be load-bearing.
     const tokens = defaultTheme["dark"]!;
     const broken = {
       ...tokens,
@@ -315,11 +327,121 @@ describe("C10 fail-on-revert", () => {
     const paths = errors.map((e) => e.path);
 
     expect(errors.length, errors.map((e) => e.message).join("\n")).toBeGreaterThan(0);
-    expect(paths).toContain("palettes.syntax.comment");
-    expect(paths).toContain("palettes.tone.muted");
-    expect(errors.some((e) => e.message.includes("the background moves rather than the slot"))).toBe(
-      true,
-    );
+    expect([...new Set(paths)].sort(), "the set, so a slot leaving it fails here too").toEqual([
+      "palettes.syntax.comment",
+      "palettes.syntax.key",
+      "palettes.syntax.keyword",
+      "palettes.syntax.number",
+      "palettes.tone.error",
+    ]);
+    // **The remedy the message names widened with R-THM-001 and this row is
+    // where that is recorded.** It used to read *the background moves rather
+    // than the slot*, which was the only remedy there was: a ground and an ink
+    // that do not clear leave you one value to move. Composition gives a second
+    // — the theme may declare a different ink for that ground — so the message
+    // offers both, and it still refuses the one remedy that would be wrong,
+    // which is moving the slot everywhere for the sake of one surface.
+    expect(
+      errors.every((e) => e.message.includes("the background moves, or this theme composes a different ink")),
+      errors.map((e) => e.message).join("\n"),
+    ).toBe(true);
     expect(loadTheme({ dark: broken, light: defaultTheme["light"]! }, "dark").ok).toBe(false);
+  });
+
+  it("T6.22 (I43, R-THM-002): dropping `floor` from a high-contrast theme \u2192 T2.24 fails, and nothing else does", () => {
+    // **The revert is the state this rule replaced**, and the point of the row
+    // is the second half: removing the declaration leaves a theme that loads,
+    // resolves, clears every floor and is called high contrast while promising
+    // nothing. That is exactly how 7 : 1 went stale the first time — it lived in
+    // a roadmap entry and one contract row, and `hcLight` arrived at 6.55 : 1 on
+    // `bgElev` with every gate green.
+    //
+    // So a revert that is *invisible in results* is the finding here, not an
+    // objection to the row: what the declaration buys is a check that fires on
+    // the tokens that come next, and nothing about today's tokens can show that.
+    const hc = defaultTheme["hcLight"]!;
+    const { floor: _dropped, ...undeclared } = hc;
+
+    expect(validateTokens(undeclared as typeof hc), "it still loads, which is the whole problem")
+      .toEqual([]);
+    expect((undeclared as typeof hc).floor, "and promises nothing").toBeUndefined();
+
+    // **What the declaration catches, shown against the palette as it was.** The
+    // eight refs `hcLight` shipped before the composition are legal under the
+    // common floor and illegal under the declared one — one theme, two verdicts,
+    // and only the declared floor can tell them apart.
+    const before = {
+      ...hc,
+      composed: Object.fromEntries(
+        Object.entries(hc.composed ?? {}).filter(([ground]) => ground !== "surface.bgElev"),
+      ),
+    } as typeof hc;
+
+    const withPromise = validateTokens(before);
+    expect(withPromise.length, "the uncomposed palette is refused under the declared floor")
+      .toBeGreaterThan(0);
+    expect(
+      withPromise.every((e) => e.message.includes("this theme declares")),
+      withPromise.map((e) => e.message).join("\n"),
+    ).toBe(true);
+
+    const { floor: _also, ...beforeUndeclared } = before;
+    expect(
+      validateTokens(beforeUndeclared as typeof hc),
+      "and accepted without it \u2014 the same tokens, and the declaration is the only difference",
+    ).toEqual([]);
+  });
+});
+
+/**
+ * C10 T6.106 — the seam a resolver row cannot see.
+ *
+ * **The pairing is the row.** T2.49 measures `resolve` against `inkOn` and is
+ * green whether or not any painter ever passes a ground, which is the shape of
+ * F1240 itself: a gate that checks an ink nobody emits. So the fail-on-revert
+ * names the row on the other side of the seam, and asserts the difference the
+ * revert makes rather than the revert's own absence.
+ */
+describe("C10 I48 — the ground carried from the painter into the resolver", () => {
+  it("T6.106 (I48, F1240): dropping `on` from `runStyle`'s resolver call → T2.49 still passes and C11 T2.13 fails", () => {
+    const theme = store("dark").current;
+    const run = { text: "failed", tone: "error" } as const;
+    const base = resolveTone("default", theme, caps(24));
+
+    // The tree as it stands: the ground reaches the resolver.
+    const onGround = runStyle(run, base, { theme, capabilities: caps(24) as never, on: "selection" });
+    // The revert: the same call with the argument dropped.
+    const reverted = runStyle(run, base, { theme, capabilities: caps(24) as never });
+
+    expect(onGround.colour, "the ink the theme composed for the ground").toEqual({
+      kind: "rgb",
+      hex: inkOn(theme.tokens, "tone.error", "selection"),
+    });
+    expect(reverted.colour, "and the revert paints the page's ink on the wash").toEqual({
+      kind: "rgb",
+      hex: theme.tokens.palettes["tone"]!.slots["error"]!,
+    });
+    expect(reverted.colour, "which is a different value, so the revert is visible").not.toEqual(onGround.colour);
+
+    // **And T2.49's subject is untouched by the revert**, which is the half that
+    // makes the pairing necessary rather than tidy: `resolve` answers correctly
+    // for both grounds whether or not anything asks it.
+    expect(resolve("tone.error", theme, caps(24), "selection").colour).toEqual(onGround.colour);
+  });
+});
+
+describe("C10 I71 — the carrier gate counts per fact", () => {
+  it("T6.153 (C10 I71): the gate accepting one carrier → T2.57 fails", () => {
+    // **The defect, as the shipped table before ruling 69**: disclosure's row
+    // read `mark` and `mark`, and the old gate asked only whether `tone` and
+    // `ground` appeared together and whether a row written `alone` cited a
+    // file — so a single carrier written without the word passed both. A gate
+    // counting distinct carriers is the only arm that sees it.
+    const distinct = (carriers: string): number => new Set(carriers.split("+").map((c) => c.trim())).size;
+    const oldGate = (carriers: string): boolean =>
+      !(/\btone\b/u.test(carriers) && /\bground\b/u.test(carriers)) && !carriers.includes("alone");
+    expect(oldGate("mark"), "the old gate passed a single carrier").toBe(true);
+    expect(distinct("mark"), "what I71 counts").toBeLessThan(2);
+    expect(distinct("mark + word"), "disclosure since ruling 69").toBe(2);
   });
 });

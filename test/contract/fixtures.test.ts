@@ -445,3 +445,14 @@ describe("C08 §4 — a mutating verb's answer has a recording behind it", () =>
     ).toMatch(/export interface WorldDriver\b/u);
   });
 });
+
+describe("C08 I19 — an authored stream takes C06's reader", () => {
+  it("T2.13 (C08 I19, F1432): the fixtures entry's createNdjsonReader is the one the subprocess transport parses with", async () => {
+    // **Identity, not equal behaviour**: a second implementation passes every
+    // behavioural row on the day it is written and is the copy I19 forbids.
+    // `subprocess.ts` imports its reader from `ndjson.ts`; that is the subject.
+    const entry = await import("../../src/fixtures/index.js");
+    const transport = await import("../../src/data/transport/ndjson.js");
+    expect(entry.createNdjsonReader).toBe(transport.createNdjsonReader);
+  });
+});

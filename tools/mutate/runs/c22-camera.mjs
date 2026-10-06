@@ -103,7 +103,13 @@ const results = await runPass({
       // carries it; nothing can move a camera.
       name: "the binding is gone",
       file: KEYMAP,
-      from: '  { target: "liveBlock", key: { name: "[" }, action: "orbitLeft" },',
+      // Re-anchored 2026-09-24: the camera family moved to `interaction` and the
+      // brackets retired with it (§102, C26 I27, C16 I28) — §102's control row is
+      // `←→ orbit`, and `liveBlock` is *outside*, where a camera may not be
+      // committed from.
+      // Re-anchored for C16 §6c: the row spreads `fromRegistry` where it called
+      // `chordOf`, and it is the same row.
+      from: '  { target: "interaction", ...fromRegistry("move.left"), action: "insideLeft" },',
       to: "",
       expect: "T4.17f",
     },
@@ -193,7 +199,7 @@ const results = await runPass({
       // spins the glyph three times too fast.
       name: "the spinner counter advances once per wake",
       file: SESSION,
-      from: "      const steps = Math.floor((now - (this.#tickAt ?? now)) / spinnerMs);",
+      from: "      const steps = Math.floor((now - (this.#tickAt ?? now)) / TICK_MS);",
       to: "      const steps = 1;",
       expect: "T4.17l",
     },

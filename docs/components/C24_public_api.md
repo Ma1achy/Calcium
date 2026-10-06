@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L4 shell — the façade over everything below |
 | **Depends on** | C04 C05 C07 C09 C10 C22 C23 · re-exports from each |
 | **Consumed by** | Every consuming app — `prism-tui`, the docker reference app, anything else |
@@ -16,7 +16,7 @@
 
 Twenty-three components, and an ordinary document consumer touches five things:
 `createTui`, block builders, an adapter signature, a manifest, and theme tokens.
-An interactive application may additionally open one bounded `PushedSurface`.
+An interactive application may additionally attach one bounded `ChildSurface`.
 **Eleven of the twenty-three remain invisible** — terminal, transcript,
 viewport, overlays, input, editor, parser, completion, history, process runner,
 and frame scheduler. The surface composes those owners; it does not expose them.
@@ -32,11 +32,11 @@ The test it serves: Phase 1 is done when someone who is not its author builds a 
 Six, split by what ships to production — one by what a consumer pays to import, and one by when.
 
 ```
-@fmx/calcium            runtime — createTui, builders, types, defaultTheme
-@fmx/calcium/profiling  the report types and Tier; C28 (I31)
-@fmx/calcium/mermaid    the Mermaid transform, and the renderer it loads (I36)
-@fmx/calcium/testing    adapter harness, document assertions, fakes
-@fmx/calcium/fixtures   recording tooling and the Fixture model
+calcium-tui            runtime — createTui, builders, types, defaultTheme
+calcium-tui/profiling  the report types and Tier; C28 (I31)
+calcium-tui/mermaid    the Mermaid transform, and the renderer it loads (I36)
+calcium-tui/testing    adapter harness, document assertions, fakes
+calcium-tui/fixtures   recording tooling, the Fixture model, and C06's NDJSON reader (C08 I19)
 ```
 
 **`mermaid` is production, and it is separate for a cost rather than an audience.** `mermaidCode` is a synchronous builder over `beautiful-mermaid`, an ESM-only package that brings a layout engine with it; on the runtime barrel it was about a quarter of a cold import — 80–156 ms of 400–480 on a native filesystem, six interleaved pairs — for a builder no example calls (F1188). A synchronous function cannot load an ESM module on demand, so the two shapes that took the emulator (C23 I71) and the grammars (C09 I71) off the graph do not reach it; an entry of its own does, and it is the shape this section already has. A consumer that draws diagrams imports the subpath and pays what it paid before, when it chooses; every other consumer's first frame is that much closer to its import.
@@ -59,7 +59,7 @@ export function createTui(config: TuiConfig): TuiInstance;
 export type { TuiConfig, TuiInstance, SessionSnapshot, ChromeFn, StopReason };
 export { SurfaceError };
 export type {
-  PushedSurface, PushedSurfaceHandle, SurfaceContext, SurfaceActionEvent,
+  ChildSurface, ChildSurfaceHandle, SurfaceContext, SurfaceActionEvent,
   SurfaceInputPhase, SurfaceInputFidelity, SurfaceCloseOutcome,
   SurfaceFault, SurfaceKeyBinding, SurfaceKeyChord,
 };
@@ -89,6 +89,7 @@ export type { ThemeTokens, ThemeSet, PaletteSpec, ColourRef, Style };
 export { defaultTheme };
 
 // hooks
+export type { ReservedKeyAction };   // what `TuiConfig.keyActions` is keyed by — the registry's ids (I39, C16 §6c)
 export type { LocalHandler, LocalContext, AskOptions, Choice };   // C23 §2 — and `localHandlers` refuses a wider ctx (C23 I39)
 export type { CompletionSource, CompletionContext, Candidate, Slot };
 export type { LiveSpec, ViewRefresh };
@@ -105,9 +106,16 @@ export type { WorldDriver };
 export { cells, truncate, planColumns };
 ```
 
-`TuiInstance.openSurface()` opens one application-owned full-region view. Its
+`TuiInstance.openSurface()` attaches one application-owned **captured child over
+its own block** (C16 I49, R-BLK-645, R-BLK-711). **It was a full-region view and
+that is what changed in M9**: *a pushed view takes the screen, you do something,
+you come back — and the transcript has a HOLE where that work was.* The child
+owns the keyboard and owns nothing else; its blocks are an entry, the transcript
+stays, and what settled while it was attached is there when it detaches. Its
 render callback receives a fresh producer context on every invalidation and
-resize, plus the currently observed input-fidelity mode. Its keymap is data and
+resize, plus the currently observed input-fidelity mode — and the context's `width`
+and `height` are **the room inside its entry** (I41), not the region's, so a child
+that fills what it is told shows whole. Its keymap is data and
 its actions are delivered serially with monotonic timestamps and ordinals.
 Native CSI-u events retain press/repeat/release; legacy bytes use deterministic
 50 ms release synthesis. The handle exposes `elapsedMs` from that same host-clock
@@ -115,8 +123,46 @@ origin so an application can schedule frames without opening a competing clock.
 A second surface, duplicate binding, malformed surface,
 or failed initial render is a typed `SurfaceError`. Later render/action failures
 close the surface and resolve `closed` with a typed fault. Close is idempotent,
-restores enhanced keyboard mode, and removes the pushed view before the session
-releases the terminal.
+restores enhanced keyboard mode, and returns ownership to the host before the
+session releases the terminal.
+
+**The renames are 0.x and carry no deprecation cycle** (`00-AUTHORITY.md`).
+`PushedSurface` → `ChildSurface`, `PushedSurfaceHandle` → `ChildSurfaceHandle`,
+and the schema string `"calcium.pushed-surface/1"` → `"calcium.child-surface/1"`,
+because a schema that still says *pushed* is a record of the model this MR
+retired. The rest of the family keeps its names — `SurfaceContext`,
+`SurfaceKeyBinding`, `SurfaceError` and the others never claimed a push, and
+renaming them would be churn dressed as consistency. `openSurface` likewise: the
+verb is what an application calls, the design constrains what the thing *is*,
+and there is no rule here to follow into a second name.
+
+**The left-hand names are superseded and nothing exports them** — no alias, because an
+alias is an export nothing consumes and 0.x owes no deprecation cycle. The break is
+recorded under `## Unreleased` in the root `CHANGELOG.md` (ruling 58). **This record
+read `ChildSurface` → `ChildSurface` for a time**: the mechanical rename that
+landed M9 rewrote its own record, and a rename that names itself on both sides
+forbids nothing and reads as a finished sentence. It is restored from `b8bbacda`'s
+parent.
+
+**The attach can be refused for a reason that is new** (C16 I49, R-BLK-908). A
+captured child reserves one `host.detach` action, and an attach whose reserved
+chord is not reachable is a `SurfaceError` beside the existing four — *may never
+leave capture without a visible, reachable host escape* is a precondition, and a
+precondition nobody can fail is a sentence rather than a guarantee.
+
+**`keyActions` answers the chords the design reserved** (I39, C16 §6c, ruling 64). Fourteen
+of the registry's bindings name a feature the framework does not build — the agent strip,
+the permission posture, per-token values, the message queue — and hold the chord so an
+application cannot take it. An application that builds the feature registers the handler:
+
+```ts
+keyActions?: Partial<Record<ReservedKeyAction, () => boolean | void>>;
+```
+
+Keyed by the registry's id (`"queue.drop"`), because that is the name `/help`, `docs/KEYS.md`
+and the design all print. `false` means *not handled*: the row's displaced meaning runs if it
+has one — `⌥⌫` kills a word — and otherwise the key passes. With no handler the row resolves
+as though it were absent. An id outside the set is refused at construction, naming the set.
 
 **`greeting` is how the session's first entry gets there** (C22 I44). S02 specifies
 that entry — *"an ordinary `ViewDocument`, not a screen … appended to the
@@ -236,12 +282,22 @@ A consumer never constructs, inspects or drives any of them. If one is ever need
 
 None of the three moves the export list, and all three stay in `UNCONSUMED_MEMBERS` naming their owner — this ruling says they are not public, not that they are finished.
 
-**The profiler's view is interior on the same argument** (I33). `ProfileView` is opened by `/profile`
-at the prompt and driven by C16's `pushedView` keys; a consumer constructs neither the overlay
-manager it pushes into nor the scheduler it commits through, so a published constructor would hand
-over two of the eleven above with an extra step. What a consumer drawing its own pane needs is already
-here — `profileCard`, `profileDeck`, `CARDS`, `SECTIONS`, `GlyphCaps` — and the framework's view draws with exactly
-those (C28 §3c).
+**The profiler's deck is a verb's, not a consumer's** (I33). `/profile` composes it at the prompt
+into a transcript entry (C23 §2, C28 §3c); nothing that composes it joins the surface, because the
+verb reads a report through `HandlerDeps` and a consumer's own handler already has that report as
+`LocalContext.profile`. What a consumer drawing its own deck needs is already here — `profileCard`,
+`CARDS`, `SECTIONS`, `GlyphCaps` — and the framework's verb draws every card through the published
+`profileCard`, walking the section through `deckOf`, which is interior. **`profileDeck` is not
+among them** (ruling 78, F1327): it was published for the view, the view retired, and a helper whose
+only readers are its own test row and a consumer nobody has written is `paneTitle`'s shape again.
+Nothing in `src/` called it, so it is deleted rather than kept interior. *As it stood:* ~~`profileCard`,
+`profileDeck`, `CARDS`, `SECTIONS`, `GlyphCaps` — … walking the section in the order `profileDeck`
+indexes~~. *As it stood before that:*
+~~`ProfileView` is opened by `/profile` at the prompt and driven by C16's `pushedView` keys; a
+consumer constructs neither the overlay manager it pushes into nor the scheduler it commits through,
+so a published constructor would hand over two of the eleven above with an extra step … and the
+framework's view draws with exactly those~~ — the view, its layer and the target retired together
+(R-EXA-082, F1254).
 
 ### What a producer is told, and what stays interior
 
@@ -252,7 +308,7 @@ those (C28 §3c).
 | export `detectCapabilities` (F43, F54, F124) | **refused** | `ProducerContext.capabilities` — C02's **resolved** record. An app re-deriving from the environment reads seven variables it does not know about and misses the overrides it supplied itself; measured wrong at three of four locale shapes, in both directions, inside the fix written for the finding that asked for it. |
 | export `createBlockRegistry` (F37) | **refused** — it is one of the eleven | `ProducerContext.measure` for production, `expectDocument().lines()` for evidence (§7, I23) |
 | export `validateDocument` (F36) | **refused**, and it was already served | `expectDocument().isValid()`, which has shipped since this section was written. What survived was a deep import nobody re-checked against the surface — a workaround to delete, not a gap to close. |
-| export `liveDeclarations` (F28) | **refused on this entry** | `liveParts` on `@fmx/calcium/testing` (§7, I24). The cost is to testing by the finding's own text; a production consumer reading back its own declaration holds a second record of the document. |
+| export `liveDeclarations` (F28) | **refused on this entry** | `liveParts` on `calcium-tui/testing` (§7, I24). The cost is to testing by the finding's own text; a production consumer reading back its own declaration holds a second record of the document. |
 | an adapter that can `ask` (F77) | **refused** | the local route (C23 §2). C07 specifies a pure mapping from result to document. The 185 lines that finding measured are `meta`, the failure arm, the invocation record and the spawn — the confirm was never the expensive part, and the producer grant closes the rest. |
 | tell a live part the width so it can size its own history (F24, F25) | **refused, and nothing replaces it** | C12 already buckets N samples into the available dot columns, with I5 keeping each column's vertical span. The finding reports a view opened at 120 and read at 80 drawing *"two samples per column"*; that is C12 working. The ring's length is retention, which the producer owns and no terminal bounds. **Measured against `plot/curve.ts`, and the direction inverts** — over-wide is handled, under-wide is a resolution loss rather than a wrong frame. `render` still receives the context, for `capabilities`: a live panel drawing `░█` is F54's list inside F24's route. |
 
@@ -454,11 +510,13 @@ come from the far side and the far side has not promised they are distinct.
 C04 §3a puts vertical rhythm in the block; if every adapter had to think about it,
 half of them would not, and the surfaces would render dense while the specs drew
 them spaced. So the builders decide: `b.table`, `b.plot`, `b.panel`, `b.rule`,
-`b.steps`, `b.kv`, `b.comparison`, `b.patch`, `b.code` and `b.tip` set `gapBefore`
-when they are not the first block in the sequence they are built into; `b.pills`,
-`b.notice`, `b.progress`, `b.logs`, `b.events`, `b.raw`, `b.spark`, `b.group` and
-`b.spinner` do not — a second `pills` row belongs against the first, and a run of
-notices is a list rather than a set of sections.
+`b.steps`, `b.kv`, `b.comparison`, `b.patch`, `b.code`, `b.tree`, `b.split`, `b.form` and `b.tip` set
+`gapBefore` when they are not the first block in the sequence they are built into;
+`b.pills`, `b.tape`, `b.notice`, `b.progress`, `b.logs`, `b.events`, `b.raw`,
+`b.spark`, `b.group` and `b.spinner` do not — a second `pills` row belongs against
+the first, a tape is that row with a window over it, and a run of notices is a list
+rather than a set of sections. **A tree is a section** (C04 §3ap): it is a structure
+of its own, as a table is, and not a row of peers set against the one before it. **So is a split** (C04 §3aq): two panes are a region, as a `panel` is. **So is a form** (C04 §3ar): its fields are one question put to the reader, and its buttons answer it.
 
 **Nineteen builders return blocks, and this paragraph names nineteen** — `b.live`
 is the twentieth. It was deferred with §5 and has landed; it takes `gapBefore`'s
@@ -561,17 +619,21 @@ because it is derived from the arguments rather than accepted as one.
 | `message` | the driver or the containment boundary caught it | **relayed** from `err` |
 | `retryInMs` | the source's backoff | **relayed** |
 | `attempt` | `src.failures`, once per source | **relayed** |
-| `height` | a committed measure, or C23's frame read | **no** — derived |
+| `height` | absent: the box is fitted at its layout width (C09 §3a-quater) | **no** — fitted |
 | `elapsedMs` | whoever holds the clock | **no** |
 | `spinner` | the renderer, per capability set | **no** |
 
 **`height` is the one the scoping does not reach, and it is the one worth naming.**
-The framework's own defaults choose 1 for `error` and 2 for `retrying`, and those
-two numbers are a frame read rather than an arithmetic: both boxes land inside
-`b.live`'s panel, so three rows spend one on a second border inside the first, and
-two rows drew `loading` over `⠋ loading` — the same word twice. A consumer picking
-a height reintroduces exactly that, so `b.status` derives it the way the default
-does. **The builder and the default are one implementation**, which is the other
+`b.status` declares none, and the box is **fitted**: C09's `statusRowsFor` sizes it at
+the width the layout hands it — border, banner, the message wrapped whole, the detail
+within its cap (C09 §3a-quater, C04 I66). It used to declare 1 for `error` and 2 for
+`retrying`, numbers read from a frame *inside `b.live`'s panel* and applied to a box
+that was not in one: at 80 columns a 158-cell message with two `details` drew a border,
+no banner, one row cut at `…`, and no detail at all. **A consumer picking a height
+reintroduces that**, so the builder does not take one; the fit is the same function
+the render allocates with, which is what makes it a measurement rather than a guess.
+Free-standing, a one-row failure is now the full figure — border, banner, message,
+four rows — where it was a red line. **The builder and the default are one implementation**, which is the other
 half of the ruling: the same kind constructed in three places drifts, and the
 place that drifts is the one with fewer tests.
 
@@ -676,9 +738,11 @@ pausing surfaces that defect rather than causing it. The alternative — pausing
 that opted into sharing — would make off-screen behaviour depend on an unrelated declaration,
 so an app adding a key to share a fetch would find its polling semantics changed with it.
 
-**What does not change**: nothing is released, the part stays declared, and C23 I33's five
-triggers remain the only teardown. A pushed view is visible while its layer exists, so the
-pause reaches transcript-hosted parts and does not reach a drill-in at all.
+**What does not change**: nothing is released, the part stays declared, and C23 I33's four
+triggers remain the only teardown. ~~A pushed view is visible while its layer exists, so the
+pause reaches transcript-hosted parts and does not reach a drill-in at all~~ — superseded
+with the pushed view (F1254): every host is an entry (I40, C23 I83), so the pause reaches
+every part.
 
 **`b.live` returns a `panel`, and the three renderings supply its child.** Both
 halves were forced rather than chosen, and by different things.
@@ -690,10 +754,12 @@ half-way through. C23 I34 is the ruling and it is the one `settle(id, doc)` alre
 took: name the operation for the shape that exists. A part wanting several blocks
 returns a `group`, which is one block with children.
 
-*A `panel`, because `Panel` is the only kind with a `title`* — and the title is
-where a live part says what state it is in. `· 14s ago` when stale, `· unavailable`
-when failing, both drawn that way by S13 §3 and §4 already. A part rendering a bare
-`table` has nowhere to put either, so the guarantee below would hold for some
+*A `panel`, because `Panel` is the only kind with a frame* — and the frame is
+where a live part says what state it is in: `updated 4m ago` at the top border's
+inline end when stale (C04 I127, §047). *Amended with R-HON-002: this read `· 14s
+ago` in the title and `· unavailable` when failing — the first moved to the notice,
+and the second was never written by anything; a failing part is the framework's
+error box.* A part rendering a bare `table` has nowhere to put the notice, so the guarantee below would hold for some
 consumers and not others, which is not a guarantee. Hence `title` on the spec: the
 framework owns that row, the consumer owns the children.
 
@@ -744,9 +810,12 @@ builder constructed, so an override could reach for a `notice` and nothing else 
 a red line of text where the framework draws a bordered box with a tag, a spinner
 and a countdown. Both example apps did exactly that, independently, which is the
 signal: **an override is not a request to render worse.** `b.status` takes
-`renderError`'s own three parameters in its own order, so the null override is
-`renderError: b.status` and the useful one wraps it — `b.group("column", [history,
-b.status(err, retryInMs, attempt)])`, which keeps the data the default replaces.
+`renderError`'s own three parameters in its own order, and the useful override wraps
+it — `b.group("column", [history, b.status(err, retryInMs, attempt)])`, which keeps the
+data the default replaces. **`renderError: b.status` is not the null override**, and
+this paragraph said it was: the default is the *framed* figure, drawn without a border
+because the panel has one, and `b.status` is the free-standing one, so inside a live
+panel it draws a border within the border. Supplying no override is the null override.
 
 **`renderError`'s third parameter is a deliberate widening, and the alternative is recorded
 because it is invisible from the result.** `attempt` is the source's consecutive failure count
@@ -770,7 +839,7 @@ at all (rule 3), because silently re-attempting something the user asked for onc
 is a surprise. Both are decided from the declaration, so both are answerable at the
 moment a failure arrives rather than after a heuristic.
 
-**`b.live` works wherever a block does**, in a transcript entry or a pushed view, and C23 drives both. That replaces two mechanisms with one: S02's banner sections and S13's panels now run on the same code, and C22's identity loop goes back to being about identity.
+**`b.live` is driven in a transcript entry, and only there** (I40, C23 I83). ~~`b.live` works wherever a block does, in a transcript entry or a pushed view, and C23 drives both~~ — **superseded with the pushed view** (R-EXA-082, F1254). One mechanism still replaces two: S02's banner sections and S13's panels now run on the same code, and C22's identity loop goes back to being about identity.
 
 ---
 
@@ -797,7 +866,7 @@ throwing (C09 §4), so the lists are an affordance and not a gate.
 
 ---
 
-## 7. `@fmx/calcium/testing`
+## 7. `calcium-tui/testing`
 
 The adapter story is "pure function, fixture in, document out". The assertions that make that worth anything would otherwise be reimplemented badly by each consumer, or not at all.
 
@@ -1129,7 +1198,7 @@ one more line on §3's list.
 ## 9. Invariants
 
 - **I1** — Every export is used by **the union of** `prism-tui` and the reference app. Neither alone exercises the whole surface — docker touches no `spectrum`, no `WorldDriver` and only part of the manifest schema. An export used by neither is removed.
-- **I2** — The eleven components in §3's absent list are not reachable from any entry point. **This was unfalsifiable until the entry points existed** — `src/index.ts` was `export {}`, so the claim held over a surface with no exports — and its first real run found `BlockRegistry` named in `@fmx/calcium/testing`, where `renderToLines` took one as a parameter. The sharper half of that finding was not the naming: `createBlockRegistry` is exported from no entry, so the two functions were uncallable by any consumer. An export nothing can invoke is A03 §2's vacuity class reached through the surface rather than through a rule.
+- **I2** — The eleven components in §3's absent list are not reachable from any entry point. **This was unfalsifiable until the entry points existed** — `src/index.ts` was `export {}`, so the claim held over a surface with no exports — and its first real run found `BlockRegistry` named in `calcium-tui/testing`, where `renderToLines` took one as a parameter. The sharper half of that finding was not the naming: `createBlockRegistry` is exported from no entry, so the two functions were uncallable by any consumer. An export nothing can invoke is A03 §2's vacuity class reached through the surface rather than through a rule.
 - **I3** — Builders return frozen blocks; there is no second description type.
 - **I4** — A generated id is stable within one document and never rendered.
 - **I5** — No builder infers a tone, glyph or action from a field name.
@@ -1139,8 +1208,8 @@ one more line on §3's list.
 - **I9** — Startup validation severities are those of §8, and each cites the spec that set it. The severities are C24's and the enforcement is the owning component's for six of the seven; the seventh is a warning, which nothing that throws could express, and so nothing did until it was written. **The moment is `start()` for six of them** — `createTui` is eager about `validateConfig` alone, and §8's opening sentence said otherwise for as long as it existed.
 - **I10** — The runtime entry exports no function that performs I/O except `createTui` **and `b`, named here because it does** (F927). `b.image({ path })` reads the file synchronously at construction, and it is a published convenience rather than an oversight: the alternative is every consumer reading the bytes itself. What made it worth writing down is that the invariant had no row until C24's uncited list was worked through, so a second exception could have arrived beside it unread — and the comment at the call site argues *where* the read belongs (never `presentation/`, whose renderer would do I/O at frame cadence and make `measure` and `render` disagree the moment the file changed between them) rather than *whether* the public surface may do it at all. **A correct sentence answering a different question than the invariant asks**, which is the shape review passes. T2.6 compares the reaching set against this list by equality, so a third is a failure and a retired second is one too.
 - **I11** — The reference app lives in its own repository and consumes Calcium as a published dependency, so the unused-export scan runs against `prism-tui` plus the app's declared import manifest, refreshed on each version bump. It is a reported signal, not a build gate.
-- **I12** — `b.live` behaves identically in a transcript entry and in a pushed view. C23 drives both, so the difference between them is placement and input ownership (D4) and never the block's own lifecycle — a live block that worked in one and not the other would make D3's two renderings two implementations.
-- **I13** — `@fmx/calcium/testing` ships the document assertions, so no consumer reimplements them. `degradesTo1Bit` is the one that earns the module: it is B04's compliance sweep, and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
+- **I12** — **Retired with the pushed view, and replaced by I40** (F1254). It read: *`b.live` behaves identically in a transcript entry and in a pushed view. C23 drives both, so the difference between them is placement and input ownership (D4) and never the block's own lifecycle — a live block that worked in one and not the other would make D3's two renderings two implementations.* The design deleted the pushed view (C25 §3b, R-EXA-082), and *identically in both* over a set of one host forbids nothing — a row citing it is green over an absent subject.
+- **I13** — `calcium-tui/testing` ships the document assertions, so no consumer reimplements them. `degradesTo1Bit` is the one that earns the module: it is B04's compliance sweep, and no consumer would write it themselves, which is exactly how the colour axis starts losing information invisibly.
 - **I14** — `planColumns`, `cells` and `truncate` are public because a custom block kind cannot satisfy C09 I1 without them. A consumer measuring width with `.length` disagrees with the measurer, and the disagreement is silent.
 - **I15** — Every block-returning `b.*` builder sets a `gapBefore` default **of its own** (§4), and an explicit `gapBefore` always wins over it — at every position, including the first, which is the only one where the two can disagree. The explicit value arrives through `BlockOpts`, which every one of them accepts; before that argument existed the invariant was unwritable as a test, and so was the half of §4 that promised it. The default is the builder's and not the block kind's: `b.steps` gaps and `b.spinner` does not, and both return `Steps`. A builder with no default is a kind whose rhythm silently depends on which adapter wrote it.
 - **I16** — No entry point exports a type that declares work for the framework to perform unless something in `src/` performs it. `ViewRefresh` is the measured case: a consumer could declare a refreshing part, type-check, and never be called — A03 §2's vacuity class reached through the export list rather than through a rule. MG25 is the mechanical form, over **functions and classes** — not constants, which A03 §MG25 correction 1 excludes deliberately and this sentence named for some time anyway (F1000); a declaration type is caught by the producer it belongs to appearing there.
@@ -1156,13 +1225,13 @@ one more line on §3's list.
 - **I26** — **A consumer can build a `ProducerContext`**, with the real measurer in it. `ProducerContext.measure` is the frame's own — one arithmetic, or a split decided in a producer and the rows drawn on screen disagree — and `BlockRegistry` stays interior (§3), so a consumer whose adapter or handler *takes* a context could not call it outside a session. That is I19's argument a second time: a producer the framework can test and a consumer cannot is a producer whose app-side tests assert against something the user never sees. **Found by deleting the reference app's reimplementation of the measurer** (F37), which was also the fixture its own suite measured with. `localContext` comes with it for the same reason and adds `ask`, defaulting to the **decline** path — C23 I36's own semantics, so a handler tested without a scripted answer takes the route `Esc` takes rather than a stub's.
 
 - **I27** — **`LiveSpec.source` declares sameness and `LiveSpec.derive` is what makes it usable.** Two parts naming one key share one `fetch` and one fold, so two panels of one document cannot show two samples of one instant (C23 I44). The pairing is not a convenience: a part accumulating inside its `fetch` cannot share one, which is what the reference app did, so `source` without `derive` has no consumer. A conflicting `every` on one key is **refused, in the losing part's panel, naming both parts** — thrown, it is swallowed by the append's deliberate bare catch and the author sees two loading panels for ever — and conflicting `fetch` closures are **not checked** — the key is the claim that they are the same and the framework takes it, which is the standing of a string key at all (C23 I42, C23 I43, C23 I47).
-- **I28** — **A live part does not poll while nothing is looking at it, and this is not configurable** (I6, C23 I46). It reaches every part rather than only those declaring a `source`, because a part accumulating inside `fetch` is already broken by I27's rule and pausing surfaces that rather than causing it; the alternative would make off-screen behaviour depend on an unrelated declaration. **Nothing is released** — the part stays declared and C23 I33's five triggers remain the only teardown — and a pushed view is visible while its layer exists, so the pause reaches transcript-hosted parts and not a drill-in. It is a stated behaviour change for declarations that predate it, which is why it is an invariant here and not only in C23.
+- **I28** — **A live part does not poll while nothing is looking at it, and this is not configurable** (I6, C23 I46). It reaches every part rather than only those declaring a `source`, because a part accumulating inside `fetch` is already broken by I27's rule and pausing surfaces that rather than causing it; the alternative would make off-screen behaviour depend on an unrelated declaration. **Nothing is released** — the part stays declared and C23 I33's four triggers remain the only teardown ~~— and a pushed view is visible while its layer exists, so the pause reaches transcript-hosted parts and not a drill-in~~ (superseded, F1254: every host is an entry, I40). It is a stated behaviour change for declarations that predate it, which is why it is an invariant here and not only in C23.
 
 - **I29** — **A published function's arguments are constructible from the published surface.** A parameter whose type is interior makes the function itself interior, whatever the export list says — and the failure is silent in exactly the direction that matters, because the export *is* there and the signature *does* resolve until a consumer tries to supply the argument. **Three instances and the third is why this is a rule** (§8a, §8b, §8c): `CompletionContext` shipped with `completionContext`, `ProducerContext` with `producerContext`, and `plotToSvg` was published for a year with `ResolvedTheme` and `loadTheme` both interior. **`RenderContext.theme` is why it survived** — one published route to the type existed, inside a synchronous `render`, which is the one place an SVG cannot be used. A route that exists and does not reach the callers is indistinguishable from a route that works, from the export list. **Checked rather than promised**: MG29 reads every exported function's parameter types and asks whether each is exported or reachable from an exported type, which is the same question §3's refusal list already answers by hand for the exports it removes. **Its stated blind spot is the one that hid this**: a type reachable through *some* published route counts as constructible, and `ResolvedTheme` was — through `RenderContext`, into a synchronous `render`. The rule reports reachability and cannot ask whether the route reaches the caller who needs it, so it would have found this only once `RenderContext` did not exist.
 - **I30** — **A published builder constructs every block kind, and every member of a kind, that the published types declare — except a value only the framework can compute.** I29's dual, and it fails in the same silent direction: the type is exported, the member resolves, and the gap appears only when a consumer tries to set it. **The exception is `who computes`, not `who holds`** — a value the framework *hands* a consumer, as `renderError` hands `err`, `retryInMs` and `attempt`, is relayed rather than claimed, and relaying it is not the thing MG27 refuses. Derived members stay underivable: `state` follows from whether a countdown is present, and `height` is C23's frame read, so neither is a parameter. **Three instances, and each had been recorded as owed its own commit**, which is how a queue nobody drains gets made: `status` had no builder at all, `b.plot` omitted eight of `Plot`'s 58 — four of them a form's only datum, so four forms were unconstructible and three reduced — and `FigureBuilder.setFacets` set a field the published function could not. **Checked by MG27 in both directions**, which is why the rule can be widened safely: an omission needs a reason keyed `Kind.field`, and an entry whose builder now sets the field is itself a violation, so the reasons cannot outlive their subject. **Stated blind spot**: MG27 is per *member* and this rule is also about *kinds*, and a kind with no builder has no member row to be missing — `status` was invisible to it for that reason, and what found it was writing a consumer that needed one.
-- **I31** — **`@fmx/calcium/profiling` publishes types, `Tier`, and nothing that runs.** No recorder, no probe, no capture: a consumer imports it to *read* a report, and everything that produces one is reached through `createTui`. An entry point that ships behaviour nothing on the runtime surface can reach is a second way in (→ C22 I93).
+- **I31** — **`calcium-tui/profiling` publishes types, `Tier`, and nothing that runs.** No recorder, no probe, no capture: a consumer imports it to *read* a report, and everything that produces one is reached through `createTui`. An entry point that ships behaviour nothing on the runtime surface can reach is a second way in (→ C22 I93).
 - **I32** — **`ChromeContext.lastFrame` carries the previous frame's `work` and its name says so.** The figure is composition alone and never `work + wait`: the wait is time before the frame began, so a sum grows while the session is idle (C28 I4). It reports the last **completed** frame whatever its `outcome` — `report()` filters fallbacks out of `worst` and the durations because those are projections over the frames that *composed* (C28 I6), while `timeline` carries them because it is the series of what happened (C28 I54, F1020), and this is neither: it is the most recent measurement rather than a projection; a session repeatedly falling back would otherwise hold a drawn frame's figure on screen indefinitely. It clears with the ring on a tier change, because a figure from the tier before is one nothing is maintaining. The current frame's total cannot be known while composing it, so a member named for the current frame would hold a number it cannot have — the shape this repository keeps finding. It is `undefined` at tier `off` and for the first frame of a session, and a chrome that draws it says which frame it is describing.
-- **I33** — **The profiler's view is opened at the prompt and never constructed by a consumer: no `ProfileView`, `createProfileView` or layer id joins the published surface, and the deck exports that were published for a consumer drawing its own — `profileCard`, `profileDeck`, `CARDS`, `SECTIONS`, `GlyphCaps` — are what the framework's own view draws with, through the same exports.** `CARDS` is among them because **a card's id is its address**: a consumer building its own navigation needs the questions and the groups, and a hard-coded list of ids in an application is the register written a second time by someone who cannot see it change. `paneTitle` was published with no consumer anywhere in the tree, tools or examples for the whole of its life, and MG24 could not see it because a root re-export of a function is not an interface member (F945); the view is its first consumer, and this invariant is what says a published pane helper has to have one.
+- **I33** — **The profiler's deck is composed at the prompt by `/profile` and never by a published constructor: no `ProfileView`, `createProfileView`, layer id or refresh cadence joins the published surface, and the deck exports published for a consumer drawing its own — `profileCard`, `CARDS`, `SECTIONS`, `GlyphCaps` — are what the framework's own verb draws with: every card through `profileCard`, the section by `SECTIONS` and the named card by `CARDS`** (amended, R-EXA-082, F1254; amended again, ruling 78, F1327: `profileDeck` struck from the list). *As it stood:* ~~The profiler's view is opened at the prompt and never constructed by a consumer … are what the framework's own view draws with, through the same exports.~~ `CARDS` is among them because **a card's id is its address**: a consumer building its own navigation needs the questions and the groups, and a hard-coded list of ids in an application is the register written a second time by someone who cannot see it change. `paneTitle` was published with no consumer anywhere in the tree, tools or examples for the whole of its life, and MG24 could not see it because a root re-export of a function is not an interface member (F945); this invariant is what says a published pane helper has to have one. **`profileDeck` is the one this invariant removed** (ruling 78, F1327). Its framework consumer was the view; the verb walks `deckOf` itself, so what was left reading it was T1.11 and a consumer with its own navigation that nobody had written — a helper held on the surface by its own test row, which is the state this invariant exists to refuse. Nothing in `src/` called it, so it was deleted rather than kept interior. *As it stood:* ~~**`profileDeck` is the one whose framework consumer retired**: … so its consumers are T1.11 and the consumer with its own navigation it was published for.~~
 - **I34** (F999) — **A consumer does not index a published type to recover a name `src/` already declares.** The two instances are `examples/plots`' own aliases — `Plot["form"]` for `PlotForm` and `NonNullable<Plot["camera"]>` for `Camera` (§8e) — and both compile, which is the direction that makes this silent: the index expression is a *correct* way to spell a type and a *wrong* way to name one. `Camera` is a view and C04 I75 keeps the live one off the block; `PlotForm` came back into an app file under the framework's own name, beside a comment describing the framework's declaration. **The population is the consumers' index expressions and not the surface's member list**, and that is the ruling rather than a convenience: fifty named types sit in a published member's type position unpublished, most of them a property of the single owner that names them, where indexing is the right spelling and a second name would be a second record. The check resolves each `Owner["member"]` in the example apps to the member's declared type name and fails when `src/` declares it and no entry point publishes it — so `Series["tone"]`, whose type **is** published, and `TerminalCapabilities["imageProtocol"]`, an inline union `src/` never named, are cleared for two different reasons and neither is a special case. **Stated blind spot**: it sees the aliases a consumer wrote, so a consumer who gave up and hand-declared the union instead is outside it — the failure mode `LocalContext` was published against, and the one an index expression is evidence *of*.
 ---
 
@@ -1175,9 +1244,9 @@ one more line on §3's list.
 5. Ids are generated unless supplied, matter only for patched blocks, and are never rendered (I4).
 6. A bare string is a cell; nothing is inferred from field names (I5).
 7. `b.live` gives A02 §7's whole pattern by default, with fixed behaviour and overridable rendering (I6).
-8. `b.live` works identically in a transcript entry and a pushed view, driven by C23 in both (I12).
+8. `b.live` is driven only in a transcript entry, by C23; a second kind of host is a spec change before it exists (I40). **Superseded with the pushed view** (F1254): *as it stood* ~~`b.live` works identically in a transcript entry and a pushed view, driven by C23 in both (I12)~~.
 9. Animation lives in block kinds; `measure` cannot see `tick` (I7).
-10. `@fmx/calcium/testing` ships the assertions, so no consumer reimplements them (I13).
+10. `calcium-tui/testing` ships the assertions, so no consumer reimplements them (I13).
 11. Startup validation errors on anything that would render a session wrong, and warns on anything merely suspect (I9).
 12. `planColumns`, `cells` and `truncate` are public because a custom block kind cannot be written without them (I14).
 13. Every block-returning builder sets a `gapBefore` default of its own, and an explicit value always wins (I15, §4).
@@ -1199,12 +1268,14 @@ one more line on §3's list.
 29. A published builder constructs every kind and member the published types declare, except a value only the framework can compute — and the test is who computes it, not who holds it (I30, §4b, §8d, MG27).
 30. **A fourth entry point, for types a consumer reads rather than behaviour they run** (I31). `profiling` ships because the profiler ships; it holds no recorder, so importing it cannot start one.
 31. **The context carries the *last* frame's cost, and the member is named for it** (I32). A frame's total is unknowable while it is being composed, so the honest member is the one that says which frame it describes.
-32. **The profiler's view is a verb's, not a consumer's** (I33). Nothing that opens it is published; what was published to draw a pane is what the framework draws its own with.
+32. **The profiler's deck is a verb's, not a consumer's** (I33). Nothing that composes it is published; what was published to draw a card is what the framework draws its own with. *As it stood:* ~~The profiler's view … Nothing that opens it is published~~ (R-EXA-082, F1254).
 33. **A type `src/` names is nameable from the surface, and the consumers are what say which ones** (I34, §8e). Checked over the index expressions an app wrote rather than over the members a type declares, because the gap is invisible from inside a package whose every caller imports the declaration directly — and because the member list would answer *fifty*, where the consumers answer *two*.
 34. **The assertion helper measures what the app registered** (I35, F405). Not an exported registry — the definitions, which the consumer already holds because `TuiConfig.blocks` takes them. The measured failure is the one that makes this a defect rather than an omission: an unregistered kind does not throw, it renders as one row and every assertion below it passes.
 35. **The runtime barrel imports nothing from the Mermaid renderer; the transform is its own entry** (I36, F1188).
 36. **Retired with Ink** (I37, F1209). It read: *a launcher can narrow the renderer's dependency graph before the app imports it, and the narrowing is exact or absent* (F1192, R01 R4.7). The graph it narrowed was Ink's — one import line, one barrel, 1,319 modules — and deleting Ink deleted every part of the subject: the file the `load` hook watched, the specifier the `resolve` hook answered, and the dependency that pulled es-toolkit into the tree at all. The entry point is removed rather than left registering hooks nothing can arm.
 37. **Every entry resolves into one bundled graph that keeps one instance, the same names, the emulator and the renderer off the graph, and a named frame** (I38, F1193, A04 §5).
+38. **A reserved key's handler is registered by the design's id, and an unknown id is refused at construction** (I39, C16 §6c). → T2.23, T3.14
+39. **A child is told the room inside its entry** (I41). What it fills is what the frame shows, both borders and every row.
 
 ---
 
@@ -1213,14 +1284,20 @@ one more line on §3's list.
 ### Tier 1 — unit
 
 - **I35** (F405, C04 I119) — **`expectDocument` renders with the definitions the caller registered.** `fullRegistry()` held `table`, `plot` and `patch` and offered no way to add a fourth, so a consumer who registers a kind could not test it with the published assertion helper: every height of their block rendered as **one row**, because the registry fell back to `raw`. The frame was correct and the instrument could not see it — a reader that guesses is measuring the guess. The parameter is `readonly AnyBlockDefinition[]`, which is exactly what `TuiConfig.blocks` takes — a definition of some **one** kind, and `readonly BlockDefinition[]` (the first draft's spelling) asks each element to handle *any* block, which is the contravariance C04 I119 records, so the surface asks for nothing a consumer cannot already construct (I19's rule, and the reason this is a parameter rather than an exported `BlockRegistry`: the registry is one of the eleven §3 keeps unreachable).
-- **I36** (F1188) — **The runtime barrel imports nothing from the Mermaid renderer.** `@fmx/calcium` re-exports no `mermaidCode` and a process that imports `dist/index.js` under the import trace loads no module from `beautiful-mermaid` or `elkjs`; the transform is `@fmx/calcium/mermaid`, a one-line barrel over `presentation/mermaid.ts`, and the function behind it is the same function — the contract rows hold unchanged, because what moved is an import line and not a byte of output. **The observable is the graph and never a duration** (C23 I71's argument): a timing row is green on a fast machine with the renderer still on the graph, and red on a slow one with it gone. T5.8 runs the same check through the bundled entry, where the renderer is external to a separate entry point (F1193).
+- **I36** (F1188) — **The runtime barrel imports nothing from the Mermaid renderer.** `calcium-tui` re-exports no `mermaidCode` and a process that imports `dist/index.js` under the import trace loads no module from `beautiful-mermaid` or `elkjs`; the transform is `calcium-tui/mermaid`, a one-line barrel over `presentation/mermaid.ts`, and the function behind it is the same function — the contract rows hold unchanged, because what moved is an import line and not a byte of output. **The observable is the graph and never a duration** (C23 I71's argument): a timing row is green on a fast machine with the renderer still on the graph, and red on a slow one with it gone. T5.8 runs the same check through the bundled entry, where the renderer is external to a separate entry point (F1193).
 - **I37** (F1192) — **Retired with Ink** (F1209). It read: *`prepareLaunch()` narrows Ink's es-toolkit import to the one module it binds, exactly or not at all* — a `load` hook matching Ink's import line byte for byte to arm a `resolve` hook that answered the resolved barrel URL with the one file. **It was a rule about a third party's import line**, and it retires rather than going unproven: with Ink gone es-toolkit is not in the tree, the hooks can never arm, and `prepareLaunch()` would be an export whose every branch is unreachable. **The measured win goes with it and is recorded here so nobody re-derives it**: 1,319 modules of a cold import's 2,442, and 235 → 208 ms without the compile cache, 205 → 162 with it, six of six interleaved pairs (R01 R4.7). The graph is smaller than either figure now, because the hundred modules of Ink itself went too.
 - **I38** (F1193, A04 §5) — **Every entry resolves into one bundled graph, and the bundle keeps four things the file tree had.** *One instance*: `testing` and `fixtures` share the registry, the theme and the measurer with the runtime, and a child importing two entries sees one class object — a bundle per entry without splitting would give a consumer's test two registries and an `instanceof` that lies. *The same names*: each bundled entry's export keys equal its `tsc` file's, for all six. *Off the graph still*: the emulator's dynamic import is its own chunk and the Mermaid renderer is external to a separate entry, so C23 I71 and I36 hold in bundle form and the same children show it. *Frames still named*: C28 I65. What makes the bundle safe to evaluate in one scope is MG1 and MG22 — the graph is acyclic across and within layers, so the bundler's order is the loader's — and nothing in `src/` reads `import.meta`, `__dirname` or `createRequire`. **The observable is the graph and never a duration** (I36's rule): under the import trace the armed bundled runtime is fewer than four hundred modules where the file tree was 1,130.
+- **I39** (C16 §6c, ruling 64, → C22 I134) — **`TuiConfig.keyActions` is keyed by the registry's id for a reserved action, and an id outside that set is a construction error.** `keyActions?: Partial<Record<ReservedKeyAction, () => boolean | void>>`, with `ReservedKeyAction` exported from the runtime entry — the fourteen ids the design names and the tree reserves: `agent.next`, `agent.previous`, `agent.1`…`agent.9`, `posture.cycle`, `values.toggle`, `queue.drop`. **The design's spelling and not the tree's `KeyAction`**, because an application reads the registry, `/help` and `docs/KEYS.md`, and all three say `queue.drop`. The type refuses a wrong id at compile time for a consumer that names the field; `validateConfig` refuses it again for one that does not — a configuration read from JSON — and the message names every reserved id, so the reader learns the set from the refusal. A handler returning `false` has not handled the key (C22 I134).
+- **I40** — **`b.live` is driven only in an entry** (R-EXA-082, F1254, → C23 I83). Every part a `b.live` block declares is registered against the transcript entry it was appended in, and the published `RefreshHost` names one kind, `"entry"`. **It replaces I12**, whose *identically in a transcript entry and in a pushed view* had lost one side: with the view gone it was a sameness claim over a set of one, and it could not be violated. The stronger statement is the one a consumer can act on — **where a live block runs is decided, not open** — and a second host kind is a spec change in C23 before it reaches this surface.
+- **I41** — *(M9 item 2, → C22 I110, C14 I56, C09 I1)* **`SurfaceContext.width` and `height` are the child's interior: the panel's inside less the entry's chrome.** The child's blocks are drawn inside a `panel` inside a transcript entry, so what it is told is what that nesting leaves of the region — `width` is the panel's child width at the region's width (C09's `panel` row: *children measured at `w − 2`*, answered by C09's own `panelInterior` rather than a second subtraction), and `height` is the region's height less the entry's command rows (C22's `commandRows` for `child <id>`, the measurer's function), the panel's two border rows and the entry's closing blank (C22 I85). **Both floor at one.** Told the region, a child that filled it drew an entry four rows taller than the screen and every body row two cells wider than its box: the viewport showed the bottom of it, and the command row, the top border and the first body rows were never on screen. A child that renders exactly `height` rows of at most `width` cells is on screen whole, both borders and every body row, while the viewport follows the tail — which C14 I56 keeps true while it is attached.
+- **I42** — *(C23 I92, review batch 4 M15.9)* **`AskAnswer` and `QuestionOutcome` are published beside `AskOptions`**, because a handler that awaits `ctx.ask` must be able to name what it awaits. `AskAnswer` is `{ key, text?, outcome }`, and `outcome` is `"answered" | "cancelled" | "expired"`. → T2.34
+- **I43** — *(C23 I91, C23 I92, C23 I93)* **`AskOptions` takes `signal?: AbortSignal` and `expiresAfterMs?: number`**, both optional, so every existing caller compiles unchanged. A second question waits rather than throwing; a choice set with two defaults, or a default on `reply…` or an inspection, rejects. The additions are recorded in CHANGELOG. → T2.34
+- **I44** (F1504) — **What the release notes say about the published surface is true of it.** Every backticked name `CHANGELOG.md`'s `## Unreleased` says *is exported* or *are exported* is published by an entry in `package.json`'s `exports`, read from the built declarations those entries name; every name it says *is not on a package entry point* or *is removed from the public API* is not; and every backticked name in `MIGRATION.md` §2's table that `dist/` declares is published. **The third clause is the one the finding was about**: §2 is *changes the compiler finds*, and a compiler reports a name only where the consumer could write it, so a row names the published handle a consumer meets the change through — `ChromeFn`'s context, `Notice.state`, `LocalContext.ask` — and never the interior type the change was made in. Six of §2's fifteen rows named an interior type — `ChromeContext`, `Verdict` with `InterceptVerdict`, `RouterDeps`, `CallState` in two rows, `KeyAction` — and two of the six, `Verdict` and `RouterDeps`, no consumer could hit: on the surface before each change neither was reachable by name or through a published type's fields, measured by compiling a consumer against the packed tarball (F1504). **Measured once and not re-measured**: which rows a consumer can *hit* was decided by compiling a consumer per row against packed tarballs before and after each change; this invariant keeps the names honest and does not re-run that. **Stated blind spots**: prose naming a symbol without one of the three phrases — *refused by `validateDocument`*, *`menuBlocks`' second parameter* — is outside it, and `validateDocument` is on no entry; a member named `Type.field` is checked at `Type` only, so a removed or misspelt member passes; a name with no capital is not read as a name, because the notes' lowercase words are values (`live`, `quote`) that `dist/` also declares as functions; a name `dist/` no longer declares at all — `profileDeck`, `clearConfirmLayer` — is indistinguishable from a word that was never a name, and passes; and a structural route is not checked, so a row naming a published handle whose member no longer reaches the change passes. → T2.35
 
-- **T1.9** (I31): every runtime value exported from `@fmx/calcium/profiling` → two frozen lookup tables and nothing callable; importing the module constructs no recorder, registers no timer and touches no process figure. Asserted on the module's own exports rather than on a written list, because a list is satisfied by the list. **The two tables are the operations a report's reader has that a type cannot give them**: `TIER_RANK` compares two tiers, and `PHASE_GROUP` groups a span into `compute` / `draw` / `output` / `input` / `far side` — which is the *is it computing or drawing* question, unanswerable from `spans` alone because a `Record<SpanName, Histogram>` carries no grouping. A frozen table starts nothing, which is the whole of why either is here.
+- **T1.9** (I31): every runtime value exported from `calcium-tui/profiling` → two frozen lookup tables and nothing callable; importing the module constructs no recorder, registers no timer and touches no process figure. Asserted on the module's own exports rather than on a written list, because a list is satisfied by the list. **The two tables are the operations a report's reader has that a type cannot give them**: `TIER_RANK` compares two tiers, and `PHASE_GROUP` groups a span into `compute` / `draw` / `output` / `input` / `far side` — which is the *is it computing or drawing* question, unanswerable from `spans` alone because a `Record<SpanName, Histogram>` carries no grouping. A frozen table starts nothing, which is the whole of why either is here.
 - **T1.10** (I32): at the recorder — `undefined` before any frame; the first frame's `work` after one; the **first** frame's figure after the second, so a member filled with the frame in flight reads a number that frame cannot have; the last completed frame's whatever its `outcome`, because a projection over drawn frames would hold a stale figure through a run of fallbacks; and `undefined` again after a tier change, which clears it with the ring. **The four clauses are four states and only one is reachable from a session** — a driven session has composed several frames before anything can read a footer, so *the first frame's is undefined* cannot be constructed there.
 - **T1.10b** (I32): a real session at `off` and at `counters` → the footer carries no cost cell; at `spans` it carries one, and the label says which frame it describes. **The wiring, which T1.10 cannot see**: `ComposeDeps.lastFrame` is optional, so a fixture omitting it answers `undefined` at every tier and a row built on one passes on the day nothing is wired.
-- **T1.11** (I33): `src/shell/profile-view.ts` imports `profileDeck` and `SECTIONS` from `profiling/panes/index.ts` — the same module the root re-exports — and the published surface names no `ProfileView`, no `createProfileView` and no layer id. The row draws the view and compares its layer to `api.profileDeck(report, section, index, region, caps)`, then calls `api.profileCard` for **every** id in the published `CARDS`: a register a consumer can read is a menu, and a menu with a dead entry in it is worse than no menu. `paneTitle`, the surface this replaces, had no consumer anywhere in the tree, tools or examples for the whole of its life and MG24 could not see it, because a root re-export of a function is not an interface member (F945).
+- **T1.11** (I33): the published surface names no `createProfileView`, no layer id, no refresh cadence and nothing named for a view; `api.SECTIONS` and `api.CARDS` equal the registers `/profile` reads; `api.profileCard` draws **every** id in the published `CARDS`; and the surface names no `profileDeck` (ruling 78, F1327). *As it stood:* ~~and `api.profileDeck` draws every published section~~ — the row was the helper's last reader, and a row that exercises an export is not a consumer of it. *As it stood before that:* ~~`src/shell/profile-view.ts` imports `profileDeck` and `SECTIONS` … The row draws the view and compares its layer to `api.profileDeck(report, section, index, region, caps)`~~ — the file retired with the view (R-EXA-082, F1254). Every card, because a register a consumer can read is a menu, and a menu with a dead entry in it is worse than no menu. `paneTitle`, the surface this replaces, had no consumer anywhere in the tree, tools or examples for the whole of its life and MG24 could not see it, because a root re-export of a function is not an interface member (F945).
 - **T1.12** (I37, F1192): **Retired with I37** (F1209). It held the arming predicate over Ink's source — the exact line arms, two names or double quotes do not — and the URL rewrite from the barrel to `compat/function/throttle.mjs`. Both functions are deleted with the entry point.
 
 - **T1.1**: each builder produces a block passing `validateBlock` — twenty cases.
@@ -1246,7 +1323,7 @@ one more line on §3's list.
 - **T2.7** (I5): a source scan finds no field-name-keyed tone or glyph table in `builders/`.
 - **T2.8**: every block kind in C04's union has a builder — exhaustive over the type.
 - **T2.10** (I16): MG25 — every exported value in `src/` is referenced by another `src/` module, or named in an allow-list that is **compared by equality**. **The row existed and the citation did not**, which is the state SP9 is built to report: `enforce-rules.test.ts` held the fabricated violation, the non-vacuity control, the exemption arm and the equality arm, all under a title naming only the rule. A row that checks an invariant perfectly under another name answers *no* to the question SP9 asks. A new test-only export fails until it is named, which is the arm the rule needs rather than the list: an allow-list checked by membership is one where the thirty-fourth entry arrives behind the thirty-first unread. Shown to fire against fabricated files.
-- **T2.12** (I13): `@fmx/calcium/testing` exports `expectDocument`, and `degradesTo1Bit` is reachable from it and from **no other entry** — the assertion that earns the module, because no consumer would write B04's compliance sweep themselves and the colour axis loses information invisibly without it. Asserted on the built assertion object rather than on a list of names, since a list is satisfied by the list. **The fixture is a `scroll` around the notice**, because a flat document exercises the assertion and not the walk — and the walk is where the sweep could not read two of the four kinds that hold blocks (F925).
+- **T2.12** (I13): `calcium-tui/testing` exports `expectDocument`, and `degradesTo1Bit` is reachable from it and from **no other entry** — the assertion that earns the module, because no consumer would write B04's compliance sweep themselves and the colour axis loses information invisibly without it. Asserted on the built assertion object rather than on a list of names, since a list is satisfied by the list. **The fixture is a `scroll` around the notice**, because a flat document exercises the assertion and not the walk — and the walk is where the sweep could not read two of the four kinds that hold blocks (F925).
 - **T2.13** (I14): `planColumns`, `cells` and `truncate` are on the runtime entry, and `cells` is the **same function** `presentation/text.ts` exports — by identity, not by name. A consumer measuring with a re-exported copy would still disagree with the measurer the day the two diverge, and the disagreement is silent (C09 I1).
 - **T2.14** (I19): every hook argument type has its producer on the same entry — `CompletionSource` with `contextAt` and `parseManifest`, so a consumer implementing the hook can *derive* the `CompletionContext` it receives rather than hand-build a literal that agrees with the test.
 - **T2.15** (I22): `registerGrammar` is on the runtime entry, and a grammar registered through it reaches the parser — the asymmetry this API refuses is a factory a consumer can import and cannot install (F93, C09 I23).
@@ -1257,6 +1334,9 @@ one more line on §3's list.
 - **T2.22** (I35, F405): `expectDocument(doc, [faultyDefinition])` on a document holding that kind measures its declared height; without the second argument the same document measures **one row**. **The control is the pair**, because the failing reading is not an error — it is a plausible number, and a row asserting only the passing arm cannot tell a registered kind from a fallback.
 - **T2.21** (I34): every `Owner["member"]` in the example apps' sources is resolved to the member's declared type name, and a name `src/` declares must be published by some entry point. **The row's subject is the resolution and not the count**, so it carries its own controls: `Series["tone"]` clears because `Tone` is published and `TerminalCapabilities["imageProtocol"]` clears because nothing is declared under that name — two clearances by two different arms, and a resolver that returned nothing would pass by finding nothing. The non-vacuity guard is that the scan finds index expressions at all, since an app rewritten without one empties the population while leaving the assertion green (SS26). **Four arms, and only the third can fail on the surface**: the population guard, the residue, the resolution of the finding's own two names against the published set, and a fabricated one-line surface — which is where the resolver's second defect was found, since every type in `src/` spans lines and a line-start anchor resolves the whole corpus while missing its own fabrication.
 - **T2.20** (I11): the surface signal is **reported and never gated** — `index.mjs` computes it after the violation set is closed, never pushes it into `violations`, and enforce exits 0 today with a residue in the hundreds. That last figure is what makes the absence a decision rather than a tree with nothing to report. The rest of I11 is a claim about another repository and a release cadence, which nothing here can hold; what is checkable is the disposition, and the disposition is the half that could silently change.
+- **T2.23** (I39): `ReservedKeyAction`'s members, as the keymap's reserved map holds them, equal the registry ids of the reserved actions and nothing else — by equality, so a fifteenth reservation the type does not name fails — and the runtime entry exports the type.
+- **T2.34** (I42, I43): the runtime entry's declaration names `AskAnswer`, `QuestionOutcome` and `AskOptions`; `AskOptions` has `signal` and `expiresAfterMs`, both optional; `AskAnswer.outcome` is the three words.
+- **T2.35** (I44): the backticked subjects of `CHANGELOG.md`'s *is exported* and *are exported* clauses under `## Unreleased` are each published by some `package.json` entry, read from the entry's `types` declaration in `dist/`; the subjects of *is not on a package entry point* and *is removed from the public API* are each published by none; and every backticked head in `MIGRATION.md` §2's table that some `dist/` declaration file declares is published. Each population is asserted non-empty, and each §2 row contributes a checked name. **Fabricated**: a notes text calling an interior declaration exported, a negative clause naming a published one, and a §2 row naming an interior type each produce exactly their own violation.
 
 ### Tier 3 — edge cases
 
@@ -1276,19 +1356,22 @@ one more line on §3's list.
 - **T3.10**: nesting `b.panel` inside `b.group` inside `b.panel` → valid, measured correctly.
 - **T3.11**: an adapter registered for an absent verb → warning at startup, session opens.
 - **T3.12**: a theme failing contrast → construction throws before the terminal is acquired.
+- **T3.14** (I39): `createTui` with `keyActions: {copy: …}` throws a `ConfigError` whose message names `copy` and every reserved id; the control is a known id, which constructs.
 - **T3.13 (I27)**: two `b.live` parts naming one `source` with different `every` → the losing part's panel names **both** ids and **both** values, and neither part is left at `◌ loading`. **From the public entry, and that is the whole row**: the first implementation threw, which every unit test of the driver could see and no consumer ever could.
 
 ### Tier 4 — integration
 
 - **T4.1** (with C22): `createTui` with only the four required fields produces a usable session.
 - **T4.2** (with C09): every builder's output measures correctly at seven widths.
-- **T4.3** (with C23): a `b.live` part in a transcript entry and one in a pushed view are driven by the same code path.
+- **T4.3** (I40, with C23): a `b.live` part's host is an entry and the published `RefreshHost` admits no other kind — C23 T4.21 is the row, from C23's side. **Amended with the pushed view** (F1254): *as it stood* ~~a `b.live` part in a transcript entry and one in a pushed view are driven by the same code path~~.
 - **T4.4** (with C23): a failing `b.live` part leaves its siblings rendering.
 - **T4.4a** (I27, with C23): two parts naming one `source`, from the public entry only — one `fetch` per tick and one value in both panels. **The control is the same pair without the key**, and it must show two calls and two values: the row's subject is the divergence, so a fixture that cannot produce one asserts nothing.
 - **T4.4b** (I28, with C23, C14): a hosting entry scrolled out of the viewport → the `fetch` spy stops advancing; scrolled back → it advances again. Both halves, because a pause that never resumes satisfies the first.
 - **T4.5** (with C10): `defaultTheme` passes every contrast floor at every colour depth.
 - **T4.6** (with C07): an adapter written using only the public surface produces a document indistinguishable from one written against internals.
+- **T4.8** (§4b, C09 §3a-quater, C04 I66): **through `b.status`**, at 80 and 40 columns — a 158-cell message with two `details` draws the banner, **every word of the message** and **both detail lines**, and `measure` equals the rows drawn; the same at `ASCII` and 1-bit, where the words are the check because the furniture differs. A one-row message draws border, banner and message: four rows. The builder's block carries no `height`, asserted on the object, because a declared one is the defect.
 - **T4.7** (with the reference app): the docker app compiles against the public entry only — no deep imports.
+- **T4.22** (I41, C22 I110): `SurfaceContext` through a real session — at 60×20 the child is told `{ width: 57, height: 9 }` where the region is 59 × 13, and after a resize to 80×24 it is re-rendered with the new interior; a surface id long enough to wrap its command row takes one row more off the height, and its last body row and top border are both on screen.
 
 ### Tier 5 — e2e
 
@@ -1309,6 +1392,7 @@ one more line on §3's list.
 - **T6.19** (I36, F1188): restoring `export { mermaidCode }` to `src/index.ts` → **T5.6** fails on the graph — the renderer's bundle is in the import's list — while every contract row on `mermaidCode` stays green, which is why the row is a graph row and not a contract one.
 - **T6.17** (I34): dropping `Camera` or `PlotForm` from the runtime entry → T2.21's **resolution** arm fails, and the consumer's spelling of a *view* becomes a property of a plot again. **Which arm fails is the part worth writing down, because it was measured and it is not the obvious one.** The residue arm — *no app indexes for a name `src/` declares* — stays **green** under that revert: closing the finding deleted the index expressions, so its population no longer holds them and cannot hold them again until an app re-indexes. A residue watches the consumers; the surface is watched by resolving `Plot.form` and `Plot.camera` against the published set by name. **The revert that reads as tidiness**: nothing else breaks, and the only other evidence is an alias reappearing in an app file under a framework name.
 - **T6.20** (I37, F1192): **Retired with I37** (F1209). It named the two reverts — arming on `includes` instead of the exact line, and dropping the `existsSync` guard — and both name code that no longer exists.
+- **T6.22** (§4b): `framedStatus` declaring its old height again (`1`/`2` free-standing) → **T4.8** fails on the words: the message is cut at `…` and the details are gone, with `measure` and the rows still agreeing.
 - **T6.21** (I38, F1193): building each entry alone (`splitting: false`) → **T5.8**'s one-instance arm fails — `SurfaceError` through the runtime and through `testing` are two classes — while every other row stays green, which is why the arm is a class identity and not an export list; pointing one `default` back at the `tsc` file → the parity arm holds and the module-count arm fails on the same child.
 
 - **T6.1** (I2): exporting one of the eleven absent components → T2.1 fails, and the layering starts leaking.

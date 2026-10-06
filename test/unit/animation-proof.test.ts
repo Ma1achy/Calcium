@@ -206,7 +206,7 @@ describe("tools/animation-proof.mjs — the frames it assembles", () => {
 
   it("AP10: the spinner gallery names every set and every set moves", () => {
     // **The set, by equality** (C24 §6): a name the gallery drops leaves every
-    // other row green. And each set's glyph changes across the forty ticks —
+    // other row green. And each set's glyph changes across the capture —
     // the one property a still frame of a spinner cannot show.
     const s = frames["spinner-sets"];
     const first = plain(s?.frames[0] ?? "");

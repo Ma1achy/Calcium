@@ -28,7 +28,7 @@
 
 import { NO_SPAN } from "../data/viewmodel/index.js";
 import type { Probe } from "../data/viewmodel/index.js";
-import { cells } from "../presentation/text.js";
+import { cells, stripControl } from "../presentation/text.js";
 import {
   DEFAULT_FOOTER_ROWS,
   HEADER_ROWS,
@@ -36,12 +36,16 @@ import {
   MAX_FOOTER_ROWS,
   PROMPT_GUTTER,
   PROMPT_SUBSTITUTION,
+  RAIL_COLUMNS,
   regionWidth,
   RULE_ROWS,
+  transcriptWidth,
 } from "./config.js";
 import type { TerminalSize } from "../terminal/lifecycle.js";
+import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Block } from "../data/viewmodel/index.js";
-import type { Chrome, SessionSnapshot } from "./types.js";
+import type { Chrome, CopyState, GuardRefusal, Label, OwnerHints, SessionSnapshot, WatchRowState } from "./types.js";
+import type { OwnerRung } from "../interaction/router/types.js";
 
 /** What the frame is, before anything paints it. */
 export type Composed = Readonly<{
@@ -49,6 +53,15 @@ export type Composed = Readonly<{
   now: number;
   header: readonly Block[];
   footer: readonly Block[];
+  /**
+   * The application's label for the prompt's upper rule, or `null` (I111).
+   *
+   * **Resolved with the chrome and carried on the frame**, for the reason
+   * `footerRows` is: the painter reads one value and the composer reads it
+   * once. A label computed at paint time would be a second call into the
+   * application from a place that is meant to be pure drawing.
+   */
+  label: Label | null;
   /**
    * Rows the footer occupies — its blocks' measured height, clamped to
    * `MAX_FOOTER_ROWS`, zero for `[]` (I82). Carried so `heightsSum` and the
@@ -58,11 +71,13 @@ export type Composed = Readonly<{
   /**
    * Where the transcript sits — C16's `region`, and the width it is drawn at.
    *
-   * `width` is the terminal's less `CONTENT_MARGIN_R` (I109): the transcript is
-   * resized, measured and rendered at it, and the paint pads what comes back to
-   * `size.columns`. C16 reads `top` and `height` and nothing else.
+   * `width` is the terminal's less `CONTENT_MARGIN_R` (I109) and less the
+   * rail's column (C14 I57): the transcript is resized, measured and rendered at
+   * it, and the paint pads what comes back to `size.columns`. `left` is that
+   * column — the pointer's column is translated by it as its row is by `top`.
+   * C16 reads `top` and `height` and nothing else.
    */
-  region: Readonly<{ top: number; height: number; width: number }>;
+  region: Readonly<{ top: number; left: number; height: number; width: number }>;
   /**
    * How big a layer may be — C15's `Region`, `{ width, height }`.
    *
@@ -88,8 +103,60 @@ export type ComposeDeps = Readonly<{
    */
   probe?: Probe;
   session: () => SessionSnapshot;
-  /** Copy mode, for the chrome. A frame property, like `size` (C16 §5b). */
-  copyMode: () => boolean;
+  /**
+   * Who owns the keyboard, for the chrome's owner line (§103, R-KEY-004). A
+   * frame property, like `size` (C16 §5b).
+   *
+   * **This was `nativeSelection: () => boolean` and the widening is the ladder
+   * arriving.** That member's own argument — *a reader whose mouse has gone
+   * dead with nothing on screen saying why has been given a bug* — is §103's
+   * *AN OWNER YOU CANNOT SEE IS AN OWNER YOU WILL FIGHT*, stated for one rung
+   * of six. Native selection was not the special case; it was the only rung anyone
+   * had reached the end of that argument for.
+   */
+  owner: () => OwnerRung | null;
+  /** C16 I44 — whether that owner is still refusing activations. */
+  ownerArmed: () => boolean;
+  /**
+   * C16 I70 — the key the guard refused, and the way out. Optional for
+   * `bufferedEntries`' reason: a composition with no session graph has no guard.
+   */
+  ownerRefused?: () => GuardRefusal | null;
+  /**
+   * Entries held out of the frame by copy mode (C14 I34).
+   *
+   * **Optional, and absent is *nothing held*** — the same terms `ChromeContext`
+   * states it on. A composition with no session graph behind it has no hold to
+   * report, and a required member here would make every harness that composes a
+   * frame declare a zero it cannot be wrong about.
+   */
+  bufferedEntries?: () => number;
+  /** C22 I116 — the live toast's text, or undefined. Optional: absent is *none live*. */
+  toast?: () => string | undefined;
+  /** C22 I116, C23 I92 — the live toast's mark when it is not `ok`. Absent is `ok`. */
+  toastMark?: () => "expired" | undefined;
+  /**
+   * The copy rung's mode and size (C14 I55). Optional for `bufferedEntries`'
+   * reason: a composition with no session graph has no mode to report.
+   */
+  copy?: (columns: number) => CopyState | undefined;
+  /** C22 I118 — a form field holds the editor; the owner line names it. */
+  editingField?: () => boolean;
+  /**
+   * C22 I133 — what the owner line names its keys from. Optional for
+   * `bufferedEntries`' reason: with no session graph there is no keymap but the
+   * default, and absent is that.
+   */
+  hints?: () => OwnerHints | undefined;
+  /**
+   * C22 I139 — the watches and the row's selection. Optional for
+   * `bufferedEntries`' reason: a composition with no session graph has no
+   * watches, and absent is *no row*.
+   */
+  watches?: () => WatchRowState | undefined;
+  /** C02's resolved record, for the chrome's marks (A03 SS47). `null` before
+   * the session graph exists, which is also when there is no owner. */
+  capabilities: () => TerminalCapabilities | null;
   /**
    * C24 I32 — the previous frame's cost, for the chrome.
    *
@@ -122,9 +189,24 @@ export type ComposeDeps = Readonly<{
 function chromeOf(
   deps: ComposeDeps,
   ctx: Parameters<Chrome["header"]>[0],
-): { header: readonly Block[]; footer: readonly Block[] } {
+): { header: readonly Block[]; footer: readonly Block[]; label: Label | null } {
   using _s = deps.probe?.span("chrome") ?? NO_SPAN;
-  return { header: deps.chrome.header(ctx), footer: deps.chrome.footer(ctx) };
+  // **The label is under the same span and for the same reason** (C28 I39):
+  // the question is *how much of this frame is the application's chrome*, and a
+  // third span firing once would be the same answer written so nobody adds it up.
+  const raw = deps.chrome.label?.(ctx) ?? null;
+  // A string that strips to nothing is no label — the caller supplying `""` or
+  // a line of control characters means the same thing as supplying nothing, and
+  // two spellings of absence is how a slot acquires a blank it draws.
+  //
+  // **Normalised to one shape here** (I114): a caller may return the bare string
+  // that shipped or a record naming a hue, and the painter reads one thing. The
+  // stripping is the text's either way — a hue name is not drawn, so it is not
+  // a channel a control character could travel on.
+  const text = raw === null ? null : stripControl(typeof raw === "string" ? raw : raw.text).trim() || null;
+  const hue = raw === null || typeof raw === "string" ? undefined : raw.hue;
+  const label: Label | null = text === null ? null : hue === undefined ? { text } : { text, hue };
+  return { header: deps.chrome.header(ctx), footer: deps.chrome.footer(ctx), label };
 }
 
 export function compose(deps: ComposeDeps): Composed {
@@ -133,18 +215,39 @@ export function compose(deps: ComposeDeps): Composed {
   const now = deps.now();
   const session = deps.session();
   const lastFrame = deps.lastFrame?.();
+  const capabilities = deps.capabilities();
+  // **The frame's own width, handed down** (C14 I60): the count over a
+  // rectangle is taken over lines laid at the transcript's width, and a copy
+  // state that composed a frame to learn it would compose one inside this one.
+  const copy = deps.copy?.(size.columns);
+  const editingField = deps.editingField?.() === true;
+  const toast = deps.toast?.();
+  const toastMark = toast === undefined ? undefined : deps.toastMark?.();
+  const hints = deps.hints?.();
+  const ownerRefused = deps.ownerRefused?.() ?? null;
+  const watches = deps.watches?.();
   const ctx = {
     session,
     now,
     columns: size.columns,
-    copyMode: deps.copyMode(),
+    owner: deps.owner(),
+    ownerArmed: deps.ownerArmed(),
+    bufferedEntries: deps.bufferedEntries?.() ?? 0,
     // Spread rather than assigned, so `exactOptionalPropertyTypes` sees the
     // member as absent rather than present-and-undefined: a chrome doing
     // `"lastFrame" in ctx` gets the same answer as one doing `!== undefined`.
     ...(lastFrame === undefined ? {} : { lastFrame }),
+    ...(capabilities === null ? {} : { capabilities }),
+    ...(copy === undefined ? {} : { copy }),
+    ...(editingField ? { editingField } : {}),
+    ...(toast === undefined ? {} : { toast }),
+    ...(toastMark === undefined ? {} : { toastMark }),
+    ...(hints === undefined ? {} : { hints }),
+    ...(ownerRefused === null ? {} : { ownerRefused }),
+    ...(watches === undefined ? {} : { watches }),
   };
 
-  const { header, footer } = chromeOf(deps, ctx);
+  const { header, footer, label } = chromeOf(deps, ctx);
   // **The footer is its content** (I82, §6l.4 B): measured at this frame's
   // width, clamped to the maximum the size gate can hold, and zero for `[]` —
   // the lower rule is the prompt's edge, not the footer's head, so a frame
@@ -162,7 +265,7 @@ export function compose(deps: ComposeDeps): Composed {
   // before the height, because `promptRows` is what the height subtracts.
   const content = regionWidth(size.columns);
   const wanted = Math.max(1, deps.promptRows(content, PROMPT_GUTTER));
-  const promptRows = Math.max(1, Math.min(wanted, Math.floor(size.rows / 2)));
+  const promptRows = Math.max(1, Math.min(wanted, promptCap(size.rows)));
 
   // Clamped at zero: a terminal too short for chrome plus a prompt gets a
   // transcript of no rows rather than a negative height that would read as an
@@ -176,15 +279,25 @@ export function compose(deps: ComposeDeps): Composed {
     now,
     header,
     footer,
+    label,
     footerRows,
     // Below the header and its rule (I87, §6l.7), and one column narrower than
     // the terminal (I109, §6l.9): the transcript is measured and drawn at this,
     // while the paint pads every row to `size.columns`. The frame is the
     // terminal's width and the *document* is narrower — the one distinction a
     // composer can read the wrong side of.
-    region: Object.freeze({ top: HEADER_ROWS + HEADER_RULE_ROWS, height, width: content }),
-    // **The same height and now the same width as the transcript region** (I28,
-    // I109 · §6l.9 row 5). A layer's content is content: `place.ts` centres at
+    // **And one column in from the left** (C14 I57, ruling 68): column 0 is the
+    // selection rail's on every row, and the transcript is laid out beside it.
+    region: Object.freeze({
+      top: HEADER_ROWS + HEADER_RULE_ROWS,
+      left: RAIL_COLUMNS,
+      height,
+      width: transcriptWidth(size.columns),
+    }),
+    // **The same height as the transcript region, and the region's width** (I28,
+    // I109 · §6l.9 row 5) — the transcript's plus the rail's column, because a
+    // layer floats over the whole region and the rail is the transcript's alone
+    // (C14 I57). A layer's content is content: `place.ts` centres at
     // `⌊(region.width − width) / 2⌋` and clamps to it, so a centred layer moves
     // by nought or one column and a layer declaring no width is one cell
     // narrower — right for the reason the transcript's rows are. It was the whole
@@ -274,4 +387,14 @@ export function gutterMatchesPrompt(): boolean {
   // are compared with each other, and the equality holds under either
   // convention.
   return PROMPT_SUBSTITUTION.every((form) => PROMPT_GUTTER.first === cells(form)); // narrow-ok
+}
+
+/**
+ * The most rows the prompt's slot takes — half the terminal, floored at one
+ * (S01 §3). **One function, two readers**: `compose` caps the prompt with it,
+ * and a replacing question's inspection sizes its box to it (C23 I88), because
+ * that question is drawn in this slot (C22 I142) and not in the region.
+ */
+export function promptCap(rows: number): number {
+  return Math.max(1, Math.floor(rows / 2)); // cells-ok — a row count
 }

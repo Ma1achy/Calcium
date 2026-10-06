@@ -21,8 +21,19 @@
 // about. The fabricated violation catches the first, the scope check the
 // second, the existence check the third; no one of them catches the others,
 // which is why all three are here (A03 §2, commitment 14).
-import { existsSync, globSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, globSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 import { PLOT_UNIONS } from "../../src/data/viewmodel/validate.js";
+import {
+  themeRuleContentDigest,
+  themeSlotsOf,
+  validateRuleRecords,
+  validateThemeRuleRecords,
+  type RuleRecord,
+  type ThemeRuleRecord,
+} from "../../docs/design/language/build-calcium.mjs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -44,15 +55,26 @@ import {
 } from "../../tools/enforce/module-graph.mjs";
 import {
   allowListCoverage,
+  bidiFormatCodePoints,
   checkAllowLists,
+  checkBidiLiterals,
   checkControlBytes,
   checkEmojiBases,
+  checkGlyphWidthClass,
+  checkMarkDomains,
   checkMarks,
+  checkRuleCitations,
   checkSourceScans,
+  parseDomainTable,
   parseEmojiBases,
+  parseGlyphTable,
   RAMP_VOCABULARIES,
+  ruleCitationCorpus,
   SCANS,
+  trackedBidiCandidates,
 } from "../../tools/enforce/source-scans.mjs";
+import { isBidiFormat } from "../../src/data/text.js";
+import { GLYPH_TOKENS } from "../../src/presentation/blocks/glyphs.js";
 import { hasEmojiForm } from "../../src/presentation/text.js";
 import type { Scan } from "../../tools/enforce/source-scans.d.mts";
 import {
@@ -694,7 +716,7 @@ const FABRICATED: readonly Fabrication[] = [
     source: 'import type { TerminalSize } from "../../terminal/lifecycle.js";',
   },
   {
-    // SS13. Copied from the shape copy mode reaches for: yank has to put text
+    // SS13. Copied from the shape native selection reaches for: yank has to put text
     // somewhere and `pbcopy` is one line away. C14 §6 injects the writer for
     // exactly that reason — a component that shells out cannot be unit-tested.
     rule: "SS13",
@@ -757,7 +779,26 @@ const scanIds = SCANS.map((s) => s.id);
  * list: a rule invisible to `implemented` is a rule the fabrication check does not
  * demand a violation for, which is A03 §2 arriving in the mechanism against it.
  */
-const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54", "SS57"];
+// SS63 and SS64 read the design registry and `glyphs.ts` rather than a file
+// corpus, so neither fits a `SCANS` row: SS63 compares a recorded `widthClass`
+// against `cells()`'s own tables, and SS64 compares marks across three
+// structures inside a domain closure. **SS64 is a gate as of M4's close** — it
+// reported for exactly as long as it was red, because a gate red on its first
+// run is a gate somebody switches off, and the three characters it found were
+// ruled rather than exempted.
+// **SS65 is the third of that family and it is an absence rule, not a
+// comparison.** SS64 pairs the marks appearing on both sides, so a registry
+// glyph with no character in `glyphs.ts` never enters a pair and passes in the
+// same green as one that was checked — which is why the two cannot share a row.
+// Its fabrication lives with C09's own suite, and the arm below reads that file.
+// **SS67 is a membership with a bidirectional arm** — every surface a renderer
+// names against `SURFACE_ROLES` — so it is SS65's shape and not a `SCANS` row.
+// Its fabrication is C10's T2.62, in `theme.test.ts`.
+// **SS68 reads the specs against the registry** — a citation against a JSON
+// document, SS63's shape — and fabricates in its own row below.
+// **SS69's corpus is `git ls-files`**, which no single-file row can stand for,
+// and its subject is the character SS52's reason forbids writing in this file.
+const STANDALONE_SCANS = ["SS47", "SS52", "SS53", "SS54", "SS57", "SS63", "SS64", "SS65", "SS67", "SS68", "SS69"];
 
 const implemented = [
   ...scanIds,
@@ -859,6 +900,28 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       // would be commitment 14 satisfied by assertion, so the next test reads
       // that file and looks for them.
       ...SPEC_RULES,
+      // SS63 and SS64 read the design registry — a JSON document — against
+      // `text.ts`'s own range tables and against `glyphs.ts`'s two mark tables.
+      // The one-file `FABRICATED` shape holds a `src/` file's text and has
+      // nowhere to put a second and a third document, so both drive their own
+      // sources through the readers their signatures take. Their rows are below.
+      "SS63",
+      "SS64",
+      // SS65 reads the same two documents and its fabrication is C09's spec
+      // row, in `glyph-presence.test.ts`. Listed here for the SP family's
+      // reason, and the arm below is what stops the listing being the whole
+      // of the claim.
+      "SS65",
+      // SS67's fabrication is C10's T2.62, in `theme.test.ts`, and the arm
+      // below reads it for SS65's reason.
+      "SS67",
+      // SS68 reads Markdown against the registry, which `FABRICATED`'s one
+      // `src/` file cannot hold; its row is "SS68 fires" below.
+      "SS68",
+      // SS69 likewise, for SS52's reason: the subject is a character that
+      // would reorder this file if written literally, and the corpus is the
+      // tracked set. Its rows build the character at run time, below.
+      "SS69",
     ]);
     expect([...implemented].sort()).toEqual([...covered].sort());
   });
@@ -1520,6 +1583,149 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
     ).toBe(s.members);
   });
 
+  it("SS68 fires: a spec citing a design rule the registry has never held", () => {
+    // **The fabrication is the defect that was found by hand**: C26 I24 cited
+    // `R-NAV-004`, and the registry has no `R-NAV` family. Two documents, so a
+    // row that fired on anything would also fire on the control file.
+    const docs: Record<string, string> = {
+      "docs/components/C98_fabricated.md": "a sentence on keys *(R-NAV-004)* moving focus.\n",
+      "docs/components/C99_control.md":
+        // A current id, an example and a superseded one — every status
+        // resolves, because specs cite history on purpose.
+        "focus *(R-INT-003)*.\nthe band *(R-BLK-191, an example)*.\nhistory *(R-REG-001, superseded)*.\n",
+    };
+    const read = (f: string): string => docs[f] ?? "";
+    const fired = checkRuleCitations(Object.keys(docs), read);
+    expect(fired.map((v) => [v.rule, v.file, v.line]), "the dangling id fires, once, where it is").toEqual([
+      ["SS68", "docs/components/C98_fabricated.md", 1],
+    ]);
+    expect(fired[0]?.message).toContain("R-NAV-004");
+
+    // **The control**: the same corpus with the citation fixed is clean — so
+    // the row is about the id and not about the file.
+    docs["docs/components/C98_fabricated.md"] = "a sentence on keys *(R-INT-004)* moving focus.\n";
+    expect(checkRuleCitations(Object.keys(docs), read)).toEqual([]);
+
+    // **The vacuity controls** (A03 §2): a registry parsed as no rules, or a
+    // corpus citing nothing, would pass every citation — so each is the
+    // violation, reported alone.
+    const empty = checkRuleCitations(Object.keys(docs), read, JSON.stringify({ rules: [] }));
+    expect(empty.map((v) => v.rule), "an empty registry").toEqual(["SS68"]);
+    expect(empty[0]?.message).toMatch(/did not read/u);
+    expect(checkRuleCitations(["docs/components/C97_silent.md"], () => "no citations here\n").map((v) => v.rule), "a silent corpus").toEqual(["SS68"]);
+
+    // And the real tree, which must be green — both directories read.
+    expect(ruleCitationCorpus().some((f) => f.startsWith("docs/architecture/")), "the architecture documents are in scope").toBe(true);
+    expect(checkRuleCitations()).toEqual([]);
+  });
+
+  it("SS63 fires: a recorded width class that disagrees with what `cells()` measures", () => {
+    // **The fabrication is the defect that shipped** (F1246): `focus ▸` and
+    // `disclosure ▾` were recorded `narrow` and measure one cell narrow, two
+    // wide. The values came from a design block that stated a measurement it
+    // said had never been taken, and nothing read `widthClass`, so a snapshot
+    // with no reader drifted for as long as it existed.
+    const text = readFileSync("src/presentation/text.ts", "utf8");
+    const wrong = JSON.stringify({
+      glyphs: [{ id: "focus", unicode: "▸", ascii: ">", widthClass: "narrow" }],
+      delimiters: [],
+    });
+    const fired = checkGlyphWidthClass(wrong, text);
+    expect(fired.length, "the mismatch fires").toBeGreaterThan(0);
+    expect(fired[0]?.rule).toBe("SS63");
+    expect(fired[0]?.message).toContain("focus");
+
+    // **The same record, corrected** — the remedy's own control, so the row is
+    // about the class and not about the word `narrow` appearing anywhere.
+    const right = JSON.stringify({
+      glyphs: [{ id: "focus", unicode: "▸", ascii: ">", widthClass: "ambiguous" }],
+      delimiters: [],
+    });
+    expect(checkGlyphWidthClass(right, text)).toEqual([]);
+
+    // **The vacuity control**: an empty parse of `text.ts` classifies every
+    // character as narrow and agrees with a registry that says so, which is a
+    // rule with nothing to be wrong about (A03 §2).
+    const blind = checkGlyphWidthClass(right, "export const NOTHING = 0;\n");
+    expect(blind.length, "an empty range table is the violation, not a pass").toBeGreaterThan(0);
+
+    // And the real pair, which must be green.
+    expect(checkGlyphWidthClass()).toEqual([]);
+  });
+
+  it("SS64 fires: `:` for collapsed disclosure against the separator it shares a row with", () => {
+    // **The fabrication is the character that was very nearly chosen** (F1246).
+    // `:` passed the registry's own collision check because that check sees the
+    // registry alone; `:` is `GlyphSet.separator` and `GlyphSet.dashedVertical`,
+    // and a call head shows a lead mark and a field separator on one row. This
+    // is the case the domain model exists to fail.
+    const glyphSource = readFileSync("src/presentation/blocks/glyphs.ts", "utf8");
+    const real = JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as {
+      glyphs: { id: string; ascii?: string }[];
+    };
+    const withColon = JSON.parse(JSON.stringify(real)) as typeof real;
+    const collapsed = withColon.glyphs.find((g) => g.id === "disclosure-collapsed");
+    expect(collapsed, "the record the fabrication edits exists").toBeDefined();
+    if (collapsed !== undefined) collapsed.ascii = ":";
+
+    const fired = checkMarkDomains(JSON.stringify(withColon), glyphSource);
+    const colon = fired.filter((v) => v.message.includes('":"'));
+    expect(colon.length, "`:` against the separator is a clash").toBeGreaterThan(0);
+    expect(colon.some((v) => v.message.includes("separator"))).toBe(true);
+    expect(colon.every((v) => v.rule === "SS64")).toBe(true);
+
+    // **The remedy's control**: `(` in the same slot draws no `:` finding, so the
+    // row is about the character and not about the record being touched at all.
+    expect(
+      checkMarkDomains().filter((v) => v.message.includes('":"')),
+      "the shipped `(` is clear",
+    ).toEqual([]);
+
+    // **The vacuity control, and it is the one this rule most needs.** With no
+    // marks read out of `glyphs.ts` the scan compares the registry with itself
+    // and passes — so an empty parse *is* the violation.
+    const blind = checkMarkDomains(undefined, "export const NOTHING = 0;\n");
+    expect(blind.length, "an empty parse is refused").toBe(1);
+    expect(blind[0]?.message).toContain("no mark was read");
+
+    // **A figure domain is not a mark domain**, and the control is the tree's own
+    // border family: every ASCII corner and tee is `+` and every edge `-`, which
+    // is the fallback working. 45 of the rule's first 59 findings were this.
+    expect(
+      checkMarkDomains().filter((v) => v.message.includes("border")),
+      "box drawing collapsing to `+` is not a collision",
+    ).toEqual([]);
+  });
+
+  it("SS64 reads every key: the parsed GLYPH_TABLE and GLYPH_DOMAINS keys equal GLYPH_TOKENS, by equality (question 57)", () => {
+    // **The control neither of SS64's own controls is.** An empty parse is a
+    // violation and a mark with no domain is reported, and both see a whole
+    // table vanish; one key dropping out moves no count anyone reads.
+    // `"work-unit"` is quoted because it is hyphenated, and a `(\w+)` key parse
+    // passed it by — so the rule compared seventeen marks and said so nowhere.
+    const glyphSource = readFileSync("src/presentation/blocks/glyphs.ts", "utf8");
+    const tokens = [...GLYPH_TOKENS].sort();
+    const { ascii, unicode } = parseGlyphTable(glyphSource);
+    expect(Object.keys(ascii).sort(), "GLYPH_TABLE's ASCII halves, by key").toEqual(tokens);
+    expect(Object.keys(unicode).sort(), "GLYPH_TABLE's Unicode halves, by key").toEqual(tokens);
+    expect(Object.keys(parseDomainTable(glyphSource, "GLYPH_DOMAINS")).sort(), "GLYPH_DOMAINS, by key").toEqual(tokens);
+    // The row responds: the quoted key is one the parse reads, with its halves.
+    expect([ascii["work-unit"], unicode["work-unit"]], "the hyphenated token's pair").toEqual(["*", "●"]);
+  });
+
+  it("SS39's alternation is GLYPH_TOKENS, by equality (question 57, F661)", () => {
+    // A stale list fails loudly for a token it lacks and silently for a token
+    // it keeps after retirement — it had both, `live` and `step` kept and
+    // `question`, `current` and `focus` missing.
+    const rule = SCANS.find((r) => r.id === "SS39");
+    const alternation = /\(\?!\(\?:([\w|-]+)\)/u.exec(rule?.pattern.source ?? "")?.[1];
+    expect(alternation, "SS39's negative lookahead, read").toBeDefined();
+    expect((alternation ?? "").split("|").sort()).toEqual([...GLYPH_TOKENS].sort());
+    // And it responds in both directions on a real glyph position.
+    expect(rule?.pattern.test('glyph: "work-unit"'), "a current token passes").toBe(false);
+    expect(rule?.pattern.test('glyph: "running"'), "the retired slot is refused").toBe(true);
+  });
+
   it("SS57 fires: the shipped head mark, the info glyph, and not the keycap bases", () => {
     // **The fabricated violation is the character that shipped** (C09 I45,
     // F823): `step: ["⏺︎", "*"]` restored is the genuine defect, not a string
@@ -1625,6 +1831,35 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
       stale.some((v) => v.file === "src/prose.ts" && v.message.includes("carries no mark")),
       "an exemption that outlives its reason is a violation of its own",
     ).toBe(true);
+  });
+
+  it("SS47 judges a literal's value, not its spelling: an escaped mark fires (F1326)", () => {
+    // **The fabricated violation is the shipped defect.** `patch/definition.ts`
+    // held the split separator as `"│"`, and a scan of the source
+    // characters read six ASCII characters. Every spelling of `│` must fire, and
+    // the literal one is the control: it fired before the change, so a row
+    // where the escapes fire and the literal does not has a broken fixture, not
+    // a working rule.
+    const spellings: Readonly<Record<string, string>> = {
+      "src/literal.ts": 'const sep = "│";',
+      "src/four.ts": String.raw`const sep = "│";`,
+      "src/braced.ts": String.raw`const sep = "\u{2502}";`,
+      "src/template.ts": String.raw`const row = ` + "`${a}\\u2502${b}`;",
+    };
+    const files = Object.keys(spellings);
+    const fired = checkMarks(files, (f) => spellings[f] ?? "", {});
+    expect(fired.map((v) => v.file).sort(), "every spelling of one value is one mark").toEqual([...files].sort());
+    expect(fired.every((v) => v.rule === "SS47")).toBe(true);
+
+    // **`\xNN` is a spelling too**, and U+00B6 is a mark — not prose, not a letter.
+    expect(checkMarks(["src/byte.ts"], () => String.raw`const p = "\xb6";`, {}), "a byte escape").toHaveLength(1);
+
+    // **Decoded from the left, one escape at a time.** `"\\u2502"` is a backslash
+    // and six ASCII characters: a decoder run as a bare `\\u` regex would call it
+    // `│`. And an escaped prose mark stays prose — the rule judges the value both
+    // ways, so `—` passes exactly as `—` does.
+    expect(checkMarks(["src/slash.ts"], () => String.raw`const s = "\\u2502";`, {}), "an escaped backslash").toEqual([]);
+    expect(checkMarks(["src/dash.ts"], () => String.raw`const d = "a — b";`, {}), "an escaped em dash is prose").toEqual([]);
   });
 
   it("MG27 reads every builder file, not a pair named by hand (F1028)", () => {
@@ -2104,6 +2339,30 @@ describe("A03 commitment 14 — no rule is assumed to work", () => {
         `${rule} has no test asserting it fires`,
       ).toBe(true);
     }
+  });
+
+  it("SS65 has a fabrication in the file that owns it", () => {
+    // The SP row's mechanism, for the same reason: naming SS65 in `covered`
+    // above would otherwise satisfy commitment 14 by being named in a set.
+    // The title is asserted rather than the behaviour, because the behaviour
+    // is asserted there — what this stops is the row being deleted.
+    const suite = readFileSync("test/unit/glyph-presence.test.ts", "utf8");
+    const titles = [...suite.matchAll(/\bit\("([^"]+)"/g)].map((m) => m[1] ?? "");
+    expect(
+      titles.some((t) => t.includes("SS65") && /\bfails\b|\bfires\b/.test(t)),
+      "SS65 has no test asserting it fires",
+    ).toBe(true);
+  });
+
+  it("SS67 has a fabrication in the file that owns it", () => {
+    // SS65's arm, for SS65's reason: naming SS67 in `covered` above would
+    // otherwise satisfy commitment 14 by being named in a set.
+    const suite = readFileSync("test/contract/theme.test.ts", "utf8");
+    const titles = [...suite.matchAll(/\bit\("([^"]+)"/g)].map((m) => m[1] ?? "");
+    expect(
+      titles.some((t) => t.includes("SS67") && /\bfails\b|\bfires\b/.test(t)),
+      "SS67 has no test asserting it fires",
+    ).toBe(true);
   });
 
   it("every workflow rule has a fabrication in the file that owns the readers", () => {
@@ -2784,6 +3043,12 @@ describe("A03 commitment 14b — the inventory equals what is implemented", () =
     MG7: "test/contract/adapters.test.ts",
     MG8: "test/contract/fixtures.test.ts",
     MG9: "test/contract/blocks.test.ts",
+    // **SS66 is a gate in `make enforce` rather than a scan in `tools/enforce/`**,
+    // because its corpus is the registry against a ledger and not `src/`. It runs
+    // under `design-check`, which `enforce` depends on, and its four checks are
+    // held by the controls in the file named here — so the row is enforced, and
+    // this entry is what stops it reading as implemented when it is not.
+    SS66: "test/unit/rule-ledger.test.ts",
   };
 
   /**
@@ -3215,6 +3480,93 @@ describe("SS54 — the refusal register resolves its premises against the tree",
   });
 });
 
+describe("SS69 — a literal bidi format character in a tracked file", () => {
+  // **F1402**: `trust-boundary.test.ts` landed with its twelve bidi characters
+  // as literal code points — a file write turned the escapes into characters —
+  // and enforce was green. **The character is never written in this file**: it
+  // is built from its code point, which is the remedy the rule asks for.
+  const RLO = String.fromCodePoint(0x202e);
+  const one = (file: string, source: string) =>
+    checkBidiLiterals({ candidates: { tracked: 1, files: [file] }, readFile: () => source });
+
+  it("SS69 fires: a literal U+202E in a test file, with its line and column", () => {
+    const found = one("test/contract/example.test.ts", `const a = 1;\nconst name = \`evil${RLO}.png\`;\n`);
+    expect(found.map((v) => [v.rule, v.file]), "fires once, where it is").toEqual([
+      ["SS69", "test/contract/example.test.ts:2"],
+    ]);
+    expect(found[0]?.message).toContain("U+202E at column 19");
+    // **The control**: the escape is the remedy, and six ASCII characters are
+    // not the character they name.
+    expect(one("test/contract/example.test.ts", "const name = `evil\\u202E.png`;\n")).toEqual([]);
+  });
+
+  it("SS69 fires on every member of the set, and the set is isBidiFormat's", () => {
+    // **Assert the set, not its first member**: each of the twelve, alone.
+    const set = bidiFormatCodePoints();
+    for (const cp of set) {
+      const found = one("docs/example.md", `a${String.fromCodePoint(cp)}b`);
+      expect(found.map((v) => v.rule), `U+${cp.toString(16)} fires`).toEqual(["SS69"]);
+    }
+    // **The parse agrees with the function's behaviour**: the set is read out of
+    // `text.ts`'s source, and the BMP run through `isBidiFormat` is the check
+    // that the parse read what the function answers.
+    const answered: number[] = [];
+    for (let cp = 0; cp <= 0xffff; cp += 1) if (isBidiFormat(cp)) answered.push(cp);
+    expect(set, "parsed from the source = answered at run time").toEqual(answered);
+    expect(set.length, "ruling 71's twelve").toBe(12);
+    // And a right-to-left letter is not a format character.
+    expect(one("docs/example.md", "\u05D0")).toEqual([]);
+  });
+
+  it("SS69's exemptions are compared by equality, both directions", () => {
+    const source = `x${RLO}y`;
+    const exempt = { "docs/fixture.md": "a reason" };
+    const read = (f: string): string => (f === "docs/fixture.md" ? source : "clean");
+    expect(
+      checkBidiLiterals({ candidates: { tracked: 2, files: ["docs/fixture.md"] }, readFile: read, exemptions: exempt }),
+      "an exempt file holding one is not reported",
+    ).toEqual([]);
+    // The dead entry: its file holds none, so the entry is the violation.
+    const dead = checkBidiLiterals({ candidates: { tracked: 2, files: [] }, readFile: read, exemptions: exempt });
+    expect(dead.map((v) => v.rule)).toEqual(["SS69"]);
+    expect(dead[0]?.message).toMatch(/holds no literal bidi character/u);
+  });
+
+  it("SS69's vacuity controls: an unread set or an empty corpus is the violation", () => {
+    const noSet = checkBidiLiterals({ codePoints: [], candidates: { tracked: 1, files: ["a.md"] }, readFile: () => RLO });
+    expect(noSet.map((v) => v.rule), "a set parsed as nothing").toEqual(["SS69"]);
+    expect(noSet[0]?.message).toMatch(/did not/u);
+    expect(bidiFormatCodePoints("export function isBidiFormat(cp: number): boolean {\n  return BIDI.has(cp);\n}\n"), "a reshaped function parses as nothing").toEqual([]);
+    const noCorpus = checkBidiLiterals({ candidates: { tracked: 0, files: [] } });
+    expect(noCorpus.map((v) => v.rule), "no tracked file").toEqual(["SS69"]);
+  });
+
+  it("SS69 reads through git: a tracked file is a candidate and an untracked one is not (the stated blind spot)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ss69-"));
+    try {
+      const git = (...args: string[]) => spawnSync("git", args, { cwd: dir, encoding: "utf8" });
+      expect(git("init", "-q").status, "git init").toBe(0);
+      writeFileSync(join(dir, "held.ts"), `const s = "${RLO}";\n`);
+      writeFileSync(join(dir, "clean.ts"), 'const s = "\\u202E";\n');
+      writeFileSync(join(dir, "image.png"), Buffer.concat([Buffer.from([0x89, 0x50, 0x00, 0x00]), Buffer.from(RLO)]));
+      expect(git("add", "held.ts", "clean.ts", "image.png").status, "git add").toBe(0);
+      // Untracked: the blind spot, demonstrated rather than asserted in prose.
+      writeFileSync(join(dir, "loose.ts"), `const s = "${RLO}";\n`);
+      const seen = trackedBidiCandidates(bidiFormatCodePoints(), dir);
+      expect(seen, "the tracked text file, and neither the binary nor the untracked one").toEqual({
+        tracked: 3,
+        files: ["held.ts"],
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("SS69 on the real tree: no tracked file holds one, and the list is empty", () => {
+    expect(checkBidiLiterals()).toEqual([]);
+  });
+});
+
 describe("SS52 — a NUL makes a file invisible to every search", () => {
   // **The rule exists because it produced a false conclusion, not because a byte
   // is untidy** (F236). `test/edge/status.test.ts` carried three literal NULs;
@@ -3377,4 +3729,606 @@ describe("make check — the lint corpus is the repository's own sources (F1079)
       expect(await linter.isPathIgnored(path), `${path} is a source and must be linted`).toBe(false);
     }
   });
+});
+
+// --- the design registry's supersession chain ------------------------------
+
+/**
+ * **A supersession chain is legal; a chain with no single current terminus is
+ * not.** The checker read `successor.status !== 'current'`, which forbade chains
+ * outright — and a chain is the only move available once a rule's own links are
+ * sealed. A released rule's `supersededBy` cannot be redirected
+ * (`lint-immutable.mjs`), so a rule narrowing a rule that already narrowed
+ * something has nowhere to attach but the end of the line.
+ *
+ * Four ways a chain fails to have one terminus, one row each, because each is a
+ * different edit and a single fabrication would leave three arms untested.
+ */
+describe("the design registry — supersession chains", () => {
+  // The module's own record type, not a second copy of it here — a transcription
+  // is the drift `.d.mts` files exist to stop, one level in.
+  type Rule = RuleRecord & { sectionKey: string; supersedes: string[]; supersededBy: string | null };
+  const load = (): Rule[] =>
+    (JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as { rules: Rule[] }).rules;
+
+  const validate = (rules: Rule[]): void => {
+    validateRuleRecords(rules);
+  };
+
+  /** A rule with a digest the checker will accept, so a row fails on its own subject. */
+  const digestOf = (r: Pick<Rule, "title" | "text" | "sectionKey">): string =>
+    createHash("sha256").update(JSON.stringify([r.title, r.text, r.sectionKey ?? null])).digest("hex");
+
+  const linked = (id: string, status: string, supersedes: string[], supersededBy: string | null): Rule => {
+    const base = { title: `fabricated ${id}`, text: `fabricated normative text for ${id}`, sectionKey: "current-contract" };
+    return { id, ...base, status, supersedes, supersededBy, contentDigest: digestOf(base) };
+  };
+
+  it("A03-DSN1 passes: a three-link chain ending in one current rule is legal", () => {
+    // The arm the amendment opens, asserted before the four refusals — a row
+    // that only fabricates failures cannot tell a fixed checker from a checker
+    // that refuses everything.
+    const rules = [
+      ...load(),
+      linked("R-ZZZ-001", "superseded", [], "R-ZZZ-002"),
+      linked("R-ZZZ-002", "superseded", ["R-ZZZ-001"], "R-ZZZ-003"),
+      linked("R-ZZZ-003", "current", ["R-ZZZ-002"], null),
+    ];
+    expect(() => { validate(rules); }, "a chain with one current terminus is legal").not.toThrow();
+  });
+
+  it("A03-DSN1 fires: a chain that closes on itself is a cycle", () => {
+    const rules = [
+      ...load(),
+      linked("R-ZZZ-001", "superseded", ["R-ZZZ-002"], "R-ZZZ-002"),
+      linked("R-ZZZ-002", "superseded", ["R-ZZZ-001"], "R-ZZZ-001"),
+    ];
+    expect(() => { validate(rules); }).toThrow(/supersession cycle at R-ZZZ-00[12]/u);
+  });
+
+  it("A03-DSN1 fires: a chain ending in a superseded rule with no successor has no terminus", () => {
+    // **The arm the old check bought by accident**, and the one worth keeping:
+    // requiring the *first* successor to be current made this impossible to
+    // express, so relaxing it without this row would drop the property rather
+    // than widen it.
+    const rules = [
+      ...load(),
+      linked("R-ZZZ-001", "superseded", [], "R-ZZZ-002"),
+      linked("R-ZZZ-002", "superseded", ["R-ZZZ-001"], null),
+    ];
+    // **Two refusals are correct here and iteration order picks which speaks**:
+    // walking from `001` the chain ends at `002`, and `002` on its own turn is
+    // superseded with no successor. The row anchors on what both say rather
+    // than on whichever the loop reaches first, which is an ordering detail.
+    expect(() => { validate(rules); }).toThrow(/R-ZZZ-002.*(no successor|without a successor)/u);
+  });
+
+  it("A03-DSN1 fires: a chain ending in a superseded rule whose successor is itself dead", () => {
+    // The same property one link further out, where a per-link status check
+    // would pass and only the walk to the end can fail: every link resolves and
+    // is reciprocal, and the terminus is `example` rather than `current`.
+    const rules = [
+      ...load(),
+      linked("R-ZZZ-001", "superseded", [], "R-ZZZ-002"),
+      linked("R-ZZZ-002", "superseded", ["R-ZZZ-001"], "R-ZZZ-003"),
+      linked("R-ZZZ-003", "example", ["R-ZZZ-002"], null),
+    ];
+    expect(() => { validate(rules); }).toThrow(/chain ends at R-ZZZ-003, which is example/u);
+  });
+
+  it("A03-DSN1 fires: a link to a rule that does not exist", () => {
+    const rules = [...load(), linked("R-ZZZ-001", "superseded", [], "R-ZZZ-404")];
+    expect(() => { validate(rules); }).toThrow(/R-ZZZ-001 has invalid successor R-ZZZ-404/u);
+  });
+
+  it("A03-DSN1 fires: a released rule's supersession link cannot be redirected", () => {
+    // **The control the chain amendment most needed and the checker cannot
+    // carry.** Relaxing `validateRuleRecords` widened what a *legal* chain looks
+    // like; what stops a chain being rearranged after release is a different
+    // gate in a different file — `lint-immutable.mjs`, comparing against the
+    // sealed baseline — and a row that only fabricated against the checker would
+    // have left the guard the amendment leans on unasserted. R-GLY-001 could be
+    // superseded precisely because its own `supersededBy` was empty; the three
+    // history rules pointing *at* it have theirs set, and this is what keeps
+    // them pointing there.
+    //
+    // The shipped script is run as it ships, against a fabricated copy of the
+    // directory: it has no exports and resolves both files beside itself, so a
+    // copy is the only way to hand it a different registry without editing it.
+    const dir = mkdtempSync(join(tmpdir(), "calcium-immutable-"));
+    const from = "docs/design/language";
+    copyFileSync(`${from}/lint-immutable.mjs`, join(dir, "lint-immutable.mjs"));
+    copyFileSync(`${from}/released-baseline.json`, join(dir, "released-baseline.json"));
+    const reg = JSON.parse(readFileSync(`${from}/calcium-registry.json`, "utf8")) as {
+      rules: { id: string; supersededBy: string | null }[];
+    };
+
+    // The unedited pair passes, or the row below is about the copy rather than
+    // about the redirect.
+    writeFileSync(join(dir, "calcium-registry.json"), JSON.stringify(reg));
+    const clean = spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+    expect(clean.status, clean.stdout + clean.stderr).toBe(0);
+
+    // **The fabrication**: a released history rule re-aimed past the rule it was
+    // sealed against, at the rule that now supersedes it — which is exactly the
+    // rearrangement that would have been the easy way out of this problem.
+    const hist = reg.rules.find((r) => r.id === "R-HIS-006");
+    expect(hist?.supersededBy, "the sealed link the fabrication redirects").toBe("R-GLY-001");
+    if (hist !== undefined) hist.supersededBy = "R-GLY-003";
+    writeFileSync(join(dir, "calcium-registry.json"), JSON.stringify(reg));
+
+    const fired = spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+    expect(fired.status, "a redirected released link is refused").toBe(1);
+    expect(fired.stderr + fired.stdout).toMatch(/R-HIS-006: supersededBy REDIRECTED R-GLY-001 → R-GLY-003/u);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  /**
+   * **A current rule the baseline never held was checked by nothing** (AUTHORITY.md
+   * §Release). Every comparison in `lint-immutable.mjs` walked the baseline, so 22
+   * current rules at revision 0.9 were outside every gate, and one was rewritten
+   * under its own ID with all of them green. Removing the registry walk from the
+   * lint → this row fails; it is the only row whose fabrication the baseline walk
+   * cannot see.
+   */
+  it("A03-DSN1 fires: a current rule absent from the baseline", () => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-release-"));
+    const from = "docs/design/language";
+    copyFileSync(`${from}/lint-immutable.mjs`, join(dir, "lint-immutable.mjs"));
+    copyFileSync(`${from}/released-baseline.json`, join(dir, "released-baseline.json"));
+    const reg = JSON.parse(readFileSync(`${from}/calcium-registry.json`, "utf8")) as {
+      rules: Record<string, unknown>[];
+    };
+    const lint = () => spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+
+    writeFileSync(join(dir, "calcium-registry.json"), JSON.stringify(reg));
+    const clean = lint();
+    expect(clean.status, clean.stdout + clean.stderr).toBe(0);
+
+    reg.rules.push(linked("R-ZZZ-010", "current", [], null));
+    writeFileSync(join(dir, "calcium-registry.json"), JSON.stringify(reg));
+    const fired = lint();
+    expect(fired.status, "an unreleased current rule is refused").toBe(1);
+    expect(fired.stderr).toMatch(/R-ZZZ-010: CURRENT RULE NOT RELEASED/u);
+    expect(fired.stderr.match(/NOT RELEASED/gu), "and it is the only rule refused").toHaveLength(1);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  /**
+   * **The release only adds** (AUTHORITY.md §Release). The tool is run as it ships,
+   * against a copy: it seals a rule the baseline lacks and the lint then passes,
+   * and it refuses — writing nothing — when a sealed rule's content has changed or
+   * the revision was not bumped. A writer that re-derived every entry would seal
+   * the rewrite the baseline exists to catch; comparing sealed entries instead of
+   * rewriting them → the second fabrication below passes, and this row fails.
+   */
+  it("A03-DSN1: release.mjs seals what is missing and refuses to rewrite what is sealed", () => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-release-"));
+    const from = "docs/design/language";
+    for (const f of ["lint-immutable.mjs", "released-baseline.json", "calcium-registry.json"]) {
+      copyFileSync(`${from}/${f}`, join(dir, f));
+    }
+    const release = (rev: string) =>
+      spawnSync("node", ["tools/design/release.mjs", rev, "--dir", dir], { encoding: "utf8" });
+    const lint = () => spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+    const read = () => readFileSync(join(dir, "calcium-registry.json"), "utf8");
+    const write = (r: unknown) => { writeFileSync(join(dir, "calcium-registry.json"), `${JSON.stringify(r, null, 2)}\n`); };
+    type Reg = { meta: { revision: string }; rules: Record<string, unknown>[] };
+
+    // The revision must move.
+    const same = release((JSON.parse(read()) as Reg).meta.revision);
+    expect(same.status, same.stdout + same.stderr).toBe(1);
+    expect(same.stderr).toMatch(/is the current one — a release bumps it/u);
+
+    // A new current rule is sealed, and the lint agrees.
+    const reg = JSON.parse(read()) as Reg;
+    reg.rules.push(linked("R-ZZZ-011", "current", [], null));
+    write(reg);
+    expect(lint().status, "unreleased first").toBe(1);
+    const ok = release("9.1");
+    expect(ok.status, ok.stdout + ok.stderr).toBe(0);
+    expect(ok.stdout).toMatch(/released 9\.1 · 1 rules sealed \(1 current\)/u);
+    const after = lint();
+    expect(after.status, after.stdout + after.stderr).toBe(0);
+
+    // A sealed rule rewritten under its own ID is refused, and nothing is written.
+    const edited = JSON.parse(read()) as Reg;
+    const target = edited.rules.find((r) => r["id"] === "R-SEL-005");
+    expect(target, "the rule the review rewrote").toBeDefined();
+    if (target !== undefined) target["contentDigest"] = "0".repeat(64);
+    write(edited);
+    const baselineBefore = readFileSync(join(dir, "released-baseline.json"), "utf8");
+    const refused = release("9.2");
+    expect(refused.status, refused.stdout + refused.stderr).toBe(1);
+    expect(refused.stderr).toMatch(/R-SEL-005: sealed digest changed — supersede it, do not edit it/u);
+    expect(readFileSync(join(dir, "released-baseline.json"), "utf8"), "nothing written").toBe(baselineBefore);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("A03-DSN1 fires: a link the target does not acknowledge", () => {
+    const rules = [
+      ...load(),
+      linked("R-ZZZ-001", "superseded", [], "R-ZZZ-002"),
+      linked("R-ZZZ-002", "current", [], null),
+    ];
+    expect(() => { validate(rules); }).toThrow(/supersession is not reciprocal/u);
+  });
+
+  // ── A03-DSN4 — theme rules, sealed like rules (AUTHORITY §Release 5) ──
+  type ThemeRule = ThemeRuleRecord & { supersedes: string[] };
+  const themeRules = (): ThemeRule[] =>
+    (JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as { themeRules: ThemeRule[] }).themeRules;
+  const themeRule = (
+    id: string, selector: string, declarations: string, status: string, supersedes: string[], supersededBy: string | null,
+  ): ThemeRule => ({
+    id, selector, declarations, status, ruleIds: ["R-THM-001"], supersedes, supersededBy,
+    contentDigest: themeRuleContentDigest({ selector, declarations }),
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): the checker refuses a theme rule's digest drift, a non-reciprocal link, a chain not ending current, a malformed or repeated id, and two current values for one slot", () => {
+    // The shipped records pass, or every refusal below is about the fixture.
+    expect(validateThemeRuleRecords(themeRules()).size).toBe(themeRules().length);
+    const sel = '[data-theme="dark"] .c-zzz';
+
+    const drifted = [...themeRules(), { ...themeRule("TR-9001", sel, "color:#111111", "current", [], null), declarations: "color:#222222" }];
+    expect(() => validateThemeRuleRecords(drifted)).toThrow(/TR-9001 immutable theme rule content drifted/u);
+
+    const oneSided = [
+      ...themeRules(),
+      themeRule("TR-9001", sel, "color:#111111", "superseded", [], "TR-9002"),
+      themeRule("TR-9002", sel, "color:#222222", "current", [], null),
+    ];
+    expect(() => validateThemeRuleRecords(oneSided)).toThrow(/TR-9001 \/ TR-9002 supersession is not reciprocal/u);
+
+    const deadEnd = [
+      ...themeRules(),
+      themeRule("TR-9001", sel, "color:#111111", "superseded", [], "TR-9002"),
+      themeRule("TR-9002", sel, "color:#222222", "superseded", ["TR-9001"], null),
+    ];
+    expect(() => validateThemeRuleRecords(deadEnd)).toThrow(/TR-9001's supersession chain ends at TR-9002, which is superseded/u);
+
+    expect(() => validateThemeRuleRecords([...themeRules(), themeRule("TR-01", sel, "color:#111111", "current", [], null)]))
+      .toThrow(/invalid stable theme rule id TR-01/u);
+    const first = themeRules()[0]!;
+    expect(() => validateThemeRuleRecords([...themeRules(), themeRule(first.id, sel, "color:#111111", "current", [], null)]))
+      .toThrow(new RegExp(`duplicate stable theme rule id ${first.id}`, "u"));
+
+    // **Two current values for one slot**, reached through the expansion: one
+    // record names `nord` inside an `:is(…)` group with a comma list, the other
+    // names it plainly — nord's `.c-meta` was this shape before §Release 5.
+    const slot = [
+      ...themeRules(),
+      themeRule("TR-9001", ':is([data-theme="dark"],[data-theme="nord"]) .c-zzz, [data-theme="ink"] .c-yyy', "color:#111111", "current", [], null),
+      themeRule("TR-9002", '[data-theme="nord"]  .c-zzz', "color:#222222;background:#000000", "current", [], null),
+    ];
+    expect(() => validateThemeRuleRecords(slot)).toThrow(/TR-9001 and TR-9002 are both current for color on nord \.c-zzz/u);
+    // The control: the same pair with the first superseded by the second is history, not a collision.
+    const recorded = [
+      ...themeRules(),
+      themeRule("TR-9001", ':is([data-theme="dark"],[data-theme="nord"]) .c-zzz, [data-theme="ink"] .c-yyy', "color:#111111", "superseded", [], "TR-9002"),
+      themeRule("TR-9002", '[data-theme="nord"]  .c-zzz', "color:#222222;background:#000000", "current", ["TR-9001"], null),
+    ];
+    expect(() => validateThemeRuleRecords(recorded)).not.toThrow();
+    expect(themeSlotsOf(':is([data-theme="dark"],[data-theme="nord"]) .c-zzz, [data-theme="ink"] .c-yyy')).toEqual([
+      ["dark", ".c-zzz"], ["nord", ".c-zzz"], ["ink", ".c-yyy"],
+    ]);
+    expect(() => themeSlotsOf(".c-zzz")).toThrow(/names no theme/u);
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): lint-immutable fails a theme rule unreleased, its digest changed, its link redirected, or deleted", () => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-theme-immutable-"));
+    const from = "docs/design/language";
+    copyFileSync(`${from}/lint-immutable.mjs`, join(dir, "lint-immutable.mjs"));
+    copyFileSync(`${from}/released-baseline.json`, join(dir, "released-baseline.json"));
+    const fresh = () => JSON.parse(readFileSync(`${from}/calcium-registry.json`, "utf8")) as { themeRules: ThemeRule[] };
+    const lint = (reg: unknown) => {
+      writeFileSync(join(dir, "calcium-registry.json"), JSON.stringify(reg));
+      const r = spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+      return { status: r.status, out: r.stdout + r.stderr };
+    };
+    const clean = lint(fresh());
+    expect(clean.status, clean.out).toBe(0);
+    expect(clean.out).toMatch(/and 869 released theme rules/u);
+
+    const unreleased = fresh();
+    unreleased.themeRules.push(themeRule("TR-9001", '[data-theme="dark"] .c-zzz', "color:#111111", "current", [], null));
+    expect(lint(unreleased).out).toMatch(/TR-9001: CURRENT THEME RULE NOT RELEASED/u);
+
+    const rewritten = fresh();
+    const band = rewritten.themeRules.find((r) => r.selector === '[data-theme="hcDark"] .bg-selection' && r.status === "current")!;
+    band.declarations = "background:#00405c";
+    band.contentDigest = themeRuleContentDigest(band);
+    const r1 = lint(rewritten);
+    expect(r1.status).toBe(1);
+    expect(r1.out).toMatch(new RegExp(`${band.id}: released digest changed`, "u"));
+
+    const redirected = fresh();
+    const old = redirected.themeRules.find((r) => r.id === "TR-0106")!;
+    expect(old.supersededBy, "nord's meta, the sealed link the fabrication redirects").toBe("TR-0748");
+    old.supersededBy = "TR-0001";
+    expect(lint(redirected).out).toMatch(/TR-0106: supersededBy REDIRECTED TR-0748 → TR-0001/u);
+
+    const deleted = fresh();
+    deleted.themeRules = deleted.themeRules.filter((r) => r.id !== "TR-0864");
+    expect(lint(deleted).out).toMatch(/TR-0864: RELEASED THEME RULE DELETED/u);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): release.mjs seals theme rules and refuses to rewrite a sealed one", () => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-theme-release-"));
+    const from = "docs/design/language";
+    for (const f of ["lint-immutable.mjs", "released-baseline.json", "calcium-registry.json"]) copyFileSync(`${from}/${f}`, join(dir, f));
+    const release = (rev: string) => spawnSync("node", ["tools/design/release.mjs", rev, "--dir", dir], { encoding: "utf8" });
+    const lint = () => spawnSync("node", [join(dir, "lint-immutable.mjs")], { encoding: "utf8" });
+    type Reg = { themeRules: ThemeRule[] };
+    const read = () => JSON.parse(readFileSync(join(dir, "calcium-registry.json"), "utf8")) as Reg;
+    const write = (r: unknown) => { writeFileSync(join(dir, "calcium-registry.json"), `${JSON.stringify(r, null, 2)}\n`); };
+
+    const reg = read();
+    reg.themeRules.push(themeRule("TR-9001", '[data-theme="dark"] .c-zzz', "color:#111111", "current", [], null));
+    write(reg);
+    expect(lint().status, "unreleased first").toBe(1);
+    const ok = release("9.1");
+    expect(ok.status, ok.stdout + ok.stderr).toBe(0);
+    expect(ok.stdout).toMatch(/1 theme rules sealed · 870 in the baseline/u);
+    expect(lint().status, "and sealed after").toBe(0);
+
+    const edited = read();
+    edited.themeRules.find((r) => r.id === "TR-0748")!.contentDigest = "0".repeat(64);
+    write(edited);
+    const before = readFileSync(join(dir, "released-baseline.json"), "utf8");
+    const refused = release("9.2");
+    expect(refused.status).toBe(1);
+    expect(refused.stderr).toMatch(/TR-0748: sealed digest changed — supersede it, do not edit it/u);
+    expect(readFileSync(join(dir, "released-baseline.json"), "utf8"), "nothing written").toBe(before);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): the restored history — four band predecessors, the composed hcDark rule, mono's accent and nord's meta — each superseded and linked", () => {
+    // Record by record, value by value: this is what each slot drew before the
+    // value that stands, read out of git at the commit that overwrote it.
+    const all = themeRules();
+    const byId = new Map(all.map((r) => [r.id, r]));
+    const history = all.filter((r) => r.status === "superseded");
+    const row = (r: ThemeRule) => [r.selector.split(",")[0], r.declarations, byId.get(r.supersededBy!)!.declarations];
+    expect(history.map(row)).toEqual([
+      ['[data-theme="nord"] .c-meta', "color:#b48ead", "color:#ba96b3"],
+      ['[data-theme="hcDark"] .bg-selection', "background:#00405c", "background:#efc51c;color:#000000"],
+      ['[data-theme="hcDark"] .bg-focusGround', "background:#2e2e2e", "background:#234f92;color:#ffffff"],
+      ['[data-theme="hcLight"] .bg-selection', "background:#a8ccf0", "background:#46176d;color:#ffffff"],
+      ['[data-theme="hcLight"] .bg-focusGround', "background:#c9c9c9", "background:#7face3;color:#000000"],
+      ['[data-theme="hcDark"] .bg-selection .c-dim', "color:#fff", "background:#efc51c;color:#000000"],
+      ['[data-theme="mono"] .c-accent', "color:#fff", "color:#f0f0f0"],
+    ]);
+    // The deleted composed rule is whole — nine tones, each in both forms.
+    const composed = history.find((r) => r.selector.startsWith('[data-theme="hcDark"] .bg-selection .c-dim'))!;
+    expect(themeSlotsOf(composed.selector).map(([, s]) => s)).toHaveLength(18);
+    // And every link is reciprocal, and every successor is current.
+    for (const r of history) {
+      const next = byId.get(r.supersededBy!)!;
+      expect(next.status, `${r.id}'s successor`).toBe("current");
+      expect(next.supersedes, `${next.id} acknowledges ${r.id}`).toContain(r.id);
+    }
+  });
+});
+
+/**
+ * **The seal is outside the branch** (AUTHORITY.md §Release 4). The in-tree lint
+ * compares two files a branch can both edit, and its anchor is recomputable; this
+ * compares the branch's baseline with a ref's copy, which the branch cannot edit.
+ * Each row builds a throwaway repository — a commit holding the baseline as `main`,
+ * then an edit in the working tree — so no row depends on what `origin/main` holds
+ * today. Dropping the digest comparison → DSN3's rewrite row passes and fails
+ * here; treating a ref with no baseline as unresolved → the first-release row
+ * fails; passing on an unresolved ref → the shallow-clone row fails.
+ */
+describe("A03-DSN3 — the released baseline against another ref's copy", () => {
+  type Entry = { digest: string; status: string; supersedes: string[]; supersededBy: string[] };
+  type Baseline = { rules: Record<string, Entry>; count: number; themeRules?: Record<string, Entry>; themeCount?: number };
+  const real = JSON.parse(readFileSync("docs/design/language/released-baseline.json", "utf8")) as Baseline;
+  const git = (repo: string, ...a: string[]) =>
+    spawnSync("git", ["-C", repo, "-c", "user.email=t@t", "-c", "user.name=t", ...a], { encoding: "utf8" });
+  const repoWith = (base: Baseline | null): string => {
+    const repo = mkdtempSync(join(tmpdir(), "calcium-released-"));
+    git(repo, "init", "-q", "-b", "main");
+    const dir = join(repo, "docs/design/language");
+    spawnSync("mkdir", ["-p", dir]);
+    writeFileSync(join(repo, "README"), "x\n");
+    if (base !== null) writeFileSync(join(dir, "released-baseline.json"), JSON.stringify(base, null, 1));
+    git(repo, "add", "-A");
+    expect(git(repo, "commit", "-q", "-m", "base").status, "the base commit").toBe(0);
+    return repo;
+  };
+  const head = (repo: string, edit: (b: Baseline) => void): void => {
+    const b = structuredClone(real);
+    edit(b);
+    writeFileSync(join(repo, "docs/design/language/released-baseline.json"), JSON.stringify(b, null, 1));
+  };
+  const check = (repo: string, ref = "main") =>
+    spawnSync("node", ["tools/design/released-against.mjs", "--repo", repo, "--ref", ref], { encoding: "utf8" });
+  const run = (edit: (b: Baseline) => void, ref = "main") => {
+    const repo = repoWith(real);
+    head(repo, edit);
+    const r = check(repo, ref);
+    rmSync(repo, { recursive: true, force: true });
+    return { status: r.status, out: r.stdout + r.stderr };
+  };
+  const someCurrent = Object.keys(real.rules).find((id) => real.rules[id]!.status === "current")!;
+  const someSuperseded = Object.keys(real.rules).find((id) => real.rules[id]!.status === "superseded")!;
+
+  it("A03-DSN3 (AUTHORITY §Release 4): an unchanged baseline passes, and one with an entry added passes", () => {
+    const same = run(() => undefined);
+    expect(same.status, same.out).toBe(0);
+    expect(same.out).toMatch(new RegExp(`OK · ${String(Object.keys(real.rules).length + Object.keys(real.themeRules ?? {}).length)} entries sealed on main kept, 0 added`, "u"));
+    const added = run((b) => { b.rules["R-ZZZ-900"] = { digest: "a".repeat(64), status: "current", supersedes: [], supersededBy: [] }; });
+    expect(added.status, added.out).toBe(0);
+    expect(added.out).toMatch(/kept, 1 added/u);
+  });
+
+  it("A03-DSN3 (AUTHORITY §Release 4): a sealed digest rewritten — the re-anchor the in-tree lint passes — fails", () => {
+    const r = run((b) => { b.rules["R-SEL-005"]!.digest = "0".repeat(64); });
+    expect(r.status, r.out).toBe(1);
+    expect(r.out).toMatch(/R-SEL-005: digest changed from main's/u);
+  });
+
+  it("A03-DSN3 (AUTHORITY §Release 4): a removed entry, a changed supersedes, an illegal status and a redirected link each fail", () => {
+    const removed = run((b) => { delete b.rules[someCurrent]; });
+    expect(removed.status, removed.out).toBe(1);
+    expect(removed.out).toMatch(new RegExp(`${someCurrent}: REMOVED`, "u"));
+
+    const supersedes = run((b) => { b.rules[someCurrent]!.supersedes = ["R-ZZZ-901"]; });
+    expect(supersedes.out).toMatch(new RegExp(`${someCurrent}: supersedes changed`, "u"));
+
+    const revived = run((b) => { b.rules[someSuperseded]!.status = "current"; });
+    expect(revived.out).toMatch(new RegExp(`${someSuperseded}: status superseded → current is not a legal transition`, "u"));
+
+    const redirected = run((b) => { b.rules[someSuperseded]!.supersededBy = ["R-ZZZ-902"]; });
+    expect(redirected.status, redirected.out).toBe(1);
+    expect(redirected.out).toMatch(new RegExp(`${someSuperseded}: supersededBy changed`, "u"));
+  });
+
+  it("A03-DSN4 (AUTHORITY §Release 5): released-against fails a rewritten theme digest and passes a theme supersession", () => {
+    const theme = Object.keys(real.themeRules ?? {}).find((id) => real.themeRules![id]!.status === "current")!;
+    expect(theme, "the baseline seals theme rules").toBeDefined();
+    const rewritten = run((b) => { b.themeRules![theme]!.digest = "0".repeat(64); });
+    expect(rewritten.status, rewritten.out).toBe(1);
+    expect(rewritten.out).toMatch(new RegExp(`${theme}: digest changed from main's`, "u"));
+    const removed = run((b) => { delete b.themeRules![theme]; });
+    expect(removed.out).toMatch(new RegExp(`${theme}: REMOVED`, "u"));
+    const superseded = run((b) => {
+      b.themeRules![theme]!.status = "superseded";
+      b.themeRules![theme]!.supersededBy = ["TR-9999"];
+      b.themeRules!["TR-9999"] = { digest: "a".repeat(64), status: "current", supersedes: [theme], supersededBy: [] };
+    });
+    expect(superseded.status, superseded.out).toBe(0);
+    expect(superseded.out).toMatch(/kept, 1 added/u);
+  });
+
+  it("A03-DSN3 (AUTHORITY §Release 4): a supersession — status to superseded, a successor linked — is not a change", () => {
+    const r = run((b) => {
+      b.rules[someCurrent]!.status = "superseded";
+      b.rules[someCurrent]!.supersededBy = ["R-ZZZ-903"];
+      b.rules["R-ZZZ-903"] = { digest: "b".repeat(64), status: "current", supersedes: [someCurrent], supersededBy: [] };
+    });
+    expect(r.status, r.out).toBe(0);
+    // The control: the same link added *without* the transition is a change.
+    const linkOnly = run((b) => { b.rules[someCurrent]!.supersededBy = ["R-ZZZ-903"]; });
+    expect(linkOnly.status, linkOnly.out).toBe(1);
+  });
+
+  it("A03-DSN3 (AUTHORITY §Release 4): a ref holding no baseline passes and says so; a ref that does not resolve fails", () => {
+    const repo = repoWith(null);
+    head(repo, () => undefined);
+    const first = check(repo);
+    expect(first.status, first.stdout + first.stderr).toBe(0);
+    expect(first.stdout).toMatch(/main holds no docs\/design\/language\/released-baseline\.json — nothing is released there yet/u);
+    const shallow = check(repo, "origin/main");
+    expect(shallow.status, shallow.stdout + shallow.stderr).toBe(1);
+    expect(shallow.stderr).toMatch(/origin\/main does not resolve/u);
+    rmSync(repo, { recursive: true, force: true });
+  });
+});
+
+/**
+ * **The fixtures are the page's projection** (AUTHORITY.md §Fixtures). They were
+ * committed once and sixteen of them went stale while the page was rebuilt around
+ * them, because nothing derived them and nothing compared them. `--check` is what
+ * `make design-check` runs, and each row below fabricates one kind of drift in a
+ * copy and asserts it is named — the clean control first, so a check that refused
+ * everything could not pass. Replacing `--check`'s comparison with a count of
+ * files → the content, dimension and hash rows fail; dropping the directory walk
+ * → the unexpected-file rows fail.
+ */
+describe("the design fixtures — derived from the page, checked against it", () => {
+  const from = "docs/design/language/fixtures";
+  const check = (dir: string) =>
+    spawnSync("npx", ["tsx", "tools/design/fixtures.ts", "--check", "--out", dir], { encoding: "utf8" });
+  const copy = (): string => {
+    const dir = mkdtempSync(join(tmpdir(), "calcium-fixtures-"));
+    for (const f of readdirSync(from)) copyFileSync(join(from, f), join(dir, f));
+    return dir;
+  };
+  const problems = (r: ReturnType<typeof check>): string[] =>
+    r.stderr.split("\n").map((l) => l.trim()).filter((l) => l !== "" && !l.startsWith("FAIL"));
+  type Entry = { file: string; cols: number; rows: number; sha: string };
+  const index = (dir: string): Entry[] => JSON.parse(readFileSync(join(dir, "INDEX.json"), "utf8")) as Entry[];
+  const writeIndex = (dir: string, entries: Entry[]) => {
+    writeFileSync(join(dir, "INDEX.json"), JSON.stringify(entries, null, 1));
+  };
+
+  it("A03-DSN2 passes: the committed corpus equals the derivation", () => {
+    const r = check(from);
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(r.stdout).toMatch(/^fixtures · \d+ derived from the page, all equal, nothing unexpected$/mu);
+  });
+
+  it("A03-DSN2 fires on every kind of drift, one at a time, naming the file", () => {
+    const dir = copy();
+    const first = index(dir)[0]!;
+    const control = check(dir);
+    expect(control.status, "the copy is clean before anything is fabricated").toBe(0);
+
+    // Contents: one character of one panel.
+    const text = readFileSync(join(dir, first.file), "utf8");
+    writeFileSync(join(dir, first.file), `${text.slice(0, -1)}x\n`);
+    const content = check(dir);
+    expect(content.status).toBe(1);
+    expect(problems(content)).toEqual([`${first.file}: differs from the page`]);
+    writeFileSync(join(dir, first.file), text);
+
+    // Dimensions and hashes: each field of the index alone.
+    for (const field of ["cols", "rows", "sha"] as const) {
+      const entries = index(dir);
+      const e = entries[0]!;
+      if (field === "sha") e.sha = "0".repeat(16);
+      else e[field] += 1;
+      writeIndex(dir, entries);
+      const r = check(dir);
+      expect(r.status, field).toBe(1);
+      expect(problems(r), field).toEqual(["INDEX.json: differs from the page"]);
+      copyFileSync(join(from, "INDEX.json"), join(dir, "INDEX.json"));
+    }
+
+    // Names: a rename is one missing file and one unexpected one.
+    const renamed = first.file.replace(/^\d{3}/u, "999");
+    copyFileSync(join(dir, first.file), join(dir, renamed));
+    rmSync(join(dir, first.file));
+    const rename = check(dir);
+    expect(rename.status).toBe(1);
+    expect(problems(rename).sort()).toEqual(
+      [`${first.file}: missing — the page produces it`, `${renamed}: unexpected — the page does not produce it`].sort(),
+    );
+    rmSync(join(dir, renamed));
+
+    // Missing alone, then restored.
+    const missing = check(dir);
+    expect(problems(missing)).toEqual([`${first.file}: missing — the page produces it`]);
+    copyFileSync(join(from, first.file), join(dir, first.file));
+
+    // Unexpected alone: a file the page does not produce.
+    writeFileSync(join(dir, "stray.txt"), "kept by hand\n");
+    const extra = check(dir);
+    expect(extra.status).toBe(1);
+    expect(problems(extra)).toEqual(["stray.txt: unexpected — the page does not produce it"]);
+    rmSync(join(dir, "stray.txt"));
+
+    // And the copy is clean again, so every refusal above was the fabrication's.
+    expect(check(dir).status, "restored").toBe(0);
+    rmSync(dir, { recursive: true, force: true });
+  }, 60_000);
+
+  it("A03-DSN2: --check writes nothing", () => {
+    const dir = copy();
+    writeFileSync(join(dir, "stray.txt"), "kept by hand\n");
+    const before = readdirSync(dir).sort().map((f) => [f, readFileSync(join(dir, f), "utf8")]);
+    expect(check(dir).status).toBe(1);
+    const after = readdirSync(dir).sort().map((f) => [f, readFileSync(join(dir, f), "utf8")]);
+    expect(after).toEqual(before);
+    rmSync(dir, { recursive: true, force: true });
+  }, 30_000);
 });

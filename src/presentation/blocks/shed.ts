@@ -24,6 +24,20 @@
  * two records of one decision.
  */
 
+import { insetWidth, type KeyValue } from "../../data/viewmodel/index.js";
+import { cells, stripControl, truncate } from "../text.js";
+import { background, based, clampSpans, focusStyle, groundSequence, paint, selectionStyle, tone, withBackground, type Span } from "./paint.js";
+import type { NavElement, RenderContext } from "./types.js";
+
+/**
+ * The shed mark's lead (C09 I108, §104, parked 19) — `+`, at every rung.
+ *
+ * **Not a `GlyphSet` slot, because it has no second rung to fall to.** A slot
+ * exists so a mark can change with the terminal; this one is ASCII already, so
+ * a slot would be a table entry with the same character in both columns.
+ */
+export const SHED_LEAD = "+";
+
 /**
  * What running out of width does to a part (C09 I81).
  *
@@ -85,9 +99,13 @@ export type ShedResult = Readonly<{
    * cannot be the part that survives.
    *
    * A count and not a list, because a list of what went is wider than what
-   * stayed. The lead is the `residue` slot (C09 I22, C04 I49) — `⋯` against
-   * `~`, one cell at both conventions — handed in because this module holds no
-   * capabilities.
+   * stayed. **The lead is `+` at every rung** (C09 I108, §104, parked 19): the
+   * design draws `val loss  0.0372  +1`, and a lead that is ASCII everywhere is
+   * one this module can hold itself rather than take from a caller with
+   * capabilities. It was the `residue` slot, `⋯` against `...`, which the
+   * design keeps for a truncated list and never draws beside a shed row. What
+   * went is reachable through the kind's element (C09 I113), not through this
+   * string.
    */
   mark: string | null;
 }>;
@@ -143,12 +161,7 @@ const spanOf = (parts: readonly Part[], at: (p: Part) => number, gap: number): n
  * decision — the message gives up its room before the timestamp gives up any —
  * so a proportional rule would answer a different question correctly.
  */
-export function shedRow(
-  parts: readonly Part[],
-  width: number,
-  gap: number,
-  lead: string,
-): ShedResult {
+export function shedRow(parts: readonly Part[], width: number, gap: number): ShedResult {
   // **The withholding is a part of the row and is budgeted like one.** A mark
   // appended after the widths are settled is a mark the clamp pays for, which
   // takes the cells out of whichever part happens to be last — silently, and
@@ -157,11 +170,11 @@ export function shedRow(
   // second can only shed more, and a third would have nothing new to remove
   // that the second did not already see.
   const first = solveRow(parts, Math.max(0, Math.floor(width)), gap); // cells-ok — a cell count
-  if (first.shed.length === 0) return stated(first, null); // cells-ok — a part count
+  if (first.shed.length === 0) return stated(first, false); // cells-ok — a part count
   // The mark's own separator, floored at one cell: a row whose parts carry
   // their own leading gaps passes `gap: 0`, and a mark written hard against the
   // last part is a mark that reads as part of it.
-  const mark = MARK_CELLS + Math.max(gap, 1); // cells-ok — a cell count
+  const mark = markCells(parts.length) + Math.max(gap, 1); // cells-ok — a cell count
   const second = solveRow(parts, Math.max(0, Math.floor(width) - mark), gap); // cells-ok — a cell count
   // **The reservation gives way where it would make the row clip, and
   // `clipped` is what says so.** At four columns `events` shed its type and its
@@ -171,7 +184,7 @@ export function shedRow(
   // without cutting; past that the row wins. **The first pass is the answer
   // then, not a narrower second one**: it is the same shedding against a budget
   // that spends nothing on a mark the container was going to clip anyway.
-  return second.clipped ? stated(first, null) : stated(second, lead);
+  return second.clipped ? stated(first, false) : stated(second, true);
 }
 
 /**
@@ -180,11 +193,11 @@ export function shedRow(
  * the difference between a row that says it withheld something and a row that
  * spends its last cells saying so.
  */
-const stated = (solved: Solved, lead: string | null): ShedResult =>
+const stated = (solved: Solved, marked: boolean): ShedResult =>
   Object.freeze({
     kept: solved.kept,
     shed: solved.shed,
-    mark: lead === null || solved.shed.length === 0 ? null : `${lead}${String(solved.shed.length)}`, // cells-ok — a part count
+    mark: !marked || solved.shed.length === 0 ? null : `${SHED_LEAD}${String(solved.shed.length)}`, // cells-ok — a part count
   });
 
 /** One pass of the ladder, against a budget the caller has already reserved from. */
@@ -264,16 +277,260 @@ function solveRow(parts: readonly Part[], width: number, gap: number): Solved {
 }
 
 /**
- * The mark's width, reserved before the widths are settled.
+ * The mark's width, reserved before the widths are settled (C09 I108).
  *
- * Two cells covers `⋯1` through `⋯9`, and a row with ten parts to shed is not a
- * row this mechanism is saving. A count that outgrew the reservation would take
- * its extra cell from the clamp, which is the defect the reservation exists to
- * prevent — so the constant is the honest bound rather than a guess, and the
- * kinds have three, four and five parts.
+ * **It was the constant `2` and the constant was a sentence about one rung.**
+ * The justification read *two cells covers `⋯1` through `⋯9`* — true, and
+ * written where the lead is a **parameter**. The ASCII `residue` is `...`, three
+ * cells, so `...2` is four against a reservation of two, and the shortfall came
+ * out of the clamp: a rendered `events` row at 20 columns drew
+ * `rolled the flee~ ..~`, the mark itself cut and its **count truncated away**.
+ * A residue mark that has lost its count is not a degraded mark; it is a mark
+ * that says nothing, which is the exact failure this reservation exists to
+ * prevent — named in the paragraph above and defeated by the line below it.
+ *
+ * **Both halves are derived now, so neither is a guess.** The lead is measured
+ * rather than assumed, and the count's width comes from the most parts that can
+ * ever shed — the highest-ranked one never does, so it is `parts.length - 1`.
+ * That removes the old bound's escape clause (*a row with ten parts to shed is
+ * not a row this mechanism is saving*) rather than restating it: a kind with
+ * eleven parts now reserves three cells for the count because it can need them.
+ *
+ * **The lead is a constant now, and the reservation is not.** Parked 19 moved
+ * the mark to `+n`, which is one cell at every rung — so the half of this that
+ * measured the lead has nothing left to vary. The half that reserves before
+ * solving is the one that was ever load-bearing, and it stays.
  */
-const MARK_CELLS = 2;
+const markCells = (parts: number): number =>
+  // `+` is one cell under either convention, so there is nothing to ask the
+  // terminal: the rung dependence I108 was written against has no subject.
+  // **The reservation itself stays** — without it the clamp cuts the mark.
+  cells(SHED_LEAD) + String(Math.max(1, parts - 1)).length; // cells-ok — a digit count // narrow-ok — `+` is ASCII, one cell under either convention
 
 /** The row's span at its natural widths, for a caller deciding whether to ask at all. */
 export const naturalSpan = (parts: readonly Part[], gap: number): number =>
   spanOf(parts, (p) => p.natural, gap);
+
+/** One item's answer to *what did your row not draw* — label against full text. */
+export type Withheld = readonly Readonly<{ label: string; value: string }>[];
+
+/**
+ * C09 I113, I124 — what each item's row withheld, **or `null` where the block
+ * drew no mark**.
+ *
+ * **Keyed on the drawn mark and not on the shed alone.** A plan that shed with
+ * no room for the mark (`second.clipped`) draws no `+n`, and a target on a row
+ * that says nothing about withholding is a stop the reader cannot account for.
+ *
+ * **One answer, three readers** (I124, I125): the elements, the expanded
+ * form's `measure` and its render each take the lists from here, over the same
+ * plan — so the rows an expansion adds and the rows it draws cannot be two
+ * answers to *what did this row withhold*.
+ */
+export function withheldBy(
+  plan: ShedResult | null,
+  parts: readonly Part[],
+  items: number,
+  withheld: (index: number, gone: ReadonlySet<string>) => Withheld,
+): readonly Withheld[] | null {
+  if (plan === null || plan.mark === null) return null;
+  const kept = new Set(plan.kept.map((k) => k.id));
+  const gone: ReadonlySet<string> = new Set(parts.filter((p) => !kept.has(p.id)).map((p) => p.id));
+  return Object.freeze(Array.from({ length: items }, (_, i) => withheld(i, gone)));
+}
+
+/**
+ * C09 I124, I125 — the rows an expansion adds: **one per withheld part**, and
+ * none where the block is not expanded or withheld nothing. A detail line is
+ * one row whatever its width, so this is a count and never a measurement.
+ */
+export function expansionRows(lists: readonly Withheld[] | null, expanded: boolean | undefined): number {
+  if (expanded !== true || lists === null) return 0;
+  return lists.reduce((sum, list) => sum + list.length, 0); // cells-ok — a count of withheld parts
+}
+
+/**
+ * C09 I124 — the fold of a kind that sheds: `expanded` written as `true` and
+ * then **removed**, so collapsing restores the block its producer made rather
+ * than one carrying `expanded: false`. No width and no plan: whether the block
+ * sheds is the width's question, and a fold at a width that sheds nothing draws
+ * nothing (I124).
+ */
+export function foldExpanded<B extends Readonly<{ expanded?: boolean }>>(block: B): B {
+  if (block.expanded !== true) return { ...block, expanded: true };
+  const { expanded: _expanded, ...rest } = block;
+  return rest as B;
+}
+
+/** Two cells between a withheld part's label and its value, the kinds' own gap. */
+const DETAIL_GAP = 2;
+
+/**
+ * C09 I124 — one item's withheld parts, drawn beneath its row as `label  value`
+ * — **the form a table row's dropped columns take** (C11 §3): indented by
+ * C04's inset, on `surface.bgElev`, one row per part.
+ *
+ * **A value is never shed a second time**, and that is the ruling the frame
+ * made. The parts were withheld because the row could not fit them, so a detail
+ * line holding the label and the value is the same fit one indent narrower — a
+ * `keyValue` sheds its value exactly where key and value do not fit, and the
+ * expansion would shed it again. So the value truncates, and where the label
+ * would leave it fewer than `minValue` cells the **label** gives way and the
+ * value takes the line: the value is what the reader expanded to see.
+ *
+ * **The ground as the table lays it** — padded to the width only where there is
+ * a ground to paint, and nothing where the rung has none (C11 I25's guard).
+ */
+export function withheldLines(
+  list: Withheld,
+  width: number,
+  minValue: number,
+  ctx: RenderContext,
+): readonly string[] {
+  if (list.length === 0) return []; // cells-ok — a count of withheld parts
+  const inner = insetWidth(width);
+  const indent = " ".repeat(Math.max(0, width - inner)); // cells-ok — the inset's own cells
+  const ambiguous = ctx.capabilities.ambiguousWidth;
+  const muted = tone("muted", ctx.theme, ctx.capabilities);
+  const plain = tone("default", ctx.theme, ctx.capabilities);
+  const elev = background("surface.bgElev", ctx.theme, ctx.capabilities);
+  const base = elev.background === undefined ? "" : groundSequence("surface.bgElev", ctx.theme, ctx.capabilities);
+  return list.map((part) => {
+    const label = stripControl(part.label);
+    const value = stripControl(part.value);
+    const labelled = cells(label, ambiguous) + DETAIL_GAP + minValue <= inner;
+    const spans: Span[] = labelled
+      ? [
+          { text: indent },
+          { text: label, style: muted },
+          { text: " ".repeat(DETAIL_GAP) },
+          { text: truncate(value, inner - cells(label, ambiguous) - DETAIL_GAP, ctx.capabilities), style: plain },
+        ]
+      : [{ text: indent }, { text: truncate(value, inner, ctx.capabilities), style: plain }];
+    if (base === "") return paint(clampSpans(spans, width, ctx.capabilities));
+    const used = spans.reduce((sum, span) => sum + cells(span.text, ambiguous), 0); // cells-ok — a sum of measured spans
+    const filled = [...spans, { text: " ".repeat(Math.max(0, width - used)) }];
+    return based([paint(clampSpans(filled, width, ctx.capabilities))], base)[0] ?? "";
+  });
+}
+
+/**
+ * C09 I113, I124 — the rows that shed, as targets whose peek holds what they
+ * withheld, and whose `⏎` expands the block in place.
+ *
+ * **One element per item, at the full width, and `detail` only where the item
+ * lost something** — `tableElements`' shape (C26 §5), because a dropped part
+ * here and a dropped column there are one subject. A `steps` row with no
+ * detail draws the block's mark and withheld nothing of its own, so it is a
+ * target with no peek, exactly as a table row that fits is.
+ *
+ * **Every element carries `expand` on the block** (I124, ruling 42): the plan
+ * is block-wide, so the expansion is too. **Expanded**, each element spans its
+ * row and the parts drawn beneath it — a table's expanded row's shape — and the
+ * peek goes, because nothing it would list is withheld from view.
+ */
+export function shedElements(
+  blockId: string,
+  lists: readonly Withheld[] | null,
+  width: number,
+  firstRow: number,
+  copy: (index: number) => string,
+  expanded: boolean | undefined,
+): readonly NavElement[] {
+  if (lists === null) return Object.freeze([]);
+  const open = expanded === true;
+  const activate = Object.freeze({ kind: "expand" as const, label: open ? "collapse" : "expand", target: blockId });
+  const out: NavElement[] = [];
+  let row = firstRow;
+  for (const [i, rows] of lists.entries()) {
+    const height = 1 + (open ? rows.length : 0); // cells-ok — a row count
+    const detail: KeyValue | null =
+      open || rows.length === 0 // cells-ok — a count of withheld parts
+        ? null
+        : Object.freeze({ kind: "keyValue", id: `${blockId}-shed-${String(i)}-detail`, rows: Object.freeze(rows) });
+    out.push(
+      Object.freeze({
+        id: `shed-${String(i)}`,
+        level: "row" as const,
+        rows: Object.freeze({ from: row, to: row + height }),
+        cols: Object.freeze({ from: 0, to: width }),
+        activate,
+        copy: copy(i),
+        ...(detail === null ? {} : { detail }),
+      }),
+    );
+    row += height;
+  }
+  return Object.freeze(out);
+}
+
+/**
+ * What focus does to one shed row (C09 I137, I113, §7k): `on` is the ground the
+ * row stands on and its inks resolve against (C10 I48), `head` whether it is
+ * focus's own row.
+ */
+export type ShedLit = Readonly<{ on: "focusGround" | "selection"; head: boolean }>;
+
+const UNLIT = (): ShedLit | null => null;
+
+/**
+ * Which shed rows focus touches — `R-SEL-006`'s row (C09 I137, §7k).
+ *
+ * **Gated on the plan `elements` reads**, which the caller passes as a thunk so
+ * a block focus is not on pays nothing for it. A row is an element only where
+ * it sheds (I113), so a focus naming `shed-i` at a width where nothing sheds —
+ * the frame between a resize and C26 moving focus — paints nothing: the render
+ * and the element set are one answer, not two that agree (§7k's trace, S2).
+ *
+ * `selected` holds the head too whenever an extent exists (C26 I16), so a
+ * selected head stands on selection's ground and keeps focus's weight — the
+ * mark that persists, here, because these rows have no `▸` column.
+ */
+export function shedFocus(
+  blockId: string,
+  ctx: RenderContext,
+  plan: () => readonly Withheld[] | null,
+): (index: number) => ShedLit | null {
+  const focus = ctx.focus ?? null;
+  if (focus === null) return UNLIT;
+  const head = focus.blockId === blockId ? focus.rowId : null;
+  const selected = new Set((focus.selected ?? []).filter((s) => s.blockId === blockId).map((s) => s.rowId));
+  if (head === null && selected.size === 0) return UNLIT;
+  if (plan() === null) return UNLIT;
+  return (index) => {
+    const id = `shed-${String(index)}`;
+    const isHead = id === head;
+    const isSelected = selected.has(id);
+    if (!isHead && !isSelected) return null;
+    return { on: isSelected ? "selection" : "focusGround", head: isHead };
+  };
+}
+
+/**
+ * A shed row's spans dressed for focus (C09 I137) — C25's `dress`, the other
+ * `row` without a `▸` column, so the same rule.
+ *
+ * **The ground where it carries and weight at every rung.** At 1-bit
+ * `focusStyle` answers nothing and `selectionStyle` answers `inverse`, so the
+ * head is bold, the extent inverse, and a selected head both — never inversion
+ * for focus, which would make the head and the extent one frame (§7k's first
+ * cell). **The bold replaces a dim rather than sitting beside it**: SGR 1 and 2
+ * close with one `22`, so both on one span draws bold only up to the first
+ * close (F1258). Attributes only, so no cell moves and `measure` sees nothing.
+ */
+export function dressShed(spans: readonly Span[], lit: ShedLit | null, ctx: RenderContext): readonly Span[] {
+  if (lit === null) return spans;
+  const behind = (lit.on === "selection" ? selectionStyle : focusStyle)(ctx.theme, ctx.capabilities);
+  const inverse = behind.inverse === true;
+  return spans.map((span) => {
+    const { dim, ...grounded } = withBackground(span.style, behind);
+    return {
+      text: span.text,
+      style: {
+        ...(lit.head || dim === undefined ? grounded : { ...grounded, dim }),
+        ...(inverse ? { inverse: true } : {}),
+        ...(lit.head ? { bold: true } : {}),
+      },
+    };
+  });
+}

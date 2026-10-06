@@ -42,9 +42,6 @@
  * stall it exists to report. So the count is taken when the attempt starts.
  */
 
-import { b } from "@fmx/calcium";
-import type { Block } from "@fmx/calcium";
-
 /** The interval, and the unit the caption is denominated in. */
 export const TICK_MS = 2000;
 
@@ -82,28 +79,6 @@ export interface Ring {
   readonly cap: number;
 }
 
-/**
- * The cap, from the width the document was built at.
- *
- * **A display decision, not a memory one.** `form: "line"` does no windowing —
- * the whole series spreads across the plot — so the buffer's length *is* the
- * window, and one sample per column is the density that neither downsamples nor
- * stretches. Sixty samples across 120 columns is a sparse line; two hundred
- * across 80 is noise.
- *
- * The subtraction is the frame the plot sits inside: the view's own border, the
- * panel's, and the y-axis labels. Approximate on purpose — it decides a density,
- * not a layout, and C12 owns the layout.
- *
- * **It cannot follow a resize** (FINDINGS F24). `LiveSpec.render` receives the
- * fetched data and nothing else — no width, no context — so this is fixed when
- * the view opens and a terminal resized afterwards draws the same samples at a
- * different density. Recorded rather than worked around: the app cannot reach
- * the width from inside a tick, and inventing one here would be a second place
- * the terminal's width lives, which is what C01 I13 exists to prevent.
- */
-export const capFor = (width: number): number => Math.max(24, width - 12);
-
 export function createRing(cap: number): Ring {
   const values: (number | null)[] = [];
   let ticks = 0;
@@ -139,149 +114,6 @@ export function createRing(cap: number): Ring {
       return missed;
     },
     cap,
-  };
-}
-
-/**
- * One ring per container, and the rows stay rectangular by construction.
- *
- * **The dashboard is the surface that sees every container and keeps nothing**:
- * `b.live`'s `render` reads the tick's snapshot alone, which is gap 1 unfilled
- * on the other surface. `container.ts` fills it for one container; this fills it
- * for all of them, and one container's CPU across ticks is one row of a matrix
- * with as many rows as there are containers.
- *
- * **Every known container is ticked, present or not** (C12 §6a B2). A container
- * that vanishes from a snapshot takes a `null` rather than dropping out, and a
- * container first seen at tick 40 is back-filled with 39 of them — so **column k
- * is tick k in every row**, which is what makes the set a matrix rather than a
- * stack of unrelated series.
- *
- * That is not tidiness. `columnsOf` places a sample at `round((i / span) * (w −
- * 1))` using *that series' own* length, so ragged rows would be stretched to a
- * common width and column k would mean a different instant in every one —
- * arithmetically self-consistent, and describing a different thing than it
- * holds. Padding is the only fix and only the app can do it, because only the
- * app knows which end is old.
- *
- * **Nothing is ever forgotten.** A stopped container keeps its row of absences
- * until the view closes: that is what a heatmap of a machine looks like, and a
- * row that disappears renumbers the ordinate under the reader.
- */
-export interface RingSet {
-  /**
-   * One tick's readings, keyed by container id. Absent from the map and present
-   * with a `null` are the same thing here — *no reading* — because they are the
-   * same thing to a reader, and the ring counts both as missed.
-   */
-  tick(readings: ReadonlyMap<string, number | null>): void;
-  /** Ids in first-seen order, which is the order the rows are in. */
-  readonly ids: readonly string[];
-  /** The ring for an id, or `undefined` if it has never been seen. */
-  ring(id: string): Ring | undefined;
-  /** Ticks taken. Every ring has had exactly this many samples pushed. */
-  readonly ticks: number;
-}
-
-/**
- * The accumulated matrix as a heatmap — the ring set's first renderer (C12 §3a).
- *
- * **`createRingSet` has filled a rectangular matrix that nothing drew since it
- * landed**, which is the shape F21 names: data with no surface. The dashboard
- * shows *this tick* as a table of bars; the history was accumulating beside it
- * with no way onto the screen, so a reader could see which container is busy now
- * and never which one has been.
- *
- * **A matrix rather than N sparklines, and the shared range is the difference.**
- * Every row is scaled against one range, so an idle container and a saturated
- * one draw differently — which is the comparison the block exists to make. A
- * stack of independently-scaled rows is the same picture for every container and
- * says nothing (C12 §6a B1).
- *
- * **Rectangular by construction**, which C04 I50b requires: `tick` back-fills a
- * new id with `null` before the tick it first appears in, so every ring is
- * exactly `ticks` long whatever order containers started in.
- *
- * `null` for *no history yet* rather than an empty matrix: a heatmap of one tick
- * is a column of single cells, which is honest and not worth a special case, but
- * a heatmap of *no* ticks has no columns at all.
- */
-export function historyBlock(
-  set: RingSet,
-  labelFor: (id: string) => string,
-  unicode = true,
-): Block | null {
-  if (set.ticks === 0 || set.ids.length === 0) return null;
-
-  const series = set.ids.map((id) => ({
-    values: [...(set.ring(id)?.values ?? [])],
-    label: labelFor(id),
-  }));
-
-  return b.plot({
-    id: "cpu-history",
-    form: "heatmap",
-    // **`yMin: 0` and no ceiling, the same pair the single-container plot
-    // takes** (F27): a floor because a matrix of 0.2% wobbles otherwise draws
-    // every row at full density, and no ceiling because `CPUPerc` is
-    // per-core-normalised and 780% is an ordinary reading.
-    yMin: 0,
-    yFormat: "percent",
-    height: Math.max(1, Math.min(series.length, HISTORY_ROWS)),
-    xLabels: [`-${String(set.ticks)} ticks`, "", "now"],
-    // **The second channel** (C10 I31). Density stays the carrier and colour
-    // joins it above 8-bit, so what a 1-bit reader sees is what they saw before
-    // the member existed.
-    colormap: "viridis",
-    series,
-  });
-}
-
-/** Rows the history panel will draw before it says how many it did not. */
-const HISTORY_ROWS = 6;
-
-export function createRingSet(cap: number): RingSet {
-  const rings = new Map<string, Ring>();
-  const order: string[] = [];
-  let ticks = 0;
-
-  return {
-    tick(readings) {
-      // **New ids are back-filled before the tick, not after.** A ring created
-      // empty at tick 40 would be 39 samples short of every other row for the
-      // rest of the session, and the stretch that produces is invisible in every
-      // number — the row renders, at the wrong density, against a shared axis.
-      for (const id of readings.keys()) {
-        if (rings.has(id)) continue;
-        const fresh = createRing(cap);
-        for (let i = 0; i < ticks; i += 1) {
-          fresh.began();
-          fresh.took(null);
-        }
-        rings.set(id, fresh);
-        order.push(id);
-      }
-
-      // **Every known ring, not every reading.** A container missing from this
-      // snapshot is a container that produced nothing, which is a gap in its row
-      // and not an absence of row.
-      for (const id of order) {
-        const ring = rings.get(id);
-        if (ring === undefined) continue;
-        ring.began();
-        ring.took(readings.get(id) ?? null);
-      }
-      ticks += 1;
-    },
-    get ids() {
-      return order;
-    },
-    ring(id) {
-      return rings.get(id);
-    },
-    get ticks() {
-      return ticks;
-    },
   };
 }
 

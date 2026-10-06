@@ -1,0 +1,46 @@
+the mouse in the focus model — every consumed, state-changing gesture lands
+on a state a key already reaches
+
+  click on an entry      focus it — the same state ↓ reaches
+  click on a focused row activate — the same state ⏎ reaches
+  drag selectable contentextend the selection — ⇧↓'s state
+  drag a control         the hit component handles its declared drag first;
+                         selection is only the content fallback
+  wheel                  scroll, and FOCUS DOES NOT MOVE
+  click the scrollbar    jump there — focus still does not move
+  click a chip or button focus and activate in one, because it is
+                         atomic — there is nothing to be inside
+  click the prompt       focus it, and put the caret there
+  click an agent in the  switch to it — the footer row is a real
+  footer                 control, not a readout
+
+★ a click never does something a key cannot
+
+  which is C02's rule, and it is the reason the mouse costs almost
+  nothing to add: every consumed gesture is a SHORTCUT to a state that already
+  exists, so there is no second set of behaviours to design, test or
+  degrade.
+
+  a gesture with no keyboard equal is a feature half the readers
+  cannot use, and this framework ships to terminals with no mouse at
+  all.
+
+hover, and why it is not a channel
+
+  hover shows a TOOLTIP only where the same detail appears on
+  keyboard focus. A tooltip that exists only under a pointer fails
+  the rule, so there are none.
+
+  and hover NEVER changes focus — a wash that follows the pointer
+  makes the cursor's position unreadable, which is the one thing the
+  wash exists to say.
+
+the capture trade, declared rather than discovered
+
+  while the app tracks the mouse, the terminal's OWN selection needs
+  a modifier — shift-drag or option-drag, by emulator.
+     ⌥⇧C native      tracking off · the terminal owns the mouse
+
+  so copy mode is the framework's answer rather than a fight, and
+  mouse: "off" is a config value for anyone who would rather have
+  their emulator's selection all the time.

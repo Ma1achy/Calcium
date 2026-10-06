@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` (harness) + `prism-tui` (world). Same split as C05 and C07 |
+| **Package** | `calcium-tui` (harness) + `prism-tui` (world). Same split as C05 and C07 |
 | **Layer** | L0 data (harness) · L5 app (world) |
 | **Depends on** | C06 (`Invocation`, `RawResult`, `RawPatch`, `FixtureHandler`) · C05 (`Manifest`, for the `__manifest__` endpoint) |
 | **Consumed by** | C06's fixture transport · the demo build · every adapter test |
@@ -215,6 +215,7 @@ Route 3 matters: an unfixtured verb returns a plausible failure rather than hang
 - **I16** — A mutating verb changes the world, and the response it returns is `derived` from a recording of that verb rather than composed. Without mutation a demo cannot show a workflow, and a workflow is what a demo is for; without derivation the response is a fiction with no recording behind it (I10).
 - **I17** — The corpus file declares `schema: "tui.fixtures/1"`. An absent or unrecognised value fails the load; it is never assumed.
 - **I18** — `live` mode advances by reading the injected `clock` on each query. Nothing in C08 schedules, and no mode advances the world unasked.
+- **I19** — *(F1432, → C06 I12, C07 I12)* **An authored stream of text takes its patches from C06's reader, never from a hand-placed `degraded`.** `calcium-tui/fixtures` publishes `createNdjsonReader` — the reader the subprocess transport parses with, not a copy of it — so a fixture describing what a far side writes feeds the lines through it and replays what it emits. When degradation trips is C06's rule, interior to it: a fixture that restates the rule answers as the reader did on the day it was copied, and the copy hid a defect two components away — the docker example placed `degraded` after the ninth line, as C06's floor does, and the first nine lines it then lost were C07's, which no fixture exercising the rule from outside could show. → T2.13, T3.12
 
 ---
 
@@ -239,6 +240,7 @@ Route 3 matters: an unfixtured verb returns a plausible failure rather than hang
 17. `live` mode **pulls**: it reads the clock on each query and advances by the elapsed delta. Nothing in C08 schedules, because a world that advances unasked is a world whose reproducibility depends on real elapsed time (I18).
 18. The corpus file is versioned `tui.fixtures/1` and stores `stdoutRaw`, deriving `stdout` at load. An unrecognised schema fails the load rather than being parsed hopefully (I17).
 19. §7's tests are tagged by half. A **world** test is the reference app's to run, not a deferral Calcium carries — the repo that owns the domain owns the assertion about it (→ A04 §1).
+20. An authored stream of text is fed through C06's own reader, published on `calcium-tui/fixtures`; no fixture places `degraded` by hand (I19).
 
 ---
 
@@ -297,6 +299,7 @@ This is not a deferral list. A **W** row is not a test Calcium is failing to run
 - **T2.12** (I16, I10): the three provenances owe three different things, and the asymmetry is the claim — `derived` must carry a `capturedAt` (*a recording knows when it was taken*), `authored` must carry a note and must **not** carry a `capturedAt`, `recorded` owes neither. **That is *derived from a recording rather than composed*, enforced**: the timestamp is the recording's fingerprint and is exactly what a composed answer cannot produce. A note does not buy its way out, which is what makes them two rules rather than one.
 - **T2.12b** (I16): `record()` is the only site in `src/data/fixtures/` that produces `provenance: "recorded"`. If any other could stamp it, a composed answer could claim a recording it never had and every row above would still pass.
 - **T2.12c** (I16): **a watch, not coverage.** §5's W tier names `prism-tui` and `docker-tui` as the owners of *that a particular world advances, mutates and refuses as its domain requires*, so I16's first clause has no subject in this repository and a row asserting it here would assert a fixture of its own making. What is checkable is that the seam stayed one: `WorldDriver` is declared here and constructed nowhere here, and the row fails the day a world lands in `src/`.
+- **H** — **T2.13** (I19): `calcium-tui/fixtures`' `createNdjsonReader` **is** the function `src/data/transport` builds the subprocess transport's reader from — identity, not equal behaviour, because a second implementation passes every behavioural row on the day it is written and is the copy I19 forbids.
 ### Tier 3 — edge cases
 
 - **H** — **T3.1**: `advance(0)` → the driver is not called, and the world value is unchanged.

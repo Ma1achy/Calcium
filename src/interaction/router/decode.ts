@@ -18,6 +18,7 @@
  */
 
 import type {
+  DecodeCapabilities,
   Decoder,
   DecoderOptions,
   InputEvent,
@@ -163,14 +164,35 @@ const CSI_TILDE_KEYS: Readonly<Record<string, string>> = Object.freeze({
  * as Alt (bit 2) and one sending it as Meta (bit 8) are describing the same
  * keystroke, and splitting them here would put the terminal's configuration into
  * the keymap.
+ *
+ * **Bit 8 is Meta without a protocol and Super with one** (C16 I41, I34 amended).
+ * That sentence above is true of a terminal that reported nothing — `⌘` does not
+ * reach the application there, so a bit-8 arrow genuinely *is* `⌥↑`. It is false
+ * of a terminal that answered `CSI > 3 u`: kitty's encoding defines bit 8 as
+ * Super, and folding it to `meta` there discards what the terminal took the
+ * trouble to say. `CSI 1;9A` is legal in both encodings and means a different
+ * chord in each, so **the arm an escape sequence arrived on cannot be the
+ * condition** — only the negotiated protocol can, and reading it by arm made
+ * `⌘↑` and `⌥↑` one key on a terminal that distinguishes them.
+ *
+ * The control that keeps this honest is `CSI 1;3A`: bit 2, `meta` under both.
  */
-function modifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "shift"> {
+function modifiersOf(
+  param: string | undefined,
+  protocol: DecodeCapabilities["keyboardProtocol"],
+): Pick<Key, "ctrl" | "meta" | "shift" | "super"> {
   const encoded = param?.split(":", 1)[0];
   const bits = encoded === undefined ? 0 : Math.max(0, Number(encoded) - 1);
+  const eight = (bits & 8) !== 0;
+  const isSuper = eight && protocol === "kitty";
   return {
     shift: (bits & 1) !== 0,
-    meta: (bits & 2) !== 0 || (bits & 8) !== 0,
+    meta: (bits & 2) !== 0 || (eight && !isSuper),
     ctrl: (bits & 4) !== 0,
+    // Absent rather than false, as the csi-u arm emits it — a `super: false` on
+    // every key would make `keySlot` and the collision check see a field that is
+    // there for the two chords that use it and nowhere else (I34).
+    ...(isSuper ? { super: true } : {}),
   };
 }
 
@@ -178,14 +200,14 @@ function modifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "sh
  * kitty's modifier field, for the `u` arm alone (C02 §3, C16 §2).
  *
  * Plus one, like xterm's, and the low three bits agree — shift 1, alt 2, ctrl 4.
- * **Bit 8 is folded into nothing**: it is xterm's Meta and kitty's Super, and
- * `⌘a` arriving as `Alt-a` is the live-binding class `modifiersOf`'s comment
- * records, one encoding over. kitty's own meta is bit 32 and joins alt in
+ * **Bit 8 is `super`** — kitty's own definition, and what the body below has
+ * done since C16 I34 was amended; this comment said *folded into nothing* for
+ * as long after (C16 §6c). kitty's own meta is bit 32 and joins alt in
  * `meta`, the pair the `CSI 1;m X` arm already folds. Stated blind spot: an
  * xterm at `formatOtherKeys=1` loses a Meta modifier here; its default format is
  * `CSI 27;m;k ~`, which `modifiersOf` keeps.
  */
-function kittyModifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "shift"> {
+function kittyModifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" | "shift" | "super"> {
   const bits = param === undefined || param === "" ? 0 : Math.max(0, Number(param) - 1);
   // Written as `=== bit` rather than `!== 0` so these three lines do not
   // duplicate `modifiersOf`'s: `tools/mutate/runs/c16-modifiers.mjs` anchors on
@@ -195,6 +217,12 @@ function kittyModifiersOf(param: string | undefined): Pick<Key, "ctrl" | "meta" 
     shift: (bits & 1) === 1,
     meta: (bits & 2) === 2 || (bits & 32) === 32,
     ctrl: (bits & 4) === 4,
+    // **Bit 8, which used to fold into nothing** (C16 I34). The reason it was
+    // dropped — *`⌘a` arriving as `Alt-a` is the live-binding class* — is a
+    // statement about the *legacy* arm, and the two arms are distinguished now.
+    // Here the terminal reported the protocol and said `super`, so answering
+    // `meta` would be discarding what it said.
+    super: (bits & 8) === 8,
   };
 }
 
@@ -229,7 +257,7 @@ const KITTY_MODIFIER_KEYS: Readonly<Record<number, string>> = Object.freeze({
 function key(
   name: string,
   sequence: string,
-  mods: Partial<Pick<Key, "ctrl" | "meta" | "shift">> = {},
+  mods: Partial<Pick<Key, "ctrl" | "meta" | "shift" | "super">> = {},
   event?: "press" | "repeat" | "release",
   encoding?: Key["encoding"],
 ): InputEvent {
@@ -238,6 +266,11 @@ function key(
     ctrl: mods.ctrl ?? false,
     meta: mods.meta ?? false,
     shift: mods.shift ?? false,
+    // **Absent rather than `false` when the terminal could not say** (C16 I34).
+    // Only the csi-u arm ever sets it, so *absent* is the legacy record's honest
+    // answer — `⌘a` there genuinely is `Alt-a`, and a `super: false` on every
+    // legacy key would read as *the terminal said no* rather than *it cannot say*.
+    ...(mods.super === true ? { super: true } : {}),
     sequence,
     ...(encoding === undefined ? {} : { encoding }),
   });
@@ -422,6 +455,21 @@ export function createDecoder(options: DecoderOptions): Decoder {
       if (code >= 1 && code <= 26) {
         return out.push(key(String.fromCharCode(96 + code), ch, { ctrl: true })), 1;
       }
+      // **The four above the letters, by the same ASCII rule** (C16 I17, I49).
+      // `0x1c`–`0x1f` are `⌃\`, `⌃]`, `⌃^` and `⌃_`, which is `code + 64` in
+      // the same table `code + 96` reads for the letters — and the arm was
+      // missing, so each arrived as a key **named by its own control byte**:
+      // unbindable, because no chord can be written for a name that is an
+      // unprintable character.
+      //
+      // Found by T2.13 rather than by reading (M9): `host.detach`'s base
+      // candidate is `⌃]` *because* it is a byte every terminal sends without
+      // being persuaded, and the one thing that could not be done with it was
+      // bind it. `0x1b` is ESC and is handled above; `0x00` is `⌃@` and stays
+      // out, because a NUL in the stream is not a keystroke anyone pressed.
+      if (code >= 28 && code <= 31) {
+        return out.push(key(String.fromCharCode(code + 64), ch, { ctrl: true })), 1;
+      }
       return out.push(key(ch, ch)), 1;
     }
 
@@ -514,7 +562,7 @@ export function createDecoder(options: DecoderOptions): Decoder {
     if (body.startsWith("<")) return mouse(body, final, consumed, out);
 
     const params = body.split(";");
-    const mods = modifiersOf(params[1]);
+    const mods = modifiersOf(params[1], capabilities.keyboardProtocol);
 
     // The two forms a terminal uses to report a key it cannot express as a
     // bare byte — which is every modified Enter, Tab and Space, and therefore
@@ -574,6 +622,13 @@ export function createDecoder(options: DecoderOptions): Decoder {
     // (T3.13) — the first version of this line took any `Z` final and turned a
     // malformed sequence into a keystroke, which the existing row caught.
     if (final === "Z" && body === "") return out.push(key("tab", sequence, { shift: true })), consumed;
+
+    // **Focus reports** (I61, C01 I23): taken only when a notification rung is
+    // opted in, and swallowed whole before this — so none ever leaked as a key,
+    // and none was ever heard. The bare form only, as `Z`'s.
+    if ((final === "I" || final === "O") && body === "") {
+      return out.push(Object.freeze({ kind: "focus" as const, focused: final === "I" })), consumed;
+    }
 
     const name = CSI_LETTER_KEYS[final];
     if (name === undefined) return consumed;

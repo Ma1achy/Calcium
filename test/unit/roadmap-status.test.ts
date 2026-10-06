@@ -313,11 +313,24 @@ describe("roadmap-status — the Order column's verifier", () => {
     // the signal cannot exercise it** — which is itself the signal's stated
     // limit: a citation whose cell names no single-word symbol is unmeasured
     // here, and reads in the report exactly like one that has none adrift.
-    const anchoredCite = "`src/shell/confirm.ts:101`";
-    // Line 200 — inside the file (354 lines) and non-blank, so the *gate* has
-    // nothing to say about it. A line past the end or on a blank one fails for
-    // the gate's own reasons and would prove the wrong thing.
-    const drifted = run(mutate(anchoredCite, "`src/shell/confirm.ts:200`"));
+    // **Re-anchored twice as `confirm.ts` grew C23 §7f**, and the moves are the
+    // reason the row is written against a named line rather than a number:
+    // `choiceBlock` went 101 → 155 → 169, and the fabrication's target had to
+    // move with it both times or the control would be measuring two drifted
+    // citations against each other — a repair can hide the gap it exposed, by
+    // moving a fabrication onto a covered line. The second move is the one
+    // that shows why: 210 had become
+    // `ConfirmDeps`'s own line ± the window, so the fabrication read as
+    // *anchored* and the row went red by one. **A third time with review
+    // batch 2's M5** (169 → 243), which grew the question's refusal notice,
+    // and a fourth with review batch 4's §7g (243 → 312), which split `ask`
+    // into `ask` and `show` for the question queue.
+    const anchoredCite = "`src/shell/confirm.ts:312`";
+    // Line 150 — inside the file, non-blank, and sixty lines clear of the
+    // nearest symbol this cell names, so the *gate* has nothing to say about
+    // it. A line past the end or on a blank one fails for the gate's own
+    // reasons and would prove the wrong thing.
+    const drifted = run(mutate(anchoredCite, "`src/shell/confirm.ts:150`"));
     expect(drifted.ok, "the run still passes — this is a signal, not a gate").toBe(true);
     const d = /citation anchorage · (\d+)\/(\d+) line citations/u.exec(drifted.out);
     expect(Number(d?.[2]), "the population is unchanged").toBe(total);
@@ -329,7 +342,7 @@ describe("roadmap-status — the Order column's verifier", () => {
     // The control in the other direction: the same cell pointed back at a line
     // that does carry the symbol restores the count, so the counter is reading
     // the citation rather than the edit.
-    const back = run(mutate(anchoredCite, "`src/shell/confirm.ts:102`"));
+    const back = run(mutate(anchoredCite, "`src/shell/confirm.ts:313`"));
     expect(Number(/citation anchorage · (\d+)\//u.exec(back.out)?.[1]), "the control").toBe(anchored);
   });
 
@@ -347,7 +360,7 @@ describe("roadmap-status — the Order column's verifier", () => {
     const [anchored, total] = anchorage(run().out);
 
     // Entry 25's cell is the live instance: it writes `ghost()` and cites
-    // `paint.ts:444`, where `deps.ghost()` is read. **The bare form must change
+    // the `paint.ts` line where `deps.ghost()` is read. **The bare form must change
     // neither number** — one symbol, two spellings.
     const bare = run(mutate("reads `ghost()` fresh per paint", "reads `ghost` fresh per paint"));
     expect(anchorage(bare.out), "the two spellings are one symbol").toEqual([anchored, total]);
@@ -372,7 +385,12 @@ describe("roadmap-status — the Order column's verifier", () => {
     const field = run(mutate("reads `ghost()` fresh per paint", "reads `ghost()` `#anchor` fresh per paint"));
     expect(field.ok, "and a real field is still demanded of the file").toBe(false);
     expect(field.out, "by name").toContain("#anchor");
-  });
+  // **Its own limit, and the reason is the asymmetry** (F1406). Four spawns of the
+  // tool, each walking the tree over the bind mount: 1.35 s alone, and 46.6 s,
+  // 34.1 s and 38.2 s in three consecutive loaded chains against the file's 30 s.
+  // The row asserts counts, not speed, so a timeout here is a verdict about the
+  // machine; 120 s costs nothing when the tree is right.
+  }, 120_000);
 
   it("RS9: the grep-reach signal counts the sweep's own evidence, not the Order row", () => {
     // **The sixth sweep's finding, made countable.** Every earlier sweep claimed
@@ -497,19 +515,25 @@ describe("roadmap-status — the Order column's verifier", () => {
     // The violation is fabricated rather than anchored on either, for RS8/RS10's
     // reason: this session is rewriting both sentences. It is spliced onto the
     // end of the confirmed-OPEN paragraph, and the symbol is one that certainly
-    // exists in the scope the gate names — `documentView` has an implementation
-    // file of its own under `src/shell/`.
+    // exists in the scope the gate names — `liveDeclarations` is the walk that finds a
+    // document's live parts, written in four files including `src/shell/execution.ts`.
+    //
+    // **It was `documentView`, and the symbol went to zero when the pushed view
+    // did** (C22 §13a, R-EXA-082, F1253) — which is this row's own subject
+    // arriving at its fixture: a fabricated violation whose symbol has left the
+    // tree is a rule with nothing to be wrong about, and the failure is the
+    // instrument working. The replacement is chosen for the property the row
+    // needs and nothing else: it occurs in `src/`, and `execution.ts` writes it.
     const { at, body } = openParagraph(ROADMAP);
-    const gate = " **Gate**: `documentView` occurs zero times in `src/`.";
+    const gate = " **Gate**: `liveDeclarations` occurs zero times in `src/`.";
     const r = run(ROADMAP.slice(0, at + body.length) + gate + ROADMAP.slice(at + body.length));
     expect(r.ok, "a symbol declared absent and present in the tree").toBe(false);
-    expect(r.out).toMatch(/a gate says `documentView` occurs zero times/u);
-    // **The set is asserted, not the first file.** The first draft pinned
-    // `document-view.ts` and went red because the arm named `construct.ts` —
-    // which is where the walk happened to arrive first, an ordering the rule
-    // never promised. The arm now reports every writer, sorted, so the row
-    // asserts a member of the set (`execution.ts` calls `documentView.open`)
-    // and survives any reorder of the tree.
+    expect(r.out).toMatch(/a gate says `liveDeclarations` occurs zero times/u);
+    // **The set is asserted, not the first file.** The first draft pinned one
+    // file and went red because the arm named another — which is where the walk
+    // happened to arrive first, an ordering the rule never promised. The arm
+    // reports every writer, sorted, so the row asserts a member of the set and
+    // survives any reorder of the tree.
     expect(r.out).toMatch(/\d+ files write it \(/u);
     expect(r.out).toContain("src/shell/execution.ts");
   });

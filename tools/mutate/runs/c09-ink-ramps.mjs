@@ -65,15 +65,20 @@ const results = runPass({
       // C09 I52 (T2.119, T6.96) — the brief's other answer: the ramp compresses as the bar shortens.
       name: "the bar's extent is its filled length",
       file: SIMPLE,
-      from: "            const t = animateT(block.ramp?.animate, extentT(i, barWidth), effectiveTick(ctx.tick, ctx.capabilities), barWidth, i);",
-      to: "            const t = animateT(block.ramp?.animate, extentT(i, filled), effectiveTick(ctx.tick, ctx.capabilities), filled, i);",
+      // Anchored on the two `barWidth` arguments alone, which is what this
+      // mutation exchanges. The call was one line and became six when I99
+      // threaded `ctx.motion` through it; an anchor holding the whole call
+      // rotted for a reason that had nothing to do with the extent.
+      from: "              extentT(i, barWidth),",
+      to: "              extentT(i, filled),",
       expect: "T2.119",
     },
     {
       // C09 I54 (T2.120, T4.8) — F227 restored by content: the cadence reads the kind alone.
       name: "tickIntervalOf reads ANIMATES alone",
       file: ANIMATION,
-      from: "  return animatesByContent(block) ? rampCadenceMs() : null;",
+      // Re-anchored 2026-09-27 (C09 I120): the content check takes the tick.
+      from: "  return animatesByContent(block, at) ? rampCadenceMs() : null;",
       to: "  return null;",
       expect: "T2.120",
     },

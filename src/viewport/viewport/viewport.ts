@@ -47,6 +47,19 @@ class ViewportImpl implements Viewport {
   #followTail = true;
   #anchor: Anchor | null = null;
   /**
+   * The entry L4 keeps whole, and the hold that asked (I56).
+   *
+   * A token rather than the id, so a hold replaced by a second one cannot be
+   * released by the first one's disposal.
+   */
+  #held: Readonly<{ id: EntryId }> | null = null;
+  /**
+   * **Whether the hold, and not the reader, detached this viewport** (I56).
+   * Only then does the release give the tail back: a reader who scrolled away
+   * chose where they are, and ending a hold is not a reason to move them.
+   */
+  #heldDetached = false;
+  /**
    * The last range `visible()` answered, until the viewport moves (I30).
    *
    * **Dropped in `#setTop` and nowhere else**, because every path that changes
@@ -194,6 +207,7 @@ class ViewportImpl implements Viewport {
 
   scrollBy(rows: number): void {
     if (rows === 0) return;
+    this.#readerMoved();
     const before = this.#topRow;
     this.#setTop(this.#topRow + rows);
 
@@ -210,6 +224,7 @@ class ViewportImpl implements Viewport {
   }
 
   scrollToTop(): void {
+    this.#readerMoved();
     this.#setTop(0);
     // The same derivation as `scrollBy`: at the top, following iff the whole
     // transcript fits — `maxTop() === 0`, spelled as the comparison it is.
@@ -219,10 +234,32 @@ class ViewportImpl implements Viewport {
   }
 
   scrollToBottom(): void {
+    this.#readerMoved();
     this.#setTop(this.#maxTop());
     this.#followTail = true;
     this.#anchor = null;
     this.#emit({ kind: "scroll" });
+  }
+
+  keepWhole(id: EntryId): Disposable {
+    const hold = Object.freeze({ id });
+    this.#held = hold;
+    this.#heldDetached = false;
+    // **Nothing moves here.** The hold is a limit on following, read at the
+    // next content change or resize; taking it is not a scroll.
+    return {
+      [Symbol.dispose]: () => {
+        if (this.#held !== hold) return;
+        this.#held = null;
+        if (!this.#heldDetached) return;
+        // **The detach was the hold's, so the tail comes back with its end** (I56).
+        this.#heldDetached = false;
+        this.#followTail = true;
+        this.#anchor = null;
+        this.#setTop(this.#maxTop());
+        this.#emit({ kind: "scroll" });
+      },
+    };
   }
 
   /** I17 — exactly `viewportHeight − 1`, both ways. The overlap is the point. */
@@ -281,8 +318,7 @@ class ViewportImpl implements Viewport {
     // where the drift is one event deep and reads as the terminal's doing. It is
     // per frame now (C22 I34), so it compounds — which is how this was found.
     // `#afterContent` had the same two-branch shape all along, ten lines away.
-    if (this.#followTail) this.#setTop(this.#maxTop());
-    else this.#restoreFromAnchor();
+    this.#follow();
     this.#emit({ kind: "resize" });
   }
 
@@ -346,6 +382,7 @@ class ViewportImpl implements Viewport {
         this.#topRow = 0;
         this.#followTail = true;
         this.#anchor = null;
+        this.#heldDetached = false;
         break;
       }
 
@@ -413,9 +450,49 @@ class ViewportImpl implements Viewport {
    * the reader is looking at stays on the same screen row (I4).
    */
   #afterContent(): void {
-    if (this.#followTail) this.#setTop(this.#maxTop());
-    else this.#restoreFromAnchor();
+    this.#follow();
     this.#emit({ kind: "content" });
+  }
+
+  /**
+   * Follow the tail, or hold the anchor — **and stop at a held entry** (I56).
+   *
+   * A viewport the hold detached is still following in every sense but the
+   * last rows: when the tail stops threatening the entry's first row — the
+   * entry shrank, the region grew — it follows again, so I5 is re-derived here
+   * rather than left as the hold set it.
+   */
+  #follow(): void {
+    if (!this.#followTail && !this.#heldDetached) {
+      this.#restoreFromAnchor();
+      return;
+    }
+    const stop = this.#heldTop();
+    if (this.#held !== null && stop !== null && stop < this.#maxTop()) {
+      this.#setTop(stop);
+      this.#followTail = false;
+      this.#anchor = Object.freeze({ id: this.#held.id, rowOffset: 0 });
+      this.#heldDetached = true;
+      return;
+    }
+    this.#setTop(this.#maxTop());
+    this.#followTail = true;
+    this.#anchor = null;
+    this.#heldDetached = false;
+  }
+
+  /** The held entry's first row, or `null` — no hold, or an id the store no longer holds. */
+  #heldTop(): number | null {
+    const held = this.#held;
+    if (held === null) return null;
+    const i = this.#ids.indexOf(held.id);
+    return i < 0 ? null : this.#index.rowsBefore(i);
+  }
+
+  /** The reader moved: the hold ends for this viewport (I56). */
+  #readerMoved(): void {
+    this.#held = null;
+    this.#heldDetached = false;
   }
 
   #rebuild(): void {

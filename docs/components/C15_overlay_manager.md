@@ -3,10 +3,10 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L2 viewport |
 | **Depends on** | C04 (`Block`) · C09 (`measure` via the registry). **Not C14** — the region is passed to `layout()`, so C15 imports nothing from it |
-| **Consumed by** | C16 (input priority) · C19 completion · C20 reverse search · L4 (confirms, pushed views) |
+| **Consumed by** | C16 (input priority) · C19 completion · C20 reverse search · L4 (confirms, panels, peeks) |
 | **Source** | A01 D3, D4, D7 · A02 §2 |
 | **Status** | Draft |
 
@@ -14,11 +14,11 @@
 
 ## 1. Purpose
 
-Some things sit above the transcript: a completion menu, reverse-i-search, a confirm, the `?` help, and the two pushed views — dashboard and logs (A01 D4). None of them belongs in the scrollback. They are transient, positional, and they take input priority while present.
+Some things sit above the transcript: a completion menu, reverse-i-search, a confirm, a panel above the prompt, a peek beside a focused element. None of them belongs in the scrollback. They are transient, positional, and they take input priority while present.
 
 C15 owns the stack of those layers: what is on top, where each one sits, how big it is, and what `Esc` closes. It does not route keys — that is C16, which reads the top of this stack to decide priority.
 
-The unifying decision: **overlays and pushed views are the same mechanism with different placement.** Both are content above the transcript with input priority; one is positioned and content-sized, the other fills the viewport region. Treating them separately would mean two `Esc` implementations, two focus rules, and a question nobody wants to answer about what happens when a confirm appears inside the dashboard.
+**There is no pushed view, and this section used to open by naming two** (R-EXA-082, F1254). The unifying decision was *overlays and pushed views are the same mechanism with different placement* — one positioned and content-sized, the other filling the region — and the argument for it was that treating them separately would mean two `Esc` implementations and two focus rules. The design removes the second half rather than the argument: the test for anything wanting a frame of its own is *does it have its own prompt and its own context*, and a reading, a diff and a help page have neither, so each is an entry in the transcript. What is left is **one mechanism with one shape**: content above the transcript, positioned, content-sized, with input priority while present. **The `fill` placement went with it** (parked 3): it outlived the kind for a while because three refusals named it, and each of those refusals had a live subject besides, so the placement was deleted and the three were amended rather than emptied (§4).
 
 ---
 
@@ -29,19 +29,29 @@ type Placement =
   | Readonly<{ kind: "anchored"; row: number; rows?: number;   // the anchor's own extent, default 1
                prefer: "above" | "below" }>
   | Readonly<{ kind: "centred" }>
-  | Readonly<{ kind: "fill" }>;                  // views only
 
-type Layer = Readonly<{
+/** What every kind carries. */
+type LayerBase = Readonly<{
   id:          string;
-  kind:        "overlay" | "view" | "peek";        // peek — takes no keys, is never `top` (§2a)
   placement:   Placement;
   content:     readonly Block[];
-  dismissable: boolean;                          // false = must be resolved, not escaped
   width?:      number;                            // cells; absent means the region's width
   maxHeightFraction?: number;                     // overlays; default 0.5
   /** Where this layer wants the terminal cursor, relative to its own origin (I19). */
   cursor?:     Readonly<{ row: number; col: number }>;
 }>;
+
+/**
+ * One kind, one shape (I30, §2d). `blocking` owns input while it is up and
+ * `dismissal` is what closes it (I26); `owner` is the rung it answers at (I29,
+ * C16 I63). The union is the table in §2d written as a type, and `push` and
+ * `update` check the same table at run time for a caller the type does not reach.
+ */
+type Layer =
+  | (LayerBase & Readonly<{ kind: "peek";  blocking: false; dismissal: "focus";  owner?: undefined }>)
+  | (LayerBase & Readonly<{ kind: "panel"; blocking: false; dismissal: "escape"; owner?: SubstateOwner }>)
+  | (LayerBase & Readonly<{ kind: "overlay"; owner?: QuestionOwner }> &
+      (Readonly<{ blocking: true; dismissal: "answer" | "escape" }> | Readonly<{ blocking: false; dismissal: "escape" }>));
 
 type Placed = Readonly<{
   layer:  Layer;
@@ -54,14 +64,14 @@ type Placed = Readonly<{
   cursor?: Readonly<{ row: number; col: number }>;
 }>;
 
-type DismissReason = "explicit" | "anchorEvicted";
+type DismissReason = "explicit" | "anchorEvicted" | "displaced";   // displaced — I28's arrival closed it (I32)
 
 /** What `update` may change — deliberately not `dismissable`. See below. */
 type LayerUpdate = Partial<Pick<Layer, "content" | "placement" | "width" | "cursor">>;
 
 type OverlayChange =
   | Readonly<{ kind: "push";    id: string; layerKind: Layer["kind"] }>
-  | Readonly<{ kind: "pop";     id: string; layerKind: "overlay" | "view" }>   // a peek is never popped (I21)
+  | Readonly<{ kind: "pop";     id: string; layerKind: "overlay" | "panel" }>  // a peek is never popped (I21)
   | Readonly<{ kind: "content"; id: string }>
   | Readonly<{ kind: "dismiss"; id: string; reason: DismissReason }>;
 
@@ -75,16 +85,25 @@ interface OverlayManager {
 
   readonly stack:  readonly Layer[];             // bottom-first
   readonly top:    KeyedLayer | null;            // the topmost layer that takes keys — never a peek (I21)
-  readonly hasView: boolean;
+  readonly generation: number;                   // keyed pushes and removals, never down (I33)
 }
 
+/** The keyed layers (I21), and the ones the pointer reaches (I31): a peek takes the wheel and nothing else. */
+function takesInput(p: Placed): boolean;
+function takesPointer(p: Placed, e: "wheel" | "press"): boolean;
+
+/** Which owner rung a keyed layer is (§103, R-QST-001) — and, for a substate, which one. */
+type QuestionOwner = Readonly<{ rung: "question" }>;
+type SubstateOwner = Readonly<{ rung: "substate"; name: "find" | "complete" | "preview" }>;
+type LayerOwner = QuestionOwner | SubstateOwner;
+
 /** A layer C16 can route to. `top` is typed to this so a peek cannot reach `activeTarget`. */
-type KeyedLayer = Layer & Readonly<{ kind: "overlay" | "view" }>;
+type KeyedLayer = Layer & Readonly<{ kind: "overlay" | "panel" }>;
 ```
 
 ### A layer changes without leaving the stack
 
-`update` exists because every consumer needs it and none of them is opening a new layer when it does. C19's menu narrows on each keystroke and re-highlights on each arrow; S12's logs view scrolls its own buffer; C25 §3b's fullscreen patch pages, and binds `n` and `p`. All three change what is drawn while the layer stays exactly where it is.
+`update` exists because every consumer needs it and none of them is opening a new layer when it does. C19's menu narrows on each keystroke and re-highlights on each arrow; C20's reverse search rewrites its match line; a peek's content changes when the entry under it is patched. All three change what is drawn while the layer stays exactly where it is. **Two of the three examples here were pushed views** — a logs buffer scrolling itself and a fullscreen patch paging — and the seam outlives them (F1254): what argues for `update` is a layer whose content changes while the layer does not move, which is what every remaining kind does.
 
 The two alternatives were considered and are worse in ways that are not obvious.
 
@@ -99,7 +118,7 @@ The two alternatives were considered and are worse in ways that are not obvious.
 
 `BlockRegistry` answers one question — `measure(block, width) → rows`. There is no query for the width a block would *like*, and adding one means every registered kind implementing it.
 
-So `Layer.width` is declared, in cells, and absent means the region's. `Placed.left` follows from it: `0` for `anchored` and `fill`, and `floor((region.width − width) / 2)` for `centred`. Without a declared width every overlay is region-width, `left` is permanently zero, and `centred` is vertical-only in a section that promises both axes.
+So `Layer.width` is declared, in cells, and absent means the region's. `Placed.left` follows from it: `0` for `anchored`, and `floor((region.width − width) / 2)` for `centred`. Without a declared width every overlay is region-width, `left` is permanently zero, and `centred` is vertical-only in a section that promises both axes.
 
 This is I8's argument one field over. C19 knows its longest candidate and a confirm knows its text; C15 knows neither, and a component that guesses a width here would be inventing the same information I8 forbids it inventing about the remainder.
 
@@ -117,14 +136,18 @@ disposable `push` returned is `dismiss` under another name. `pop()` on a non-dis
 `dismiss` of an unknown id remove nothing and emit nothing. There is no removal path that emits
 nothing, and that is what makes the stream the owner's seam rather than a courtesy.
 
-**It matters because the manager is not always called by the owner.** C16's ⌃c ladder answers a
-pushed view with `pop()` (`router.ts`'s `pushedView` rung) and never learns who raised it; the owner
-that holds state about the layer — an offset, a remembered profiler tier, a timer — learns nothing
-unless it subscribed. Measured 2026-09-09 (F944): after the ladder's `pop()`, `document-view.ts`'s
-`openFor` still names its command over an empty stack, and `keys.ts` reads `openFor` to decide which
-owner a view key belongs to. C28's view subscribes at construction and runs its teardown from the
-change carrying its id, so `Esc`, the ladder and its own `pop()` all reach the same line
-(C28 §3c, C28 I50). The other two owners have the same subscription since F944 was measured — `document-view.ts` (C22 T4.65) and `patch-view.ts` (C25 T2.15) — so every pushed view in `src/shell/` now tears down from this stream, and the ladder reaches all three without knowing any.
+**It matters because the manager is not always called by the owner.** C16's ⌃c ladder pops the
+top keyed layer and never learns who raised it; the owner that holds state about the layer — an
+offset, a timer — learns nothing unless it subscribed. Measured 2026-09-09 (F944): after the
+ladder's `pop()`, `document-view.ts`'s `openFor` still named its command over an empty stack.
+
+**The three owners that argued for this stream are gone and the seam is not** (R-EXA-082, F1254).
+They were the pushed views — the patch, the document and the profiler's deck — and each one's
+teardown ran from the change carrying its id. What is left on the stack is a confirm, a completion
+menu, a panel and a peek, and the first three all hold state a stale owner costs: an in-flight
+answer, a selected row, an anchor. The argument was never about views; it was about **who is
+holding state when someone else removes the layer**, and a `pop()` from the ladder is still not
+the owner's call.
 
 ---
 
@@ -153,19 +176,17 @@ that has the keys*, and a peek never has them.
 
 **What `peek` means, in three rules.**
 
-- **A peek is never `top`** (I21). `top` is the topmost layer of kind `overlay` or `view`, and
+- **A peek is never `top`** (I21). `top` is the topmost layer of kind `overlay` or `panel`, and
   it is typed to say so — `KeyedLayer` — so C16's `overlayTop` cannot see a peek without a type
   error. `pop()` reads `top`, so a peek is never popped; only its owner removes it, through
   `dismiss(id)` or the disposable. The Ctrl-C ladder, `promptUnderMenu`, the confirm's
   `answerHandler` and the terminal cursor all read `top` and all are unchanged by a peek.
-- **A peek is anchored** (I22). Its whole meaning is *beside the thing it describes*; a centred or
-  `fill` peek is a confirm or a view wearing the wrong kind, and both entry points refuse it —
+- **A peek is anchored** (I22). Its whole meaning is *beside the thing it describes*; a centred peek
+  is a confirm wearing the wrong kind, and both entry points refuse it —
   `update` too, on I20's argument that `LayerUpdate` admits `placement`.
-- **Every overlay sorts above every peek, and every peek above every view** (I23, I2 widened). A
+- **Every overlay sorts above every panel, and every panel above every peek** (I23). A
   confirm raised by the far side while a peek is up draws over the peek and takes the keys;
-  the peek stays, because nothing about the element it describes has changed. A view is never
-  pushed over a peek: `push(view)` is rejected onto any non-empty stack as before, and every path
-  that pushes a view runs from the prompt, where no element is focused and no peek exists.
+  the peek stays, because nothing about the element it describes has changed.
 
 **The peek is a projection of focus, and it has no key of its own.** L4 reconciles it — on
 every delivered input and on every viewport change — against three facts: the active target
@@ -174,7 +195,7 @@ row is on screen. All three, and a peek is on the stack anchored at that row wit
 any fewer, and there is none. So `↓` onto an element with a detail opens it, `↓` onto one
 without closes it, `⏎` activates the element (the peek has no `⏎`), and `Esc` at `liveBlock` is
 `focusPrompt` as it is today — the peek closes *because focus left*, not because `Esc` reached
-it. Copy mode freezes the screen and takes every key; the target is `copyMode`, so the peek is
+it. Native selection freezes the screen and takes every key; the target is `nativeSelection`, so the peek is
 dismissed for the same reason. An anchored width is the region's, on the confirm's argument
 (`confirm.ts`, `placementOf`): a narrower layer leaves the rows behind it visible on the same
 line. `maxHeightFraction` is the default half, which is the fraction the confirm's own comment
@@ -199,7 +220,6 @@ Structural, at rest — cells where two rules both hold:
 | the region edge | `prefer: "below"`, C15 flips above when there is no room | I17, existing arithmetic |
 | the element's row scrolled off screen | no anchor → no peek | I17's anchor is a region row |
 | the element is inside a `scroll` box | **uninhabited** — a scroll owns its elements (C09 I30, C26 §4b cell 3): one per child, block-level, and none carries a `detail`, because only a table **row** declares one (`table/definition.ts`, `rowDetail`). So no element inside a box can want a peek, and the content-row → region-row translation the pointer does (`elementAt`, F757 row c) has nothing to translate | measured: `elementsIn` over a scroll holding a cut table answers two elements, `detail` on neither, against the same table alone answering row `a` with one. `peekWanted` carried a guard for this state for as long as it was owed under `SCROLL_PEEK`; the guard was unreachable and is gone, and `test/integration/peek.test.ts` T4.13 pins the premise — it goes red the day a scroll's element gains a `detail`, which is the day the translation is owed |
-| a `view` push | rejected as today; unreachable from a focused element | every view is pushed from the prompt |
 | `Esc` | `focusPrompt` (today's binding); the peek follows focus out | no `Esc` reaches a layer that is not `top` |
 
 Event-mediated — the trace:
@@ -218,11 +238,11 @@ Event-mediated — the trace:
 **Containment is not correctness.** The frame rows assert the peek's row against the element's
 row, and the transcript rows the peek does not cover against the same frame with no peek.
 
-**Content is `Block[]`, not React.** Every overlay and every pushed view renders through the same block library as the transcript — so a completion menu is themed, degrades to ASCII, and is measurable by the same code. The dashboard's five panels are a `group` of `panel`s. React appears only in the positioning shell, never in the content.
+**Content is `Block[]`, not React.** Every layer renders through the same block library as the transcript — so a completion menu is themed, degrades to ASCII, and is measurable by the same code. React appears only in the positioning shell, never in the content.
 
 That is the payoff of the block vocabulary being a vocabulary rather than a rendering of one particular thing, and it is worth defending: a component that reaches for raw React to draw an overlay has stepped outside theming and measurement at once.
 
-### 2b. Approval is a layer, and a subagent's transcript is a view
+### 2b. Approval is a layer, and a subagent is a tab
 
 **A call that needs a decision does not draw the decision in its own gutter** (`AGENT_TUI_DESIGN.md`
 §9e §8). It goes to the overlay — the surface that already carries questions, image previews and
@@ -241,26 +261,150 @@ call's head reads `⬤ rm -rf build/ · ⠋ waiting` beneath it so a transcript 
 layer still shows what is happening (C23 I60). On resolve the layer pops, the head updates, and a
 denied call keeps its head reading `denied`.
 
-**A subagent's transcript is a different document, not a longer block**, so `⏎` on a subagent's
-head pushes a `view` — the mechanism an attached terminal would use, for the same reason — and
-never expands in place. Ruled here and **deferred**: nothing in `src/` produces a subagent, and the
-far side's transcript type does not exist. The two-level nesting rule (C22 I89) is what this
-deferral protects; a transcript of transcripts is a composition problem wearing a rendering
-problem's clothes.
+**A subagent's transcript is a different document, not a longer block** — and the design settles
+what shape that takes: *a subagent → A TAB* (R-EXA-082). It has its own prompt and its own
+context, which is the test, and that is exactly what a layer is not. So `⏎` on a subagent's head
+does not push anything here; it is a composition question for C22 and not a stack question for
+C15. Still **deferred**: nothing in `src/` produces a subagent, and the far side's transcript type
+does not exist. The two-level nesting rule (C22 I89) is what this deferral protects.
 
 ---
 
+## 2c. Blocking and dismissal are two fields — M8
+
+**`dismissable` carried three concepts and the design separates them** (R-QST-001, R-BLK-822). The flag answered *can `pop()` remove it* (I3), *is it modal to the mouse* (C16 I8) and *does it claim keys before the prompt* (C16 I25) — three questions with one bit, which is right for exactly as long as the three answers agree. They do not. `R-BLK-822` is the design's own construction of the case that breaks it:
+
+> ★ BLOCKING AND REPLACING ARE INDEPENDENT. A typed reply BLOCKS and FLOATS, which is the combination that proves it — and it never becomes dismissable, because an owner is still waiting.
+
+And R-QST-001 says the answer is not inferred: *a question declares blocking and owner explicitly.*
+
+So a layer carries two fields.
+
+| field | what it answers | values |
+|---|---|---|
+| `blocking` | does this layer own input while it is up | `true` · `false` |
+| `dismissal` | what closes it | `escape` · `focus` · `answer` |
+
+**Three shapes, and the design names all three** (R-BLK-779):
+
+> a **PANEL** floats above the prompt, between two rules. DISMISSABLE: a click off it CLOSES it, and the click stops there. a **PEEK** anchored BESIDE an element, and it takes NO KEYS — it is a projection of focus, so focus leaving closes it. an **OVERLAY** modal, and it OWNS input. NOT dismissable: clicking off it does nothing, because an owner is waiting.
+
+| kind | `blocking` | `dismissal` | takes keys |
+|---|---|---|---|
+| `overlay` | declared — a question's is `true`; a completion menu's was `false` until M8 made it a panel | `answer` when blocking, `escape` otherwise | yes |
+| `panel` | `false` | `escape` | yes |
+| `peek` | `false` | `focus` | no |
+
+**The old flag maps onto the pair without ambiguity**, which is what makes the rewrite mechanical: `dismissable: true` was *not blocking, closed by escape*, and `dismissable: false` was *blocking, closed by its answer*. Nothing in the tree held the third combination, because it could not be written.
+
+**What the split retires, and it is the better half of the change.** C16's step 3 asked `!top.dismissable || coversRegion(top.id)` — a declared flag **or** a measured geometry, because the flag could not say *owns input* on its own and a full-region layer had to be recognised by its box. `blocking` says it, so `coversRegion` goes and C16 I8 is amended: a layer that owns input says so, and one that does not is not made modal by being large. C16's `promptKeys` carries the same shape from the other side — *a layer that is chrome for the prompt does not stop typing* — and that is `blocking: false` written as an exception before the field existed.
+
+### A blocking layer closes the panels beneath it
+
+R-BLK-873, and it is an ordering rule rather than a placement one:
+
+> a panel is DISMISSABLE and a question is NOT. Two layers, and one of them is about to take the keyboard. **THE PANEL CLOSES FIRST**, and its state is held with the prompt's. A panel is a thing you opened; a question is a thing that arrived. The arriving one cannot silently sit under something you were reading, and stacking two dismissable-versus-not layers makes `esc` ambiguous.
+
+So pushing a `blocking` layer dismisses every `panel` already on the stack, each with its own change and its own reason (I25), before the new layer is pushed. **The reason is `displaced`** (I32): not `explicit`, which says the reader closed it, and not an eviction, because the referent has not gone. *Its state is held with the prompt's* is R-BLK-873's clause, and the holding is the owner's — C15 records which kind of removal it was and nothing else. *(Amended in review batch 3, M8 item 7. The reason was `explicit`, so an owner reading the stream could not tell the reader closing its menu from a question closing it, and none tried: `keys.ts` kept the menu's candidates and selection as though it were still open.)*
+
+**Why here and not in C16.** The rule is about what the *stack* may contain, and the stack is this component's. A version living in the caller is a rule every caller has to remember, and the measured cost of that shape is C16 §6's second keymap.
+
+---
+
+## 2d. The layer's shape, walked — review batch 3 (M7 item 5, M8 items 2, 6 and 7)
+
+**Walked against the tree at `55d5eaa2`, after M5 landed `owner`, before any code.** Three of
+the review's items are about this component and they are both kinds of interaction: which field
+combinations a layer may hold is structural, and what a displaced panel leaves behind is
+event-mediated. A third artefact — the generation — is a counter, and its rows are the sequences
+C16 cannot see.
+
+### The classification table — structural, at rest
+
+Every combination of the three fields, against what the tree did with it. **A row governed by one
+rule is left out**; each row here is a cell where two rules meet.
+
+| kind · blocking · dismissal | the two rules that meet | the tree at `55d5eaa2` | ruling |
+|---|---|---|---|
+| peek · false · focus | — | accepted | **the only peek** (I30) |
+| peek · **true** · any | *a peek is never `top`* (I21) meets *pushing a blocking layer closes the panels* (I28) | accepted: the push **closed the completion menu** and the peek then blocked nothing, because C16's modal gate reads `top` and `top` skips it | refused |
+| peek · false · **escape** | *a peek is never popped* (I21) meets *`escape` is what `pop()` reaches* (I3) | accepted, and a promise nothing keeps | refused |
+| peek · false · **answer** | *a peek takes no keys* meets *only its own answer closes it* | accepted, and nothing can answer it | refused |
+| panel · anything but false · escape | I27 | refused since M8 | unchanged |
+| overlay · true · answer | — | a question | valid |
+| overlay · true · escape | *blocking owns input* meets *`pop()` reaches `escape`* | accepted; **no producer in `src/`** — `router-dispatch.test.ts` hands one to the router directly | valid, recorded: the strict form (I29's finding) is the sweep that retires it |
+| overlay · false · escape | — | eleven test stand-ins for a menu; no producer in `src/` | valid, on the same record |
+| overlay · **false** · **answer** | *not blocking lets keys past it* (C16 step 9) meets *nothing but its answer closes it* | accepted: an owner waits while the global keymap acts beneath it and a click beside it reaches the transcript | refused |
+| overlay · any · **focus** | *an overlay takes keys* meets *focus leaving closes it* | accepted, and nothing moves focus while an overlay is `top` — so nothing closes it | refused |
+
+**The type is the table and so is the check** (I30). A discriminated union on `kind` makes every
+refused row a compile error at a literal; `push` and `update` check the same table at run time,
+because a caller holding a widened `Layer`, a cast or JavaScript reaches the stack without the
+type. **`placement` is not narrowed in the union**: `LayerUpdate` admits it and names no kind, so
+the run-time check (I20, I22, I27) is the only one both routes reach, and a type narrowing it
+would read as a guarantee `update` does not give.
+
+**The pointer half of the table** (I31). `takesInput` was the one predicate for keys and
+for the pointer, and it removed peeks from C16's hit-testing — so C16 I48's *`overlay › panel ›
+peek › base` is the scroll order* named a band no event could reach: a wheel over a truncated peek
+scrolled the transcript row beneath it. Two predicates: `takesInput` stays *the keyed layers*, and
+`takesPointer(p, gesture)` admits a peek for the wheel and for nothing else — a press on a peek
+still reaches the row beneath (I21), which is the element the peek describes.
+
+### The sequence trace — event-mediated
+
+*The menu* is the completion menu, `keys.ts`'s; *the draft* is the prompt's text.
+
+| # | sequence | the tree at `55d5eaa2` | ruling |
+|---|---|---|---|
+| D1 | the menu is open (`git st`, selection null) → a verb asks | I28 dismisses the menu with `explicit`; `keys.ts` keeps `candidates`, `selection`, `requested` and `builtFor`, so `hasMenu()` stays true and `redrawMenu()` updates a layer that is not there | the reason is `displaced` (I32); the owner **holds** its state and clears its live half, so `hasMenu()` is false while the question is up |
+| D2 | D1 → the reader answers, the draft unchanged | nothing is shown; the next keystroke rebuilds a typed menu from scratch, and a requested one filters the stale list and pushes it | **restored**, on the answer's own dispatch, with its candidates, its selection and whether `Tab` opened it |
+| D3 | a requested menu with row 2 selected → a question → the answer | the selection is gone | restored with row 2 selected, and `⏎` accepts row 2 |
+| D4 | the menu → a typed-reply question; the reader types a reply → the answer | — | restored: the reply borrows the prompt and `restoreDraft` runs before the layer is disposed (`confirm.ts` `settle`), so the draft is the held one when the removal arrives |
+| D5 | the menu → a question → the draft changes while it is up → the answer | — | **not restored**, and the held state is dropped: a list built for another line is not the reader's list. Nothing a reader can do reaches this — keys go to the question — so the row drives the draft directly as a stand-in for any writer, and it is the control for D2 |
+| D6 | the menu → question 1 → answered → question 2 asked in a microtask → answered | — | restored after question 1, displaced again by question 2 (a second `displaced` change), restored after question 2. **The net is *restored after the last***, and no frame need compose in between |
+| D7 | the reverse search → a question → the answer | the panel goes; C20's `searchState` stays non-null behind it | restored from C20's own state, which already holds the query and the hit; nothing is snapshotted here, because C20 holds it |
+| D8 | the chip preview → a question → the answer | the preview comes back on the answer's batch: `syncChipPreview` derives it from the caret after every batch and refuses only while something else is up | unchanged — a projection has no state to hold, and the row is the control that the restore mechanism is needed only where state lives |
+| D9 | the menu → a question → `⌃c` | M5 rejects `⌃c` at a question (C16 I62) | no path: the question stays up and so does the held state |
+
+**A peek is not displaced**: I28 closes panels and the peek is a projection of focus, which a
+question does not move.
+
+### The generation — the sequences C16 cannot see
+
+C16 I43's epoch compared the rung at two reads, and a question raised and answered between them
+leaves the rung where it was. The counter the epoch needs is here, because every keyed
+push and removal passes through this component: `generation` counts them and never goes down
+(I33).
+
+| sequence | rung at the two reads | `generation` |
+|---|---|---|
+| a question pushed and dismissed between two reads | `scope`, `scope` | +2 |
+| a question pushed over the menu (I28) | `substate`, `question` | +2: the menu's removal and the push |
+| a peek pushed, updated and dismissed | unchanged | unchanged — a peek is not an owner |
+| `update` on the question | unchanged | unchanged — the owner did not change |
+| `pop()` on an `answer` layer | unchanged | unchanged — nothing was removed |
+
+### What the walk found
+
+- **Five field combinations accepted that nothing can honour** — a blocking peek that closes
+  panels and blocks nothing, a peek promising `escape` or `answer`, an overlay closed by focus,
+  and a non-blocking overlay closed by its answer. Refused (I30).
+- **A band of the scroll order no event could reach**: one predicate answered for keys
+  and the pointer, and the peek is the kind where they differ (I31).
+- **A dismissal reason that said the reader closed a menu the question closed**, and an
+  owner that therefore kept its state live behind a layer that had gone (I32).
+- **An owner change invisible to a counter of rungs**, whose counter belongs here (I33).
+
 ## 3. Stack rules
 
-**Overlays always sit above views.** A confirm raised from inside the dashboard appears over it, which is why A02's focus priority lists `overlay` above `pushedView`.
+**Overlays always sit above panels, and panels above peeks** (I23). A confirm raised while a completion menu is open appears over it, which is why A02's focus priority lists `overlay` above the prompt's substate.
 
-**I2 holds by construction through `push`, and is enforced anyway.** A view is only ever pushed onto an empty stack — every other cell of §6's `push(view)` column is a rejection — so overlays always follow it in push order and a naive implementation sorting by push order alone satisfies I2 without ever knowing it. That makes the invariant true and its fail-on-revert test unfalsifiable, which is A03's vacuity class arriving in a spec rather than in a rule. The sort is therefore real code in `layout()`, and T6.2 constructs a mis-ordered stack directly rather than reaching it through `push`, which is possible because placement is a pure function of a stack it is handed.
-
-**At most one view.** Views do not nest in v1. Pushing a second is rejected as an orchestration bug — the drill-in path from the dashboard opens a live block in the transcript, not another view (A01 D7), so nesting is never needed.
+**The sort is real code in `layout()` rather than a property of push order.** It was written that way for `view`, whose every non-empty push was a rejection — so overlays always followed it in push order and an implementation sorting by push order alone satisfied the rule without ever knowing it, which is A03's vacuity class arriving in a spec. **The reason changed with the kind and the code did not** (R-EXA-082, F1254): a peek and a panel are both pushed onto stacks that already hold things, in orders a session genuinely produces, so the sort is now exercised by `push` as well as by a hand-built stack. T2.8 keeps the hand-built one because it is the only way to construct a stack `push` would have sorted on the way in.
 
 **Overlays nest freely.** Reverse-i-search over a completion menu is legitimate.
 
-**A peek sits beneath every overlay and above the view, and is never `top`** (§2a, I21, I23). It
+**A peek sits beneath every overlay and every panel, and is never `top`** (§2a, I21, I23). It
 takes no keys, so nothing in this section about `pop` or `Esc` reaches it; its owner dismisses
 it, and the change it emits is `dismiss`, never `pop`.
 
@@ -276,7 +420,7 @@ Popping emits a change. **C15 does not write to the transcript**, and after A01 
 
 ## 4. Placement
 
-Views fill the viewport region entirely: `top = 0`, `left = 0`, full height and width. Nothing to decide.
+**Two placements, and both are positioned.** There was a third, `fill` — the region entire, `top = 0`, `left = 0` — and nothing in `src/` produced one once the view kind was removed (R-EXA-082, F1254). It was kept a while on the argument that I20, I22 and I27 were each written as a refusal of it, and a refusal whose subject cannot be constructed is A03 §2's vacuity class. **The argument was true of one clause in each and not of the invariants** (parked 3): I20 refuses a centred layer with no width, I22 a centred peek, I27 a centred, blocking or non-`escape` panel, and all of those are constructible. So the placement is deleted and the three refusals keep every subject they still have. A layer that wants the region is a centred layer declaring the region's width and `maxHeightFraction: 1`, and nothing in the tree wants one.
 
 ### Drawing a layer is L4's, and nothing did it
 
@@ -316,13 +460,13 @@ Written here before the build rather than after it, because each has a failure t
 
 **1 — A layer over the prompt is the case with two owners.** The prompt paints its rows and the layer composites over them, so those cells are written twice. That is correct, and it means **the layer must paint every cell in its box, background included**. A loop that writes only the glyphs its blocks produce leaves the prompt showing through the gaps, and the symptom is text bleeding through a menu rather than anything that reads as a layout error.
 
-**2 — Stacking order is push order, and the last layer wins each cell.** I1 and I2 settle it and nothing currently produces two overlapping layers, which is exactly why it is worth asserting rather than inheriting: "the last one wins" is obvious only once two of them overlap, and the first time that happens will be in front of a user.
+**2 — Stacking order is the band sort, and the last layer wins each cell.** I23 settles it, and "the last one wins" is obvious only once two of them overlap — the first time that happens will be in front of a user.
 
-**3 — A pushed view occupies the viewport region rather than floating.** Header and footer are untouched (T4.4). The drawer treats it as a layer whose box *is* the viewport region rather than as a replacement for the transcript — one path for both kinds, and the alternative is a second compositing rule that only one layer kind takes. S12's composed frame is the one to check it against.
+**3 — Every layer floats; none replaces the transcript.** There was a `fill` placement whose box *was* the viewport region, and the drawer treated it as one more layer rather than as a replacement — one path for every kind. The placement is deleted (§4), and the path it argued for is the only one there is.
 
-**4 — Read the frame.** This will be the first time anything this component places appears on a screen, and every comparable first in this project was caught by looking rather than by an assertion: the glyph column rendering `…`, C12's y-label decimals, C25's five defects. Compose a menu over a prompt, a confirm over a view, and a search over a menu, and look at all three.
+**4 — Read the frame.** This will be the first time anything this component places appears on a screen, and every comparable first in this project was caught by looking rather than by an assertion: the glyph column rendering `…`, C12's y-label decimals, C25's five defects. Compose a menu over a prompt, a confirm over a menu, and a peek beside an element, and look at all three.
 
-**A view's content is already the region's worth, and C15 does not scroll it.** The owner windows it — S12 holds fifty thousand log lines and renders the visible ones, having committed to owning its own scroll and calling no C14 (S12 T2.3); C25 §3b's fullscreen patch does the same through `n`, `p`, `g` and `G`. Said explicitly because its absence invites C15 growing a scroll offset for views, and that is a second scroll model beside C14's — the thing A01 D3 spent a decision avoiding. C15 clips nothing vertically beyond reporting `truncated`.
+**C15 scrolls nothing, and there is no longer a kind that needed saying so of** (R-EXA-082, F1254). The sentence here was *a view's content is already the region's worth and its owner windows it* — written to stop C15 growing a scroll offset for views, which is a second scroll model beside C14's and the thing A01 D3 spent a decision avoiding. The refusal survives its subject: a layer is placed at the size it measures, C15 clips nothing vertically beyond reporting `truncated`, and anything long enough to need windowing is an entry in the transcript, where C14 already scrolls.
 
 Overlays are content-sized and resolved in a fixed order:
 
@@ -375,15 +519,14 @@ The alternative — C15 subscribing to C13 and anchoring on an `EntryId` — was
 
 Over the stack's shape.
 
-| From ↓ / call → | `push(overlay)` | `push(view)` | `push(peek)` | `pop` | `dismiss(id)` | `update(id, …)` |
-|---|---|---|---|---|---|---|
-| **empty** | → overlays (T1.1) | → view (T1.2) | → peek, `top` null (T1.23) | null (T3.1) | no-op (T3.2) | false, no change (T3.17) |
-| **overlays** | → overlays, deeper (T1.3) | rejected (T3.4) | → beneath them, `top` unchanged (T1.24) | pops the top if dismissable (T1.5, T1.9) | removes that layer (T1.7) | shape unchanged (T1.12) |
-| **view** | → view+overlays (T1.4) | rejected (T3.3) | → view+peek, `top` the view (T1.24) | → empty (T1.6) | → empty (T1.7) | shape unchanged (T1.12) |
-| **view+overlays** | → deeper overlays (T1.3) | rejected (T3.3) | → between them (T1.24) | pops the overlay first (T1.8) | removes that layer (T1.7) | shape unchanged (T1.12) |
-| **peek** | → overlay above it (T1.24) | rejected (T3.4b) | → two peeks (T1.23) | **null, peek stays** (T1.25) | → empty (T1.25) | shape unchanged |
+**The `push(view)` column is gone with the kind, and with it three rejection cells** (R-EXA-082, F1254). Every one of them said the same thing — a view is pushed onto an empty stack or not at all — and that rule is what made I2's sort unfalsifiable through `push`. A panel and a peek both arrive onto stacks that already hold things.
 
-Pushing a view while overlays exist is rejected rather than reordered: it means the caller raised a view from inside a modal, which is a bug worth surfacing.
+| From ↓ / call → | `push(overlay)` | `push(panel)` | `push(peek)` | `pop` | `dismiss(id)` | `update(id, …)` |
+|---|---|---|---|---|---|---|
+| **empty** | → overlays (T1.1) | → panel, it is `top` (T1.31) | → peek, `top` null (T1.23) | null (T3.1) | no-op (T3.2) | false, no change (T3.17) |
+| **overlays** | → overlays, deeper (T1.3) | → beneath them, `top` unchanged (T1.33) | → beneath them, `top` unchanged (T1.24) | pops the top if dismissable (T1.5, T1.9) | removes that layer (T1.7) | shape unchanged (T1.12) |
+| **panel** | → overlay above it; a **blocking** one closes the panel first (T1.32) | → two panels (T1.33) | → beneath it (T1.33) | pops the panel (T1.30) | removes that layer (T1.7) | shape unchanged (T1.12) |
+| **peek** | → overlay above it (T1.24) | → panel above it (T1.33) | → two peeks (T1.23) | **null, peek stays** (T1.25) | → empty (T1.25) | shape unchanged |
 
 `update` is the only call that changes no cell of this table — it alters a layer, never the stack's shape. It earns a column precisely so that stays visible: a later hand reaching for "update should push if the id is unknown" has to write a transition that contradicts the row above it.
 
@@ -391,9 +534,9 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 
 ## 7. Invariants
 
-- **I1** — At most one `view` in the stack at any time.
-- **I2** — Every `overlay` sorts above every `view`, regardless of push order.
-- **I3** — `pop()` removes only the topmost dismissable layer; a non-dismissable layer is not escapable.
+- **I1** — **Retired with the view kind** (F1254). *At most one `view` in the stack at any time* — there is no `view` kind, so the rule has no subject. Its nesting clause was answered by the design rather than dropped: a thing wanting a frame of its own is a tab, and everything else is a block, an entry or a question (R-EXA-082).
+- **I2** — **Retired with the view kind** (F1254). *Every `overlay` sorts above every `view`* is I23's first half with the bottom band removed; I23 is the rule and it is stated over the bands that exist.
+- **I3** — `pop()` removes only the topmost layer whose `dismissal` is `"escape"`; a layer closed by its answer or by focus is not escapable (§2c, M8). The predicate moved off `dismissable` and the rule did not: *escapable* was always one of the three things that flag conflated, and it is the one `pop()` ever meant.
 - **I4** — Layer content is `Block[]`; no layer carries raw React.
 - **I5** — `layout()` is pure — same stack and region, same result — and performs no I/O.
 - **I6** — No placed layer exceeds the region on either axis, and neither offset is negative: `0 ≤ top`, `top + height ≤ region.height`, `0 ≤ left`, `left + width ≤ region.width`. Stated over both axes because `Placed` carries both, and a single-axis reading is what left `left` out of it.
@@ -404,27 +547,40 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 - **I11** — No layer paints a backdrop, dim or otherwise. A terminal renders a dimmed region as damaged output rather than as depth, and the separation an overlay needs comes from its border and its position — which are things a cell grid can actually express.
 - **I12** — C15 imports nothing from `terminal/` **or C14**; the region arrives as data.
 - **I13** — Pushing returns a disposable; disposing is equivalent to `dismiss(id)`.
-- **I14** — `update` changes a layer's content, placement or width and never the stack's shape, its order, or its `dismissable`. A layer whose escapability changes mid-life makes C16's Ctrl-C ladder depend on when it looked.
+- **I14** — `update` changes a layer's content, placement or width and never the stack's shape, its order, its `blocking` or its `dismissal` (§2c, M8). A layer whose escapability changes mid-life makes C16's Ctrl-C ladder depend on when it looked — and the same is true of ownership twice over, because a layer that stopped blocking mid-answer would hand the keyboard back to a prompt an owner is still waiting on.
 - **I15** — `layout()` omits a zero-height overlay and dismisses nothing. Acting on what it computed would cost I5.
 - **I16** — An overlay's width is `min(layer.width ?? region.width, region.width)`, and its content is measured at that width rather than at the region's. `Placed.left` is derived from it.
 - **I17** — An anchored overlay never covers its anchor's own rows, `[row, row + rows − 1]`, **whenever either side has a row to offer**. A single-row anchor is the default and the special case, not the general one. The qualification is T3.8's: a one-row region with a one-row anchor has no room on either side, and an overlay covering its anchor is a better answer than one silently absent.
 - **I18** — The `maxHeightFraction` clamp is floored at one row. `floor(1 × 0.5)` is zero, and a region too short for the fraction must not swallow every overlay it holds.
 - **I19** — The terminal cursor is placed by whatever holds focus and hidden when that thing has none. A layer states its own through `Placed.cursor`, relative to its origin; absent means hidden. The choice is the drawer's and never C17's — a `cursorCell` that varied with focus would put focus inside a component that has no notion of it.
-- **I20** — **A `centred` layer declares a width, and `push` and `update` refuse one that does not.** I16 resolves an absent width to the region's, which is right for an anchored layer and is the whole of what `fill` means — so a centred layer without one is placed at `left = floor((region.width − region.width) / 2)` and is indistinguishable from a `fill` layer at every width. **The state reads as correct everywhere and is wrong about what it was asked to be**, which is why the check is at construction rather than in a caller's comment: `confirm.ts` carried exactly that comment, written after the defect had been found once, and a second centred layer written by anyone else would have reached it again. `update` is checked too, because `LayerUpdate` admits `placement` — so a layer pushed anchored and updated to centred reaches the same state by a route the push-time check cannot see.
-- **I21** — **A `peek` is never `top`.** `top` is the topmost layer of kind `overlay` or `view`, typed `KeyedLayer`; `pop()` reads it and so never removes a peek, and C16's `activeTarget` is unchanged by any number of peeks on the stack. A peek is removed only by its owner (`dismiss`, or the disposable).
-- **I22** — **A `peek` is anchored**, and `push` and `update` refuse a centred or `fill` one. Its meaning is *beside the thing it describes*; the other two placements are a confirm's and a view's.
-- **I23** — Every `overlay` sorts above every `peek`, and every `peek` above every `view`, regardless of push order. I2 is this invariant's `overlay`/`view` half.
-- **I24** — **A call's approval is an `overlay` of the confirm host's shape — the invocation, an optional consequence line, and the choices as the host's own table — composed by C23 and placed here; it takes the keys as every confirm does, and a subagent's transcript opens as a `view` and never as an expansion** (§2b, → C23 I60, C26 I23).
+- **I20** — **A `centred` layer declares a width, and `push` and `update` refuse one that does not.** I16 resolves an absent width to the region's, which is right for an anchored layer — so a centred layer without one is placed at `left = floor((region.width − region.width) / 2)`, which is zero, and is centred on neither axis a reader can see: it is an anchored layer's column span wearing `centred`. *(Amended, parked 3: this read "indistinguishable from a `fill` layer", and the placement it compared with is deleted; the state it forbids is unchanged.)* **The state reads as correct everywhere and is wrong about what it was asked to be**, which is why the check is at construction rather than in a caller's comment: `confirm.ts` carried exactly that comment, written after the defect had been found once, and a second centred layer written by anyone else would have reached it again. `update` is checked too, because `LayerUpdate` admits `placement` — so a layer pushed anchored and updated to centred reaches the same state by a route the push-time check cannot see.
+- **I21** — **A `peek` is never `top`.** `top` is the topmost layer of kind `overlay` or `panel`, typed `KeyedLayer`; a **panel takes keys and is therefore `top`** — it is what a completion menu and a command palette are (R-BLK-866), and a layer that is never `top` cannot reach the ladder at all; `pop()` reads it and so never removes a peek, and C16's `activeTarget` is unchanged by any number of peeks on the stack. A peek is removed only by its owner (`dismiss`, or the disposable).
+- **I22** — **A `peek` is anchored**, and `push` and `update` refuse a centred one. Its meaning is *beside the thing it describes*, and `centred` is a confirm's. *(Amended, parked 3: it refused `fill` too, and the placement is deleted — §4.)*
+- **I23** — **`overlay › panel › peek › base`, regardless of push order, and this is the scroll priority too** (R-BLK-779, §2c). One ordering does both jobs, which is the design's own argument for it: a wheel over a panel moves the panel and not the transcript beneath it, for the same reason a key over a panel is the panel's. **The `view` band is gone and the ordering is over the three kinds that exist** (R-EXA-082, F1254): `overlay › panel › peek › base`, where `base` is the transcript. I2 was this invariant's `overlay`/`view` half and is retired; what it protected — a confirm drawing over what it was raised from — is the `overlay › panel` edge, which `push` now reaches on its own because both arrive onto occupied stacks.
+- **I24** — **A call's approval is an `overlay` of the confirm host's shape — the invocation, an optional consequence line, and the choices as the host's own table — composed by C23 and placed here; it takes the keys as every confirm does, and a subagent is a tab rather than a layer of any kind** (§2b, R-EXA-082, → C23 I60, C26 I23).
 - **I25** — **Every removal of a layer emits exactly one change carrying that layer's id, synchronously, before the removing call returns** — `pop` from `pop()`, `dismiss` with its reason from `dismiss(id)` and from the push's disposable — and a call that removes nothing emits nothing. An owner holding state about a layer can therefore run its teardown from the subscription alone, whichever caller removed the layer; C16's ⌃c ladder is the caller that never asks an owner, and this is the only way it reaches one (§2, → C28 I50).
+- **I26** — **`blocking` and `dismissal` are independent, and both are declared** (§2c, R-QST-001, R-BLK-822). `blocking` says whether the layer owns input; `dismissal` says what closes it — `escape`, `focus` or `answer`. Neither is inferred from the other, from the kind, or from the layer's geometry: *a question declares blocking and owner explicitly*, and a typed reply is the combination that proves the fields are two — it blocks, it floats above a live prompt, and it is still not escapable. The single `dismissable` flag answered three questions at once and was right only while their answers agreed.
+- **I27** — **A `panel` is anchored, non-blocking and closed by `escape`**, and `push` and `update` refuse any other combination (§2c, R-BLK-779, R-BLK-776). *Floats above the prompt, between two rules* is a placement relative to something, so `centred` is a confirm's (§4; `fill`, which this also refused, is deleted — parked 3); and the two fields are fixed rather than declared because a blocking panel is an overlay and a panel that outlives `esc` is a peek — the kind is the name for exactly this triple, and a panel free to vary them would be a fourth kind wearing a third one's name.
+- **I28** — **Pushing a `blocking` layer first dismisses every open `panel`**, each with its own change and its own reason, before the new layer is pushed (§2c, R-BLK-873). *A panel is a thing you opened; a question is a thing that arrived* — the arriving one cannot silently sit under something the reader was reading, and two layers differing on escapability make `esc` ambiguous. It lives here rather than in the caller because it is a rule about what the stack may hold, and a rule every caller must remember is the shape C16 §6 measured the cost of.
+
+  **The subject is the panel and not every escapable layer**, which the first draft of this invariant got wrong in the direction that reads as more general. R-BLK-873 names both parties — *a panel is DISMISSABLE and a question is NOT*, and *THE PANEL CLOSES FIRST* — so the rule is about the pair it names. Read as *every `escape` layer*, it closed a **view**: a confirm raised over a dashboard took the dashboard with it, which is a full-region thing the reader is inside rather than a transient they opened above the prompt. **The instance is gone and the scoping is not** (F1254): the generalisation was invisible while a view was the only other escapable kind nobody had tested it against, T4.2 is where it showed, and the rule still has to say *panel* rather than *escapable* because a peek is escapable-adjacent and untouched by an arrival.
+- **I29** — **A keyed layer's owner rung is declared on the layer, and `push` refuses a declaration its fields contradict** (R-QST-001, §103, → C16 I63; review batch 2, M5 item 3). `owner: { rung: "question" }` is an `overlay`, `blocking`, closed by `answer`; `owner: { rung: "substate", name }` is a `panel`, and `name` is `find`, `complete` or `preview`; a `peek` declares none, because it takes no keys. `update` cannot change it — `LayerUpdate` does not admit it, for I14's reason. **An undeclared overlay is a question and an undeclared panel an unnamed substate**, which is C16's `rungOfLayer`. *A question declares blocking and owner explicitly* — the design's own words — and before this field C16 derived the rung twice, from `kind` for the footer and the guard and from an answer callback for the intercept table, and the two disagreed on a blocking overlay nothing could answer.
+
+  **The strict form is not built, and why.** R-QST-001 read to the letter makes every overlay declare `owner: question` and so be blocking and closed by `answer`. Probed on the tree, that refused **52 rows in 11 files** — C15's own placement fixtures (`anchored`, `centred`, `covering`, `wrappingLayer`), T1.33's non-blocking advisory, and session and router harnesses standing a non-blocking overlay in for a menu. None of those overlays has a design counterpart; they are test stand-ins, and migrating them is a sweep rather than this item. What closes the defect is one derivation, and the declared owner gives it; the strict refusal is recorded as a finding and left for the sweep.
+- **I30** — **A layer's three fields are one table, and `push` and `update` refuse every row it does not hold** (§2d, R-BLK-779, R-QST-001; review batch 3, M8 item 6). A `peek` is non-blocking and closed by `focus`; a `panel` is I27's triple; an `overlay` is blocking, or closed by `escape`, or both — never closed by `focus`, and never non-blocking while closed by its `answer`. The table is also the type: `Layer` is a union discriminated on `kind`, so a refused literal does not compile, and the run-time check stays for the caller the type does not reach — a cast, a widened value, JavaScript. I22, I27 and I29 are rows of this table and keep their numbers.
+- **I31** — **The pointer reaches a layer through `takesPointer`, and a peek takes the wheel and nothing else** (§2d, C16 I48; review batch 3, M8 item 2). `takesInput` is the keyed layers and answers for keys alone; `takesPointer(p, "wheel")` admits every layer and `takesPointer(p, "press")` the keyed ones, so a click on a peek still reaches the row beneath (I21) and a wheel over one is the peek's. `layout()` is draw order, bottom-first, so **the last layer covering a point is the one under the pointer**.
+- **I32** — **A panel I28 closes is `displaced`, and its owner holds its state and restores it when the arrival resolves** (§2c, §2d, R-BLK-873; review batch 3, M8 item 7). The removal's change carries `reason: "displaced"`, which neither the reader's `explicit` nor `anchorEvicted` is. The owner holds what it needs to show the panel again and clears its live half; when no blocking layer remains, it restores the panel if the prompt's draft is the one it held and drops the held state if not. C15's part is the reason; the holding is the owner's, because C15 holds no information about what a layer refers to.
+- **I33** — **`generation` counts every push and every removal of a keyed layer and never goes down** (§2d, C16 I43; review batch 3, M7 item 5). A peek's push and dismissal, an `update` and a `pop()` that removes nothing leave it where it was. It is the owner generation C16's epoch reads, because a rung compared at two reads cannot see a question raised and answered between them.
+- **I34** — *(ruling 23, C22 §6l.9b, → C22 I145)* **A layer declares whether the prompt stays live beneath it: `promptLive?: boolean`, carried by `update` as well as `push`.** Absent is `false`. It is one of §6l.9b's two properties — *whether the prompt is drawn under* — and the one that changes while the layer is up: a completion menu is live while it holds no selection and not once it holds one, so its owner updates the field with the selection, and a field set only at push would read correct and be stale on the first `Tab` that selects. The other property, where a printable key goes, stays the owner's (C22 I51). → T1.38
 
 ---
 
 ## 8. Commitments
 
-1. Overlays and pushed views are one mechanism with different placement (I1, I2).
+1. Every layer is one mechanism with a declared placement and a declared kind; there is no pushed view (I23, R-EXA-082).
 2. Layer content is blocks, so overlays are themed, degradable and measurable like everything else (I4).
-3. Overlays always sort above views; at most one view exists (I2, I1).
-4. Pushing a second view is rejected as an orchestration bug (I1).
+3. Overlays sort above panels and panels above peeks, regardless of push order (I23).
+4. ~~A `fill` layer has no producer, and the three refusals written against it are what keep the placement~~ — **the placement is deleted, and the three refusals keep their live subjects** (I20, I22, I27; §4, parked 3).
 5. `Esc` pops the top dismissable layer; a confirm is not escapable (I3).
 6. Placement flips before clamping (I7).
 7. Truncation is reported; the owner renders its own indicator (I8).
@@ -439,12 +595,19 @@ Pushing a view while overlays exist is rejected rather than reordered: it means 
 16. An anchor is a span rather than a row, and an overlay never covers it while either side has room (I17).
 17. Both clamps have a floor of one row, so a short region never silently swallows a layer (I18).
 18. The terminal cursor is placed by whatever holds focus and hidden when that thing has none; a layer states its own in `Placed`, and C17's `cursorCell` is unchanged because it has no notion of focus (I19).
-19. A centred layer declares its own width, and both entry points refuse one that does not — the absent-width default is `fill`'s meaning, and a centred layer that inherits it is `fill` while reading as centred (I20, I16).
+19. A centred layer declares its own width, and both entry points refuse one that does not — the absent-width default is an anchored layer's, and a centred layer that inherits it sits at `left` 0 while reading as centred (I20, I16).
 20. A peek is a third kind and never `top`, so it takes no keys, is never popped and leaves C16's ladder untouched (I21).
 21. A peek is anchored, and both entry points refuse one that is not (I22).
-22. Overlays sort above peeks, peeks above views (I23, I2).
-23. Approval is the confirm layer with a call's content, and a subagent is a pushed view (I24).
+22. `overlay › panel › peek › base`, whatever the push order, and the same ordering is the scroll priority (I23, I2).
+23. Approval is the confirm layer with a call's content, and a subagent is a tab (I24).
 24. A removal reaches the owner through the change stream, synchronously and exactly once, whoever called it (I25).
+25. A layer declares `blocking` and `dismissal` separately; neither is inferred from the other, from the kind or from the geometry, and a typed reply blocks while floating above a live prompt (I26, §2c).
+26. A `panel` is anchored, non-blocking and closed by `escape`, refused at both entry points in any other combination (I27).
+27. A blocking layer arriving closes every open **panel** first, each with its own change; a peek is untouched (I28).
+28. A layer's kind, `blocking` and `dismissal` are one table, typed as a union and checked at both entry points (I30).
+29. A peek takes the wheel and no key or click, and the topmost layer under the pointer is the one it reaches (I31).
+30. A panel closed by an arriving question is `displaced`, held by its owner and restored when the question resolves (I32).
+31. The stack counts its keyed pushes and removals, so an owner raised and gone between two reads is still seen (I33).
 
 ---
 
@@ -454,31 +617,43 @@ Six tiers. Every cell of the §6 transition table is covered.
 
 ### Tier 1 — unit
 
-- **T1.21** (I20): a centred layer pushed with no width → refused, naming the layer. **The frame is the control**: the same layer with a width placed beside a `fill` layer at the same region, read for a `left` that differs — without it the row asserts a throw and says nothing about the state the throw prevents, which is a placement indistinguishable from `fill` at every width.
+- **T1.21** (I20): a centred layer pushed with no width → refused, naming the layer. **The frame is the control**: the same layer with a width placed beside a region-width anchored layer at the same region, read for a `left` that differs — without it the row asserts a throw and says nothing about the state the throw prevents, which is a centred layer at `left` 0.
 - **T1.22** (I20): a layer pushed **anchored** and updated to `centred` with no width → refused, and the layer is left exactly as it was. The route the push-time check cannot see, and the assertion on the survivor is the half that matters: a guard that throws after mutating leaves a layer neither placed nor removed.
 - **T1.20** (I19): a layer carrying a cursor and a layer carrying none, placed → the first's `Placed.cursor` is relative to its own origin and survives the flip from `below` to `above`; the second's is absent. Both, because a field that is always present and always ignored passes any test of the first alone — and the two live producers answer oppositely, which is why this is a field.
 
 - **T1.23** (I21): `push(peek)` on empty → stack of one and `top` is `null`; a second peek → stack of two, `top` still `null`, `hasView` false.
-- **T1.24** (I21, I23): a peek pushed **after** an overlay → `top` is the overlay and `layout()` places the peek beneath it; a peek pushed after a view → `top` is the view; a peek pushed between a view and an overlay → placed between them. **Reached through `push`**, which is what distinguishes I23 from I2: a peek can legitimately arrive in any order, so the sort is exercised by the manager and not only by T2.8's hand-built stack.
+- **T1.24** (I21, I23): a peek pushed **after** an overlay → `top` is the overlay and `layout()` places the peek beneath it; a peek pushed after a panel → `top` is the panel and the peek is beneath it; a peek pushed between a panel and an overlay → placed beneath both. **Reached through `push`**: a peek can legitimately arrive in any order, so the sort is exercised by the manager and not only by T2.8's hand-built stack.
 - **T1.25** (I21, I3): `pop()` with a peek beneath a dismissable overlay → the overlay goes and the peek stays; `pop()` with only a peek → `null` and the peek stays; `dismiss(peekId)` → removes it and emits `dismiss`, never `pop`.
-- **T1.26** (I22): a `centred` peek (with a width) and a `fill` peek → both refused by `push`, naming the layer; an anchored peek updated to `fill` → refused, and the layer is left exactly as it was.
-- **T1.1**: `push(overlay)` on empty → stack of one, `top` is it, `hasView` false.
-- **T1.2**: `push(view)` on empty → `hasView` true.
+- **T1.26** (I22): a `centred` peek (with a width) → refused by `push`, naming the layer; an anchored peek updated to `centred` → refused, and the layer is left exactly as it was.
+- **T1.1**: `push(overlay)` on empty → stack of one, `top` is it.
+- **T1.2**: an anchored overlay on empty → stack of one, `top` is it, and `layout()` places it. **Re-aimed off `hasView`** (F1254), **then off `fill`** (parked 3): what is left to assert is that the stack holds and exposes one layer.
 - **T1.3**: two overlays → LIFO order, `top` is the second.
-- **T1.4** (I2): overlay pushed over a view → overlay is `top`.
+- **T1.4** (I23): a centred overlay pushed over a panel → the overlay is `top` and the panel is beneath it.
 - **T1.5**: `pop` with two overlays → removes the top one only.
-- **T1.6**: `pop` with only a view → empty.
+- **T1.6**: `pop` with only one overlay → empty.
 - **T1.7** (I13): `dismiss(id)` removes that specific layer from any depth; the returned disposable does the same.
-- **T1.8** (I2): `pop` with a view plus an overlay → the overlay goes first.
+- **T1.8** (I23): `pop` with a panel plus an overlay → the overlay goes first.
 - **T1.9** (I3): `pop` on a non-dismissable top → returns null, stack unchanged.
 - **T1.10**: `dismiss` on a non-dismissable layer → removes it. Explicit resolution always works.
-- **T1.11**: view placement → `top` 0, `left` 0, full region height and width.
+- **T1.11**: **retired with the placement** (parked 3). It read *`fill` placement → `top` 0, `left` 0, full region height and width*.
 - **T1.12** (I14): `update` on a layer at any depth changes its content and leaves `stack`, its order, `top` and `hasView` identical; a `content` change is emitted.
 - **T1.13** (I14): `LayerUpdate` has no `dismissable` — a compile-level test rejects `update(id, { dismissable: true })`, which is the only form the restriction can take.
 - **T1.14** (I16): a layer declaring `width: 40` in a 120-cell region → `Placed.width` 40, and its content was measured at 40, not 120. The height differs from the region-width measurement, which is the point.
 - **T1.15** (I16, I6): a `centred` layer of width 40 in a 120-cell region → `left` 40. Odd remainders round down, deterministically (T3.12).
 - **T1.27** (I24, §2b): `approvalPrompt`'s options pushed through the confirm host produce a layer of kind `overlay` whose blocks are the invocation notice, the `warn` consequence when supplied and none when not, and the host's 3-column choice table with `always allow` as an ordinary row; `activeTarget` answers `overlay` while it is up; resolving *deny* pops it and the entry beneath reads `denied`.
-- **T1.28** (I25): a view whose owner holds state, popped by a **non-owner** calling `pop()` → the owner's subscriber saw one `pop` change carrying the view's id **before `pop()` returned**, and the owner's state is gone by the time the caller reads it; `dismiss(id)` on the same view → one `dismiss`; `dismiss` of an id not on the stack → no change at all. Written against C28's view in `test/unit/profile-view.test.ts`, because that is the owner whose state is a profiler tier and a timer — the two things a stale owner costs the most.
+- **T1.28** (I25): a layer whose owner holds state, popped by a **non-owner** calling `pop()` → the owner's subscriber saw one `pop` change carrying the layer's id **before `pop()` returned**, and the owner's state is gone by the time the caller reads it; `dismiss(id)` on the same layer → one `dismiss`; `dismiss` of an id not on the stack → no change at all. **Moved off C28's view** (F1254), which was the owner whose state was a profiler tier and a timer; it is written in `test/unit/overlay.test.ts` against an owner that keeps a flag, because what the row is about is the **ordering of the change against the call's return** and not what the state happens to be.
+
+- **T1.29** (I26, R-QST-001): `blocking` and `dismissal` are read from the layer and from nowhere else — a region-height non-blocking layer is not modal and a one-row blocking layer is, which is the pair `coversRegion` answered backwards. The combination that proves them independent is the typed reply's: `blocking: true`, `dismissal: "answer"`, anchored above a live prompt.
+- **T1.30** (I3, I26): `pop()` removes an `escape` layer, leaves an `answer` layer, and leaves a `focus` layer — three values, three answers, in one stack. The old row asserted two of the three because only two existed.
+- **T1.31** (I27): `push` refuses a centred panel, a blocking panel and a panel whose `dismissal` is not `escape`; the control is the anchored non-blocking `escape` one, which is accepted. `update` is checked on the same three, because `LayerUpdate` admits `placement`.
+- **T1.32** (I28, I32, R-BLK-873): with a panel and a peek on the stack, pushing a blocking overlay leaves the peek and the overlay — the panel is gone, its change carried its id and the reason `displaced` (amended from `explicit`, I32), and it was emitted **before** the push returned. The control is pushing a *non*-blocking overlay, which leaves the panel where it was.
+- **T1.33** (I23, R-BLK-779): a stack pushed in every order sorts `peek · panel · overlay` bottom-first, asserted as the whole sequence of ids rather than by the top alone — a sort is a property of the list, and the first member is the degenerate one. **The overlay is a non-blocking advisory**, because I28 makes *a panel beneath a blocking layer* a stack this component will not hold: a row using a question would be asserting the sort over three bands while claiming four.
+
+- **T1.35** (I30): the §2d table both ways — each refused row is refused by `push` naming the layer, and by `update` where `update` can reach it (a peek or a panel moved to `centred`); each valid row is accepted. The refused literals are also compile errors, asserted with `@ts-expect-error`, which is the half that goes red if the union widens.
+- **T1.36** (I31): `takesPointer` over a peek, a panel and an overlay for `wheel` and for `press` — the peek answers `true` for the wheel and `false` for the press, and `takesInput` answers `false` for it; the keyed kinds answer `true` for both.
+- **T1.37** (I33): `generation` after a push, a `pop()`, a `dismiss`, a push over a panel (I28), a peek's push, `update` and dismissal, and a `pop()` on an `answer` top — asserted as the sequence of values after every step, so a counter moving on the peek or on `update` fails at that step and not at the end.
+- **T1.38** (I34): a layer pushed with `promptLive: true` reads it on `top`; an `update` of `promptLive: false` changes it without touching content or placement; a layer pushed without it reads `false`.
+- **T1.34** (I29): `push` refuses `owner: question` on a panel, on a non-blocking overlay and on an overlay closed by `escape`, `owner: substate` on an overlay, and any owner on a peek; the controls — a blocking `answer` overlay declaring `question`, a panel declaring `substate: "complete"`, and an overlay declaring nothing — are accepted. `LayerUpdate` does not admit `owner`, asserted at compile level.
 
 ### Tier 2 — contract / interface
 
@@ -488,18 +663,16 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T2.4** (I1, I2, I6, I14): a thousand random sequences of `push`, `pop`, `dismiss` and `update` — **sequences, not single calls**, and I1, I2 and I14 are asserted after *every* step rather than at the end. A component holding state is tested over its history: an invariant that constrains each operation says nothing about the path, and that is where C12, C13 and C14 each hid a defect.
 - **T2.5** (I9): the module graph shows no import from C13 in `overlay/` (MG13).
 - **T2.6** (I12): the module graph shows no import from `terminal/` or C14.
-- **T2.8** (I2): placement over a stack built by hand with an overlay beneath a view → the view is placed first and the overlay last. Reached without `push`, because `push` cannot produce this stack and that is exactly why the sort is otherwise untestable.
+- **T2.8** (I23): placement over a stack built by hand with an overlay beneath a peek → the peek is placed first and the overlay last. Reached without `push`, because `push` sorts on the way in and a stack in the wrong order is otherwise unconstructible.
 - **T2.9** (I16, T3.5b): the anchor span, over a corpus of anchor rows and extents from 1 to 5 in regions of every height → the placed overlay never intersects `[row, row + rows − 1]` on either side of the flip.
-- **T2.10** (I21, I23): T2.4's random sequences with `push(peek)` added → after **every** step `top` is never a peek and `layout()` lists every view before every peek before every overlay.
-- **T2.7**: every `OverlayChange` variant is emitted by at least one operation — `push`, `pop`, `content` and both `dismiss` reasons, `explicit` and `anchorEvicted`. The second reason is emitted by a caller passing it, which is the whole of I10.
+- **T2.10** (I21, I23): T2.4's random sequences with `push(peek)` added → after **every** step `top` is never a peek and `layout()` lists every peek before every panel before every overlay.
+- **T2.7**: every `OverlayChange` variant is emitted by at least one operation — `push`, `pop`, `content` and all three `dismiss` reasons, `explicit`, `anchorEvicted` and `displaced`. The second is emitted by a caller passing it, which is the whole of I10; the third by I28's arrival, and by nothing else.
 
 ### Tier 3 — edge cases
 
 - **T3.1**: `pop` on empty → null, no throw.
 - **T3.2**: `dismiss` with an unknown id → no-op.
-- **T3.3** (I1): `push(view)` while a view exists → rejected, stack unchanged.
-- **T3.4** (I1): `push(view)` while overlays exist → rejected.
-- **T3.4b** (I1, §2a): `push(view)` while only a peek exists → rejected, as onto any non-empty stack. Recorded as the ruling rather than an accident: a view is pushed from the prompt, where no element is focused and no peek can be.
+- ~~**T3.3**, **T3.4**, **T3.4b**~~ — **struck with I1** (F1254, R-EXA-082). Three rejections of `push(view)` onto a non-empty stack, in the three shapes a stack can have. There is no `push(view)`.
 - **T3.5** (I7): an overlay preferring `below` at a row with 2 rows beneath and 12 above → **flips above and shows its full height**. The classic bug, tested directly. A control above it asserts the fixture is taller than the room below, so a fixture that fits either way cannot report a pass.
 - **T3.5b** (I7): the same overlay against a prompt **two rows tall** — `row: 18, rows: 2` in a twenty-row region → the menu occupies rows 10–17 and touches neither prompt row. Both the single-row readings overlap it, and both produce a self-consistent `Placed`, so this is asserted as a frame and not only as numbers.
 - **T3.6** (I7): neither side fits → the larger side is taken and clamped; `truncated` true.
@@ -524,32 +697,38 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T4.1** (with C09): overlay content measures through the same registry as transcript blocks; heights agree with what is rendered.
 - **T4.2** (with C09, C10): an overlay in both themes and at 1-bit has identical geometry.
 - **T4.3** (with C02, C09): under `unicode: "ascii"`, overlay borders use ASCII and the height is unchanged.
-- **T4.4** (with C14): a full-screen view occupies exactly the viewport region; header and footer are untouched.
+- **T4.4**: **retired with the placement** (parked 3). It read *a `fill` layer occupies exactly the viewport region; header and footer are untouched*.
 - **T4.5** (with C14, I14): an overlay anchored to a transcript row follows it as the viewport scrolls — by its owner recomputing the region row and calling `update(id, { placement })` — and clamps at the edges. C15 is driven here, not subscribed.
 - **T4.5b** (with C16): `pop()` returning `null` is disambiguated by `top` — the Ctrl-C ladder falls through with an empty stack and no-ops with a non-dismissable layer, and the two are distinguished without reading the return value.
-- **T4.6** (with C16): `top` determines input priority; an overlay over a view routes keys to the overlay.
+- **T4.6** (with C16): `top` determines input priority; an overlay over a panel routes keys to the overlay.
 - **T4.7** (with C19): the completion menu pushes an anchored overlay and renders its own "N more" from `Placed.truncated`.
 - **T4.7b** (with C19, I14): typing narrows the candidate set through `update`, not through a pop and a push — asserted by the change log, which holds one `push`, N `content` and one `pop` rather than N of each.
-- **T4.9** (with C25): C25 §3b's fullscreen patch is a view whose content is a single block, carried by `Block[]` with no special case; paging through it with `n` and `p` is the owner calling `update`, and `Placed` never gains a scroll offset.
+- **T4.9** (with C25): a layer whose content is a single block is carried by `Block[]` with no special case, and `Placed` never gains a scroll offset. **Re-aimed off the fullscreen patch** (F1254): that layer was C25 §3b's pushed view, its `n`/`p` paging went with it, and what the row was ever about is that this component holds no offset of its own.
 - **T4.10** (with C16, I21): a graph with a focused table row and a peek on the stack → `router.target` is `liveBlock`, `↓` moves focus to the next row and `⏎` fires the row's action — the three keys a plain overlay was measured to steal.
 - **T4.11** (with L4, C26 §5): the trace in §2a, driven through the graph's stdin — `↓` onto a row declaring `detail` pushes one peek anchored at that row; `↓` onto a row without one dismisses it; `↓` onto a third with one pushes again; `Esc` leaves the block and the stack is empty. Asserted on the stack **and on the frame**: the peek's first painted row is the element's row plus one, and every transcript row the peek does not cover is byte-identical to the same frame without the peek.
 - **T4.12** (with C23, I14): the focused entry is patched so the cut cell's text changes → the peek's content changes through one `content` change, with no `pop` and no `push`.
-- **T4.8** (with L4): popping a view emits a `pop` change and the transcript is untouched — same entry count, same live id, before and after. C15 writes nothing and L4 appends nothing (A01 D7).
+- **T4.14** (with L4, C19, C23; I32): §2d's D1–D3 and D5 through the graph's stdin — a typed menu, and a requested one with row 2 selected, each displaced by a question and answered: the menu is back on the answer's dispatch with the same rows and the same selection, and `⏎` accepts row 2. While the question is up `hasMenu` is false. **The control is D5**: the draft changed under the question, and nothing is restored and a keystroke afterwards builds from the new line.
+- **T4.15** (with L4, C20; I32): §2d's D7 — the reverse search displaced by a question and restored from C20's state with its query; and D8's chip preview back on the answer's batch, which is the control that needs no holding.
+- **T4.8** (with L4): popping a layer emits a `pop` change and the transcript is untouched — same entry count, same live id, before and after. C15 writes nothing and L4 appends nothing (A01 D7).
 
 ### Tier 5 — e2e
 
 - **T5.1**: a completion menu near the bottom of the terminal flips above the prompt and shows every candidate.
 - **T5.2**: reverse-i-search raised over a completion menu → both stacked, keys go to the search, `Esc` returns to the menu.
-- **T5.3**: a confirm raised inside the dashboard → drawn over it, `Esc` does nothing, `n` resolves it and returns to the dashboard.
+- **T5.3**: a confirm raised over a completion menu → drawn above it, `Esc` does nothing, `n` resolves it. **The menu is closed by the arrival** (I28), which is the half this row gained when the dashboard it named stopped existing.
 - **T5.4**: resizing the terminal with three layers open → all reposition correctly, none escapes the region, no blank frames.
-- **T5.5**: `Esc` from the logs view → view pops, the transcript is untouched, and focus returns to the still-live block with selection preserved (A01 D7). The untouched transcript is what makes the preserved selection possible, not an incidental detail beside it. **No longer deferred — C22 §13a takes the ruling.** The blocker was never the assertion, and twice it was misstated: first as "nothing pushes a `kind: "view"` layer", which C25's fullscreen patch made false, and then as a ruling that had not been taken. §13a takes it, and a logs view is squarely the case it rules on — `--logs` is a flag declaring `view` (C05 I20), so the producer that opens it is the one this row has been waiting for. The row goes live with that producer; the assertion is unchanged from the day it was written.
-- **T5.6**: `Esc` from a fullscreen patch → the view pops, nothing is appended, and the transcript's selection is intact. The half of T5.5 that no longer needs C22 §13's ruling, asserted against the producer that exists (C25 §3c A2).
+- ~~**T5.5**, **T5.6**~~ — **struck with the view kind** (F1254, R-EXA-082). Both were `Esc` from a pushed view — the logs view and the fullscreen patch — asserting that the pop left the transcript untouched and the selection intact. There is nothing to press `Esc` on: a diff expands in place and logs are a block with follow, so the reader never leaves the transcript and the property the rows protected is the one the design makes structural. The transcript's own `Esc` behaviour is C22's and is asserted there.
 
 ### Tier 6 — fail-on-revert
 
+- **T6.24** (I26): `blocking` derived from `dismissal !== "escape"` rather than declared → T1.29 fails, because a non-blocking overlay closed by `answer` and a blocking one closed by `escape` are both expressible and neither is derivable. The revert that reads as removing a redundant field and is exactly the conflation the split undid.
+- **T6.25** (I28): the dismissal of escapable layers moved into the caller that raises a question → T1.32 fails for every *other* caller. The revert that keeps one consumer working, which is how a rule becomes a thing each caller has to remember.
+- **T6.26** (I23): the sort's `panel` band removed → T1.33 fails, and a panel raised before a peek draws under it. The revert that passes every row asserting `top`, because `top` is unchanged by where the band sits.
+- **T6.27** (I30): the peek clause dropped from `assertPlaceable` → T1.35 fails on the blocking peek, which is the row where a push closes the completion menu and blocks nothing.
+- **T6.28** (I32): I28's dismissal reason reverted to `explicit` → T4.14 fails — the owner sees a reader's close and drops its state, and the menu does not come back.
+- **T6.29** (I33): the generation moved on every change rather than on keyed pushes and removals → T1.37 fails at the peek's step.
 - **T6.1** (I7): clamping before flipping → T3.5 fails, and menus become inexplicably small near the bottom.
-- **T6.2** (I2): removing the sort from `layout()` → T2.8 fails. **Not T1.4 or T5.3**, which was this test's original claim and was unfalsifiable: `push(view)` is rejected onto any non-empty stack, so those two never construct a stack in the wrong order and both pass under push order alone. The revert is only detectable against a hand-built stack, which is what T2.8 is.
-- **T6.3** (I1): allowing nested views → T3.3 fails and the `Esc` chain becomes ambiguous.
+- **T6.2** (I23): removing the sort from `layout()` → T2.8 fails. It was I2's row and the argument for aiming it at a hand-built stack was that `push(view)` was rejected onto any non-empty stack, so nothing reached through `push` could construct a mis-ordered one. **The kind is gone and the aim is still right** (F1254): `push` sorts on the way in, so a stack in the wrong order is only ever built by hand.
 - **T6.4** (I3): letting `Esc` dismiss a confirm → T1.9 fails; a stray keypress answers a question the user did not read.
 - **T6.5** (I4): rendering an overlay with raw React → T2.3 fails, and the overlay stops being themed or measurable.
 - **T6.6** (I9): writing to the transcript from C15 → T2.5 fails and L2 gains a dependency on the transcript's contents.
@@ -564,12 +743,12 @@ Six tiers. Every cell of the §6 transition table is covered.
 - **T6.15** (I17): computing the anchored sides from `row ± 1` rather than from the span → T3.5b fails, and a menu lands on the second line of a two-row prompt while every number in `Placed` agrees with every other.
 - **T6.16** (I18): dropping either clamp's floor of one row → T3.8 and T3.8b fail, and a short terminal loses its overlays entirely rather than showing them badly.
 - **T6.18** (I21): making `top` return the topmost layer of any kind → T1.23, T1.25 and T4.10 fail; a peek becomes `overlay` to C16 and steals `↓`, `⏎` and `Esc` from the element it describes — the measured cell.
-- **T6.19** (I23): sorting peeks with the overlays (`kind !== "view"`) → T1.24 fails, and a confirm raised over a peek is drawn beneath it.
-- **T6.20** (I22): dropping the placement check for peeks → T1.26 fails, and a `fill` peek covers the region with nothing to answer it.
+- **T6.19** (I23): sorting peeks with the overlays → T1.24 fails, and a confirm raised over a peek is drawn beneath it.
+- **T6.20** (I22): dropping the placement check for peeks → T1.26 fails, and a centred peek sits over the transcript as a confirm with nothing to answer it.
 - **T6.21** (§2a): the emitter not reconciling on the next focus move → T4.11's second row fails, and the detail of row `a` sits beside row `b`.
-- **T6.17** (I20): moving the width check into `confirm.ts` — where it lived as a comment — → T1.21 and T1.22 both fail. **The revert that reads as a tidy-up**: the comment was correct, was written after the defect, and constrained exactly one caller. The second centred layer in the tree (`clearConfirmLayer`, C20) declares no width at all.
+- **T6.17** (I20): moving the width check into `confirm.ts` — where it lived as a comment — → T1.21 and T1.22 both fail. **The revert that reads as a tidy-up**: the comment was correct, was written after the defect, and constrained exactly one caller. The second centred layer in the tree (`clearConfirmLayer`, C20) declared no width at all; it was retired in review batch 2 (C16 ruling 61), so the confirm is the only one.
 - **T6.22** (I24): the approval pushed as a `peek` → T1.27's `activeTarget` assertion fails and `⏎` reaches the transcript instead of the choice; the consequence line drawn when none was supplied → T1.27's block count fails.
-- **T6.23** (I25): emitting the removal change on a microtask rather than before the call returns → T1.28's *before `pop()` returned* fails, and C28's view answers `pane` for one turn after the ladder has already popped it; removing the `pop` emission → T1.28 and C28 T4.6 fail, and the tier stays raised for the session.
+- **T6.23** (I25): emitting the removal change on a microtask rather than before the call returns → T1.28's *before `pop()` returned* fails, and an owner answers *still open* for one turn after the ladder has already popped its layer; removing the `pop` emission → T1.28 fails and the owner's teardown never runs. **The measured instance was C28's view holding a raised profiler tier** (F944) and is gone with it; what the revert costs is the same and the owner is now a confirm with an answer in flight or a menu with a selected row.
 
 ---
 
@@ -581,9 +760,9 @@ Six tiers. Every cell of the §6 transition table is covered.
 | What the completion menu contains | C19 |
 | Reverse-search behaviour | C20 |
 | The dashboard's panels and refresh | S13 |
-| Whether a popped view records anything in the transcript | L4 — and after A01 D7's amendment it records nothing |
+| Whether a popped layer records anything in the transcript | L4 — and after A01 D7's amendment it records nothing |
 | Scroll state beneath an overlay | C14 |
-| Scrolling a view's own content | Its owner — S12, S13, C25 §3b. C15 places the region's worth and clips nothing |
+| Scrolling anything | C14, over the transcript. No layer scrolls: a thing long enough to need it is an entry (R-EXA-082, §4) |
 | Noticing that a layer's anchor row moved or was evicted | Its owner, through `update` and `dismiss(id, "anchorEvicted")` |
 | The width an overlay would like to be | Its owner. Measurement answers height at a width, never the reverse |
 | Backdrop effects | Rejected — terminals render dimming as a fault |

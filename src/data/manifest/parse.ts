@@ -31,7 +31,7 @@ import {
   type Result,
   type ToolDef,
 } from "./types.js";
-import { FRAMEWORK_FLAGS, FRAMEWORK_NAMES, FRAMEWORK_TOOLS, RESERVED_FLAGS } from "./framework.js";
+import { FRAMEWORK_FLAGS, FRAMEWORK_NAMES, FRAMEWORK_TOOLS, RESERVED_FLAGS, RESERVED_VERBS } from "./framework.js";
 
 const ARG_TYPE_SET: ReadonlySet<string> = new Set<string>(ARG_TYPES);
 
@@ -250,6 +250,26 @@ function compiles(pattern: string): boolean {
   }
 }
 
+/**
+ * I27 — a retired key is refused, and the refusal names what replaced it.
+ *
+ * **Not I3's case, and the two are one rule read from either side.** I3 drops a
+ * field this parser has never known, because it may come from a far side newer
+ * than this TUI. `view` is a field this parser knew and withdrew (C05 I20, C22
+ * §13a, R-EXA-082), so an author still declaring it is acting on a contract that
+ * no longer exists — and dropping it silently is what left them believing the
+ * verb opened a view. Refused whatever its value: the key retired, not `true`.
+ */
+function refuseRetired(src: Record<string, unknown>, e: Errors, at: string): void {
+  if (src["view"] === undefined) return;
+  fail(
+    e,
+    `${at}.view`,
+    `"view" retired with the pushed view (C05 I27, C22 §13a) — a verb's result is a ` +
+      `transcript entry, so there is no tier to declare; delete the key`,
+  );
+}
+
 // --- flags, args, tools ---------------------------------------------------
 
 function parseFlag(raw: unknown, e: Errors, at: string): FlagDef | null {
@@ -282,9 +302,9 @@ function parseFlag(raw: unknown, e: Errors, at: string): FlagDef | null {
   const repeatable = takeOptionalBoolean(raw, "repeatable", e, at);
   const requires = takeStringArray(raw, "requires", e, at);
   const conflicts = takeStringArray(raw, "conflicts", e, at);
-  const view = takeOptionalBoolean(raw, "view", e, at);
   const shellOnly = takeOptionalBoolean(raw, "shellOnly", e, at);
   const interactive = takeOptionalBoolean(raw, "interactive", e, at);
+  refuseRetired(raw, e, at);
 
   return {
     name,
@@ -294,7 +314,6 @@ function parseFlag(raw: unknown, e: Errors, at: string): FlagDef | null {
     ...(repeatable === undefined ? {} : { repeatable }),
     ...(requires === undefined ? {} : { requires }),
     ...(conflicts === undefined ? {} : { conflicts }),
-    ...(view === undefined ? {} : { view }),
     ...(shellOnly === undefined ? {} : { shellOnly }),
     ...(interactive === undefined ? {} : { interactive }),
     summary,
@@ -507,7 +526,6 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
   const hidden = takeOptionalBoolean(raw, "hidden", e, at);
   const persist = takeOptionalBoolean(raw, "persist", e, at);
   const interactive = takeOptionalBoolean(raw, "interactive", e, at);
-  const view = takeOptionalBoolean(raw, "view", e, at);
   const jsonFlag = takeJsonFlag(raw, e, at);
 
   // **I23 — a flag's arm must differ from the tool's default.** An arm that
@@ -559,81 +577,12 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
     }
   }
 
-  // I20 — `view` is the tier, and its three refusals are I19's shape. `streams`
-  // is deliberately absent from them: S12's logs view is a streaming source
-  // rendered into a pushed view, so refusing that pair would refuse the surface
-  // C22 §13a was ruled for.
-  //
-  // I24 again, and this is where the rule was found missing: I20's own sentence
-  // says `view` is declarable on a flag, and this refusal read the tool's field
-  // only. Both sides now read every declaration.
-  //
-  // **Conservative on purpose, and the limit is recorded rather than
-  // discovered.** A verb declared interactive whose arm resolves to `false`
-  // beside a `view` flag would be legal, and this refuses it. No app declares
-  // one; the first that wants to is the argument for narrowing this.
-  const viewAnywhere = view === true || flags.some((f) => f.view === true);
-  if (viewAnywhere) {
-    if (interactiveAnywhere) {
-      fail(
-        e,
-        `${at}.view`,
-        `"${name}" declares both view and interactive — on the tool or on a flag, ` +
-          `and either way both hand input ownership away, the view to the shell's ` +
-          `own keymap and the handoff to a child; drop whichever one the verb does not do`,
-      );
-    }
-    if (oneShot === true) {
-      fail(
-        e,
-        `${at}.view`,
-        `"${name}" declares both view and oneShot — a one-shot writes one frame ` +
-          `and exits without a terminal, and a view is a claim on one that stays`,
-      );
-    }
-    // **`view` with `local`, the third refusal, and it is inert for a reason
-    // neither of the other two has** (F1022, closing F23 and F129).
-    //
-    // The other two describe a verb that cannot exist. This one describes a
-    // verb the *route* ignores: C18 classifies on `tool.local` first, and
-    // `isViewInvocation` is read on the `app` route and nowhere else, so the
-    // pair parsed, sealed, validated, ran, and appended an ordinary transcript
-    // entry — no view, no refusal, and nothing anywhere saying so.
-    //
-    // **The declaration buys nothing on this route, and the forcing argument
-    // for having one is absent here.** C22 §13a's whole case for putting the
-    // tier on the manifest is C23 I3: the pending entry is appended before the
-    // transport is invoked and C13 has no delete, so an adapter-side decision
-    // could only produce a view *and* an entry that nothing can withdraw. The
-    // local route has no transport and appends nothing in advance — `runLocal`
-    // appends once, after the handler has returned — so a local verb may decide
-    // on seeing its own result. `/profile` is the shipped instance: its handler
-    // calls `view.open(pane)` and returns a transcript notice as the record.
-    //
-    // **Refused rather than routed, on this repo's own precedent.** `view` with
-    // `streams` was a declarable pair with no route; §13a reserved the route,
-    // refused the pair *loudly*, and built it when S9's `/logs` forced it. The
-    // defect F23 and F129 name is that this pair is refused **silently**. Parse
-    // rather than run time, because I19's argument is that the author should
-    // learn at declaration and I20's other two refusals are already here.
-    //
-    // What it forecloses was measured rather than assumed: F23 refused this arm
-    // on the ground that `/dashboard` is local and S6/S7 would want views.
-    // `DOCKER_TUI_SURFACES.md` S1 rules `/dashboard` explicitly **not** a pushed
-    // view, and draws S6 `/compare` and S7 `/drift` as transcript entries under
-    // a prompt echo, with no letter keys — so none of the three named consumers
-    // can take the mark, and no manifest in the tree declares the pair.
-    if (local) {
-      fail(
-        e,
-        `${at}.view`,
-        `"${name}" is local and declares view — a local verb is handled ` +
-          `in-process and never reaches the route that opens one, so the ` +
-          `declaration is inert; a local verb that wants a view pushes it from ` +
-          `its handler, as \`/profile\` does`,
-      );
-    }
-  }
+  // **`view` retired with the pushed view** (C05 I20, C22 §13a, R-EXA-082, F1253). Three
+  // refusals stood here — with `interactive`, with `oneShot` and with `local` — and each
+  // closed a real defect. What they refused was a *tier*, and there is one tier now: a
+  // verb's result is a transcript entry. **The key itself is refused** (I27): dropped as an
+  // unknown key, it gave an author still declaring it no signal at all.
+  refuseRetired(raw, e, at);
 
   // **I26 — a declaration that cannot take effect.** A local verb is never
   // spawned, so its JSON tokens would be appended to nothing; the refusal is
@@ -660,7 +609,6 @@ function parseTool(raw: unknown, e: Errors, at: string): ToolDef | null {
     ...(hidden === undefined ? {} : { hidden }),
     ...(persist === undefined ? {} : { persist }),
     ...(interactive === undefined ? {} : { interactive }),
-    ...(view === undefined ? {} : { view }),
   };
 }
 
@@ -734,6 +682,21 @@ export function parseManifest(raw: unknown): Result<Manifest, readonly ManifestE
       // I6 — duplicates fail rather than last-wins. Last-wins is the version of
       // this that ships: the manifest still loads, and one of the two tools is
       // simply never reachable.
+      // I28 — a verb ruled and not yet built reserves its name now, and says so:
+      // the author is not shadowing a verb they can see in `/help`, and a
+      // message claiming they were would send them looking for it.
+      // `hasOwn`, or a tool named `toString` reads the prototype as a ruling.
+      const reserved = Object.hasOwn(RESERVED_VERBS, parsed.name) ? RESERVED_VERBS[parsed.name] : undefined;
+      if (reserved !== undefined) {
+        fail(
+          e,
+          `tools[${i}].name`,
+          `"${parsed.name}" is reserved for a framework verb not yet built (C05 I28, ${reserved}) — ` +
+            `choose another name, or this manifest stops parsing the day the verb ships`,
+        );
+        return;
+      }
+
       if (framework.has(parsed.name)) {
         // By name, not by index: "already declared at tools[7]" is meaningless
         // against a file the author wrote two entries in.

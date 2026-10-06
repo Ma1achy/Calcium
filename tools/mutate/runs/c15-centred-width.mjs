@@ -8,8 +8,8 @@
 //
 // The state it forbids reads as correct at every width. An absent width resolves
 // to the region's (C15 I16), so a centred layer is placed at `left` 0 across the
-// whole region: `fill` wearing `centred`'s name, self-consistent in every number
-// C15 reports about it.
+// whole region: centred on neither axis, and self-consistent in every number C15
+// reports about it.
 //
 // The rest attack the two joints step 2 created — the update route, and the
 // pairing that must not move with the placement.
@@ -23,7 +23,17 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/unit/overlay.test.ts test/integration/confirm.test.ts " +
-  "test/integration/history.test.ts test/unit/profile-view.test.ts " +
+  "test/integration/history.test.ts " +
+  // **`test/integration/router.test.ts` for M8's C15 I28 mutation**, whose
+  // subject is a layer surviving a question — a fact about the stack that only
+  // a row holding both a keyed layer and a confirm can see, and C15's own file
+  // holds none because I28 dismisses a panel on the arrival.
+  //
+  // **`test/unit/profile-view.test.ts` was in this list and is deleted**
+  // (R-EXA-082, F1254): vitest drops a path that does not exist without a word,
+  // so a run naming one is quietly executing less than it says. The rows it
+  // contributed were the pushed view's, which is the same change.
+  "test/integration/router.test.ts " +
   "test/unit/layout-engine.test.ts";
 const MANAGER = "src/viewport/overlay/manager.ts";
 const CONFIRM = "src/shell/confirm.ts";
@@ -41,6 +51,42 @@ const run = () => {
 };
 
 const MUTATIONS = [
+  // **M8's three rulings, each mutated against the row that claims it**
+  // (C15 I26, C15 I27, C15 I28). Every one below leaves a stack that reads correctly in
+  // any session where the two fields happen to agree, which is the state the
+  // single `dismissable` flag was right in for as long as it lasted.
+  {
+    // I26 — the conflation restored, in the direction that reads as removing a
+    // redundant field. It is exactly T6.24's revert.
+    name: "blocking derived from dismissal rather than declared",
+    file: MANAGER,
+    from: "    if (layer.blocking) {",
+    to: '    if (layer.dismissal !== "escape") {',
+    expect: "T1.32",
+  },
+  {
+    // I27 — the triple stops being the kind's name and becomes a convention.
+    // A panel free to vary them is a fourth kind wearing a third one's name.
+    //
+    // **Re-anchored in review batch 3** (C15 I30): the two fields are the
+    // panel's row of the §2d table now, so the mutation widens the row.
+    name: "a panel may declare any blocking and any dismissal",
+    file: MANAGER,
+    from: '  panel: Object.freeze(["false/escape"]),',
+    to: '  panel: Object.freeze(["false/escape", "true/escape", "false/answer", "true/answer", "false/focus"]),',
+    expect: "T1.31",
+  },
+  {
+    // I28 — widened back to every escapable layer, which is the draft this MR
+    // corrected. It closes a **view**: a confirm over a dashboard takes the
+    // dashboard with it, and every row about panels still passes.
+    name: "a blocking arrival closes every escape layer, views included",
+    file: MANAGER,
+    // Re-anchored in review batch 3: the dismissal carries `displaced` (C15 I32).
+    from: '        if (open.kind === "panel") this.dismiss(open.id, "displaced");',
+    to: '        if (open.dismissal === "escape") this.dismiss(open.id, "displaced");',
+    expect: "T4.2",
+  },
   {
     // C15 I25, T6.23 — the removal reaches the owner a turn late. `pop()` has
     // returned and the ladder has moved on while the view still answers `pane`;
@@ -121,11 +167,15 @@ const MUTATIONS = [
     name: "an anchored question becomes dismissable",
     file: CONFIRM,
     //
-    // **Re-anchored** (F1118): `selected` became a thunk read at render time,
-    // so the line above the one this mutation changes gained a call. The
-    // `dismissable` line is the subject and is untouched.
-    from: "        content: render(opts, selected()),\n        dismissable: false,",
-    to: "        content: render(opts, selected()),\n        dismissable: opts.placement === \"anchored\",",
+    // **Re-anchored three times.** F1118: `selected` became a thunk read at
+    // render time, so the line above gained a call. M8: `dismissable` split
+    // into `blocking` and `dismissal` (C15 I26), and escapability is the second
+    // of the two — which is the field this mutation moves, unchanged in what it
+    // means. M15: both fields stopped being literals and became §101's table's
+    // answer (C23 I73), so the mutation moves what the table said rather than
+    // what the file said — the same fact, one indirection on.
+    from: "      blocking: routing.blocking,\n      dismissal: routing.dismissal,",
+    to: "      blocking: routing.blocking,\n      dismissal: opts.placement === \"anchored\" ? \"escape\" : routing.dismissal,",
     expect: "T4.18",
   },
   {
@@ -160,6 +210,28 @@ const MUTATIONS = [
     from: "    left = Math.max(0, Math.min(left, Math.max(0, region.width - width)));\n",
     to: "",
     expect: null,
+  },
+  {
+    // **C15 I22 — a peek may be centred.** Its meaning is *beside the thing it
+    // describes*; centred it is a confirm nothing can answer. `fill` was the
+    // other placement this refused, and it is deleted (parked 3), so T1.26 now
+    // carries the whole refusal on `centred`.
+    name: "a peek may take any placement",
+    file: MANAGER,
+    from: '  if (layer.kind === "peek" && layer.placement.kind !== "anchored") {',
+    to: "  if (false) {",
+    expect: "T1.26",
+  },
+  {
+    // **C15 I27's placement clause**, apart from the triple mutated above: a
+    // centred panel is a confirm's placement with a panel's kind.
+    name: "a panel may be centred",
+    file: MANAGER,
+    // Re-anchored in review batch 3: the panel's placement clause stands alone
+    // since its fields became the §2d table's row (C15 I30).
+    from: '  if (layer.kind === "panel" && layer.placement.kind !== "anchored") {',
+    to: "  if (false) {",
+    expect: "T1.31",
   },
 ];
 

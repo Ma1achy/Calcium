@@ -13,9 +13,9 @@
  * the **first** arm rather than the last (C09 I36), which is why `/compare` is
  * worth looking at in an ordinary terminal.
  */
-import { b, defaultTheme, loadTheme, plotToSvg } from "@fmx/calcium";
-import type { SvgLayout } from "@fmx/calcium";
-import type { Block, Plot, ResolvedTheme } from "@fmx/calcium";
+import { b, defaultTheme, loadTheme, plotToSvg } from "calcium-tui";
+import type { SvgLayout } from "calcium-tui";
+import type { Block, Plot, ResolvedTheme } from "calcium-tui";
 import sharp from "sharp";
 
 /**

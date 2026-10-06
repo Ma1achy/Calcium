@@ -16,18 +16,21 @@
 import { normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Status } from "../../../data/viewmodel/index.js";
 import { cells, stripControl, truncate, wrapCells } from "../../text.js";
-import { glyphs, spinnerFrames } from "../glyphs.js";
+import { glyphs, spinnerFrameAt } from "../glyphs.js";
 import { background, fit, paint, rows, slot as surface, tone, withBackground, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext, Rendered } from "../types.js";
 import type { Style } from "../../theme/index.js";
+import { glyphTick } from "../ramp.js";
 
 /**
  * The word, in a gap in the rule — `─── ERROR ───`.
  *
  * **No square brackets, and they shipped because a figure was read literally.**
- * The design drew ` ERROR ` and `[▲ plot failed to render: …]`, and in both the
+ * An early drawing had ` ERROR ` and a bracketed message line, and in both the
  * brackets were *annotation*: they marked which cells carry a painted
- * background. They were never characters. **When the paint slot exists, the word
+ * background. They were never characters. No current fixture draws either:
+ * §048 and §096 draw ` ERROR ` in a gap in the rule and `✗ plot failed to
+ * render` beneath it, with no brackets and with the failure mark (C09 I138). **When the paint slot exists, the word
  * and its two spaces are what gets painted — white on red — and the paint is
  * what the brackets were drawing.** Until then it is the error tone in a gap and
  * nothing else.
@@ -207,8 +210,7 @@ export function elapsed(ms: number): string {
  * the history. Below one second `loading` shows no counter, because a fast load
  * must not flash one.
  */
-export function activityLine(block: Status, frames: readonly string[], tick: number): string {
-  const mark = frames[tick % frames.length] ?? ""; // cells-ok — a frame count, not a width
+export function activityLine(block: Status, mark: string): string {
   if (block.state === "retrying") {
     if (block.retryInMs === undefined) return "";
     // **Parentheses rather than a middle dot, and T4.4 is what said so.** `·` has
@@ -279,7 +281,55 @@ function tagRow(
  * make that divergence as large as an exception is long; at four lines the box
  * is at most seven rows and the worst over-draw is a number.
  */
-export const MESSAGE_LINE_CAP = 4;
+export const CONTENT_LINE_CAP = 7;
+
+/**
+ * The most rows a **detail** ever costs (C09 I84, §096).
+ *
+ * §096's *bounded with a residue row, so it never costs more than a few rows*
+ * given a number. Three, because the residue is one of them: a detail cut to the
+ * cap shows **two** of its lines and says how many it dropped, which is the
+ * smallest shape that is still a list.
+ */
+export const DETAIL_LINE_CAP = 3;
+
+/**
+ * The detail's rows: **truncated, never wrapped**, and bounded with a residue.
+ *
+ * **The opposite of `bodyOf`, on purpose.** Prose that overruns is joined and
+ * marked because losing the end loses the fact; code that overruns is *cut*,
+ * because a reflowed stack frame is a different string that reads like a real
+ * one. So each line is truncated to the width and the list is cut to the rows,
+ * and what the cut costs is stated rather than implied.
+ *
+ * **The residue is C04 I49's mechanism and not a second one** — `⋯ +N more` — so
+ * a reader who has learnt it in a container reads it here without being taught
+ * twice. It replaces the last kept row rather than being appended to it, because
+ * appending is how a bound becomes `cap + 1`.
+ *
+ * **A list that fits carries no residue**, the same asymmetry `bodyOf` draws: a
+ * mark claiming a truncation that did not happen sends a reader looking for text
+ * already on screen.
+ */
+function detailOf(
+  text: string,
+  textWidth: number,
+  forDetail: number,
+  caps: RenderContext["capabilities"],
+): readonly string[] {
+  if (forDetail === 0) return [];
+  const lines = stripControl(text).split("\n");
+  const cut = (line: string): string => truncate(line, textWidth, caps);
+  if (lines.length <= forDetail) return lines.map(cut); // cells-ok — a row count, not a width
+  const dropped = lines.length - (forDetail - 1); // cells-ok — a row count, not a width
+  // `⋯ +N more`, the same text `scroll` draws for a fold (C04 I49) — the glyph
+  // from the set so `ascii` substitutes it, and the words verbatim so a reader
+  // is not taught the mark twice.
+  return [
+    ...lines.slice(0, forDetail - 1).map(cut),
+    cut(`${glyphs(caps).residue} +${String(dropped)} more`),
+  ];
+}
 
 /**
  * The wrapped message, cut to the rows available, **with a mark when it is cut**.
@@ -327,6 +377,38 @@ function bodyOf(
 }
 
 /**
+ * The cells the `cross` mark takes, asked of **both** arms and the wider kept.
+ *
+ * `glyphCells` cannot answer it: `cross` is a `GlyphSet` member, not a
+ * `GLYPH_TABLE` token, and the set's arms are not held 1:1 — the residue mark
+ * is `⋯` against `...`. Today both arms of this one are a cell (`✗`, `x`), so
+ * the maximum is exact; were they to part, the wider errs in the direction
+ * I34's top rung already errs in — a row of slack, never a row short.
+ */
+const MARK_CELLS = Math.max(
+  cells(glyphs({ unicode: "full", ambiguousWidth: "narrow" }).cross),
+  cells(glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }).cross),
+); // cells-ok — a cell count
+
+/**
+ * The rows a **present, non-empty** detail wants, bounded by its own cap.
+ *
+ * One function, so nothing can disagree about what a detail costs — the same
+ * argument `errorStatus` makes for the box's height one level up (C09 I34).
+ * It was published for `framedStatus`, which added the detail's rows to a
+ * declared height; that box is fitted now (§3a-quater) and asks nothing of a
+ * producer, so the function is this file's again.
+ */
+export function statusDetailRows(text: string | undefined): number {
+  if (text === undefined || text === "") return 0; // cells-ok — a row count
+  // **No width parameter, and that is the difference from the message.** A
+  // detail truncates rather than wrapping, so a narrower box costs it no rows —
+  // which is why `statusRowsFor`'s fixed-point argument does not apply here.
+  const lines = stripControl(text).split("\n").length; // cells-ok — a row count
+  return Math.min(DETAIL_LINE_CAP, lines); // cells-ok — a row count
+}
+
+/**
  * The rows this box needs to say what it has to say, at the width it was given
  * (C09 I34, §3a-bis).
  *
@@ -347,12 +429,14 @@ function bodyOf(
  * computes, appearing when the message is short and giving way as it grows —
  * which is what the ladder already does with them. Counting them would make a
  * two-line failure seven rows rather than five.
+ *
+ * **No capability record, because `measure` has none** (C09 I34, §3a-quater).
+ * This function also sizes a box that declares no height, and a measure cannot
+ * ask which set the terminal draws — so the mark is counted at `MARK_CELLS`,
+ * the widest of its arms, and the activity line is asked with a placeholder frame, because what is read here is
+ * whether it is *empty*, and that never depends on the frame.
  */
-export function statusRowsFor(
-  block: Status,
-  width: number,
-  caps: RenderContext["capabilities"],
-): number {
+export function statusRowsFor(block: Status, width: number): number {
   const w = normaliseWidth(width);
   // The **top** rung deliberately, not the rung this block currently has: the
   // question is how tall the good figure needs to be, and the answer is read
@@ -368,30 +452,61 @@ export function statusRowsFor(
   const rowWidth = rung.frame.border ? Math.max(1, w - 2) : w; // cells-ok — a cell count
   const textWidth = Math.max(1, rowWidth - 2 * (rung.frame.pad ? PAD : 0)); // cells-ok — a cell count
 
-  const g = glyphs(caps);
-  const mark = block.state === "error" || block.state === "retrying" ? `${g.warning} ` : "";
-  // Tick zero: the *emptiness* of the line is a function of the state and the
-  // fields, never of which frame the spinner is on, so any tick answers it.
-  const line = activityLine(block, spinnerFrames(caps, block.spinner), 0);
+  // A stand-in of the mark's width: `wrapCells` counts cells, so a run of `x`
+  // as wide as the mark wraps the message exactly as the mark does.
+  const mark = block.state === "error" || block.state === "retrying" ? `${"x".repeat(MARK_CELLS)} ` : "";
+  // A placeholder frame: the *emptiness* of the line is a function of the state
+  // and the fields, never of which frame the spinner is on.
+  const line = activityLine(block, "x");
 
   const wrapped = wrapCells(`${mark}${stripControl(block.message)}`, textWidth).length; // cells-ok — a row count
-  const rows = Math.min(MESSAGE_LINE_CAP, Math.max(1, wrapped)); // cells-ok — a row count
-  const tagRows = rung.frame.tag && rung.tag !== "none" ? 1 : 0;
+  // **The message is served first and has no cap of its own** (I84). What is
+  // bounded is the box: `CONTENT_LINE_CAP` is F239's argument moved onto the
+  // quantity it was always about — a bounded container draws an over-tall child
+  // whole, so the worst over-draw must be a number — and the number is 4 for the
+  // worst measured message plus 3 for the detail.
+  const messageRows = Math.max(1, wrapped); // cells-ok — a row count
+  const detailRows = statusDetailRows(block.detail); // cells-ok — a row count
+  const rows = Math.min(CONTENT_LINE_CAP, messageRows + detailRows); // cells-ok — a row count
+  // **`empty` draws no banner, so it counts none** (I85, F10). Counted, it was a
+  // row of slack the render centres inside a granted height — harmless there,
+  // and a wrong measure in a fitted box.
+  const tagRows = rung.frame.tag && rung.tag !== "none" && block.state !== "empty" ? 1 : 0;
   const lineRows = line === "" ? 0 : 1;
   return rows + (rung.frame.border ? 2 : 0) + tagRows + lineRows; // cells-ok — a row count
+}
+
+/**
+ * The rows the box occupies: the declared height, or the fit when there is none
+ * (C09 I31, C04 I66, §3a-quater).
+ *
+ * **One function for `measure` and `render`**, so the two cannot answer the
+ * question differently — the fitted box is a promise `render` keeps because it
+ * asks the same thing `measure` asked, at the same width.
+ */
+function statusHeight(block: Status, width: number): number {
+  if (block.height === undefined) return statusRowsFor(block, width);
+  return Math.max(1, Math.floor(block.height)); // cells-ok — a row count
 }
 
 export const statusDefinition: BlockDefinition<Status> = {
   kind: "status",
 
+  // §7a — the message and the detail, which are the two parts that are text
+  // (I86, C09 I84). The frame, the spinner, the attempt count and the residue
+  // row are rendering; the detail is the part that truncates on screen and is
+  // whole here, which is the seam's own argument.
+  copy: (block) => (block.detail === undefined ? block.message : `${block.message}\n${block.detail}`),
+
   /**
-   * The declared height and nothing else (C09 I31).
+   * The declared height, or the fit at this width when none is declared (C09 I31).
    *
-   * **`measure` never reads `ctx` and this kind is why it must not**: the box is
-   * bound by a number the caller already committed, so a measurer free to
-   * recompute is a measurer free to disagree with it.
+   * **`measure` never reads `ctx` and this kind is why it must not**: a declared
+   * box is bound by a number the caller already committed, so a measurer free to
+   * recompute is a measurer free to disagree with it. A fitted box is bound by
+   * `statusRowsFor`, which takes no capability record for the same reason.
    */
-  measure: (block: Status): number => Math.max(1, Math.floor(block.height)), // cells-ok — a row count
+  measure: (block: Status, width: number): number => statusHeight(block, width),
 
   // No `window` (C09 I27, C09 I31) — a bounded box has its border at both ends
   // and cannot measure less without becoming a different box. `scroll`'s
@@ -400,7 +515,7 @@ export const statusDefinition: BlockDefinition<Status> = {
   render(block: Status, ctx: RenderContext): Rendered {
     const width = normaliseWidth(ctx.width);
     const g = glyphs(ctx.capabilities);
-    const height = Math.max(1, Math.floor(block.height)); // cells-ok — a row count
+    const height = statusHeight(block, width);
     // C28 I45 — the rows it was given, which is what the rung selection and the
     // fill both scale with. Taken after the floor, because a fractional or
     // negative height draws one row and gauging the declared value would report
@@ -414,7 +529,12 @@ export const statusDefinition: BlockDefinition<Status> = {
     // caught by looking at the image, because nothing asserts a tone per state
     // and the arithmetic is identical either way. §3a already says loading has
     // no error and therefore no rule and no tag; the tone follows the same fact.
-    const failed = block.state !== "loading";
+    // **`empty` is not a failure and neither is `loading`** (I85, §047). A
+    // refusal states its reason; it is not an error and never red. The three
+    // absences are here, at `tagRows` and at `mark` — separately, because a
+    // state that lost the tone and kept the banner would be a different wrong
+    // figure and T2.153 asserts each on its own.
+    const failed = block.state !== "loading" && block.state !== "empty";
     const ink = failed ? tone("error", ctx.theme, ctx.capabilities) : undefined;
     // **The tag's pair, both halves from `surfaces`** (C10 §4a). A ground taken
     // without its matched ink borrows a foreground nothing measured against it,
@@ -430,14 +550,16 @@ export const statusDefinition: BlockDefinition<Status> = {
     const textWidth = Math.max(1, rowWidth - 2 * gutter); // cells-ok — a cell count
 
     // **The mark is one of the two channels at one bit**, where the tone resolves
-    // to `{ bold: true }` and carries no colour at all (C09 §3a).
-    const mark = block.state === "error" || block.state === "retrying" ? `${g.warning} ` : "";
+    // to `{ bold: true }` and carries no colour at all (C09 §3a) — so it is the
+    // failure mark and never the warning's (C09 I138, ruling 85): with `▲` here
+    // an error and a warning notice shared their only non-colour carrier.
+    const mark = block.state === "error" || block.state === "retrying" ? `${g.cross} ` : "";
     // **The block's set, and `spinnerFrames` resolves an unknown name to the
     // default rather than throwing** — a spinner is decoration, and a session
     // that will not start because a set was misspelt is worse than one that
-    // spins the wrong way. The interval is `spinnerIntervalMs(block.spinner)`
-    // and belongs to whoever schedules the tick, which is not this layer.
-    const line = activityLine(block, spinnerFrames(ctx.capabilities, block.spinner), ctx.tick);
+    // spins the wrong way. **The set's own interval is read here** (C09 I112):
+    // the tick is time, and `spinnerFrameAt` turns it into this set's frame.
+    const line = activityLine(block, spinnerFrameAt(ctx.capabilities, glyphTick(ctx.tick, ctx.motion), block.spinner));
 
     // **The interior is the remainder and the group is centred inside it.** The
     // height ladder says which furniture it can afford and the width ladder
@@ -447,7 +569,11 @@ export const statusDefinition: BlockDefinition<Status> = {
     // width 9 the box drew four against a measured six, with every count in this
     // file agreeing the whole time.
     const interior = Math.max(1, height - (frame.border ? 2 : 0)); // cells-ok — a row count
-    const tagRows = frame.tag && tagFit !== "none" ? 1 : 0;
+    // **No banner on an empty block** (I85). The width ladder may afford one and
+    // the state declines it, which is why this is an `&&` here rather than a
+    // rung removed from `widthRung`: the ladder answers what the *box* can draw
+    // and the state answers what this box *should*.
+    const tagRows = frame.tag && tagFit !== "none" && block.state !== "empty" ? 1 : 0;
     // At one row the message wins: a countdown without its cause is a number
     // nobody can act on, and the cause without the countdown is still the fact.
     //
@@ -466,8 +592,25 @@ export const statusDefinition: BlockDefinition<Status> = {
     // is still waiting, and that lives entirely in the line that moves (F235).
     const lineWins = block.state === "loading";
     const lineRows = line !== "" && (interior - tagRows >= 2 || lineWins) ? 1 : 0;
-    const forMessage = Math.max(0, interior - tagRows - lineRows); // cells-ok — a row count
+    // **The allocation, in three clauses** (I84, §3a-ter). Each is a separate
+    // thing to be wrong about, which is why they are three statements and not
+    // one expression: T3.96 constructs a box for each where the other two are
+    // satisfied either way, and T6.128 takes clause 1 out on its own.
+    const content = Math.max(0, interior - tagRows - lineRows); // cells-ok — a row count
+    const wants = statusDetailRows(block.detail); // cells-ok — a row count
+    // 1 · a present, non-empty detail reserves one row, so it cannot vanish with
+    //     no mark — the silent slice this file already closed for the message
+    //     (F230), one part along.
+    const reserved = wants > 0 && content > 1 ? 1 : 0; // cells-ok — a row count
+    // 2 · the message wraps into what remains, and truncates with its own mark.
+    const forMessage = Math.max(0, content - reserved); // cells-ok — a row count
     const body = bodyOf(`${mark}${stripControl(block.message)}`, textWidth, forMessage, ctx.capabilities);
+    // 3 · the detail expands into the rows the message did not take.
+    const forDetail = Math.min(wants, Math.max(0, content - body.length)); // cells-ok — a row count
+    const detail =
+      block.detail === undefined || block.detail === ""
+        ? []
+        : detailOf(block.detail, textWidth, forDetail, ctx.capabilities);
 
     // **The whole group is centred, not the message inside the leftover.** The
     // two are the same picture at the full figure's six rows, which is why this
@@ -479,9 +622,23 @@ export const statusDefinition: BlockDefinition<Status> = {
     // The ladder's `pad` still decides the **horizontal** gutter; the vertical
     // padding it used to name is this slack, and computing it removes the case
     // where the two disagreed.
-    const group = tagRows + body.length + lineRows; // cells-ok — a row count
+    const group = tagRows + body.length + detail.length + lineRows; // cells-ok — a row count
     const slack = Math.max(0, interior - group); // cells-ok — a row count
     const above = Math.floor(slack / 2);
+
+    /**
+     * The horizontal half of I85, and the only cells it adds.
+     *
+     * Every other state's rows go through a left-aligned `fit`. `empty` is
+     * centred on **both** axes (§096) — the vertical half falling out of the
+     * group centring above, which was built for a tall error box and is why
+     * this is one function rather than a second layout.
+     */
+    const centred = (text: string): string => {
+      if (block.state !== "empty" || text === "") return text;
+      const slackCells = Math.max(0, textWidth - cells(text, ctx.capabilities.ambiguousWidth)); // cells-ok — a cell count
+      return `${" ".repeat(Math.floor(slackCells / 2))}${text}`; // cells-ok — a cell count
+    };
 
     /** Content rows are the error tone; the border and the blanks are not. */
     const span = (text: string, painted: boolean): readonly Span[] =>
@@ -515,7 +672,10 @@ export const statusDefinition: BlockDefinition<Status> = {
     if (tagRows === 1) {
       out.push(framed(tagRow(tagFit, textWidth, g.horizontal, tagInk, ink)));
     }
-    for (const row of body) out.push(boxed(row, true));
+    for (const row of body) out.push(boxed(centred(row), true));
+    // **The detail takes the default tone**, like the activity line: the message
+    // already said what went wrong and this is the evidence, not a second claim.
+    for (const row of detail) out.push(boxed(row, false));
     // **The activity line takes the default tone, not the error tone** — the
     // error already said what went wrong, and this says what is happening now.
     if (lineRows === 1) out.push(boxed(line, false));

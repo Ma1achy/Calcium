@@ -49,24 +49,6 @@ export type FlagDef = Readonly<{
   requires?: readonly string[]; // other flags that must accompany it
   conflicts?: readonly string[];
   /**
-   * This flag makes the invocation a pushed view — C22 §13a, C05 I20.
-   *
-   * On a flag as well as on the tool because a verb's tier can depend on how it
-   * was invoked: S12's logs view is `ps <uuid> --logs`, a flag on a `ps` that
-   * otherwise appends. A tool-level field alone would need `ps` split into two
-   * tools to express it, putting one verb's flags in two places.
-   *
-   * **S3 was named here too, as `ps <uuid> --watch`, and cannot be built that
-   * way.** `docker ps` takes no positional argument, `--watch` is not a docker
-   * flag, and C06 I4 sends argv to the far side verbatim — so the declaration
-   * would have put a flag docker rejects on a verb that rejects the id. S3 is a
-   * verb-level view instead (`container stats <id>`). The arm is right and the
-   * example was not, which is the distinction worth keeping: **no consumer
-   * outside a test fixture reaches this arm yet**, and saying so is weaker than
-   * the verb arm's claim on purpose.
-   */
-  view?: boolean;
-  /**
    * The shell consumes this flag; it never reaches the far side (I21, F39).
    *
    * **The axis is transmission, not presentation, and the two do not coincide.**
@@ -189,36 +171,6 @@ export type ToolDef = Readonly<{
    * result and nothing reconciling the two.
    */
   interactive?: boolean;
-  /**
-   * The verb's result is a pushed view rather than a transcript entry —
-   * C22 §13a, C05 I20.
-   *
-   * **Declared, because it must be known before the verb runs.** C23 I3 appends
-   * the pending entry *before* the transport is invoked, and C13 has no delete
-   * (C23 §8a A4 ruled it must not gain one). An adapter deciding the tier on
-   * seeing its result would produce a view *and* the entry B03 §2 says a push
-   * does not leave, with nothing able to withdraw it. So the decision precedes
-   * step 3, and the only thing known before a verb runs is its declaration.
-   *
-   * The party is the one `interactive` names, for the same reason: a view is a
-   * handoff of input ownership, and A01 D4 is the test — it takes letter keys
-   * while the prompt would otherwise hold focus, so the prompt must go.
-   *
-   * `FlagDef` carries it too, and an invocation is a view if either says so.
-   * Refused with `interactive`, with `oneShot` and with `local`; permitted with
-   * `streams`, because S12's logs view is exactly that pair.
-   *
-   * **The `local` refusal is the one whose reason is not *a verb that cannot
-   * exist*** (F1022, closing F23 and F129). The argument above — *the decision
-   * precedes step 3, and the only thing known before a verb runs is its
-   * declaration* — is C23 I3's, and C23 I3 is an obligation of the **app** route.
-   * `runLocal` has no transport and appends nothing in advance, so the tier need
-   * not be known before the verb runs there, and a local verb that wants a view
-   * pushes it from its handler and returns a transcript notice as the record.
-   * `/profile` is the shipped instance. See C05 §`view` for what the refusal was
-   * measured against and what it reserves.
-   */
-  view?: boolean;
   /**
    * The tokens that ask **this verb** for machine-shaped output (C05 I26, F1).
    *

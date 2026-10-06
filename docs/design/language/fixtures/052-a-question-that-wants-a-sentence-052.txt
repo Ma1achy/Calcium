@@ -1,0 +1,53 @@
+some questions want a SENTENCE, not a choice — the question floats and
+borrows the editor implementation while the ordinary draft is held.
+
+● git add · 0.1s · 3 files staged
+
+
+──────────────────────────────────────────────────────────────────────────────
+ ⟩ What should the commit message say?
+ 3 files · +124 −18 · parse.ts, tokens.ts, parser.test.ts
+──────────────────────────────────────────────────────────────────────────────
+❯ fix the parser's nested quote handling▌
+──────────────────────────────────────────────────────────────────────────────
+⏎ submit   ⇧⏎ newline   esc cancel
+
+no second implementation. The question gets its OWN buffer, selection,
+history and undo; paste rules, ⇧⏎ newline and ⌥← word move are shared.
+A box with a smaller
+editor inside it would be a second implementation of the hardest
+component in the system.
+
+  which is the same move the paste chip's edit view makes, and the
+  same one a subagent's prompt makes: there is ONE line editor and
+  everything that takes typing borrows its code, never another owner's state.
+
+what changes, and it is only three things
+
+  the label      ⟩ and the question, above the rule
+  the target     ⏎ answers the question rather than sending a turn
+  the escape     esc cancels the QUESTION, not the text
+
+  and the footer says submit rather than send, which is how a reader
+  knows without reading the label again.
+
+a choice with an OTHER arm is the two composed
+
+──────────────────────────────────────────────────────────────────────────────
+ ⟩ Which branch?
+
+  › feat/c26    main    type a name…
+──────────────────────────────────────────────────────────────────────────────
+←→ move     ⏎ answer   esc cancel
+
+  ↓ choosing the third
+
+──────────────────────────────────────────────────────────────────────────────
+ ⟩ Which branch?   type a name, or esc for the list
+──────────────────────────────────────────────────────────────────────────────
+❯ feat/c26-▌
+──────────────────────────────────────────────────────────────────────────────
+⏎ submit   esc back to the choices
+
+  esc steps back one level rather than cancelling outright — the
+  scope ladder, inside a question.

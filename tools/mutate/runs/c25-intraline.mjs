@@ -21,10 +21,13 @@
 // `patch-window` row, and `test/contract/patch-window.test.ts` is on `CMD` for
 // that reason.
 //
-// **`FLUSH-GONE` is also this file's evidence about T1.20b**, and the reason
-// T1.20 is not deleted as duplicate coverage. T1.20b derives its boundary set
-// from `changedRuns` itself, so this mutation moves the expectation and the code
-// together and T1.20b stays **green** — measured, 2026-09-04. T1.20's predicate
+// **`FLUSH-GONE` was also this file's evidence about T1.20b**, and T1.20b was
+// struck in M9b with the snap it asserted (C25 §3b, F1251). Its reasoning is
+// kept because it is the argument for not deleting T1.20 as duplicate coverage:
+// T1.20b derived its boundary set from `changedRuns` itself, so the mutation
+// moved the expectation and the code together and it stayed **green** —
+// measured, 2026-09-04. The two cursor mutations below now name T1.25, which
+// reads the window byte for byte. T1.20's predicate
 // is written out by hand and independent of the function, and it is what kills
 // this one. A row whose expectation comes from its subject cannot see a change to
 // its subject; the two rows are complementary and this is where that is written
@@ -141,8 +144,11 @@ const results = runPass({
       // carries them, the gate accepts them, the frame shows nothing.
       name: "SPANS-DROPPED-UNIFIED: unifiedRow does not pass the line's spans",
       file: DEF,
-      from: "    [...gutterSpans(item, layout, ctx), ...textSpans(item.text, block.language, layout.text, ctx, item.spans)],",
-      to: "    [...gutterSpans(item, layout, ctx), ...textSpans(item.text, block.language, layout.text, ctx)],",
+      // Re-anchored 2026-09-24 on the argument alone: the row's kind follows
+      // the spans since C25 I23, and dropping the spans must not drop it too.
+      // Re-anchored again 2026-09-27: the mark follows the kind since C25 I25.
+      from: "ctx, item.spans, item.kind, mark)",
+      to: "ctx, undefined, item.kind, mark)",
       expect: "T4.12",
     },
     {
@@ -151,8 +157,10 @@ const results = runPass({
       // passes; T2.7 asserts one run per half.
       name: "SPANS-DROPPED-SPLIT-LEFT: the removed side of a split row loses its spans",
       file: DEF,
-      from: "        : [...gutterSpans(left, layout, ctx, \"old\"), ...textSpans(left.text, block.language, layout.text, ctx, left.spans)];",
-      to: "        : [...gutterSpans(left, layout, ctx, \"old\"), ...textSpans(left.text, block.language, layout.text, ctx)];",
+      // Re-anchored 2026-09-24 on the argument alone (C25 I23's kind follows).
+      // Re-anchored again 2026-09-27 (C25 I25's mark follows).
+      from: "ctx, left.spans, left.kind, leftMark)",
+      to: "ctx, undefined, left.kind, leftMark)",
       expect: "T2.7",
     },
     {
@@ -206,7 +214,7 @@ const results = runPass({
       file: WINDOW,
       from: "    const to = at + group.removes.length + group.adds.length;",
       to: "    const to = at + Math.max(group.removes.length, group.adds.length);",
-      expect: "T1.20b",
+      expect: "T1.25",
     },
     {
       // The other half of the same cursor: a context line is one row *and* one
@@ -216,7 +224,7 @@ const results = runPass({
       file: WINDOW,
       from: '      units.push({ lineFrom: at, lineTo: at + 1, rows: 1 });\n      at += 1;',
       to: '      units.push({ lineFrom: at, lineTo: at + 1, rows: 1 });',
-      expect: "T1.20b",
+      expect: "T1.25",
     },
     {
       // C25 I19b's other clause: `rows` comes from `pairedRows` so a unit cannot

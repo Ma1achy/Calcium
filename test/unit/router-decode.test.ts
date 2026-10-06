@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { createDecoder, ESC_DISAMBIGUATION_MS } from "../../src/interaction/router/decode.js";
-import type { Decoder, InputEvent } from "../../src/interaction/router/types.js";
+import type { DecodeCapabilities, Decoder, InputEvent, Key } from "../../src/interaction/router/types.js";
 
 const enc = new TextEncoder();
 
@@ -25,11 +25,15 @@ function clock(start = 1_000) {
 }
 
 function decoder(
-  over: Partial<{ bracketedPaste: boolean; mouse: boolean }> = {},
+  over: Partial<DecodeCapabilities> = {},
   c = clock(),
 ): { d: Decoder; c: ReturnType<typeof clock> } {
   const d = createDecoder({
-    capabilities: { bracketedPaste: true, mouse: true, ...over },
+    // **`keyboardProtocol: "none"` is the default and it is load-bearing**
+    // (C16 I41): bit 8 of a `CSI 1;m X` modifier is Meta here and Super under
+    // `"kitty"`, so a harness that did not state it would be asserting one of
+    // two answers without saying which.
+    capabilities: { bracketedPaste: true, mouse: true, keyboardProtocol: "none", ...over },
     now: c.now,
   });
   return { d, c };
@@ -169,7 +173,7 @@ describe("C16 §2 — key decoding", () => {
     expect(feed(d, "\x1b[97:65;2u")).toStrictEqual([{ kind: "key", key: k("a", "\x1b[97:65;2u", { shift: true }) }]);
   });
 
-  it("T1.3q (C16 §2): the `u` arm's modifier bits are kitty's — bit 8 folds into nothing, bit 32 into meta", () => {
+  it("T1.3q (C16 §2): the `u` arm's modifier bits are kitty's — bit 8 is super and never meta, bit 32 is meta", () => {
     const { d } = decoder();
     const only = (s: string) => {
       const [e] = feed(d, s);
@@ -178,7 +182,9 @@ describe("C16 §2 — key decoding", () => {
     // alt: 1 + 2 = 3 → meta. kitty meta: 1 + 32 = 33 → meta. Both, 35 → meta.
     expect(only("\x1b[97;3u")).toEqual({ ctrl: false, meta: true, shift: false });
     expect(only("\x1b[97;33u")).toEqual({ ctrl: false, meta: true, shift: false });
-    // super: 1 + 8 = 9 → **no modifier**. `⌘a` is not `Alt-a`.
+    // super: 1 + 8 = 9 → **not meta**: it is `super` (C16 §6c, T1.34), and
+    // `⌘a` is not `Alt-a`. The title said *folds into nothing* after the body
+    // had started setting `super`.
     expect(only("\x1b[97;9u")).toEqual({ ctrl: false, meta: false, shift: false });
     // And the control the row needs: the same bit *is* meta through the xterm
     // arm, so a decoder that shared one function between the two would fail one
@@ -200,8 +206,44 @@ describe("C16 §2 — key decoding", () => {
     // xterm's `formatOtherKeys=1` sends the same bytes with no protocol pushed,
     // and the decoder has no way to know which encoder sent them. So the arm is
     // not gated, and a terminal that sends `CSI u` unasked still produces the key.
-    const { d } = decoder({ bracketedPaste: false, mouse: false });
+    const { d } = decoder({ bracketedPaste: false, mouse: false, keyboardProtocol: "none" });
     expect(names(feed(d, "\x1b[13;2u"))).toEqual(["enter"]);
+  });
+
+  it("T1.93 (I41): CSI 1;9A is super under the kitty protocol and meta without it — the same bytes, twice", () => {
+    // **The same bytes through two decoders is the only shape that asserts the
+    // protocol is the condition.** Feeding one decoder and checking for `super`
+    // is equally passed by a decoder that sets `super` on bit 8 always, which is
+    // the reading I34 was right to refuse for a terminal that reported nothing.
+    const firstKey = (bytes: string, protocol: "none" | "kitty"): Key => {
+      const { d } = decoder({ keyboardProtocol: protocol });
+      const first = feed(d, bytes)[0];
+      if (first === undefined || first.kind !== "key") throw new Error(`no key from ${bytes}`);
+      return first.key;
+    };
+
+    const superUp = firstKey("\u001b[1;9A", "kitty");
+    expect(superUp.name).toBe("up");
+    expect(superUp.super, "⌘↑ under the protocol is Super").toBe(true);
+    expect(superUp.meta, "and not Meta — the fold is what made them one key").toBe(false);
+
+    const metaUp = firstKey("\u001b[1;9A", "none");
+    expect(metaUp.name).toBe("up");
+    expect(metaUp.meta, "the same bytes with no protocol are Meta, and that is correct").toBe(true);
+    expect(
+      metaUp.super,
+      "⌘ did not reach the application, so there is no Super to report",
+    ).toBeUndefined();
+
+    // **The control, and it is what makes this about bit 8 rather than about the
+    // parameter.** `CSI 1;3A` is bit 2 — Alt — and is `meta` under both, so a
+    // decoder that had simply started reporting `super` for every modified arrow
+    // fails here.
+    for (const protocol of ["none", "kitty"] as const) {
+      const altUp = firstKey("\u001b[1;3A", protocol);
+      expect(altUp.meta, `⌥↑ is Meta under ${protocol}`).toBe(true);
+      expect(altUp.super, `⌥↑ is never Super (${protocol})`).toBeUndefined();
+    }
   });
 
   it("T1.3e (C16 §2, I17): xterm's Meta bit is read, so 1;10D and 1;16D are different keys", () => {
@@ -879,5 +921,20 @@ describe("C16 §2b — I12 held on one ESC arm of four (F1045)", () => {
       expect(feed(d, `red ${ESC}[31mtext${ESC}[0m`), "CSI in a payload is payload").toEqual([]);
       expect(feed(d, `${ESC}[201~`)[0]).toEqual({ kind: "paste", text: "red [31mtext[0m" });
     }
+  });
+});
+
+describe("C16 focus reports (I61)", () => {
+  it("T1.160 (I61): ESC [ I and ESC [ O decode to one focus event each, alone, between keys, and under the kitty protocol", () => {
+    const { d } = decoder();
+    expect(feed(d, "\x1b[I")).toEqual([{ kind: "focus", focused: true }]);
+    expect(feed(d, "\x1b[O")).toEqual([{ kind: "focus", focused: false }]);
+    // Between two keys, in one chunk: neither key is eaten and no key is made.
+    const mixed = feed(d, "\x1b[Ax\x1b[O\x1b[B");
+    expect(names(mixed)).toEqual(["up", "x", "focus", "down"]);
+    const { d: kitty } = decoder({ keyboardProtocol: "kitty" });
+    expect(feed(kitty, "\x1b[O")).toEqual([{ kind: "focus", focused: false }]);
+    // The bare form only, as `Z`'s: a parameter makes it malformed, and malformed is discarded.
+    expect(feed(d, "\x1b[2O")).toEqual([]);
   });
 });

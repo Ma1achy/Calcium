@@ -163,3 +163,28 @@ describe("C05 fail-on-revert", () => {
   // T6.8 is written, in test/integration/transport.test.ts, beside the T4.4 it
   // names.
 });
+
+describe("C05 I27, I28 fail-on-revert", () => {
+  it("T6.17 (I27): deleting the `view` refusal from parseTool and parseFlag → T1.24 fails", () => {
+    // The drop is what shipped: a manifest declaring a pushed view parsed into
+    // an ordinary verb, and nothing on either side said so.
+    for (const at of ["tool", "flag"] as const) {
+      const source = raw();
+      const ps = (source["tools"] as Record<string, unknown>[])[0]!;
+      if (at === "tool") ps["view"] = true;
+      else (ps["flags"] as Record<string, unknown>[])[0]!["view"] = true;
+      expect(parseManifest(source).ok, `view on the ${at}`).toBe(false);
+    }
+  });
+
+  it("T6.18 (I28, I6): the `watch` and `unwatch` rows removed from FRAMEWORK_TOOLS with RESERVED_VERBS left empty → T1.25 fails", () => {
+    // The reservation was spent when the verbs were built (ruling 50): the
+    // names are framework rows now, and the collision is a shipped verb's. If
+    // the rows went and nothing re-reserved them, an app declaring `watch`
+    // would parse into the name the framework's verb answers — the break the
+    // reservation existed to move earlier, arriving again.
+    const source = raw();
+    (source["tools"] as Record<string, unknown>[]).push({ name: "watch", local: false, summary: "mine", args: [], flags: [] });
+    expect(parseManifest(source).ok).toBe(false);
+  });
+});

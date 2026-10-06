@@ -18,7 +18,7 @@
  * own kind; the demo registers one that fails on purpose because the subject is
  * what the framework does about it.
  */
-import type { BlockDefinition } from "@fmx/calcium";
+import type { BlockDefinition } from "calcium-tui";
 
 /** The block this kind renders — a height, and the reason it will not draw. */
 export type Faulty = Readonly<{ kind: "faulty"; id: string; height: number; why: string }>;
@@ -29,7 +29,7 @@ export type Faulty = Readonly<{ kind: "faulty"; id: string; height: number; why:
  * The runtime accepted an app's kind from F1 and the types could not express
  * one, so everything below took `as unknown as` — three of them, on the
  * definition's two parameters and on the constructor's return. The interface is
- * published beside `Block`, augmentation merges against `@fmx/calcium`'s own
+ * published beside `Block`, augmentation merges against `calcium-tui`'s own
  * entry point, and `Block` is `BlockKinds[keyof BlockKinds]`, so declaring the
  * member is the whole of it.
  *
@@ -37,7 +37,7 @@ export type Faulty = Readonly<{ kind: "faulty"; id: string; height: number; why:
  * own extension point from inside; the casts were the finding kept in the tree,
  * and their absence is what says the finding closed.
  */
-declare module "@fmx/calcium" {
+declare module "calcium-tui" {
   interface BlockKinds {
     faulty: Faulty;
   }

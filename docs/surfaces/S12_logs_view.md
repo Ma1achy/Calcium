@@ -31,7 +31,7 @@ The convention sentence is still correct where it belongs — S01 §2, and S13's
 **The keymap needed a block that did not exist.** A pushed view leaves header and footer untouched (C15 T4.4) and C22's footer is one app-supplied row, so these keys cannot go in the frame's footer — they belong to the view. `panel` now carries `footer?: string` (C04 §3), which is text in a row that was drawn anyway. S13 §2's outer panel draws the same thing, and two consumers is what settled it: a keymap *below* the panel would have cost only a figure, and would have left both surfaces drawing a bottom rail with words in it that no block produces.
 
 ```
-┌ logs · a3f9b21 · gpu-04.fmx.internal ─────────────────────── ● following ─┐
+┌ logs · a3f9b21 · gpu-04.example.internal ─────────────────────── ● following ─┐
 │ 14:23:01.882  INFO   [trainer] epoch 17 started                           │
 │ 14:23:02.104  INFO   [dataloader] batch 41/256 loaded (148 samples)       │
 │ 14:23:02.339  DEBUG  [memory] gpu_mem=52GiB/80GiB host_mem=91GiB          │
@@ -45,7 +45,7 @@ The convention sentence is still correct where it belongs — S01 §2, and S13's
 
 Three regions: a title bar carrying the source and connection state, the lines, and a two-row footer — a status line and a keymap line. **The title bar is the panel's top border and the keymap is its `footer`**; the status line is an ordinary child.
 
-**Blocks, in order**: `panel` with `title` *logs · a3f9b21 · gpu-04.fmx.internal ─ ● following* and `footer` *esc back · / filter · l level · ⌃s pause · g top · G bottom · ⏎ follow*, wrapping `logs` (5 log lines), `rule` with `gapBefore`, and `keyValue` (the status line). Five inner rows, one join, one rule, one status — eight children in ten rows with the border.
+**Blocks, in order**: `panel` with `title` *logs · a3f9b21 · gpu-04.example.internal ─ ● following* and `footer` *esc back · / filter · l level · ⌃s pause · g top · G bottom · ⏎ follow*, wrapping `logs` (5 log lines), `rule` with `gapBefore`, and `keyValue` (the status line). Five inner rows, one join, one rule, one status — eight children in ten rows with the border.
 
 **This line said `raw` and the figure above says otherwise** (F141). The figure has three columns — `14:23:01.882`, a `WARN`, and a message — which is `Logs`'s shape exactly: `lines: { ts, level, message }[]`. `raw` is one flat string per line, so the alignment would be baked into the text rather than computed at the width, and **`WARN` would draw in body colour**: `levelTone` maps error/fatal, warn, debug/trace and the rest, and only the `logs` renderer calls it.
 

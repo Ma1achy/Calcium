@@ -26,12 +26,15 @@
 // which the table says rather than omits.
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { relative } from "node:path";
 
-import { defaultKeymap, keyText } from "../src/interaction/router/keymap.js";
+import { keysOutputPath, registryPath, renderKeysMarkdown, repoRoot } from "../docs/design/language/build-calcium.mjs";
+
+import { chordText, defaultKeymap, keySlot } from "../src/interaction/router/keymap.js";
 import { FOCUS_ORDER } from "../src/interaction/router/focus.js";
 
-export const KEYS_DOC = "docs/KEYS.md";
+/** The registry names the file; the builder resolves it against the repository root. */
+export const KEYS_DOC = relative(repoRoot, keysOutputPath);
 
 /** The mark on a key bound at more than one target. */
 export const LADDER_MARK = "†";
@@ -45,15 +48,15 @@ export const LADDER_MARK = "†";
  */
 function byKey(a, b) {
   if (a.name !== b.name) return a.name < b.name ? -1 : 1;
-  const ta = keyText(a);
-  const tb = keyText(b);
+  const ta = keySlot(a);
+  const tb = keySlot(b);
   return ta < tb ? -1 : ta > tb ? 1 : 0;
 }
 
 /**
  * The table, as data: one row per distinct key, one cell per target.
  *
- * @param {readonly {target: string, key: {name: string, ctrl?: boolean, meta?: boolean, shift?: boolean}, action: string}[]} bindings
+ * @param {readonly {target: string, key: {name: string, ctrl?: boolean, meta?: boolean, shift?: boolean}, action: string, fallback?: string, profile?: string}[]} bindings
  * @param {readonly string[]} order
  * @returns {{ rows: Array<{ text: string, cells: Map<string, string>, ladder: boolean }>, bindings: number, ladder: number }}
  */
@@ -62,21 +65,30 @@ export function tabulate(bindings, order) {
   const byText = new Map();
   for (const b of bindings) {
     if (!order.includes(b.target)) {
-      throw new Error(`binding ${b.target}:${keyText(b.key)} names a target outside FOCUS_ORDER`);
+      throw new Error(`binding ${b.target}:${keySlot(b.key)} names a target outside FOCUS_ORDER`);
     }
-    const text = keyText(b.key);
+    const text = chordText(b.key);
     const row = byText.get(text) ?? { key: b.key, cells: new Map() };
     if (row.cells.has(b.target)) {
       // `createKeymap` refuses this at construction; the generator refuses it
       // too rather than writing a cell that silently keeps one of the two.
       throw new Error(`duplicate binding for ${b.target} ${text}`);
     }
-    row.cells.set(b.target, b.action);
+    // **A reserved row names what it does unhandled** (C16 §6c, C22 I134): `⌥⌫`
+    // is `queueDrop` for an application that registers one and `killWordLeft`
+    // otherwise, and a cell saying only the first describes a key nobody has.
+    row.cells.set(b.target, b.fallback === undefined ? b.action : `${b.action}, else ${b.fallback}`);
+    if (b.profile !== undefined) row.profile = b.profile;
     byText.set(text, row);
   }
   const rows = [...byText.values()]
     .sort((a, b) => byKey(a.key, b.key))
-    .map((r) => ({ text: keyText(r.key), cells: r.cells, ladder: r.cells.size > 1 }));
+    .map((r) => ({
+      text: chordText(r.key),
+      cells: r.cells,
+      ladder: r.cells.size > 1,
+      profile: r.profile ?? "both",
+    }));
   return {
     rows,
     bindings: bindings.length,
@@ -111,11 +123,28 @@ export function renderKeymapTable(bindings, order) {
       "and are outside this table.",
   );
   out.push("");
-  out.push(`| key | ${order.join(" | ")} |`);
-  out.push(`|---|${order.map(() => "---").join("|")}|`);
+  out.push("");
+  out.push(
+    "**The `profile` column** (C16 \u00a76a, I35). `both` is the ordinary case. `enhanced-terminal` " +
+      "is a route that resolves only where `capabilities.keyboardProtocol === \"kitty\"`; every action " +
+      "with one also has a `both` route, because \u2318, \u21e7\u23ce, \u2303\u21e7-letters and \u2303\u21e5 are " +
+      "byte-identical to their unmodified forms on a terminal without the protocol (I36).",
+  );
+  out.push("");
+  out.push(
+    "**Every `\u2325` route needs the terminal to send Option as Meta** \u2014 ESC-prefixing rather than " +
+      "composing a character, which on macOS means *Use Option as Meta Key* in Terminal.app and " +
+      "`Esc+` in iTerm2. Not a new assumption: every `\u2325` row in this table has always required " +
+      "it \u2014 they were spelled `m+` until the key column moved to the design's notation (C16 \u00a76a clause 6).",
+  );
+  out.push("");
+  out.push(`| key | profile | ${order.join(" | ")} |`);
+  out.push(`|---|---|${order.map(() => "---").join("|")}|`);
   for (const r of t.rows) {
     const cells = order.map((target) => r.cells.get(target) ?? "");
-    out.push(`| \`${r.text}\`${r.ladder ? ` ${LADDER_MARK}` : ""} | ${cells.join(" | ")} |`);
+    out.push(
+      `| \`${r.text}\`${r.ladder ? ` ${LADDER_MARK}` : ""} | ${r.profile} | ${cells.join(" | ")} |`,
+    );
   }
   out.push("");
   out.push(
@@ -131,11 +160,21 @@ export function liveTable() {
   return renderKeymapTable(defaultKeymap, FOCUS_ORDER);
 }
 
+/**
+ * **The whole of `docs/KEYS.md`, and this tool is its one writer** (C16 §6a
+ * clause 5): the design's binding table, as the builder renders it from the
+ * registry, then the live ladder. Two projections of one source in one file —
+ * where there were two generated files under one name.
+ */
+export function keysDocument() {
+  return `${renderKeysMarkdown(JSON.parse(readFileSync(registryPath, "utf8")))}\n${liveTable()}`;
+}
+
 const isMain =
   process.argv[1] !== undefined && import.meta.url === new URL(`file://${process.argv[1]}`).href;
 if (isMain) {
-  const path = join(process.cwd(), KEYS_DOC);
-  const want = liveTable();
+  const path = keysOutputPath;
+  const want = keysDocument();
   if (process.argv.includes("--check")) {
     let have = "";
     try {

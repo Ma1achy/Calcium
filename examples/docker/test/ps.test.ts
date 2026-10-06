@@ -9,11 +9,11 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { cells } from "@fmx/calcium";
-import type { RawResult, Table, TableRow } from "@fmx/calcium";
+import { cells } from "calcium-tui";
+import type { RawResult, Table, TableRow } from "calcium-tui";
 import { COLUMNS, createPsAdapter, parseNdjson, stateOf } from "../src/ps.ts";
 
-import { producerContext } from "@fmx/calcium/testing";
+import { producerContext } from "calcium-tui/testing";
 const CORPUS = readFileSync(new URL("./corpus/ps-real.ndjson", import.meta.url), "utf8");
 
 const result = (over: Partial<RawResult> = {}): RawResult => ({
@@ -113,7 +113,7 @@ describe("walk C: the cells", () => {
   });
 
   it("C1b: every state maps to a slot in the vocabulary, and unknown is its own", () => {
-    expect(stateOf("running")).toEqual({ glyph: "running", tone: "ok" });
+    expect(stateOf("running")).toEqual({ glyph: "work-unit", tone: "ok" });
     expect(stateOf("exited")).toEqual({ glyph: "error", tone: "error" });
     // F6: `paused` is `pending`, because R01's `▪` is not a slot.
     expect(stateOf("paused")).toEqual({ glyph: "pending", tone: "warn" });

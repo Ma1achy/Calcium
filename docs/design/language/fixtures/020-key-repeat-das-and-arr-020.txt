@@ -1,0 +1,43 @@
+★ we own the key repeat, and today nobody does
+
+a terminal sends no key-up. So a held arrow arrives as a stream of
+presses at the OPERATING SYSTEM's rate — typically 500ms before the
+first repeat and then 30ms between them, and neither number is ours.
+
+  scrolling feels sluggish then runaway
+  a 3D orbit steps rather than turns
+  a slider jumps by whole values
+  and a user with repeat disabled gets no repeat at all
+
+the kitty keyboard protocol sends PRESS, REPEAT and RELEASE
+
+  so the app can hold its own timer and the rate is a DECISION — but
+  only when system repeat is enabled. It never synthesizes repeats for
+  a reader who disabled them.
+
+  DAS   delay before auto-shift   170ms   the pause before it runs
+  ARR   auto-repeat rate            25ms   40 a second, once running
+  and both are per-BINDING, because they are not one question:
+
+  ↑↓ in a list       170 / 25   fast, and it is discrete
+  ⌥↑ ⌥↓ page        250 / 90   slower — each one is a whole screen
+  a 3D orbit           0 / 16   NO delay, 60fps — it is analogue
+  a slider           200 / 40   and it ACCELERATES after a second
+  ⌫ in the prompt   300 / 30   slow to start — a mis-hold is expensive
+
+acceleration, where it earns it
+
+  held 0–1s    1 step per repeat
+  held 1–3s    4 per repeat
+  held 3s+     16 per repeat
+  so a 10,000-row table is crossable by holding an arrow, and a
+  2-row one is not overshot.
+
+without the protocol
+
+  the OS's repeat, unchanged, and everything still works. No
+  acceleration, no orbit-by-hold, no per-binding rate — and the
+  capability row says so rather than the app pretending.
+
+  which is the ladder every capability here takes: it makes things
+  BETTER, never POSSIBLE.

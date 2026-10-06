@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Architecture |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Relationship to A01** | A01 is the **outward** contract — decisions, and what the far side must do. A02 is the **inward** one — how the kit is built |
 | **Consumed by** | C01–C07, C09–C21; the composition root of any consuming app |
 | **Status** | Draft |
@@ -150,8 +150,25 @@ All three implementations are fully substitutable in every test that does not co
 
 ```typescript
 type FocusTarget =
-  | "overlay" | "copyMode" | "pushedView" | "prompt" | "liveBlock" | "global";
+  | "child" | "overlay" | "nativeSelection" | "pushedView"
+  | "interaction" | "prompt" | "liveBlock" | "global";
 ```
+
+**Amended in M5, and the row was stale before the design touched it.** It listed six
+targets where the union had seven: `interaction` had shipped with C26 and was never
+written here, so a seam document describing the focus priority was describing a priority
+the tree had not held for some time. `child` is the eighth, and it is the design's —
+§103's ownership ladder reads `child · copy · question · substate · inside · scope`, with
+an attached PTY above every host rung because those keys are not the host's to route.
+
+**The eight targets are not the six rungs, and conflating them is a defect this seam
+should not invite.** A *target* is where a handler is registered; a *rung* is who owns the
+keyboard. `prompt` and `liveBlock` are two positions of the one `scope` owner — §103's
+SCOPE is *prompt · transcript*, one owner, and `stored.at` is the position inside it — so
+the mapping is many-to-one and `global` is not a rung at all. `RUNG_OF` in
+`src/interaction/router/types.ts` is that mapping, and it is total over the union less
+`global`. **`global-intercept` is read before the ladder** and is not a target: three
+reserved routes (`interrupt`, `page-scroll`, the wheel) that no rung may claim.
 
 Array order **is** the priority. Focus is derived on every dispatch from what is on screen, plus exactly one stored bit (`prompt` vs `liveBlock`) owned by C16 and reset on every transcript append. C16 §3 owns the resolution rules.
 
@@ -173,16 +190,16 @@ No component reaches sideways or upward to cause an effect in another. Where an 
 | Command submit | `parser.parse()` → `editor.clear()` → `transport` → `adapters` → `transcript.append()` → `router.resetFocus()` → `scheduler.commit()`, **then at settlement** `history.append(line, exitCode)` | C23 |
 | Completion menu | `engine.menuLayer()` → `overlays.push()`, then `overlays.update(id, …)` per keystroke — never pop-and-repush (C19, C15 §2) | C23 |
 | History search | `history.searchLayer()` → `overlays.push()` → `update` per keystroke → `searchEnd(action)` → `editor.setText()` | C23 |
-| Patch fullscreen | the block's action → `overlays.push()` a view (C25 §3b) | C23 |
 | Resume from `SIGCONT` | C01's `onResume` → `scheduler.invalidate()` — the same call an orchestrated `resume()` makes, because C01 sets no contamination flag (C01 §Signals) | C22 |
 | Terminal too small | size gate → C22's layout-engine-free fallback → `onResize` → resume the normal frame, state intact (C22 §4) | C22 |
 | Shutdown | `session.stopping = true` → `lifecycle.release()` (which runs `beforeRelease`) → diagnostics → exit (C22 §8) | C22 |
-| Pop a pushed view | `overlays.pop()` → `commit`. **No append** — a trace would freeze the block the pop returns to and clear the selection A01 D7 preserves (C13 §4 step 2) | C23 |
 | Stall detected | inject a notice patch → `commit("stream")` (C23 §3b, I25) | C23 |
 | View refresh tick | `fetch()` → `render` → `replace` the part's panel on its host → `commit("stream")` (C23 §3b) | C23 |
-| Refresh teardown | entry settles, view pops, entry evicted, transcript cleared, or `stopping` set → `release(host)` (C23 §3b, I33) | C23 |
+| Refresh teardown | entry settles, entry evicted, transcript cleared, or `stopping` set → `release(host)` (C23 §3b, I33) | C23 |
 | Identity notice | C22's identity loop signals → compose → `transcript.append` with `origin: "refresh"` → `commit` (C22 §7, C23 §3b) | C23 |
 | `cd` / `export` | apply to `session` → `commit` | C23 |
+
+**Two rows are struck with the pushed view** (R-EXA-082, F1254), together with C23 §4's, because SP4 compares the tables by equality: ~~`Patch fullscreen` — the block's action → `overlays.push()` a view (C25 §3b)~~ and ~~`Pop a pushed view` — `overlays.pop()` → `commit`, no append~~. No layer is a view and a patch expands in place; *Refresh teardown* lost its `view pops` clause with them.
 
 This is the rule that keeps L0's two halves unaware of each other and keeps L1 and L2 unaware of the terminal. It has caught four attempted violations during specification — contamination, invalidation, scroll commits and handoff — and it is the first thing to check when a component wants a dependency that feels awkward.
 
@@ -372,7 +389,7 @@ Measured in M-T3 and recorded in A01 Appendix B. **This column is the finding ra
 
 ### Compatibility
 
-Node ≥ 22 (Ink 7's floor). macOS Terminal, iTerm2, Ghostty, Kitty, WezTerm, Windows Terminal, VTE-based Linux terminals, plus tmux and SSH. Anything without alternate-screen support refuses to open (D28).
+Node `>=22.22.1 <23` — the first Node 22 shipping Unicode 17, which `cells()` measures through (A01 §Host assumptions). macOS Terminal, iTerm2, Ghostty, Kitty, WezTerm, Windows Terminal, VTE-based Linux terminals, plus tmux and SSH. Anything without alternate-screen support refuses to open (D28).
 
 ### Failure isolation
 
@@ -429,7 +446,7 @@ Those entries **say which category they are in and name the structure that carri
 1. Six layers; imports strictly downward; lint-enforced.
 2. L0's two halves — terminal and data — do not import each other.
 3. A02 declares seams; the component specs are authoritative for signatures. The architecture doc never restates a component's full interface.
-4. Focus priority is overlay → copy mode → pushed view → prompt → live block → global; first consumer wins.
+4. Focus priority is overlay → native selection → pushed view → prompt → live block → global; first consumer wins.
 5. `createTui` requires four fields; every other field has a working default.
 6. Startup order 6→7→8 is not reorderable: handlers, then acquire, then paint.
 7. One shutdown function, five callers; release precedes printing.

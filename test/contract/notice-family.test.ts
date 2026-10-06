@@ -16,6 +16,16 @@
 // **Read in colour.** `visible()` would strip the SGR that the glyph and tone
 // resolve to, and a muted notice with the wrong tone reads identically once
 // stripped. So the expectation holds the escape bytes.
+//
+// **And in the palette the capture was taken with**, which is `ORACLE_THEME` and
+// not the shipped `dark`. Holding the escape bytes is what makes this row able to
+// see a wrong tone, and it is also what makes it see a *changed* tone: porting
+// C10's themes to the design registry moved four tone values and turned eight of
+// these rows red, every one of them reporting identical text. The claim here is
+// that the family draws what the literal drew at 73882a4f — a claim about two
+// call sites, with the palette as a constant — so the palette has to be the one
+// that was constant. Re-capturing against the new tokens would answer a different
+// question with the same assertions, and the migration would go unchecked.
 import { describe, expect, it } from "vitest";
 
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
@@ -26,11 +36,11 @@ import { createConfirmHost } from "../../src/shell/confirm.js";
 import type { RawPatch } from "../../src/data/transport/index.js";
 import { registry as overlayRegistry } from "../support/overlay.js";
 import { pipelineHarness, settled } from "../support/execution.js";
-import { DARK_THEME, FULL_CAPS } from "../support/render.js";
+import { FULL_CAPS, ORACLE_THEME } from "../support/render.js";
 
 const registry = createBlockRegistry({ defaults: true });
 const frame = (blocks: readonly Block[]): readonly string[] =>
-  renderSequenceToLines(registry, blocks, 80, { theme: DARK_THEME, capabilities: FULL_CAPS }).map((l) =>
+  renderSequenceToLines(registry, blocks, 80, { theme: ORACLE_THEME, capabilities: FULL_CAPS }).map((l) =>
     l.trimEnd(),
   );
 /** The frame the site draws now, against the frame its literal drew at 73882a4f. */
@@ -49,7 +59,7 @@ const runLocal = async (line: string): Promise<readonly string[]> => {
   // **Without the card's header** (C23 I55): a local verb settles as a card
   // since 2026-09-05, and block 0 is the shell's `⬤ verb` — the family's bytes
   // are the handler's, under it.
-  return frame(lastBlocks(h).filter((blk, i) => !(i === 0 && blk.kind === "notice" && blk.glyph === "step")));
+  return frame(lastBlocks(h).filter((blk, i) => !(i === 0 && blk.kind === "notice" && blk.state !== undefined)));
 };
 
 /** Captured at 73882a4f — the literal's frame. */
@@ -64,8 +74,16 @@ const BEFORE: Record<string, readonly string[]> = {
   cleared: [
     "\u001b[38;2;98;98;98mtranscript cleared\u001b[39m",
   ],
+  // **The one capture that was re-taken, and it moved for the other reason.**
+  // Every other row here is held to 73882a4f's bytes with the palette frozen to
+  // match. This line is not a palette: the usage message lists the *session's*
+  // theme keys, which is C10 I27 doing exactly what T2.22 asserts — an enum
+  // derived from the set rather than a module-scope literal. The set went from
+  // three to ten, so the message did. Re-taking it would hide a migration
+  // defect anywhere else and hides nothing here, because the changed part is
+  // the part the design changed.
   "theme-usage": [
-    "\u001b[38;2;212;179;90m▲ usage: /theme dark|light|high-contrast — got ``\u001b[39m",
+    "\u001b[38;2;212;179;90m▲ usage: /theme dark|light|hcDark|hcLight|ink|warm|nord|viol|mono|paper — got ``\u001b[39m",
   ],
   theme: [
     "\u001b[38;2;98;98;98mtheme: dark\u001b[39m",
@@ -81,15 +99,15 @@ const BEFORE: Record<string, readonly string[]> = {
     "\u001b[38;2;98;98;98mexiting\u001b[39m",
   ],
   stalled: [
-    "\u001b[38;2;98;98;98m  ⎿ no output for 2m\u001b[39m",
+    "\u001b[38;2;98;98;98m  ⎿  no output for 2m\u001b[39m",
   ],
   // **Both halves of this row were wrong and this table recorded them** (C23 §3b,
   // 2026-09-05). The figure was measured from the notice, not from the last patch —
   // `1m` under a notice saying `2m`, one silence with two numbers — and the hook was
   // dropped on replacement, so the row changed column. A snapshot records; it does
-  // not check.
+  // not check. The pad after `⎿` is the slot's two-cell reservation (C09 I5).
   resumed: [
-    "\u001b[38;2;98;98;98m  ⎿ resumed after 2m\u001b[39m",
+    "\u001b[38;2;98;98;98m  ⎿  resumed after 2m\u001b[39m",
   ],
 };
 
@@ -107,6 +125,9 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
     const confirm = createConfirmHost({
       overlays,
       anchor: () => ({ row: 8, rows: 1 }),
+      draft: () => "",
+      holdDraft: () => undefined,
+      restoreDraft: () => undefined,
       overlayRegion: () => ({ width: 80, height: 24 }),
       invalidate: () => undefined,
     });
@@ -205,7 +226,9 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
       state: "error",
       message: 'output truncated: append: id "same" is already in the document (C04 I14) — ViewPatch addresses blocks by id, so a duplicate has no correct target',
     });
-    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error"), "no error notice").toBe(false);
+    // **Other than the head** (C04 I141): a failed head is `error`-toned by
+    // design (R-BLK-214). The row guards the literal `✗` line, which has no `state`.
+    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error" && blk.state === undefined), "no error notice").toBe(false);
   });
 
   it("N10 `execution.ts` — `shell-failed`", async () => {
@@ -231,7 +254,7 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
     // (C23 §3c). The pipe arm writes both streams into one emulator, so the
     // sentence is a terminal line — the assertion is the same fact one shape on.
     expect(JSON.stringify(blocks).includes("cat: nothing"), "stderr under it").toBe(true);
-    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error"), "no error notice").toBe(false);
+    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error" && blk.state === undefined), "no error notice").toBe(false);
   });
 
   it("N11 `execution.ts` — `stream-error`", async () => {
@@ -249,6 +272,6 @@ describe("SS56 — the fourteen notices draw the same bytes through the family",
     const blocks = lastBlocks(h);
     expect(blocks[0]?.kind === "notice" && blocks[0].text).toBe("tail · failed");
     expect(statusBox(blocks)).toEqual({ state: "error", message: "stream failed: Error: socket closed" });
-    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error"), "no error notice").toBe(false);
+    expect(blocks.some((blk) => blk.kind === "notice" && blk.tone === "error" && blk.state === undefined), "no error notice").toBe(false);
   });
 });

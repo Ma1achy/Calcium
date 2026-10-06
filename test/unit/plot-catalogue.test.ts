@@ -673,6 +673,97 @@ describe("catalogue-png — the parser that failed silently", () => {
     expect(svg, "one bit and no styling are different images").not.toBe(plain);
   });
 
+  // --- design check R1–R4 and the compound sequence ----------------------
+  //
+  // Each row names the change that turns it red, because the class this file
+  // keeps meeting is an instrument that draws real bytes with a wrong model and
+  // looks right doing it.
+
+  type Run = { text: string; colour: string; background: string | null; bold: boolean; dim: boolean; underline: boolean };
+  const runsOf = parseLine as (l: string) => readonly Run[];
+
+  it("PC15 (latent): a compound SGR is read in full — reading params[0] alone drops the colour", () => {
+    // `sgr()` writes bold first in numeric order, so `1;38;2;R;G;B` is the
+    // framework's own spelling of a bold colour, and the first-parameter
+    // parser drew it bold in the default ink.
+    const [x] = runsOf("\x1b[1;38;2;230;159;0mX");
+    expect(x).toMatchObject({ bold: true, colour: "rgb(230,159,0)" });
+    // A compound background after a foreground consumes its own arguments.
+    const [y] = runsOf("\x1b[38;5;196;48;2;10;20;30mY");
+    expect(y?.background).toBe("rgb(10,20,30)");
+    // And the watcher reads every parameter too: `1;5` hides a `5`.
+    expect(unparsedSgr("\x1b[1;5m\x1b[38;2;5;6;7m")).toEqual([5]);
+  });
+
+  it("PC16 (R4): dim fades toward the ground by the theme's own ratio, and 22 undoes it", () => {
+    // Reverting to the fixed `#666666` turns every assertion here red: dim over
+    // the default ink is the theme's `dim` slot, and dim over a colour keeps its
+    // hue — a dim accent and a dim error were the same grey.
+    const [plain] = runsOf("\x1b[2mA");
+    expect(plain?.colour).toBe("#8a8a8a");
+    const [warm] = runsOf("\x1b[2;38;2;200;100;0mB");
+    expect(warm?.colour).not.toBe("#8a8a8a");
+    const [r, g, b] = /rgb\((\d+),(\d+),(\d+)\)/u.exec(warm?.colour ?? "")!.slice(1).map(Number);
+    expect(r! > g! && g! > b!, "the hue survives the fade").toBe(true);
+    expect(r!, "and it is fainter than the colour").toBeLessThan(200);
+    // A flag, so a later `39` stays faint and `22` clears it.
+    const [, later, cleared] = runsOf("\x1b[2mA\x1b[39mB\x1b[22mC");
+    expect(later?.colour).toBe("#8a8a8a");
+    expect(cleared?.colour).toBe("#d4d4d4");
+  });
+
+  it("PC17 (R2): an underlined run is a rule under its cells, spaces included, and nothing else is", () => {
+    // Removing `4` from the arms (or the underline pass) leaves `under` empty;
+    // this hid the diff's word-level marks, which are underline alone.
+    const svg = svgOf("ab\x1b[4mc d\x1b[24mef");
+    const under = [...svg.matchAll(/<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="1\.000"/gu)];
+    expect(under, "one rule for the run").toHaveLength(1);
+    expect(Number(under[0]![2])).toBeCloseTo(3 * 8.41, 2); // cells-ok — three cells, the space among them
+    expect(Number(under[0]![1])).toBeCloseTo(ORIGIN + 2 * 8.41, 1); // cells-ok — it starts at `c`
+    expect(svgOf("abc d"), "and an unstyled line draws none").not.toMatch(/height="1\.000"/u);
+  });
+
+  it("PC18 (R3): the page is the frame's ground — a light frame is drawn on its own page in its own ink", () => {
+    // Pinning the page to the dark theme (`fill="${BG}"`) or the unstyled ink
+    // to the dark default turns this red. A light frame paints its ground into
+    // every cell; a dark one paints none and inherits.
+    const light = Array.from({ length: 3 }, () => "\x1b[48;2;250;250;250mab cd\x1b[0m").join("\n");
+    const svg = svgOf(light);
+    expect(/<rect width="100%" height="100%" fill="([^"]+)"/u.exec(svg)?.[1]).toBe("rgb(250,250,250)");
+    expect(svg, "the unstyled ink is the light theme's").toContain('fill="#383a42">a<');
+    const dark = svgOf("ab cd");
+    expect(/<rect width="100%" height="100%" fill="([^"]+)"/u.exec(dark)?.[1]).toBe("#1a1a1a");
+    // And the caller's word wins over the inference.
+    const forced = (ansiToSvg as (a: string, o: { mode: string }) => string)("ab", { mode: "light" });
+    expect(forced).toContain('fill="#fafafa"');
+  });
+
+  it("PC19 (R3): a background run is one crisp rect, and neighbours share an edge exactly", () => {
+    // Per-span rects at `toFixed(1)` of a fractional pitch, anti-aliased, let
+    // the page through at every span boundary. Removing the run merge gives
+    // three rects for `A`; removing `crispEdges` fails the attribute check.
+    const svg = svgOf("\x1b[48;2;1;1;1mA\x1b[1mB\x1b[22mC\x1b[48;2;2;2;2mD");
+    const rects = [...svg.matchAll(/<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="16\.000" fill="([^"]+)"( shape-rendering="crispEdges")?/gu)];
+    expect(rects.map((m) => m[3])).toEqual(["rgb(1,1,1)", "rgb(2,2,2)"]);
+    expect(rects.every((m) => m[4] !== undefined), "crisp").toBe(true);
+    const [first, second] = rects;
+    expect(Number(first![1]) + Number(first![2])).toBeCloseTo(Number(second![1]), 3);
+  });
+
+  it("PC20 (R1): `⎿`, which no font here covers, is drawn from its definition; `└` stays the font's", () => {
+    // `fc-list ":charset=23bf"` is empty in the container, so as text it drew
+    // tofu on every call's first body row. Deleting its GEOMETRY entry puts it
+    // back in a `<text>` and fails the first assertion.
+    const svg = svgOf("\x1b[38;2;1;2;3m\u23bf\u2514");
+    expect(svg).not.toContain(">\u23bf</text>");
+    const strokes = [...svg.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" fill="rgb\(1,2,3\)"/gu)];
+    expect(strokes, "a vertical and the turn").toHaveLength(2);
+    // The vertical sits on the cell's centre line, where a font's `│` sits.
+    const [v] = strokes;
+    expect(Number(v![1]) + Number(v![3]) / 2).toBeCloseTo(ORIGIN + 8.41 / 2, 1);
+    expect(svg, "a covered corner is still text").toContain(">\u2514</text>");
+  });
+
   it("PC11 (F227): nothing in the catalogue emits an SGR code the parser drops", () => {
     // **This was the watcher on the one arm deliberately not built, and it paid
     // out.** `7m` had *no producer — `Style.inverse` is written nowhere in

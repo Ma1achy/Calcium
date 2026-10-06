@@ -93,8 +93,10 @@ async function session(kind: string, definition: BlockDefinition) {
 }
 
 /** A frame's transcript rows, chrome included, blanks dropped. */
+// The echo sits one column in, past the rail's reserved column 0 (C14 I57), so
+// the row is found by its content rather than by equality with a column-0 string.
 const shown = (text: readonly string[]): readonly string[] =>
-  text.slice(text.indexOf("❯ /work"));
+  text.slice(text.findIndex((r) => r.trimStart().startsWith("❯ /work")));
 
 describe("C22 I69 — the next frame honours the floor", () => {
   it("T4.49 (C22 I69, C04 I67, C04 I68): one row, then three, and the block after it survives both", async () => {

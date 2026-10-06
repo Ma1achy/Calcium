@@ -74,7 +74,16 @@ describe("C04 §3am — spans, the contract", () => {
 });
 
 describe("C04 §3am.1 — tone and value, the rendering half", () => {
-  const toned = block({ kind: "notice", id: "n", tone: "ok", text: "let x = 1", spans: [{ from: 4, to: 5, tone: "identifier" }] });
+  // **`meta` and not `identifier`, and the swap is what keeps the 1-bit arm a
+  // measurement** (C10 I50, §074). The rows below distinguish *a span's tone
+  // replaces the block's* from *it composes with it*, and at one bit a tone is
+  // its typographic class and nothing else — so the two tones have to sit in
+  // different classes or every reading agrees. `identifier` was in a different
+  // class from `ok` until I50 put it on §074's ladder where the design has it,
+  // beside `ok`; `meta` is `normal`, so `ok` block · `meta` span is still bold ·
+  // plain · bold and the row still has something to be wrong about. A fixture
+  // must be shown to respond to the thing under test.
+  const toned = block({ kind: "notice", id: "n", tone: "ok", text: "let x = 1", spans: [{ from: 4, to: 5, tone: "meta" }] });
 
   it("C04 T2.35 (C04 I89): a span's tone paints the run in the tone's SGR and the rest in the block's; at 1-bit the run is the tone's collapse and nothing else", () => {
     const theme = store().current;
@@ -82,13 +91,13 @@ describe("C04 §3am.1 — tone and value, the rendering half", () => {
     // At 24-bit a tone's style is its colour and nothing else, so the whole
     // style is the `38` the row carries.
     const ok = sgr(resolveTone("ok", theme, FULL_CAPS));
-    const identifier = sgr(resolveTone("identifier", theme, FULL_CAPS));
+    const meta = sgr(resolveTone("meta", theme, FULL_CAPS));
     expect(ok).toMatch(/^\x1b\[38;2;/u);
-    expect(identifier).not.toBe(ok);
+    expect(meta).not.toBe(ok);
     // Ink re-encodes a colour change as the next `38` with no reset between.
-    expect(row).toBe(`${ok}let ${identifier}x${ok} = 1\x1b[39m`);
+    expect(row).toBe(`${ok}let ${meta}x${ok} = 1\x1b[39m`);
 
-    // 1-bit: `ok` is the emphasised class and `identifier` the normal one, so
+    // 1-bit: `ok` is the emphasised class and `meta` the normal one, so
     // the run is the one *without* SGR 1 — the collapse, uncompensated.
     const mono = measurable({ capabilities: MONO_CAPS });
     expect(mono.renderToLines(toned, 20)).toEqual(["\x1b[1mlet \x1b[22mx\x1b[1m = 1\x1b[22m"]);
@@ -130,7 +139,7 @@ describe("C04 §3am.1 — tone and value, the rendering half", () => {
     expect(measurable({ capabilities: at(8) }).renderToLines(valued(), 40), "and the fixture responds at 8-bit").not.toEqual(measurable({ capabilities: at(8) }).renderToLines(plain, 40));
   });
 
-  it("C10 T2.26 (C10 I33, C10 I31, C04 I89, C04 I90): the depths — no SGR 1 on the identifier run at 1-bit, no 48 at 4-bit, `continuousColour`'s index at 8, `sample`'s hex at 24", () => {
+  it("C10 T2.26 (C10 I33, C10 I31, C04 I89, C04 I90): the depths — no SGR 1 on the `meta` run at 1-bit, no 48 at 4-bit, `continuousColour`'s index at 8, `sample`'s hex at 24", () => {
     const map = COLORMAPS["magma"];
     if (map === undefined) throw new Error("magma is a colormap");
     const [mono] = measurable({ capabilities: MONO_CAPS }).renderToLines(toned, 20);
@@ -176,7 +185,8 @@ describe("C04 §3am.1 — `elide`", () => {
   const ARG: TextSpan = { from: TEXT.indexOf("(") + 1, to: TEXT.indexOf(")"), elide: true };
 
   it("T2.114 (C04 I105, I107): the eighth and ninth members are admitted, inert on a wrapped token, and the boundary the fitter shortens first on a fitted one", () => {
-    expect(TEXT_SPAN_KEYS.size).toBe(9);
+    // Ten since C04 I151 admitted `ground` (T2.156 is its row).
+    expect(TEXT_SPAN_KEYS.size).toBe(10);
     expect(TEXT_SPAN_KEYS.has("elide")).toBe(true);
     expect(TEXT_SPAN_KEYS.has("ramp")).toBe(true);
     const marked = block({ kind: "notice", id: "n", tone: "info", glyph: "info", text: TEXT, spans: [ARG] });
@@ -193,30 +203,54 @@ describe("C04 §3am.1 — `elide`", () => {
     }
 
     // **On a fitted token the marked run gives way first** (C09 I46): the run
-    // ends in the marker and the runs outside it are byte-identical.
-    const head = block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: TEXT, spans: [ARG] });
+    // carries the marker inside it and the runs outside it are byte-identical.
+    const head = block({ kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: TEXT, spans: [ARG] });
     const wide = rows(head, 80)[0] ?? "";
     const narrow = rows(head, 40)[0] ?? "";
-    expect(wide).toBe(`⏺︎ ${TEXT}`);
+    expect(wide).toBe(`● ${TEXT}`);
     expect(rows(head, 40)).toHaveLength(1);
-    expect(narrow.startsWith("⏺︎ verb(")).toBe(true);
+    expect(narrow.startsWith("● verb(")).toBe(true);
     expect(narrow.endsWith(") · 4s · 12 rows")).toBe(true);
-    expect(narrow).toContain("…) · 4s · 12 rows");
+    // **The marker is INSIDE the argument, not at its end** (C09 I103, §099).
+    // This read `"…) · 4s · 12 rows"`, which is the end-cut's signature: the
+    // claim the row makes — *the marked run gives way and the runs outside it
+    // are byte-identical* — is unchanged, and only the shape of the cut moved.
+    expect(narrow).toContain("…");
+    expect(narrow.indexOf("…"), "the marker is inside the argument").toBeLessThan(narrow.indexOf(") · 4s"));
     expect(narrow.length, "shorter, and only in the marked run").toBeLessThan(wide.length);
   });
 
-  it("T2.117 (C04 I106, I109): RAMP_KEYS has six members; a seventh key and animate: sweep are refused by name; a ramped document round-trips through JSON", () => {
-    expect(RAMP_KEYS.size).toBe(6);
-    expect([...RAMP_KEYS].sort()).toEqual(["animate", "bands", "colormap", "fill", "from", "to"]);
-    expect(RAMP_ANIMATIONS).toEqual(["none", "shimmer", "wave", "breathe", "pulse", "heartbeat"]);
+  it("T2.117 (C04 I106, I109, I148, R-MOT-012): RAMP_KEYS has eight members, the union is the registry's twenty-three and `none`, a ninth key is refused by name, and a ramped document round-trips through JSON", () => {
+    expect(RAMP_KEYS.size, "`overshoot` is the eighth (C04 I148)").toBe(8);
+    expect([...RAMP_KEYS].sort()).toEqual(["animate", "bands", "colormap", "fill", "from", "overshoot", "since", "to"]);
+
+    // **The union written out, not counted.** A count is satisfied by swapping
+    // one member for another, and this list is the design's — twenty-three
+    // effects and `none`, in the registry's gallery order so the two read down
+    // together. T2.117a is what holds it to the registry rather than to this
+    // literal; both are here because the literal is what a reader checks and the
+    // property is what catches a rename.
+    expect(RAMP_ANIMATIONS).toEqual([
+      "none",
+      "shimmer", "wave", "breathe", "pulse", "heartbeat",
+      "sweepbar", "glint", "tide", "flicker", "twinkle", "pendulum",
+      "converge", "marquee", "chase", "neon", "drift", "bookend", "scatter",
+      "sweep", "pop", "wipe", "typewriter", "ripple",
+    ]);
 
     const ramped = (ramp: unknown): unknown => ({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp }] });
-    const seventh = validateBlock(ramped({ fill: "palette", period: 200 }));
-    expect(seventh.ok).toBe(false);
-    if (!seventh.ok) expect(seventh.error.join(" ")).toMatch(/unknown member "period" — a ramp carries fill, from, to, colormap, bands, animate and nothing else/u);
+    const ninth = validateBlock(ramped({ fill: "palette", period: 200 }));
+    expect(ninth.ok).toBe(false);
+    if (!ninth.ok) expect(ninth.error.join(" ")).toMatch(/unknown member "period" — a ramp carries fill, from, to, colormap, bands, animate, since, overshoot and nothing else/u);
+
+    // `sweep` used to be the refused name here, on C04 I109's *an event the render
+    // cannot time*. It ships; a name the design does not carry is what the
+    // refusal has to be shown against now.
     const sweep = validateBlock(ramped({ fill: "gradient", from: "default", to: "accent", animate: "sweep" }));
-    expect(sweep.ok).toBe(false);
-    if (!sweep.ok) expect(sweep.error.join(" ")).toMatch(/"animate" must be one of none, shimmer, wave, breathe, pulse, heartbeat.*C04 I109/u);
+    expect(sweep.ok, "a one-shot the registry declares is legal").toBe(true);
+    const invented = validateBlock(ramped({ fill: "gradient", from: "default", to: "accent", animate: "cascade" }));
+    expect(invented.ok).toBe(false);
+    if (!invented.ok) expect(invented.error.join(" ")).toMatch(/"animate" must be one of none, shimmer, wave.*C04 I109/u);
 
     // §5a — a ramp on every carrier and on the bar survives the round trip.
     const R: Ramp = { fill: "gradient", from: "default", to: "accent", animate: "wave" };
@@ -310,18 +344,28 @@ describe("C09 §5 — ramps, the extent and the split", () => {
     const bar = (current: number): string =>
       renderSequenceToLines(registry, [block({ kind: "progress", id: "p", label: "build", current, total: 10, ramp: { fill: "gradient", colormap: "viridis" } })], 40, { theme, capabilities: FULL_CAPS })[0] ?? "";
     const spansOf = (line: string): string[] => line.split(/(?=\x1b\[[0-9;]*m)/u).filter((s) => s.includes("█"));
+    /** The `off` glyph's cells — the subject, where `muted` was only its sign. */
+    const glyphOf = (line: string): number => [...line].filter((c) => c === "░").length; // cells-ok — a count
     const at30 = spansOf(bar(3));
     const at100 = spansOf(bar(9));
     expect(at30.length).toBeGreaterThan(2);
     expect(at100.length).toBeGreaterThan(at30.length);
     for (let i = 0; i < at30.length; i += 1) expect(fgOf(at30[i] ?? ""), `cell ${String(i)}`).toBe(fgOf(at100[i] ?? ""));
+    // **The `off` cells are asserted by their glyph, and the first form used
+    // the tone as a proxy for them.** `muted`'s presence stood for *there is an
+    // off cell*, which held only while the percent was `meta`; §034 reads the
+    // percent in `c-muted` on all five of its bars, the tone moved (C09 I96),
+    // and the row went red on a bar drawing no `off` cell at all. A proxy for
+    // the subject is fine until something else acquires the same property.
     const muted = fgOf(sgr(resolveTone("muted", theme, FULL_CAPS)));
-    expect(bar(3)).toContain(muted);
-    expect(bar(10), "a full bar has no off cell").not.toContain(muted);
+    const off = glyphOf(bar(3));
+    expect(bar(3), "the off cells are muted").toContain(muted);
+    expect(off, "a partial bar draws an off cell").toBeGreaterThan(0); // cells-ok — a count
+    expect(glyphOf(bar(10)), "a full bar has no off cell").toBe(0); // cells-ok — a count
     expect(bar(10).length, "a full bar still draws").toBeGreaterThan(20);
   });
 
-  it("T2.120 (C09 I54): tickIntervalOf answers spinnerIntervalMs() for a shimmer span, null for none or no animate, finds it inside a panel; ANIMATES keeps two true entries", () => {
+  it("T2.120 (C09 I54): tickIntervalOf answers spinnerIntervalMs() for a shimmer span, null for none or no animate, finds it inside a panel; ANIMATES keeps three true entries", () => {
     const moving = block({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp: { fill: "palette", animate: "shimmer" } }] });
     const still = block({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp: { fill: "palette", animate: "none" } }] });
     const plain = block({ kind: "notice", id: "n", tone: "info", text: "abcdef", spans: [{ from: 0, to: 3, ramp: { fill: "palette" } }] });
@@ -340,7 +384,10 @@ describe("C09 §5 — ramps, the extent and the split", () => {
     const nested = block({ kind: "group", id: "g", direction: "column", children: [block({ kind: "panel", id: "pn", title: "t", children: [moving] })] } as never);
     expect(animationIntervalOf([nested])).toBe(spinnerIntervalMs());
     expect(animationIntervalOf([block({ kind: "panel", id: "pn", title: "t", children: [still] } as never)])).toBeNull();
-    expect(Object.values(ANIMATES).filter((v) => v).length, "by kind, still two").toBe(2);
+    // **Three, and the third is the tape.** A running member draws the spinner
+    // in its duration slot (§030), which is the fact `steps` already animates
+    // for; the window itself never moves on a tick (C04 I124).
+    expect(Object.values(ANIMATES).filter((v) => v).length, "by kind, now three").toBe(3);
   });
 });
 
@@ -360,6 +407,50 @@ describe("C10 §4h — the categorical cycle, one copy", () => {
     for (const f of files) {
       const source = readFileSync(new URL(f, dir), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/.*$/gmu, "");
       expect(source, f).not.toMatch(/^import (?!type )[^;]*from "[./]*\/(?:plot|blocks)\//mu);
+    }
+  });
+});
+
+describe("C04 I151 — a ground on a span (F1522)", () => {
+  const errorsOf = (value: unknown): string => {
+    const outcome = validateBlock(value as Block);
+    return outcome.ok ? "" : outcome.error.join(" ");
+  };
+  const raw = (span: Record<string, unknown>, extra: Record<string, unknown> = {}): unknown => ({
+    kind: "raw",
+    id: "h",
+    text: "#1 pasted · 6L",
+    spans: [{ from: 0, to: 9, ...span }],
+    ...extra,
+  });
+
+  it("T2.156 (C04 I151): ground pick is accepted with bold and refused beside tone, value and ramp, on a hunk line, and as any other value; measure ignores it", () => {
+    expect(TEXT_SPAN_KEYS.has("ground"), "the tenth member").toBe(true);
+    expect(errorsOf(raw({ ground: "pick", bold: true })), "accepted with bold").toBe("");
+
+    expect(errorsOf(raw({ ground: "bgDeep" }))).toMatch(/"ground" must be "pick" \(C04 I151\)/u);
+    expect(errorsOf(raw({ ground: "pick", tone: "accent" }))).toMatch(/"ground" beside "tone"/u);
+    expect(errorsOf(raw({ ground: "pick", value: 0.5 }, { colormap: "viridis" }))).toMatch(/"ground" beside "value"/u);
+    // **The control for the `value` arm**: the same span without the ground is
+    // accepted, so the refusal above is the ground's and not the map's.
+    expect(errorsOf(raw({ value: 0.5 }, { colormap: "viridis" })), "a valued span on a mapped block").toBe("");
+    expect(errorsOf(raw({ ground: "pick", ramp: { fill: "gradient", from: "accent", to: "ok" } }))).toMatch(/"ground" beside "ramp"/u);
+
+    const hunk = {
+      kind: "patch",
+      id: "p",
+      path: "a.ts",
+      language: "ts",
+      hunks: [{ oldStart: 1, newStart: 1, lines: [{ op: "context", text: "abc", spans: [{ from: 0, to: 1, ground: "pick" }] }] }],
+    };
+    expect(errorsOf(hunk)).toMatch(/"ground" is refused on this member/u);
+
+    // **Appearance only** (C04 I83): the same number with the ground and without it.
+    const kit = measurable();
+    const grounded = block(raw({ ground: "pick", bold: true }) as Block);
+    const plain = block(raw({ bold: true }) as Block);
+    for (const width of [20, 80, 6]) {
+      expect(kit.measure(grounded, width), `measure at ${String(width)}`).toBe(kit.measure(plain, width));
     }
   });
 });

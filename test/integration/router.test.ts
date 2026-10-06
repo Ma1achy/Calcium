@@ -37,24 +37,35 @@ function world() {
 
   const deps: RouterDeps = {
     overlayRegion: () => ({ width: 80, height: 24 }),
+    keyReleasesReported: () => false,
+    // **The `child` rung's second source** (C16 I49). Required rather than
+    // optional, so a harness that means to attach one has to say so.
+    childAttached: () => false,
+    // C16 I73 — the stack's own count; no surface host here.
+    // C16 I74 — no layer here has anything to scroll.
+    scrollLayer: () => false,
+    // C16 I75 — the escape's detach; nothing here attaches a child.
+    detachChild: () => undefined,
+    ownerGeneration: () => overlays.generation,
+    overlayWouldResolve: () => null,
     overlayAnswerCallback: () => null,
     overlayTop: () => {
       const top = overlays.top;
       return top === null
         ? null
-        : { kind: top.kind, id: top.id, dismissable: top.dismissable };
+        : { kind: top.kind, id: top.id, blocking: top.blocking, dismissal: top.dismissal };
     },
     placed: () =>
       overlays.layout({ width: 80, height: 10 }).filter(takesInput).map((p) => ({
-        layer: { id: p.layer.id, kind: p.layer.kind, dismissable: p.layer.dismissable },
+        layer: { id: p.layer.id, kind: p.layer.kind, blocking: p.layer.blocking, dismissal: p.layer.dismissal },
         top: p.top,
         left: p.left,
         height: p.height,
         width: p.width,
       })),
     popLayer: () => void overlays.pop(),
-    copyMode: () => false,
-    exitCopyMode: () => undefined,
+    nativeSelection: () => false,
+    semanticSelection: () => false,
     liveEntry: () => {
       const id = store.liveId;
       return id === null ? null : { id };
@@ -74,6 +85,7 @@ function world() {
     promptHasText: () => false,
     clearPrompt: () => undefined,
     raiseExitConfirm: () => undefined,
+    refused: () => undefined,
   };
 
   const router = createRouter({ focus, keymap: createKeymap([]), now: () => 1_000, deps });
@@ -92,28 +104,38 @@ describe("C16 integration", () => {
       // menu as a centred layer with no width, which is neither.
       placement: { kind: "anchored" as const, row: 0, prefer: "below" as const },
       content: rows(3, "m"),
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape",
     });
 
     // No explicit focus call anywhere between those two lines.
     expect(router.target).toBe("overlay");
   });
 
-  it("T4.2 (with C15): a confirm over a view takes keys; Ctrl-C is a no-op", () => {
+  it("T4.2 (with C15): a confirm over a panel takes keys; Ctrl-C is a no-op", () => {
     const { overlays, router } = world();
+    // **It was a `fill`-placed view and is a non-blocking overlay** (R-EXA-082,
+    // F1254). The row needs a layer beneath the confirm that takes keys and
+    // **survives the confirm's arrival**, and a panel is the obvious
+    // replacement and the wrong one: C15 I28 closes every open panel when a
+    // blocking layer arrives, so the state this row is about is one the stack
+    // will not hold with a panel in it.
     overlays.push({
       id: "dash",
-      kind: "view",
-      placement: { kind: "fill" },
+      kind: "overlay",
+      placement: { kind: "centred" },
       content: rows(4, "d"),
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape",
+      width: 40,
     });
     overlays.push({
       id: "confirm",
       kind: "overlay",
       placement: { kind: "centred" },
       content: rows(2, "c"),
-      dismissable: false,
+      blocking: true,
+      dismissal: "answer",
       // A centred layer declares its width (C15 I20), and a confirm is the
       // shape that field exists for.
       width: 20,
@@ -121,13 +143,18 @@ describe("C16 integration", () => {
 
     expect(router.target).toBe("overlay");
     expect(router.dispatch(ctrlC), "consumed").toBe(true);
-    expect(overlays.stack.map((l) => l.id), "the dashboard is still beneath it").toEqual([
+    expect(overlays.stack.map((l) => l.id), "the panel is still beneath it").toEqual([
       "dash",
       "confirm",
     ]);
 
     overlays.dismiss("confirm");
-    expect(router.target, "and the view is reachable once it is answered").toBe("pushedView");
+    // **The id, not the target.** Both layers resolve to `overlay`, so the
+    // target alone cannot tell *the confirm was answered and the layer beneath
+    // is back* from *nothing changed* — which is what the `view` kind used to
+    // do for free and is now the row's to say.
+    expect(router.target, "still a keyed layer").toBe("overlay");
+    expect(overlays.top?.id, "and it is the one beneath, reachable again").toBe("dash");
   });
 
   it("T4.5 (with C13): focus enters the live block and an append returns it", () => {
@@ -194,7 +221,8 @@ describe("C16 integration", () => {
       // menu as a centred layer with no width, which is neither.
       placement: { kind: "anchored" as const, row: 0, prefer: "below" as const },
       content: rows(2, "m"),
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape",
     });
     router.dispatch(key("a"));
     router.dispatch(ctrlC);

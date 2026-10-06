@@ -52,6 +52,63 @@ export type Surfaces = Readonly<{
   diffAdd: string;
   diffRemove: string;
   /**
+   * The ground a focused region takes (R-STA-002, R-THM-004).
+   *
+   * **A text surface, and named here because it is one.** A focused region washes
+   * its whole extent — head and body — so every meaning ink lands on it, which
+   * puts it in `textSurfaces` and under every floor. It was absent from both for
+   * as long as it was read through an index, and that is the shape the floor-scope
+   * rule is about: seven inks short across two themes and sixteen of nineteen in
+   * each high-contrast theme, with nothing to report it.
+   *
+   * **Optional, and absent means *this theme paints no focus ground***, not that
+   * none was considered — focus still carries, on its mark, which is the carrier
+   * that survives to one bit anyway. All ten shipped themes declare one.
+   */
+  focusGround?: string;
+  /**
+   * A meter's fill — the ground a painted bar's `on` cells take (§034, C09 I96).
+   *
+   * **Named here because a renderer reads it now.** Every one of the ten themes
+   * has carried the slot since the registry was ported and this type declared
+   * eleven of the twenty-four the projection assigns, so the value shipped,
+   * quantised and contrast-checked with **no reader and no declaration** — its
+   * only occurrences in `src/` were the generated keys of the quantised table.
+   * §034's *the same, painted rather than drawn in glyphs* is the reader.
+   *
+   * **Optional, and absent means this theme's bars are drawn rather than
+   * painted** — the same shape as `focusGround`, and for the same reason: the
+   * glyphs are the lower rung, so a theme that omits it loses nothing a reader
+   * needs. C09 I96's predicate is the ground resolving, which covers a missing
+   * slot and a 1-bit terminal with one question.
+   */
+  meterFill?: string;
+  /**
+   * **The chosen affordance's ground and its matched ink — one pair, checked
+   * together** (§073, C10 I51 · C09 I102).
+   *
+   * A focused button takes these rather than `focusGround`: the design gives the
+   * chooser's pair to a *choice about to be taken*, which is why `pickInk`
+   * exists as a ground-specific ink at all. It has no slot it could borrow —
+   * the registry authors it `#000000` on a light ground in some themes and
+   * `#ffffff` on a dark one in others, a value chosen **for** the ground and
+   * meaningless away from it.
+   *
+   * **Declared here because both have shipped undeclared since the port.** The
+   * registry assigns `bg-pick` and `c-pickInk` in all ten themes and
+   * `from-registry.mjs` collects every `.bg-` slot and every `.c-*Ink`
+   * generically, so the values reached `tokens.generated.ts` with this type
+   * naming neither and no renderer able to read them. `focusGround` and
+   * `meterFill` were each found the same way; I51 states the shape rather than
+   * fixing a third in silence.
+   *
+   * **Optional, and absent means this theme paints no chosen ground** — the
+   * button then takes its bracket rung, which is the carrier that survives one
+   * bit anyway. All ten shipped themes declare both.
+   */
+  pick?: string;
+  pickInk?: string;
+  /**
    * The selection wash (C17 §5b, roadmap entry 23).
    *
    * **A surface rather than a palette entry, and the entry said otherwise.**
@@ -102,6 +159,31 @@ export type Surfaces = Readonly<{
   errorInk: string;
 }>;
 
+/**
+ * One agent hue, in the three tiers the design draws it at (C10 I53, §070).
+ *
+ * **Three values and not one, because they are three jobs.** `ink` is the hue as
+ * text — an agent's name in the strip; `ground` is the hue as a band; and `on` is
+ * whichever of black or white reads **on** that band, which is a property of the
+ * band and not of the hue. A single colour per hue cannot express the third, and
+ * a band whose ink is guessed is the failure R-THM-005 exists to prevent.
+ *
+ * **Per theme, all three.** Measured over the registry's 300 tokens: `ground`
+ * takes nine distinct values across the ten themes, `on` is black in some and
+ * white in others, and even `ink` moves — `#3b82f6` in eight themes against
+ * `#4e8ef6` in `light` and `#4e8df5` in `paper`, where a mid blue needs lifting
+ * off a light ground. The generator that collected these called them
+ * theme-independent and keyed them by hue name alone.
+ */
+export type Hue = Readonly<{
+  /** The hue as text. */
+  ink: string;
+  /** The hue as a band. */
+  ground: string;
+  /** The ink that reads on that band (`R-THM-005`). */
+  on: string;
+}>;
+
 export type ThemeTokens = Readonly<{
   name: string;
   /**
@@ -136,8 +218,120 @@ export type ThemeTokens = Readonly<{
    */
   background: "terminal" | "surface";
   palettes: Readonly<Record<string, PaletteSpec>>;
+  /**
+   * The ten agent hues, by name (C10 I53, §070, §093).
+   *
+   * **Not a palette**, which is an indexed cycle a reader walks; this is a
+   * lookup — `/colour` resolves the name a reader typed. §093 orders them
+   * *blue orange cyan pink lime violet yellow green red purple*, by perceptual
+   * separation rather than spectrally, because the first assignment was *five
+   * identities a deuteranope cannot separate*.
+   *
+   * **Optional so the three hand-written lenders need not carry it**, and every
+   * generated theme does; T2.53 compares all ten against the registry by
+   * equality in both directions, which is what an optional member needs in
+   * place of the type system.
+   */
+  hues?: Readonly<Record<string, Hue>>;
   surfaces: Surfaces;
   fourBit: FourBitMap;
+
+  /**
+   * **Ink composed with the ground it lands on** — `surface.<name>` to
+   * `<palette>.<slot>` to the hex that pairing takes, overriding the flat slot
+   * (R-THM-001, *"including composed ink-on-surface values"*).
+   *
+   * **A flat tone cannot clear every ground, and measuring it against one it is
+   * never drawn on is measuring a pair the design does not compose.** `nord` is
+   * the case: its `info` is 4.64 : 1 against `bg` and 3.74 : 1 against `bgElev`,
+   * and the registry supplies `#95b5d5` for exactly that pairing, which measures
+   * 4.72. Four of its tones work this way, and 71 such pairings ship across nine
+   * themes. Without this the choice is a theme below its floor or a tone dulled
+   * on the ground where it was already fine.
+   *
+   * Optional, and absent means *no pairing differs* rather than *none was
+   * considered* — a theme whose flat slots clear every ground needs no entry.
+   */
+  composed?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+
+  /**
+   * **The ratio this theme promises, when it promises more than the common
+   * floor** (R-THM-002).
+   *
+   * `FLOORS` names the minimum *every* theme must clear, so before this field a
+   * theme that promised more had no way to declare it and no way to be held to
+   * it — which left `high-contrast` as a name and one contract row as the only
+   * thing standing between that name and nothing. The promise is the theme's, so
+   * this is where it goes: `hcDark` and `hcLight` declare `7`, every meaning ink
+   * of theirs is checked against every surface they paint text on at that
+   * number, and the check runs on the same path as every other floor.
+   *
+   * It raises floors and never lowers them. A value below a slot's own floor
+   * would be a theme promising less than the framework's minimum, which is not a
+   * promise, and `validateHighContrast` takes the greater of the two.
+   *
+   * Optional, and absent means *this theme promises the common floor* — which is
+   * what nine of the ten shipped themes do.
+   */
+  floor?: number;
+
+  /**
+   * A band's one ink (R-THM-005): `<surface>` -> the ink everything drawn on that
+   * surface takes, whatever slot it names.
+   *
+   * **Total, where `composed` is enumerated**, and that difference is the whole
+   * reason this is a field rather than nineteen more entries in `composed`. A
+   * high-contrast theme promises a ratio on every surface it paints; composing
+   * ink by ink keeps the promise only for the slots somebody listed, and the
+   * measured failure was exactly that — `hcDark`'s selection carried a group of
+   * nine where the theme has nineteen meaning slots, and the ten it omitted fell
+   * through to flat inks below the promise with nothing to report it. A band ink
+   * cannot have that defect, because there is no list to be missing from.
+   *
+   * It costs the row its tone, paid for by moving state onto the glyph and the
+   * outcome word — the one-bit rung's carrier, asked per cell.
+   *
+   * **Keyed by SURFACE name**, and the type says so rather than the prose alone
+   * (C10 I45): a band is a ground that something is drawn on, so its name is
+   * that ground's name and `validateBands` finds the ground by looking it up.
+   * The first implementation found it by exclusion instead — *`focusGround` if
+   * the name is `focusGround`, otherwise `selection`* — which is right for the
+   * two entries that exist and silently wrong for a third. Naming the key type
+   * here is what stops a band being invented that no ground answers to.
+   *
+   * **Left as an open record rather than keyed by `SurfaceName`, and measured.**
+   * Narrowing the key type was tried: `surfaces` is a closed record, so every
+   * reader that holds a band name as a `string` — `inkOn`'s public parameter,
+   * and `Object.entries` inside `validateBands` — then needs a cast, and the
+   * rule ends up stated in three casts instead of one. It is stated here and in
+   * `validateBands`, and T2.55 is what enforces it.
+   */
+  bandInk?: Readonly<Record<string, string>>;
+  /**
+   * Each band's curated ANSI16 pair, for `colourDepth: 4` (C10 I61).
+   *
+   * The flat 4-bit map is per ref and composes nothing, so without this a band
+   * at 4-bit had no ground and one index per tone — the one ink it promises
+   * spread across six. Keyed like `bandInk`, by the band's surface name, and
+   * `validateBands` refuses a band in `bandInk` with no pair here.
+   */
+  bandFourBit?: BandFourBit;
+}>;
+
+/** One ANSI16 index for a band's ground and one for everything drawn on it. */
+export type BandFourBit = Readonly<Record<string, Readonly<{ ground: number; ink: number }>>>;
+
+/**
+ * One row of the floor's scope (C10 I60, R-THM-004): a ground a theme paints text
+ * on, the walker that measures it at the common floor (`pairing`), and the refs
+ * that land on it — `"meaning"` for every slot of every palette that carries
+ * meaning, or an explicit table of palette → slots. The rows are the registry's
+ * `terminalPalettes.textGrounds`, projected as `TEXT_GROUNDS`.
+ */
+export type TextGround = Readonly<{
+  ground: string;
+  pairing: string;
+  refs: "meaning" | Readonly<Record<string, readonly string[]>>;
 }>;
 
 /**
@@ -235,6 +429,11 @@ export type ResolvedTheme = Readonly<{
   name: string;
   variant: "dark" | "light";
   tokens: ThemeTokens;
+  /**
+   * The theme this one recedes, when it is `recede`'s (I59, §047). Every ref
+   * but a surface resolves as `tone.dim` resolves in it.
+   */
+  recedes?: ResolvedTheme;
 }>;
 
 /** A contrast or structural failure, named rather than counted (I3). */

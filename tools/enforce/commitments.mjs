@@ -1834,6 +1834,367 @@ export function checkInvariantCoverage(
   return { violations, uncited: found.length, retired: retiredCount, declared: specs.reduce((n, f) => n + invariantsOf(f, readFile).size, 0) };
 }
 
+// --- SP15 — a test row's id is written in one file within its spec ----------
+//
+// **SP7 checks the spec side and nothing checked the other** (review batch 3,
+// M7 item 7). A spec declaring `T1.98` once passes SP7 while two test files
+// each title a row `T1.98` about different things: `router-dispatch.test.ts`'s
+// is C16 I43's guard and `router-keymap.test.ts`'s was §6a's chord notation,
+// which no spec row declared. A fail-on-revert row saying *→ T1.98 fails* then
+// resolves against whichever file a reader opens, and a mutation run's
+// `expect: "T1.98"` is satisfied by either — the number has stopped locating
+// the row on the side a failure is reported from.
+//
+// **The attribution is SP9's**, so the two rules cannot disagree about whose a
+// row is: the spec a title names first — `C19 T5.1 …` or `T4.94 (C22 I110 …)` —
+// else the spec that owns the file (`ownerOf`). A title the rule cannot
+// attribute is counted and not judged.
+//
+// **Per spec and one file per id, and the debt is a list compared by equality**
+// (ruling D6). A strict rule was red on arrival: counted before wiring, 97 ids
+// across 21 specs were titled in more than one file — 272 by a count that did
+// not attribute a bare title to its file's owner, which is the figure that
+// said the attribution had to be SP9's. The three this commit renumbers are not
+// listed; the rest are, so the list can only shrink.
+//
+// **Stated blind spots.** A row is an `it(`/`test(` whose title starts with its
+// id, so a title built by `it.each` or a template, or one that puts the id
+// later, is not read. An id twice in **one** file is not this rule's — it is a
+// row split across two `it`s, which reads the same from a failure report. And
+// the 137 rows no owner claims are the population this cannot see; they are
+// reported beside the gate rather than dropped.
+const ROW_OPENS = /^\s*(?:it|test)(?:\.each)?\s*\(/u;
+const ROW_TITLE = /^\s*(?:(?:it|test)(?:\.each)?\s*\(\s*)?["'`](?:(C\d{2}) )?(T\d+\.\d+[a-z0-9]*)\b\s*(?:\((C\d{2})\b)?/u;
+
+/**
+ * Every row in a test source whose title starts with a test-row id, with the
+ * spec SP9 would give it. **A deferral is not a row, twice over**: `withoutTodos`
+ * blanks it, and `ROW_OPENS` — whose only suffix is `.each` — would not open on
+ * `it.todo(` either, so neither exclusion can be tested alone. What the first
+ * call carries by itself is the comments: a row quoted in a block comment is
+ * not one. A title the formatter wrapped onto the next line is read there.
+ */
+export function rowIdsIn(file, text) {
+  const lines = withoutTodos(text).split("\n");
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!ROW_OPENS.test(lines[i])) continue;
+    const title = /\(\s*$/u.test(lines[i]) ? (lines[i + 1] ?? "") : lines[i];
+    const m = ROW_TITLE.exec(title);
+    if (m === null) continue;
+    out.push({ id: m[2], spec: m[1] ?? m[3] ?? ownerOf(file), line: i + 1 });
+  }
+  return out;
+}
+
+/**
+ * The ids SP15 found in more than one file within their spec when it was
+ * wired — **debt, compared by equality**, so an entry leaves on the commit
+ * that resolves it and a new split fails on the commit that makes it.
+ */
+const SPLIT_ROWS = Object.freeze([
+  "C01 T1.20", // unit/lifecycle.test.ts, unit/sgr.test.ts
+  "C01 T1.21", // unit/lifecycle.test.ts, unit/sgr.test.ts
+  "C01 T1.22", // unit/lifecycle.test.ts, unit/sgr.test.ts
+  "C04 T1.12b", // unit/plot.test.ts, unit/view-model.test.ts
+  "C04 T1.14", // unit/plot.test.ts, unit/view-model.test.ts
+  "C04 T1.19", // unit/plot.test.ts, unit/view-model.test.ts
+  "C04 T1.30", // contract/scroll-follow.test.ts, unit/plot.test.ts, unit/spans.test.ts
+  "C04 T1.40", // unit/execution.test.ts, unit/view-model.test.ts
+  "C04 T1.49", // unit/execution.test.ts, unit/tape.test.ts
+  "C04 T1.8b", // unit/blocks.test.ts, unit/view-model.test.ts
+  "C04 T2.127", // contract/view-model.test.ts, unit/view-model.test.ts
+  "C04 T2.28", // contract/navigation-mosaic.test.ts, contract/scroll.test.ts
+  "C04 T2.29", // contract/navigation-mosaic.test.ts, contract/scroll.test.ts
+  "C04 T2.31", // contract/scroll.test.ts, contract/spans.test.ts
+  "C04 T2.32", // contract/scroll.test.ts, contract/spans.test.ts
+  "C04 T2.35", // contract/scroll.test.ts, contract/spans.test.ts, edge/owed-gate.test.ts
+  "C04 T2.36", // contract/scroll.test.ts, contract/spans.test.ts, edge/owed-gate.test.ts, unit/spans.test.ts
+  "C04 T2.37", // contract/scroll-follow.test.ts, edge/owed-gate.test.ts
+  "C04 T2.38", // contract/scroll-follow.test.ts, edge/owed-gate.test.ts
+  "C04 T2.39", // contract/scroll-follow.test.ts, edge/image-frames.test.ts, edge/owed-gate.test.ts
+  "C04 T3.22", // contract/sequence.test.ts, edge/view-model.test.ts
+  "C04 T3.9", // contract/builders.test.ts, edge/view-model.test.ts
+  "C04 T6.15", // revert/patch.test.ts, revert/view-model.test.ts
+  "C05 T4.2", // integration/manifest.test.ts, unit/completion.test.ts
+  "C06 T4.6", // integration/fixtures.test.ts, integration/transport.test.ts
+  "C07 T3.20", // unit/adapter-registry.test.ts, unit/execution.test.ts
+  "C08 T6.3", // contract/fixtures.test.ts, revert/fixtures.test.ts
+  "C09 T1.24", // unit/blocks.test.ts, unit/text.test.ts
+  "C09 T1.28", // unit/spans.test.ts, unit/text.test.ts
+  "C09 T3.10", // edge/blocks.test.ts, unit/text.test.ts
+  "C09 T3.16", // edge/blocks.test.ts, unit/text.test.ts
+  "C09 T3.4", // edge/blocks.test.ts, unit/text.test.ts
+  "C09 T3.5", // edge/blocks.test.ts, unit/text.test.ts
+  "C09 T3.91", // edge/blocks.test.ts, edge/rows.test.ts
+  "C09 T4.2", // contract/blocks.test.ts, integration/blocks.test.ts
+  "C09 T4.57", // integration/deferred-height.test.ts, integration/emulator.test.ts
+  "C09 T6.17", // contract/sequence.test.ts, revert/blocks.test.ts
+  "C10 T1.16", // unit/sgr.test.ts, unit/theme.test.ts
+  "C10 T1.17", // unit/sgr.test.ts, unit/theme.test.ts
+  "C10 T1.19", // unit/sgr.test.ts, unit/theme.test.ts
+  "C10 T1.20", // unit/sgr.test.ts, unit/theme.test.ts
+  "C10 T1.21", // unit/sgr.test.ts, unit/theme.test.ts
+  "C10 T2.30", // contract/spans.test.ts, contract/theme-required.test.ts
+  "C11 T2.4", // contract/lifecycle.test.ts, contract/table.test.ts
+  "C12 T3.10", // edge/plot.test.ts, unit/plot.test.ts
+  "C12 T3.11", // edge/plot.test.ts, unit/plot.test.ts
+  "C12 T3.11b", // edge/plot.test.ts, unit/plot.test.ts
+  "C12 T3.11c", // edge/plot.test.ts, unit/plot.test.ts
+  "C13 T2.6", // contract/lifecycle.test.ts, contract/transcript.test.ts
+  "C13 T2.7", // contract/frame-scheduler.test.ts, contract/transcript.test.ts
+  "C13 T6.14", // revert/frame-scheduler.test.ts, revert/transcript.test.ts
+  "C14 T2.7", // contract/lifecycle.test.ts, contract/viewport.test.ts
+  "C16 T1.160", // unit/router-decode.test.ts, unit/router-dispatch.test.ts
+  "C16 T1.3p", // unit/router-decode.test.ts, unit/router-dispatch.test.ts
+  "C16 T1.3q", // unit/router-decode.test.ts, unit/router-dispatch.test.ts
+  "C16 T3.12", // unit/router-decode.test.ts, unit/router-dispatch.test.ts
+  "C16 T4.1", // integration/confirm.test.ts, integration/router.test.ts
+  "C16 T4.5", // integration/confirm.test.ts, integration/router.test.ts
+  "C16 T4.6", // integration/confirm.test.ts, integration/router.test.ts
+  "C16 T4.9", // integration/confirm.test.ts, unit/router-keymap.test.ts
+  "C19 T1.4b", // edge/completion.test.ts, unit/completion.test.ts
+  "C19 T3.6", // edge/completion.test.ts, unit/completion.test.ts
+  "C19 T4.5", // integration/completion.test.ts, integration/editor.test.ts
+  "C19 T5.4", // e2e/completion.test.ts, edge/completion.test.ts
+  "C21 T5.2", // e2e/process.test.ts, e2e/transport.test.ts
+  "C22 T1.12", // unit/session-composite.test.ts, unit/session-state.test.ts
+  "C22 T1.13", // unit/session-keys.test.ts, unit/session-state.test.ts
+  "C22 T1.22f", // unit/cursor-style.test.ts, unit/session-construct.test.ts
+  "C22 T1.55", // unit/profiler-seams.test.ts, unit/session-composite.test.ts
+  "C22 T1.5b", // unit/session-config.test.ts, unit/session-paint.test.ts
+  "C22 T1.5f", // unit/session-config.test.ts, unit/session-paint.test.ts
+  "C22 T3.10", // integration/session.test.ts, unit/session-identity.test.ts
+  "C22 T4.12", // integration/session.test.ts, unit/session-paint.test.ts
+  "C22 T4.28", // integration/session.test.ts, integration/theme.test.ts
+  "C22 T5.3", // e2e/overlay.test.ts, e2e/theme.test.ts
+  "C23 T1.4", // contract/builders.test.ts, unit/execution.test.ts
+  "C23 T2.47", // contract/emulator.test.ts, unit/emulator.test.ts
+  "C23 T3.64", // contract/refresh.test.ts, unit/emulator.test.ts
+  "C23 T4.15", // integration/confirm.test.ts, integration/notice-action.test.ts
+  "C23 T4.64", // integration/emulator.test.ts, unit/actions-expand.test.ts, unit/emulator.test.ts
+  "C24 T2.13", // contract/expect-document.test.ts, contract/public-api.test.ts
+  "C24 T2.20", // contract/expect-document.test.ts, unit/enforce-rules.test.ts
+  "C24 T2.23", // contract/expect-document.test.ts, contract/public-api.test.ts
+  "C24 T4.2", // contract/builders.test.ts, contract/expect-document.test.ts
+  "C25 T1.10", // unit/patch-intraline.test.ts, unit/patch.test.ts
+  "C25 T1.9", // unit/patch-intraline.test.ts, unit/patch.test.ts
+  "C25 T2.7", // contract/patch-intraline.test.ts, contract/patch.test.ts
+  "C25 T2.8", // contract/patch-window.test.ts, contract/patch.test.ts
+  "C26 T1.43", // unit/session-keys.test.ts, unit/table.test.ts
+  "C26 T2.34", // contract/block-elements.test.ts, contract/scroll.test.ts
+  "C26 T3.47", // contract/navigation-pills.test.ts, unit/session-navigation.test.ts
+  "C26 T3.49", // contract/block-elements.test.ts, unit/session-navigation.test.ts
+  "C28 T3.4", // edge/profiler.test.ts, unit/profiler-seams.test.ts
+  "C28 T3.5", // edge/profiler.test.ts, unit/profiler-seams.test.ts
+]);
+
+/**
+ * A03 SP15 — **within one spec, a test row's id is titled in one file.**
+ */
+export function checkRowFiles(testFiles, readFile = (f) => readFileSync(f, "utf8"), exempt = SPLIT_ROWS) {
+  const where = new Map();
+  let rows = 0;
+  let unowned = 0;
+  for (const f of testFiles) {
+    let text;
+    try { text = readFile(f); } catch { continue; }
+    for (const r of rowIdsIn(f, text)) {
+      rows++;
+      if (r.spec === null) { unowned++; continue; }
+      const key = `${r.spec} ${r.id}`;
+      if (!where.has(key)) where.set(key, new Set());
+      where.get(key).add(f);
+    }
+  }
+  const split = [...where].filter(([, files]) => files.size > 1);
+  const found = split.map(([k]) => k).sort();
+  const listed = [...exempt].sort();
+  const fresh = split.filter(([k]) => !listed.includes(k));
+  const cleared = listed.filter((k) => !found.includes(k));
+  const violations = [];
+  if (fresh.length > 0) {
+    violations.push({
+      rule: "SP15",
+      file: "test",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(fresh.length)} test row id(s) titled in more than one file within their spec and ` +
+        `not on the list — ${fresh.map(([k, files]) => `${k} (${[...files].sort().join(", ")})`).join("; ")}. ` +
+        `A fail-on-revert row or a mutation's \`expect\` naming one resolves to whichever file a ` +
+        `reader opens. Renumber one, declaring it in the spec, or qualify its title with its spec.`,
+    });
+  }
+  if (cleared.length > 0) {
+    violations.push({
+      rule: "SP15",
+      file: "tools/enforce/commitments.mjs",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(cleared.length)} entr(y/ies) on SP15's list are titled in one file now — ` +
+        `${cleared.join(", ")}. The list is compared by equality so it can only shrink; remove them.`,
+    });
+  }
+  return { violations, rows, unowned, split: found.length };
+}
+
+// --- SP16 — a titled row locates the row its spec declares ------------------
+//
+// **SP7 and SP15 each ask *one id, two rows* inside one spec, and F1489 was
+// neither.** `test/integration/session.test.ts` — a C22 file — titled a row
+// `T4.34 (C19 I23, …)`. SP9's attribution reads the first citation, so the row
+// was C19's T4.34, titled in one file (SP15 green), and C19's tables declare no
+// T4.34 at all (SP7 green, having nothing to compare). C22 declares a T4.34 about
+// `--no-bg`. So a reader opening the file's spec found a different row under the
+// id, and a mutation run's `expect: "T4.34"` was scored against whichever
+// T4.34 failed (F1472's second instance).
+//
+// **Two arms, both about where the id resolves.**
+//
+// - **Misfiled**: the spec the title is attributed to does not declare the id,
+//   and the file's owner does. Measured when this landed, **30** rows — and the
+//   larger part were not collisions at all but the *same* row whose title cites
+//   a foreign invariant first: C22 declares `T4.33 (C19 I23, C15 I14, …)` and
+//   its test reads `T4.33 (C19 I23, C15 I14)`, which SP9 and SP15 file under
+//   C19. The rule cannot tell the two apart and does not try: **both are
+//   repaired by the title, which either names its spec (`C22 T4.33 (C19 I23 …)`)
+//   or takes an id of its own.** The first is what makes SP15's attribution
+//   right for that row, which it was not.
+// - **Retired**: the attributed spec declares the id retired — a struck
+//   `~~**T3.20**~~`, or a head whose first bold span says *superseded*,
+//   *retired* or *struck* — and a live row still titles it. C23 T3.20 was
+//   superseded with the pushed view and `execution.test.ts` titles a row about
+//   `Ctrl-C` clearing the queue with it (lane b4-exec2's report).
+//
+// **Per row and compared by equality** (ruling D6, SP15's shape). The debt is
+// keyed `spec id file`, because two titles in one file under one id are one
+// entry to repair, and a line number would move on every unrelated edit.
+//
+// **Stated blind spots.** (1) A row that *dangles* — its attributed spec
+// declares no such id and neither does the file's owner — is counted and
+// reported, not gated: **639** when this landed, across 28 specs, which is a
+// different defect (a row with no spec row) and a different remedy. (2) A row
+// whose attributed spec declares the id about **something else** is invisible:
+// that is the citation-resolves-against-the-wrong-thing class, which
+// `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass argues against
+// automating. (3) The retirement vocabulary is three words and a strike; a
+// fourth wording reads as live. (4) SP15's own reader limits — `it.each` and
+// template titles, and an id placed after the title's start, are not read.
+// (5) The owner is `ownerOf`'s: a file no owner claims has no second spec to
+// collide with, and its rows can only dangle.
+const RETIRED_ROW = /^[ \t]*- (?:~~\*\*(T\d+\.\d+[a-z]?)\*\*~~|\*\*(T\d+\.\d+[a-z]?)\*\*[^*\n]{0,120}?\*\*(?:[Ss]uperseded|[Rr]etired|[Ss]truck)\b)/gmu;
+
+/** Every test row id a spec declares retired: struck, or headed *superseded*, *retired* or *struck*. */
+export function retiredRowsOf(file, readFile = (f) => readFileSync(f, "utf8")) {
+  const out = new Set();
+  for (const m of readFile(file).matchAll(RETIRED_ROW)) out.add(m[1] ?? m[2]);
+  return out;
+}
+
+/**
+ * The rows SP16 found misfiled or reusing a retired id when it was wired —
+ * **debt, compared by equality**, keyed `spec id file`. The C19 and C22 rows
+ * were repaired in the commit that landed the rule, and are not listed.
+ */
+const MISFILED_ROWS = Object.freeze([
+  "C04 T1.12b test/unit/plot.test.ts", // C12 declares it; the title cites C04 I41 first
+  "C04 T1.12c test/unit/plot.test.ts", // the same
+  "C07 T1.46 test/unit/execution.test.ts", // C23's T1.46 is a different row (I48)
+  "C07 T1.47 test/unit/execution.test.ts", // C23's T1.47 is a different row (I49)
+  "C09 T1.22 test/unit/table.test.ts", // C11's T1.22 is a different row (I20)
+  "C09 T2.16 test/contract/block-window.test.ts", // retired with C09 I16; two live rows title it
+  "C13 T6.14 test/revert/frame-scheduler.test.ts", // C03 declares it citing C13
+  "C14 T5.3a test/e2e/view-model.test.ts", // C04 declares it citing C14 I4
+  "C23 T3.20 test/unit/execution.test.ts", // superseded with the pushed view
+  "C23 T3.21 test/unit/execution.test.ts", // superseded with the pushed view
+  "C23 T3.60 test/contract/refresh.test.ts", // superseded with the pushed view
+  "C23 T4.4 test/integration/confirm.test.ts", // superseded with the pushed view
+  "C26 T1.3d test/unit/router-focus.test.ts", // C16's T1.3d is a different row (I3)
+  "C26 T1.3e test/unit/router-focus.test.ts", // C16's T1.3e is a decoder row (I17)
+  "C26 T1.3h test/unit/router-focus.test.ts", // C16's T1.3h is a decoder row (I17)
+  "C26 T1.3i test/unit/router-focus.test.ts", // C16's T1.3i is a decoder row (I17)
+  "C26 T1.3j test/unit/router-focus.test.ts", // C16's T1.3j is a decoder row (I17)
+  "C26 T1.42 test/unit/table.test.ts", // C11's T1.42 is a different row (I32)
+  "C26 T1.43 test/unit/table.test.ts", // C11's T1.43 is a different row (I33)
+]);
+
+/**
+ * A03 SP16 — **a titled row locates the row its spec declares**: not an id the
+ * file's owner declares instead, and not one its spec retired.
+ */
+export function checkRowResolves(
+  testFiles,
+  specs,
+  readFile = (f) => readFileSync(f, "utf8"),
+  exempt = MISFILED_ROWS,
+) {
+  const specOf = new Map(specs.map((f) => [(f.split("/").pop() ?? "").slice(0, 3), f]));
+  const declared = new Map();
+  const retired = new Map();
+  const of = (spec) => {
+    const file = specOf.get(spec);
+    if (file === undefined) return null;
+    if (!declared.has(spec)) {
+      declared.set(spec, new Set(testRowsOf(file, readFile)));
+      retired.set(spec, retiredRowsOf(file, readFile));
+    }
+    return { declared: declared.get(spec), retired: retired.get(spec) };
+  };
+  const found = new Map();
+  let rows = 0;
+  let dangling = 0;
+  for (const f of testFiles) {
+    let text;
+    try { text = readFile(f); } catch { continue; }
+    const owner = ownerOf(f);
+    for (const r of rowIdsIn(f, text)) {
+      const mine = r.spec === null ? null : of(r.spec);
+      if (mine === null) continue;
+      rows++;
+      const key = `${r.spec} ${r.id} ${f}`;
+      if (mine.retired.has(r.id)) {
+        found.set(key, `${r.spec} retired ${r.id}`);
+        continue;
+      }
+      if (mine.declared.has(r.id)) continue;
+      const theirs = owner === null || owner === r.spec ? null : of(owner);
+      if (theirs !== null && theirs.declared.has(r.id) && !theirs.retired.has(r.id)) {
+        found.set(key, `${owner}, which owns the file, declares ${r.id} and ${r.spec} does not`);
+        continue;
+      }
+      dangling++;
+    }
+  }
+  const keys = [...found.keys()].sort();
+  const listed = [...exempt].sort();
+  const fresh = keys.filter((k) => !listed.includes(k));
+  const cleared = listed.filter((k) => !keys.includes(k));
+  const violations = [];
+  if (fresh.length > 0) {
+    violations.push({
+      rule: "SP16",
+      file: "test",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(fresh.length)} titled row(s) locate a row their spec does not declare, and are not ` +
+        `on the list — ${fresh.map((k) => `${k} (${found.get(k)})`).join("; ")}. A reader opening the ` +
+        `file's spec finds a different row under the id, and a mutation's \`expect\` is scored against ` +
+        `whichever fails. Name the row's spec in its title, or give it an id of its own and a spec row.`,
+    });
+  }
+  if (cleared.length > 0) {
+    violations.push({
+      rule: "SP16",
+      file: "tools/enforce/commitments.mjs",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(cleared.length)} entr(y/ies) on SP16's list locate their row now — ${cleared.join(", ")}. ` +
+        `The list is compared by equality so it can only shrink; remove them.`,
+    });
+  }
+  return { violations, rows, misfiled: keys.length, dangling };
+}
+
 export function checkSectionReferences(
   files,
   readFile = (f) => readFileSync(f, "utf8"),
@@ -2234,5 +2595,5 @@ export function checkReferences(
 // That is A03 §2's own subject reaching the list that enforces it.
 export const SPEC_RULES = [
   "SP1", "SP2", "SP3", "SP4", "SP5", "SP6", "SP7", "SP8", "SP9", "SP10", "SP11",
-  "SP12", "SP13", "SP14",
+  "SP12", "SP13", "SP14", "SP15", "SP16",
 ];

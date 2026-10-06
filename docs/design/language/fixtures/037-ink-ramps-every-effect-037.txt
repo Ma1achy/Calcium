@@ -1,0 +1,54 @@
+INK RAMPS · 28 registered effects
+A shimmer is a TONE effect: characters brighten in sequence; the stagger makes the highlight travel.
+Every animated row changes only colour, opacity, or brightness inside the existing cell.
+The only other legal animation is a same-cell glyph swap, used by spinner alphabets.
+
+GRADIENTS · COLOUR VARYING OVER AN EXTENT, NO MOTION
+
+  two tones across a run of text          gradient-linear     linear
+  a colormap across the extent            gradient-map        colormap · viridis
+  five discrete bands, not a slide        gradient-step       step
+  cycling a categorical palette           gradient-palette    palette
+  brightest in the middle                 gradient-centre     centred
+
+ANIMATED INK · EACH EFFECT KEEPS ITS ORIGINAL TONE AND CADENCE
+
+  a band slides through it                shimmer             working
+  the whole ramp brightens in sequence    wave                motion
+  it moves together, no position          breathe             waiting on you
+  on and off, no fade                     pulse               unseen
+  two beats then a rest                   heartbeat           alive
+  one pass, then it stops                 sweep               done
+  revealed left to right                  typewriter          arrived
+  it travels and wraps around             marquee             too wide
+  outward from the centre                 ripple              acknowledged
+  a chase of three dots running           chase               streaming
+  flicker, settle, flicker, settle        neon                connecting
+  a slow drift, never repeating           drift               idle but live
+  edges first, centre last                bookend             converging
+  one glyph at a time, random             scatter             thinking
+  a rare glint, seconds apart             glint               idle but ready
+  a slow swell, end to end                tide                a long wait, nothing wrong
+  unsteady, irregular, low                flicker             an unstable connection
+  independent points lighting             twinkle             many small things at once
+  swinging back and forth                 pendulum            searching, no progress to show
+  a hard edge passing through             wipe                a state changed, cleanly
+  one flash, then it settles              pop                 arrived once
+  both ends toward the middle             converge            closing in, nearly done
+
+BAR CARRIER · THE BAND RUNS THROUGH THE FILLED CELLS
+
+  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱                sweepbar            active progress
+
+Progress and streaming travel inline-start to inline-end; pendulum, ripple, converge and bookend declare their exceptions.
+An animation says what is happening, never merely “look at this”.
+SORTED BY HOW MUCH ATTENTION THEY ASK
+  glint · drift · tide          ambient
+  shimmer · wave · chase        working
+  breathe · pendulum            waiting
+  pulse · flicker · twinkle     attention
+  sweep · pop · wipe            terminal
+Below 8-bit, motion stops because a small palette moving reads as flicker.
+[R-MOT-012]
+
+Per-character delays are preserved. Geometry and layout are rejected by the carrier compiler.

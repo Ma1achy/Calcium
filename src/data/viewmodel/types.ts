@@ -53,6 +53,30 @@ export type DocumentMeta = Readonly<{
    * which names a mechanism that did not produce it.
    */
   origin: "user" | "action" | "agent" | "refresh" | "defect";
+  /**
+   * The submitted line's chips, as ranges into `command` (I152, ruling 104 c).
+   * Shell-owned, as `origin` is: `ProducedMeta` refuses it, so a producer cannot
+   * draw a chip into an echo. Absent where the line held none. C22 I153 draws it.
+   */
+  echo?: readonly EchoChip[];
+}>;
+
+/** What a chip stands for — C17's union, declared here so the record and the editor cannot drift (I152). */
+export type ChipKind = "paste" | "file" | "image";
+
+/**
+ * One chip of a submitted line (I152): `[from, to)` in code units of `command`,
+ * sorted and disjoint, covering exactly the chip's content — which is
+ * `command.slice(from, to)` and is not carried twice — with the parts C17
+ * composes a label from.
+ */
+export type EchoChip = Readonly<{
+  from: number;
+  to: number;
+  ordinal: number;
+  kind: ChipKind;
+  name: string;
+  lines?: number;
 }>;
 
 /**
@@ -185,19 +209,58 @@ export type Tone =
  * with an "or any string" arm is not a vocabulary.
  */
 export type Glyph =
+  /**
+   * The question mark a question leads with — `⟩` U+27E9 / `?` (`R-GLY-003`,
+   * `R-TAB-001`).
+   *
+   * **Named by both question components as their first carrier and in no file
+   * in `src/` until now** (C09 I88). The registry has declared it `current` and
+   * canonical throughout; `SS64` never saw it because a collision rule compares
+   * the marks on both sides and a mark with no character never enters a pair.
+   * Its consumer is M15's questions.
+   */
+  | "question"
+  /**
+   * The current item in a row you navigate — `›` U+203A / `*` (`R-GLY-003`).
+   *
+   * **`row-lead` is the one domain it does not have**, and the registry says so
+   * in its own record: measured over every `›` in the design, not one is a
+   * transcript gutter — the agent tape, a question's choice row, a form's
+   * button row, the completion menu, history search, the mentions picker, a
+   * notification's buttons. `▸` is the gutter's mark. Its consumers are M14's
+   * tape and M15's choice rows.
+   */
+  | "current"
   | "ok"
   | "warn"
   | "error"
   | "info"
   | "pending"
-  /** Starting, connecting, installing. Distinct from `running`: S11, S15. */
+  /** Starting, connecting, installing. Distinct from `work-unit`: S11, S15. */
   | "working"
-  | "running"
+  /**
+   * A unit of work under way, steady — `●` / `*`, the registry's `work-unit`
+   * (R-GLY-003, C04 §Glyph). **It was `running`**, which is also `CallState`'s
+   * word for the state that draws it, so `CALL_HEAD_GLYPH` read
+   * `running: "running"` and a reader could not tell the key from the value.
+   * The slot takes the registry's name and `CallState` keeps its own.
+   */
+  | "work-unit"
   | "queued"
   | "cancelled"
   | "expand"
   | "collapse"
-  | "live"
+  /**
+   * The mark in the focus gutter C11 I15 reserves (§017, R-BLK-131).
+   *
+   * **Its own token because it was `expand`'s.** `definition.ts` painted focus
+   * with `glyphFor("expand")` and sized the gutter with `glyphCells("expand")`,
+   * so the collapsed-disclosure mark and the focus mark were one character by
+   * accident of who needed a right-pointing triangle first. The design draws
+   * them apart — `▹` hollow for *there is more behind this*, `▸` filled for
+   * *you are here* — and a shared slot cannot.
+   */
+  | "focus"
   | "bullet"
   /**
    * A quotation's gutter — **a rail rather than a mark** (C04 I95, C09 I41).
@@ -239,14 +302,7 @@ export type Glyph =
    * different submission's entry. C09 §4 names the two blocks in the position
    * and the two that look as though they are.
    */
-  | "continuation"
-  /**
-   * A step in a sequence of work — a tool call's header (C09 §4,
-   * `AGENT_TUI_DESIGN.md` §9c). A *position in a sequence* and not a state, so
-   * it does not change as the step runs or settles; `running` is the state.
-   * `⏺` U+23FA is written with U+FE0E after it — the base has an emoji presentation form and the selector says to draw it as text, which `cells()` counts as zero cells (C09 I45, F823, F854).
-   */
-  | "step";
+  | "continuation";
 
 /** The tones that oblige a glyph (I6, D29). */
 export const GLYPH_REQUIRED_TONES: ReadonlySet<Tone> = new Set<Tone>(["error", "warn"]);
@@ -271,27 +327,31 @@ export type Action =
   | Readonly<{ kind: "fill"; label: string; command: string }>
   | Readonly<{ kind: "exec"; label: string; command: string }>
   | Readonly<{ kind: "open"; label: string; url: string }>
-  | Readonly<{ kind: "expand"; label: string; target: string }>
   /**
-   * Fill the screen with one block — C25 §3b's fullscreen patch is the first
-   * producer (I34).
+   * Unfold something on this entry, in place (I34, C25 §3b, R-EXA-082).
    *
-   * `target` names a block id **within the document the action fired from**, and
-   * denotes nothing else. Unlike `expand`, which toggles a row on an entry the
-   * dispatcher already holds, this is the first kind whose target the dispatcher
-   * has to *find* — and it is a free string an adapter supplies. Resolved
-   * against the whole transcript it would let one entry's action draw another
-   * entry's data; C23 I31 owns the refusal when it does not resolve.
+   * `target` names a **row or a block id within the document the action fired
+   * from**, and denotes nothing else: a table row, a folded `scroll`, or a
+   * `patch`. Rows are looked for first, so a row id equal to a block id has a
+   * known answer. Resolved against the whole transcript it would let one
+   * entry's action act on another entry's data; C23 I31 owns the refusal when
+   * it does not resolve.
+   *
+   * **This kind absorbed `view`, which filled the screen with one block.** The
+   * design deletes the pushed view — *a run's detail EXPANDS IN PLACE* — and
+   * the two were one kind wearing two names: C04's own section introducing
+   * `view` called it *the same category as `expand`: an affordance on a block
+   * that the reader invokes*. What went with it is the screen; what stayed is
+   * the resolution, which was always the half that could be wrong.
    */
-  | Readonly<{ kind: "view"; label: string; target: string }>;
+  | Readonly<{ kind: "expand"; label: string; target: string }>;
 
-/** The five, for a validator that cannot silently take a sixth (T2.11). */
+/** The four, for a validator that cannot silently take a fifth (T2.11). */
 export const ACTION_KINDS: ReadonlySet<Action["kind"]> = new Set<Action["kind"]>([
   "fill",
   "exec",
   "open",
   "expand",
-  "view",
 ]);
 
 // --- spans ----------------------------------------------------------------
@@ -341,35 +401,100 @@ export type TextSpan = Readonly<{
    * pair is bounded by two colours whose floors C10 I26 proves, a sample is not.
    */
   ramp?: Ramp;
+  /**
+   * A ground on the run (I151, §101, F1522): `pick` paints its cells on
+   * `surface.pick` with `surface.pickInk` as the ink, the pair resolved together
+   * (C09 I139). Refused beside `tone`, `value` and `ramp`, and on a hunk line.
+   * One member of one value, because one consumer: the chip preview's header.
+   */
+  ground?: "pick";
 }>;
 
-/** The members of a span, for a gate that cannot silently take a tenth (I85) — the eighth, `elide`, arrived with I105 and the ninth, `ramp`, with I107. */
-export const TEXT_SPAN_KEYS: ReadonlySet<string> = new Set(["from", "to", "bold", "italic", "underline", "tone", "value", "elide", "ramp"]);
+/** The members of a span, for a gate that cannot silently take an eleventh (I85) — the eighth, `elide`, arrived with I105, the ninth, `ramp`, with I107, and the tenth, `ground`, with I151. */
+export const TEXT_SPAN_KEYS: ReadonlySet<string> = new Set(["from", "to", "bold", "italic", "underline", "tone", "value", "elide", "ramp", "ground"]);
 
 // --- ramps ----------------------------------------------------------------
 
 /**
- * The three fills, because they mean three things (§3am.2, I106): a `gradient`
- * says *this varies continuously*, a `step` says *these are N groups*, a
- * `palette` says *these are unordered identities*.
+ * The four fills, because they mean four things (§3am.2, I106, R-MOT-012): a
+ * `gradient` says *this varies continuously*, a `centred` says *this varies
+ * continuously and the middle is the extreme*, a `step` says *these are N
+ * groups*, a `palette` says *these are unordered identities*.
+ *
+ * **`centred` is §037's `gradient-centre`, and it was missing while a true
+ * sentence said it was not.** The registry registers five `static-tone` ramps
+ * and this type carried three, reconciled by *`centre` and `linear` are both
+ * `gradient`* — which is a fact about the family and says nothing about the
+ * sampling, so *brightest in the middle* and *two tones across a run* were one
+ * value and two different pictures. `centred` folds the argument to
+ * `1 − |2t − 1|` and hands it to whichever backing is declared, so it composes
+ * with a slot pair and with a colormap exactly as `gradient` does; the gate's
+ * arity rule is already written over *every fill but `palette`* and needs no
+ * arm for it. It takes no `bands`, for `gradient`'s reason: quantising a fold
+ * gives N groups whose order is not the extent's.
+ *
+ * Five registered records, four fills, two backings — `gradient-linear` and
+ * `gradient-map` are one fill distinguished by which backing it carries, and
+ * registering the backing as a second fill would put one axis in two places.
  */
-export type RampFill = "gradient" | "step" | "palette";
-export const RAMP_FILLS: readonly RampFill[] = Object.freeze(["gradient", "step", "palette"]);
+export type RampFill = "gradient" | "centred" | "step" | "palette";
+export const RAMP_FILLS: readonly RampFill[] = Object.freeze(["gradient", "centred", "step", "palette"]);
 
 /**
- * Five loops and `none` (I109). No one-shot — `sweep`, `ripple` — because the
- * render has no birth tick to time an event from; no position effect —
- * `typewriter`, `marquee` — because those change which clusters show and belong
- * beside `elide`, not inside a colour. Timing lives in the effect (C09 §5).
+ * **The registry's twenty-three animated ramps, and `none`** (I109, R-MOT-012).
+ *
+ * **This was five loops, and the sentence excluding the rest is superseded.** It
+ * read: *no one-shot — `sweep`, `ripple` — because the render has no birth tick
+ * to time an event from; no position effect — `typewriter`, `marquee` — because
+ * those change which clusters show*. Both halves are false in this tree. The
+ * clock is injected at `shell/session.ts` and handed down, so a one-shot that
+ * records the tick it began on is timeable by the render exactly as the
+ * spinner's stamp is — `Ramp.since` is that record. And none of these change
+ * which clusters show: every one is a value in `[0, 1]` that the fill is sampled
+ * at, so `typewriter` reveals by *brightening* toward `to` rather than by
+ * withholding a cluster. R-MOT-005 is the constraint that makes that true and it
+ * is the design's own: an animation may change a cell's colour, opacity or
+ * brightness, and nothing else.
+ *
+ * **Five of the twenty-three are one-shots** — `sweep pop wipe typewriter
+ * ripple` — and `RAMP_ONE_SHOTS` is the list. They read `Ramp.since` and hold
+ * their final frame once their duration is past, so `measure` is untouched and
+ * *appearance animates, geometry never does* still holds.
+ *
+ * Ordered as the registry gallery orders them, so a reader comparing the two
+ * lists reads down rather than searching.
  */
-export type RampAnimation = "none" | "shimmer" | "wave" | "breathe" | "pulse" | "heartbeat";
+export type RampAnimation =
+  | "none"
+  // periodic — the five the framework shipped
+  | "shimmer" | "wave" | "breathe" | "pulse" | "heartbeat"
+  // periodic — the thirteen the registry adds
+  | "sweepbar" | "glint" | "tide" | "flicker" | "twinkle" | "pendulum"
+  | "converge" | "marquee" | "chase" | "neon" | "drift" | "bookend" | "scatter"
+  // one-shot — timed from `Ramp.since`, holding the final frame after
+  | "sweep" | "pop" | "wipe" | "typewriter" | "ripple";
+
 export const RAMP_ANIMATIONS: readonly RampAnimation[] = Object.freeze([
   "none",
-  "shimmer",
-  "wave",
-  "breathe",
-  "pulse",
-  "heartbeat",
+  "shimmer", "wave", "breathe", "pulse", "heartbeat",
+  "sweepbar", "glint", "tide", "flicker", "twinkle", "pendulum",
+  "converge", "marquee", "chase", "neon", "drift", "bookend", "scatter",
+  "sweep", "pop", "wipe", "typewriter", "ripple",
+]);
+
+/**
+ * **The five that end** (I109). An animation whose meaning is an event rather
+ * than a state: §037 groups `sweep · pop · wipe` as *terminal* and gives
+ * `typewriter` and `ripple` the semantics *arrived* and *acknowledged*, which are
+ * things that happen once. `marquee` is **not** one of them — §037 says it
+ * *travels and wraps around*, which is periodic by its own description, and an
+ * earlier reading that put it here had it on the strength of the word *travels*.
+ *
+ * A one-shot reads `Ramp.since`: absent, it draws its first frame and stays
+ * there, which is the honest answer for a ramp nobody has started.
+ */
+export const RAMP_ONE_SHOTS: ReadonlySet<RampAnimation> = new Set<RampAnimation>([
+  "sweep", "pop", "wipe", "typewriter", "ripple",
 ]);
 
 /**
@@ -390,10 +515,85 @@ export type Ramp = Readonly<{
   colormap?: ColormapName;
   bands?: number;
   animate?: RampAnimation;
+
+  /**
+   * **The tick a one-shot began on** (I109) — meaningless for the eighteen
+   * periodic effects and ignored by them.
+   *
+   * A tick and not a millisecond, because that is the unit the render already
+   * counts in and `presentation/` may not read a clock. Whoever mints the block
+   * records the tick; the render computes `k − since` and clamps to the final
+   * frame once the effect's duration is past. That is the whole of what I109's
+   * *the render cannot time an event* was missing — not a clock, a stamp.
+   *
+   * Absent on a one-shot means *not started*: the effect draws its frame 0 and
+   * stays there rather than replaying on every render, which is the failure a
+   * one-shot without a stamp would otherwise have.
+   */
+  since?: number;
+
+  /**
+   * **A stop past `to`** (I148, §5c.1; review batch 4 M13.4). Over the last
+   * `share` of the axis `to` is lifted channel by channel, from ×1 up to
+   * ×`lift` at `t = 1`, and `from` mixes to `to` over the rest — the hot edge's
+   * profile, which a ramp closed to `Tone` (I106) otherwise has no seam for.
+   * A gradient over a slot pair only, and never on a span (I107): a lifted
+   * `to` is no slot, so the floor has nothing to prove it against.
+   */
+  overshoot?: RampOvershoot;
 }>;
 
-/** The members of a ramp, for a gate that cannot silently take a seventh (I106). */
-export const RAMP_KEYS: ReadonlySet<string> = new Set(["fill", "from", "to", "colormap", "bands", "animate"]);
+/** `lift` finite in `(1, 2]`, `share` in `(0, 1)` (I148). */
+export type RampOvershoot = Readonly<{ lift: number; share: number }>;
+
+/** The members of a ramp, for a gate that cannot silently take a ninth (I106). */
+export const RAMP_KEYS: ReadonlySet<string> = new Set(["fill", "from", "to", "colormap", "bands", "animate", "since", "overshoot"]);
+
+// --- trails ---------------------------------------------------------------
+
+/**
+ * The five forms a streaming run's trail takes (§5c, §026, I123).
+ *
+ * **A band at the head, not a timeline.** §026 rules out a per-character fade
+ * over time — there is no per-cell timeline, so an age-based fade repaints
+ * every character of the trail on every frame — and a glyph rising into its
+ * cell, which needs a sub-cell position a terminal has not got. What is
+ * affordable is a fixed band whose cost is its width and not the reply's
+ * length.
+ *
+ * **`hotEdge` and `hue` differ by their target, not by their head.** Both
+ * arrive in the accent; `hotEdge` cools to the run's own ink and `hue` to the
+ * block's body tone. They coincide when a run has no ink of its own and
+ * separate the moment one does, which is the case `R-BLK-196` is written
+ * about — a dim run's trail must cool to dim.
+ *
+ * `weight` is the only one that survives 1-bit: a terminal has bold or it has
+ * not, so there is no settle to lose.
+ */
+export type TrailForm = "hotEdge" | "fade" | "hue" | "ripple" | "weight";
+
+export const TRAIL_FORMS: readonly TrailForm[] = Object.freeze([
+  "hotEdge", "fade", "hue", "ripple", "weight",
+]);
+
+/**
+ * The effect each trail form animates its band with, for the forms that animate
+ * (C09 I133). A form absent here draws a still band.
+ *
+ * **One table for three readers**: C09 builds the band's ramp from it, the gate
+ * refuses `trailSince` on a form whose effect is not a one-shot, and the shell
+ * stamps the forms whose effect is (C04 I109, C22 I131; ruling 81). Three
+ * `form === "ripple"` tests would be three places for the next one-shot form to
+ * be missed.
+ */
+export const TRAIL_ANIMATION: Readonly<Partial<Record<TrailForm, RampAnimation>>> = Object.freeze({
+  ripple: "ripple",
+});
+
+/** The forms that are a colour, and therefore draw nothing at 1-bit (C09 I91). */
+export const TRAIL_COLOUR_FORMS: ReadonlySet<TrailForm> = new Set<TrailForm>([
+  "hotEdge", "fade", "hue", "ripple",
+]);
 
 // --- table ----------------------------------------------------------------
 
@@ -419,6 +619,16 @@ export type Cell = Readonly<{
    * numbers for everyone.
    */
   bar?: BarSpec;
+  /**
+   * Two readings of one metric, the earlier and the later (I128, §088 §4).
+   *
+   * `text` is what follows the arrow — `from 0.41` — so the producer keeps its
+   * own formatting. **The direction and the tone are derived, never supplied**:
+   * the arrow is the sign of `to − from` and its tone the column's `polarity`,
+   * which is why construction refuses a trend cell that also carries `glyph`,
+   * `tone`, `spark` or `bar` — a second answer to a question the rule gives one.
+   */
+  trend?: Readonly<{ from: number; to: number }>;
 }>;
 
 /** A quantity against a scale (I50c, C12 §3b). */
@@ -444,7 +654,32 @@ export type BarSpec = Readonly<{
 export type ColumnDef = Readonly<{
   key: string;
   label: string;
-  align: "left" | "right";
+  /**
+   * Where the cell sits in its solved width (C11 I26, §099).
+   *
+   * **`"decimal"` is the third arm and §099 is why**: *align: r lines up the
+   * LAST character, which puts `0.0372` and `3e-4` in different places*. It
+   * splits each value at its point, right-aligns the integer part to the
+   * column's point and left-aligns the rest — so a value with no point is all
+   * integer part and **ends** where the point sits, which is what puts `1284`
+   * under `0.941`'s point.
+   *
+   * The point itself is **derived** from the column's own cells and never
+   * authored: a declared one is a number the planner can contradict when a
+   * column yields width, with nothing to report the disagreement.
+   *
+   * **Optional, and absent means *ask the values* (C11 I27, §078
+   * `R-TBL-001`).** It was required, so every producer that builds columns out
+   * of data had to answer before it had seen one — and three of the four answer
+   * `left` unconditionally, which left-aligns a column of numbers in most of
+   * the places C11's columns come from. The default is derived from the cells
+   * on the same argument the point is: an author's `left` on a column of
+   * numbers is a claim the data falsifies, and nothing reports that either.
+   * A declaration is honoured unchanged, so an adapter that means `left` keeps
+   * it. `numeric` implies `decimal`, `duration` implies `right`, and a column
+   * whose values disagree about their kind is text.
+   */
+  align?: "left" | "right" | "decimal";
   priority: number;
   minWidth: number;
   maxWidth?: number;
@@ -471,6 +706,25 @@ export type ColumnDef = Readonly<{
    * side is being described, on a field set once per column and never revisited.
    */
   truncateFrom?: "start" | "end";
+  /**
+   * Which movement the column's metric wants (I128, §086, `R-COL-006`).
+   *
+   * On the column because §086 homes a metric inside a table cell, and a column
+   * is one metric. Undeclared is `neutral`, so no adapter changes: a trend in a
+   * neutral column draws its arrow in the cell's default tone.
+   */
+  polarity?: "higher" | "lower" | "neutral";
+  /**
+   * The closed set of words this column's cells are drawn from (I6, ruling 44).
+   *
+   * **What lets a word carry a tone without a glyph.** §075's source column is
+   * the case — `env` is `warn`, `flag` is `error` — and the word *is* the fact,
+   * so the tone is its second carrier and colour is not alone (tie-break 4
+   * counts carriers per fact). **Declared, never inferred from the text**: a
+   * cell outside the set is refused, so a cell cannot opt itself out by
+   * spelling. Absent, the column is held to I6's glyph exactly as before.
+   */
+  vocabulary?: readonly string[];
 }>;
 
 export type TableRow = Readonly<{
@@ -586,6 +840,36 @@ export type Notice = Readonly<{
   tone: Tone;
   glyph?: Glyph;
   text: string;
+  /**
+   * Whether more text is still arriving (§5c, I122, §025, §026).
+   *
+   * **The fact, and never the band.** `Panel.live`'s precedent (C09 I38): a
+   * block names what is true and C09 derives the appearance. Here it is not a
+   * preference — the band's offsets depend on the terminal's width, which a
+   * producer cannot see, so a producer writing the span would be writing a
+   * number it cannot compute.
+   *
+   * Absent is settled, and a settled block has no head: `trail` alone draws
+   * nothing.
+   */
+  streaming?: boolean;
+  /**
+   * Which of the five forms the trail takes (§5c, I123). Absent is `hotEdge`,
+   * which is §026's default, and it is read only while `streaming`.
+   */
+  trail?: TrailForm;
+  /**
+   * The tick the trail's one-shot began on, when `trail` names one (C04 I109,
+   * C09 I133; ruling 81) — `Ramp.since` for a ramp the document cannot address,
+   * because C09 derives the band at render.
+   *
+   * **A producer need not supply it and usually cannot**: the shell stamps it at
+   * the first frame that draws each new arrival (C22 I131), so each arrival plays
+   * the ripple once and the band then holds its final frame. Refused on a notice
+   * whose `trail` names no one-shot, for the reason `since` is refused on a
+   * periodic effect.
+   */
+  trailSince?: number;
   /** Styled runs inside `text`, by code-unit offset (§3am, I83). */
   spans?: readonly TextSpan[];
   /** The map a span's `value` reads through (I90). Required the moment any span carries one. */
@@ -598,7 +882,71 @@ export type Notice = Readonly<{
    * Absent, the notice declares nothing and is what it always was.
    */
   action?: Action;
+  /**
+   * The lifecycle state of the call this notice heads (C23 I59, R-GLY-003).
+   *
+   * **Present, the renderer resolves the head mark from it and `glyph` is the
+   * mark above one bit.** This is the seam M4's head-mark rung needs and the
+   * reason a producer cannot choose the character: above 1-bit the design draws
+   * one `●` for every state and lets **tone** say which (§030, R-BLK-125); at
+   * one bit and in ASCII tone is gone, so the **shape** has to carry it. Which
+   * rung applies is a property of the terminal reading the frame, not of the
+   * document, and `callHead` runs in a producer that has never seen one.
+   *
+   * **It moves no geometry**, which is what makes it safe: every glyph it can
+   * resolve to is one cell with no indent, so `measure` still receives no
+   * capability and `prefixCells` still reads `glyph` alone (C09 I5, I8).
+   *
+   * It replaced `Glyph.step`, a slot holding one character — `⏺` — for a
+   * position whose whole point is that it changes.
+   */
+  state?: CallState;
 }> & Padded & Floor;
+
+/**
+ * What a call head can be, in the order a call passes through them.
+ *
+ * Named here rather than derived from `Glyph` because these are **states**, and
+ * the glyphs are how a capability rung happens to draw them — the mapping is
+ * the renderer's and changes with the rung.
+ */
+export type CallState = "queued" | "waiting" | "running" | "succeeded" | "failed" | "cancelled";
+
+/**
+ * The tone a call head in each state carries (I141, R-BLK-214).
+ *
+ * **Above 1 bit this is the only carrier of the state**, since the dot is one
+ * character for five of the six, so a tone chosen apart from the state is a
+ * head that says nothing — which shipped, as `info` for every state. Exhaustive
+ * by its type: a new state is a compile error here before it is a head — `waiting` was the sixth (I149).
+ */
+export const CALL_STATE_TONE: Readonly<Record<CallState, Tone>> = Object.freeze({
+  queued: "muted",
+  // **Blocked on you** (I149, R-BLK-214): `warn`, and the blink the design
+  // draws is not built (C23 §7g ruling 8) — the tone and the word carry it.
+  waiting: "warn",
+  running: "default",
+  succeeded: "ok",
+  failed: "error",
+  cancelled: "muted",
+});
+
+/**
+ * The glyph a call head in each state carries — the mark where tone carries
+ * (I141, C09 I45). `●` for four states and `○` for `queued` at every rung,
+ * hollow because it has not started (R-BLK-220), not because tone failed.
+ */
+export const CALL_HEAD_GLYPH: Readonly<Record<CallState, Glyph>> = Object.freeze({
+  queued: "queued",
+  waiting: "work-unit",
+  running: "work-unit",
+  succeeded: "work-unit",
+  failed: "work-unit",
+  cancelled: "work-unit",
+});
+
+/** The states, in the order a call passes through them — for the validator's union check. */
+export const CALL_STATES: readonly CallState[] = Object.freeze(Object.keys(CALL_STATE_TONE) as CallState[]);
 
 export type KeyValue = Readonly<{
   kind: "keyValue";
@@ -658,6 +1006,17 @@ export type KeyValue = Readonly<{
    * exists so a *window* can say what its parent measured.
    */
   keyWidth?: number;
+  /**
+   * The shed parts drawn beneath each row, the block expanded in place (C09
+   * I124, ruling 42).
+   *
+   * **The table's expanded row, block-wide**, because the plan is block-wide:
+   * every row sheds the same parts. Written by the kind's `fold` as a
+   * shell-origin `replace` — `true`, then absent — when `⏎` lands on a shed
+   * row; a far-side `replace` drops it, as it drops every flag (C23 I84).
+   * Where the block sheds nothing at the width it draws nothing.
+   */
+  expanded?: boolean;
 }> & Padded & Floor;
 
 export type Table = Readonly<{
@@ -711,6 +1070,22 @@ export type Table = Readonly<{
    * the block cannot be checked against.
    */
   presorted?: boolean;
+  /**
+   * The row a chooser is on — **an id, never an index** (I150, C11 I33, §097,
+   * ruling 89).
+   *
+   * **The table's `active`.** A chip carries `active` and a tape `current`; a
+   * table had neither, so the completion menu marked its selection with a cell
+   * glyph, and a glyph is all a cell can carry. §097 draws the current row with
+   * `›`, the `pick` ground and its ink across the row, and the label in bold,
+   * and a ground across a row is C11's to paint.
+   *
+   * **Presence reserves the mark's cells on every row; the value places the
+   * mark.** So an id naming no row is valid and draws no mark, and a chooser
+   * whose current has scrolled out of its window keeps its labels where they
+   * were. Nothing `measure` or the plan reads follows it.
+   */
+  current?: string;
 }> & Padded & Floor;
 
 export type Steps = Readonly<{
@@ -721,6 +1096,17 @@ export type Steps = Readonly<{
     detail?: string;
     state: "pending" | "active" | "done" | "failed";
   }>[];
+  /**
+   * The shed parts drawn beneath each row, the block expanded in place (C09
+   * I124, ruling 42).
+   *
+   * **The table's expanded row, block-wide**, because the plan is block-wide:
+   * every row sheds the same parts. Written by the kind's `fold` as a
+   * shell-origin `replace` — `true`, then absent — when `⏎` lands on a shed
+   * row; a far-side `replace` drops it, as it drops every flag (C23 I84).
+   * Where the block sheds nothing at the width it draws nothing.
+   */
+  expanded?: boolean;
 }> & Padded & Floor;
 
 export type Logs = Readonly<{
@@ -747,6 +1133,17 @@ export type Events = Readonly<{
    * never carries alone (D29).
    */
   events: readonly Readonly<{ ts: string; type: string; message: string; tone?: Tone }>[];
+  /**
+   * The shed parts drawn beneath each row, the block expanded in place (C09
+   * I124, ruling 42).
+   *
+   * **The table's expanded row, block-wide**, because the plan is block-wide:
+   * every row sheds the same parts. Written by the kind's `fold` as a
+   * shell-origin `replace` — `true`, then absent — when `⏎` lands on a shed
+   * row; a far-side `replace` drops it, as it drops every flag (C23 I84).
+   * Where the block sheds nothing at the width it draws nothing.
+   */
+  expanded?: boolean;
 }> & Padded & Floor;
 
 /**
@@ -2696,6 +3093,48 @@ export type Progress = Readonly<{
    * a colormap backing is admitted — the ink fills its cell and reads by area.
    */
   ramp?: Ramp;
+  /**
+   * The fill is a **ground** rather than glyphs (§034, `R-BLK-234`, C09 I96).
+   *
+   * **Not a tenth alphabet.** §034 draws the same 62% twice — once in slant
+   * glyphs, once as fifteen spaces on `meterFill` beside nine on `bgDeep` — and
+   * says *the ground is the extent and the glyphs are the 1-bit rung*. So this
+   * is a channel choice over whatever `style` already named, and it degrades
+   * **into** that alphabet rather than into nothing.
+   *
+   * The rung is read off the ground resolving, not off a depth: a 1-bit
+   * terminal and a theme with no `meterFill` fall to the glyphs by the same
+   * predicate (C10 I8).
+   */
+  painted?: boolean;
+  /**
+   * **What is being measured** (§035, `R-PRG-001`, C09 I97).
+   *
+   * `capacity` persists and is read in the corner of the eye; `progress`
+   * completes, and when it does the bar is gone rather than full; `count` has
+   * countable units. It decides the readout beside the bar — `NN%
+   * current/total`, `NN%`, `current of total` — which is the one consequence of
+   * the three axes that moves a frame with no colour and no motion.
+   */
+  quantity?: "capacity" | "progress" | "count";
+  /**
+   * **Whether the measurement is continuous or segmented** (§035, C09 I97).
+   *
+   * It picks the alphabet where `style` names none — `continuous` → `block`,
+   * `segmented` → `slant` — and a declared `style` outranks it, which is the
+   * registry's own deferral: *use only when its texture is declared by the
+   * component*.
+   */
+  granularity?: "continuous" | "segmented";
+  /**
+   * **Whether the work is moving** (§035, §036, C09 I97).
+   *
+   * It sets `animate` on a **declared** ramp — `still` → none, `active` →
+   * `shimmer`, `stalled` → `pulse` — and a declared `animate` outranks it. It
+   * does **not** fabricate a ramp: a bar with no ink has nothing to animate,
+   * and §035 puts that carrier outside the bar, on a spinner or a text status.
+   */
+  liveness?: "still" | "active" | "stalled";
 }> & Padded & Floor;
 
 export type Code = Readonly<{
@@ -2765,6 +3204,17 @@ export type Comparison = Readonly<{
     /** The judgement axis, and the only half that takes a colour. */
     verdict?: "better" | "worse";
   }>[];
+  /**
+   * The shed parts drawn beneath each row, the block expanded in place (C09
+   * I124, ruling 42).
+   *
+   * **The table's expanded row, block-wide**, because the plan is block-wide:
+   * every row sheds the same parts. Written by the kind's `fold` as a
+   * shell-origin `replace` — `true`, then absent — when `⏎` lands on a shed
+   * row; a far-side `replace` drops it, as it drops every flag (C23 I84).
+   * Where the block sheds nothing at the width it draws nothing.
+   */
+  expanded?: boolean;
 }> & Padded & Floor;
 
 export type Hunk = Readonly<{
@@ -2806,11 +3256,16 @@ export type Patch = Readonly<{
    */
   collapsedAfter?: number;
   /**
-   * The affordances this patch offers — `view` for fullscreen (C25 §3b).
+   * The affordances this patch offers (C25 §3b). It read *`view` for
+   * fullscreen*; the kind and the screen went with the pushed view (R-EXA-082).
+   * **An `expand` naming a patch unfolds it where it carries a `cap`**: the
+   * dispatcher resolves the id through the registry's fold (C23 I84, C09 I124),
+   * which toggles `expanded`. A patch with no cap has nothing withheld, and one
+   * naming it answers *nothing to expand*.
    *
    * On the block rather than as an unconditional key binding: the offer is data
-   * the producer supplies, so a patch that should not offer fullscreen simply
-   * does not carry the action. A binding that applied to every patch would give
+   * the producer supplies, so a patch that should not offer one simply does not
+   * carry the action. A binding that applied to every patch would give
    * the block no way to decline (C04 §3).
    */
   actions?: readonly Action[];
@@ -2830,6 +3285,89 @@ export type Patch = Readonly<{
    * it exists so a *window* can say what its parent measured.
    */
   numberWidth?: number;
+  /**
+   * The collapsed form's row budget (C25 I14, D12) — **the producer's**.
+   *
+   * Hunks are admitted while the path header, the admitted hunks and one marker
+   * row fit inside it, the first always, and the rest are dropped whole behind
+   * `⋯ N more hunks`. **Data on the block and never a viewport**, so `measure`
+   * reads it as it reads `collapsedBefore` and stays pure over `(block, width)`
+   * (C25 I1). No framework route writes one: `ProducerContext.height` is `null`
+   * on every route (C07 I18), so a patch is capped where its producer says.
+   */
+  cap?: number;
+  /**
+   * The cap set aside — every hunk and the tail, in place (C25 I11, I14, D13).
+   *
+   * **Not an elision's flag**: `collapsedBefore` counts context the block does
+   * not carry, and nothing can reveal it (I11). The cap drops hunks the block
+   * *does* carry, so a flag has something to reveal. Written by the fold as a
+   * shell-origin `replace`, `true` and then absent, so a round trip restores
+   * the producer's block (C09 I124).
+   */
+  expanded?: boolean;
+}> & Padded & Floor;
+
+/**
+ * A choice — a checkbox, or one option of a radio group (C09 I105, §018,
+ * `R-FOC-003`).
+ *
+ * **One kind for both, because §018 draws them as one shape**: *a CHECKBOX and
+ * a RADIO are the same shape — the label is part of it*. What differs is the
+ * pair of marks, and that is `exclusive`: `✓`/`✗` for a thing you turn on and
+ * off, `●`/`○` for one you pick out of a set. The shape, the wash and the two
+ * channels are identical, so a second kind would be one table of marks wearing
+ * a block schema.
+ *
+ * **`chosen` and focus are independent and must stay so.** The mark carries
+ * chosen and the wash carries focus — *so you can be on an option you have not
+ * chosen, which is the whole point of a radio group* — and neither is derivable
+ * from the other. Focus is not on the block at all: it arrives in
+ * `RenderContext`, per frame, which is what keeps a producer from ever writing
+ * one (C09 I45's argument, one shape along).
+ */
+export type Choice = Readonly<{
+  kind: "choice";
+  id: string;
+  options: readonly Readonly<{
+    id: string;
+    label: string;
+    chosen?: boolean;
+  }>[];
+  /**
+   * One of the set rather than a row of switches — `●`/`○` against `✓`/`✗`.
+   *
+   * It picks the marks and nothing else: the shape, the wash and the focus
+   * treatment do not know which it is, which is §018's *the same shape*.
+   */
+  exclusive?: boolean;
+  /** The group's own name, drawn before the options — §018's `scale`. */
+  label?: string;
+}> & Padded & Floor;
+
+/**
+ * A continuous control — §018's slider (C09 I106, `R-FOC-002`).
+ *
+ * **Three states and three mechanisms, and the value is none of them.** *The
+ * VALUE is INFO and it never changes; FOCUS is the wash; INSIDE is weight plus
+ * a painted handle.* So this block carries the label, the domain and where the
+ * handle sits, and nothing about how any of the three is drawn.
+ *
+ * **`value` is the caller's string, not a formatting of `at`.** §018 draws
+ * `3e-4` against a handle a little left of centre, which no format of a
+ * fraction produces: the domain the reader is choosing in and the position on
+ * the track are two different quantities, and a control that derived one from
+ * the other would be a linear slider with a lie on the end of it.
+ */
+export type Control = Readonly<{
+  kind: "control";
+  id: string;
+  /** The control's name, first on the row and inside the wash. */
+  label: string;
+  /** Where the handle sits, 0 to 1. Clamped, on `Progress`' rule (C09 I28). */
+  at: number;
+  /** The reading, drawn last and inside the wash — `info` at every state. */
+  value: string;
 }> & Padded & Floor;
 
 export type Pills = Readonly<{
@@ -2841,6 +3379,160 @@ export type Pills = Readonly<{
     action?: Action;
     active?: boolean;
   }>[];
+}> & Padded & Floor;
+
+/**
+ * A row of peers you navigate, which slides rather than sheds (C04 §3ao, I124,
+ * §095, `R-BLK-758`–`764`).
+ *
+ * **The sibling of `Pills` and not a variant of it.** The distinction §095 draws
+ * is whether anything points into the row — a focus, a current, a key that walks
+ * it. A row of peers nobody walks can lose its tail, because nothing is pointing
+ * at what went; a tape keeps every member and moves the window instead.
+ */
+export type Tape = Readonly<{
+  kind: "tape";
+  id: string;
+  members: readonly Readonly<{
+    id: string;
+    label: string;
+    /**
+     * The all-or-nothing group — §095's elapsed time (I126).
+     *
+     * Every member's detail is shed together or none is, and it goes **before**
+     * one member goes offscreen: knowing an agent exists beats knowing how long
+     * it has run. A row with three clocks and two blanks says the blanks are
+     * still running.
+     */
+    detail?: string;
+    state?: CallState;
+  }>[];
+  /**
+   * The member the window holds — **an id, never an index** (I124).
+   *
+   * A tape's members arrive and settle while a reader is in it, and an index
+   * names a different member the moment one is inserted before it. An id naming
+   * no member is valid and draws no mark: a tape nobody is in is still a tape.
+   */
+  current?: string;
+}> & Padded & Floor;
+
+/**
+ * One node of a `tree` (C04 §3ap, I129, §105).
+ *
+ * **`children` present — even empty — is a node with a twisty; absent is a
+ * leaf.** A directory with nothing in it is still a directory (L6), and a
+ * leaf's `expanded` is ignored, because a twisty on a leaf would be a control
+ * that does nothing (L7). Each node owns its flag: a collapsed ancestor hides
+ * a descendant's without clearing it, so re-expanding restores the subtree as
+ * the reader left it (L8).
+ */
+export type TreeNode = Readonly<{
+  /** Unique within the block at any depth — each visible node is an element (C26 I6). */
+  id: string;
+  /** The name — content, and never shed (I130). */
+  label: string;
+  /** Right-aligned beside the name — §105's `4.1 kB`, one all-or-nothing group (I130). */
+  aside?: string;
+  /** Absent is collapsed, as a table row's is. */
+  expanded?: boolean;
+  children?: readonly TreeNode[];
+}>;
+
+/**
+ * A tree — the twisty is content, the guides are decoration (C04 §3ap, I129,
+ * I130, I131, §105).
+ *
+ * **A kind because of what it holds together**: expansion a reader changes per
+ * node, guides that shed apart from the names, and one focusable row per
+ * visible node. `op: "expand"` names a node as it names a table's row.
+ */
+export type Tree = Readonly<{
+  kind: "tree";
+  id: string;
+  nodes: readonly TreeNode[];
+}> & Padded & Floor;
+
+/**
+ * Two peer panes side by side, and the divider between them is a control
+ * (C04 §3aq, I132, I133, I134, §105).
+ *
+ * **`children` and not `left`/`right`**, because which blocks hold blocks is
+ * `tree.ts`'s question and the compiler answers it from this field. The
+ * divider is the left pane's bar (ruling 22, §021), so the one column is both.
+ *
+ * **`divider` is block data though a reader moves it**: it sets both panes'
+ * widths, so their heights and their elements, and a view store would hand the
+ * element walk a geometry it cannot see (C04 I18). The shell writes it with a
+ * shell-origin `replace`, as it writes a scroll's `collapsed`. The panes'
+ * offsets are view state, held by the shell under each pane's own key.
+ */
+export type Split = Readonly<{
+  kind: "split";
+  id: string;
+  /** The panes' rows — a positive integer, and the split's height at every width. */
+  height: number;
+  /**
+   * The left pane, then the right — exactly two, refused otherwise (C04 I132).
+   * One block each; several stack in a `column` group. An array and not a pair
+   * type, because every walk that maps a container's children maps this one.
+   */
+  children: readonly Block[];
+  /** The left pane's width in cells; absent is half. Clamped at read (C04 I133). */
+  divider?: number;
+}> & Padded & Floor;
+
+/**
+ * One labelled field of a form (C04 §3ar, I135–I137, §105).
+ *
+ * **`value` is block data though the reader types it**: a submit reads it, and a
+ * value held in a view store is one the producer's own `replace` cannot see.
+ * The shell writes it with a shell-origin `replace`, as it writes a split's
+ * `divider`. The draft being typed is the borrowed editor's (C17 I29) and never
+ * reaches the block until it is committed.
+ */
+export type FormField = Readonly<{
+  id: string;
+  label: string;
+  /** One line; absent is empty. */
+  value?: string;
+  /** Decoration (§094): drawn whole where it fits, dropped with no mark where it does not. */
+  hint?: string;
+  /** Content: replaces the hint, drawn as `✗` in `error` tone, and wraps (§105). */
+  error?: string;
+  /** The flag a submit writes the value under — absent is `--<id>`, `""` is positional (C04 I137). */
+  flag?: string;
+  /**
+   * Whether the field takes input (C04 I140) — the registry's `availability`
+   * axis, word for word; absent is `enabled`. `readonly` is focusable and
+   * copyable and not entered; `disabled` is no element at all, so `⇥` skips it,
+   * stands in the well (C09 I122), and is not submitted.
+   */
+  availability?: "enabled" | "readonly" | "disabled";
+}>;
+
+/** One button of a form (C04 §3ar). */
+export type FormButton = Readonly<{
+  id: string;
+  label: string;
+  action?: Action;
+  /** The action's command gains the fields' values as arguments (C04 I137) — a `fill` or `exec` only. */
+  submit?: boolean;
+  /** At most one; absent on every button, the first is the default. Its slot holds `›` (C09 I119). */
+  default?: boolean;
+}>;
+
+/**
+ * Labelled one-line fields and the buttons that act on them (C04 §3ar, I135,
+ * I136, I137, §105): *the label is Fixed, the field Grows, the hint is
+ * decoration*.
+ */
+export type Form = Readonly<{
+  kind: "form";
+  id: string;
+  /** At least one (C04 I135). */
+  fields: readonly FormField[];
+  buttons?: readonly FormButton[];
 }> & Padded & Floor;
 
 export type Tip = Readonly<{
@@ -2881,6 +3573,18 @@ export type Panel = Readonly<{
    * either way.
    */
   live?: boolean;
+  /**
+   * The age of the reading the children show, when it is stale (I127, §047,
+   * `R-HON-002`). Absent is fresh.
+   *
+   * **A number and not words**, on I38's rule and `Status.elapsedMs`'s
+   * precedent: C09 draws `updated 4m ago` from it at the top border's inline
+   * end, and dims the children while the chrome stays legible. A producer that
+   * formatted the duration would be formatting it a second time.
+   *
+   * It changes no measurement: the notice rides in the top border.
+   */
+  staleForMs?: number;
   children: readonly Block[];
 }> & Padded & Floor;
 
@@ -3227,6 +3931,14 @@ export type Image = Readonly<{
    * `measure` and `render` disagree the moment it changed between them.
    */
   data: string;
+  /**
+   * The file `b.image({ path })` read the bytes from — **a record, never a
+   * source** (I142). Nothing below the builder opens it: `data` is what is
+   * drawn and the digest is the data's, so a path gone stale changes nothing on
+   * screen. Its reader is the copy (C09 I86), and a block built from bytes has
+   * none. A non-empty string when present (I143).
+   */
+  path?: string;
   /** Rows, declared. A positive integer — `Scroll.height`'s precedent (I47). */
   height: number;
   /**
@@ -3404,17 +4116,39 @@ export type Mosaic = Readonly<{
 export type Status = Readonly<{
   kind: "status";
   id: string;
-  state: "error" | "loading" | "retrying";
+  /**
+   * **`empty` is a correct block about nothing, never an error** (C09 I85,
+   * §047, §096). It draws no banner, no mark and no error tone, and its content
+   * is centred on both axes — the vertical half inherited from the group
+   * centring `render` already does, the horizontal half its own.
+   */
+  state: "error" | "loading" | "retrying" | "empty";
+  /** Prose. It **wraps**, because losing the end loses the fact (C09 I84, §096). */
   message: string;
   /**
-   * The rows the box occupies — required, on `plot`'s argument (C09 I31).
+   * Code. It **truncates**, and it is bounded with a residue row (C09 I84, §096).
    *
-   * A box the framework sized by guess is silently wrong and nobody notices it
-   * is wrong. On the error path the registry supplies the number `measure` has
-   * already committed, which is what makes the pair self-consistent by
-   * construction rather than by agreement.
+   * The part the box did not have. A stack trace belongs here rather than joined
+   * into `message`: as prose it reflows to nine rows at 40 columns and the cap
+   * ate it; here it keeps its own lines, is cut at `DETAIL_LINE_CAP`, and says
+   * how many it dropped.
+   *
+   * **Present and empty reserves nothing.** The clause is *non-empty*, because a
+   * `detail: ""` is a producer's shrug rather than a part.
    */
-  height: number;
+  detail?: string;
+  /**
+   * The rows the box occupies — **absent, it is fitted** (C04 I66, C09 §3a-quater).
+   *
+   * Present, it is a committed measure and the box occupies it exactly: on the
+   * error path the registry supplies the number `measure` has already committed,
+   * which is what makes the pair self-consistent by construction rather than by
+   * agreement. Absent, `measure` and `render` both take `statusRowsFor` at the
+   * width they are given — the same function, so not a guess. The field was
+   * required on the argument that a guessed height is silently wrong, and what
+   * requiring it produced was `b.status` guessing 1 or 2 with no width to fit at.
+   */
+  height?: number;
   /**
    * Supplied by whoever holds the clock, never derived from `ctx.tick` (C04 I66).
    *
@@ -3482,6 +4216,12 @@ export type KnownBlockKinds = {
   comparison: Comparison;
   patch: Patch;
   pills: Pills;
+  choice: Choice;
+  control: Control;
+  tape: Tape;
+  tree: Tree;
+  split: Split;
+  form: Form;
   tip: Tip;
   panel: Panel;
   group: Group;
@@ -3503,7 +4243,7 @@ export type KnownBlockKinds = {
  * renderer that has none draws it degraded as `raw`.
  *
  * ```ts
- * declare module "@fmx/calcium" {
+ * declare module "calcium-tui" {
  *   interface BlockKinds { faulty: Faulty }
  * }
  * ```
@@ -3608,6 +4348,22 @@ export type Result<T, E> = Readonly<{ ok: true; value: T }> | Readonly<{ ok: fal
  * what it is measuring (A02 Seam 1).
  */
 export type MeasureFn = (block: Block, width: number) => number;
+
+/**
+ * A child's copy text, or `null` when that kind declines (C09 §7a, C09 I86,
+ * `R-SEL-004`).
+ *
+ * Beside `MeasureFn` because it is the same kind of thing: a seam the registry
+ * supplies so a kind answering for its children cannot reach for its own table.
+ * The one that existed was a private switch in `kinds/containers.ts` over six
+ * kinds, and five of the seven `R-SEL-004` names copied blank through it.
+ *
+ * **`null` rather than `""`, and the difference is one blank line.** A blank
+ * line is `R-SEL-004`'s **entry** separator, so a container has to tell *this
+ * child has nothing to say* from *this child is blank* — only the first may be
+ * dropped, and joining the second forges an entry boundary inside an entry.
+ */
+export type CopyFn = (child: Block) => string | null;
 
 /**
  * The registry's `width`, as a container receives it (C09 §2c, I42): the columns

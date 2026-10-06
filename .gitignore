@@ -5,6 +5,8 @@ coverage/
 .DS_Store
 test/golden/__received__/
 __pycache__/
+# The pinned browser `make chromium` fetches (A04 §3) — never committed.
+.cache/
 
 # The default state directory (C22 §3) — history and the theme preference,
 # beside whatever project the shell was opened in.
@@ -18,3 +20,20 @@ __pycache__/
 docs/catalogue/
 .refdiff/
 docs/refdiff/*.txt
+
+# **Outputs and scratch, never the record** (review batch 2, M4 item 5). 684
+# files and ~92 MB of these were committed. A finding keeps its evidence in
+# its own text: of 38 `out/` probes FINDINGS cites, 36 are in no tree and
+# the entries still stand, because each carries what its probe measured.
+# `captures/` is capture-foreign's default output; `out/` is the probes' and
+# the mutation sweep's (`out/mutate-sweep/`, recreated by `sweep.mjs`).
+captures/
+out/
+/*.zip
+/probe-*.mjs
+/.mut-seam.out
+*.swp
+*.swo
+.swp
+.swo
+*.bak

@@ -56,12 +56,27 @@ function fakeFs(): FileSystem {
 }
 
 const FRAME: FrameQueries = {
-  copyMode: () => false,
-  enterCopyMode: () => undefined,
-  exitCopyMode: () => undefined,
-  region: () => ({ top: 1, height: 20 }),
+  nativeSelection: () => false,
+  semanticSelection: () => false,
+  semanticSelectionCount: () => 0,
+  semanticDrag: () => false,
+  enterSemanticSelection: () => undefined,
+  escapeSemanticSelection: () => undefined,
+  selectEntryUnderCaret: () => undefined,
+  selectAllLoadedEntries: () => undefined,
+  copySelectedEntries: () => undefined,
+  copyAndLeaveSemanticSelection: () => undefined,
+  toggleSemanticRect: () => undefined,
+  toast: () => undefined,
+    moveSemanticCaret: () => undefined,
+  enterNativeSelection: () => undefined,
+  exitNativeSelection: () => undefined,
+  // The transcript's box as the frame composes it (C14 I57): one column in
+  // for the rail, and one narrower than the layer region.
+  region: () => ({ top: 1, left: 1, height: 20, width: 79 }),
   overlayRegion: () => ({ width: 80, height: 24 }),
   promptAnchor: () => ({ row: 21, rows: 1 }),
+  promptCap: () => 12,
   mouseEnabled: () => false,
   raiseExitConfirm: () => undefined,
 };
@@ -312,6 +327,7 @@ describe("C22 §3 — construction order", () => {
       let sealed = false;
       return {
         submit: () => undefined,
+        emitLocal: async () => undefined,
         seal: () => void (sealed = true),
         // C16's new low rung reads these (C23 §8a, the subscription rung).
         liveStreams: 0,
@@ -326,7 +342,7 @@ describe("C22 §3 — construction order", () => {
         register: () => undefined,
         onAction: () => undefined,
         identityNotice: () => undefined,
-      releaseView: () => undefined,
+        refuse: () => undefined,
       visibilityChanged: () => undefined,
       resized: () => undefined,
     producerContext: () => producerContext(),
@@ -401,7 +417,7 @@ describe("C22 §3 — construction order", () => {
     expect(graph.capabilities.colourDepth).toBe(8);
   });
 
-  it("T1.14 (C01 I13): the viewport is built against the real terminal width", async () => {
+  it("C22 T1.183 (C01 I13): the viewport is built against the real terminal width", async () => {
     // The pair §3a could not see, because the constraint lives in C01. The
     // viewport takes width and height at step 5; only `lifecycle.ts` may read
     // them; and the lifecycle is step 7 and cannot move, because I1. Resolved
@@ -485,6 +501,7 @@ describe("C22 §3 — construction order", () => {
           seen = deps;
           return {
             submit: () => undefined,
+            emitLocal: async () => undefined,
             seal: () => undefined,
             sealed: true,
             liveStreams: 0,
@@ -495,7 +512,7 @@ describe("C22 §3 — construction order", () => {
             register: () => undefined,
             onAction: () => undefined,
             identityNotice: () => undefined,
-      releaseView: () => undefined,
+            refuse: () => undefined,
       visibilityChanged: () => undefined,
       resized: () => undefined,
     producerContext: () => producerContext(),
@@ -723,6 +740,7 @@ describe("C22 §3 — construction order", () => {
     const graph = await build({
       pipeline: () => ({
         submit: () => undefined,
+        emitLocal: async () => undefined,
         seal: () => undefined,
         sealed: true,
         liveStreams: 0,
@@ -735,7 +753,7 @@ describe("C22 §3 — construction order", () => {
         register: () => undefined,
         onAction: () => undefined,
         identityNotice: () => undefined,
-      releaseView: () => undefined,
+        refuse: () => undefined,
       visibilityChanged: () => undefined,
       resized: () => undefined,
     producerContext: () => producerContext(),
@@ -758,6 +776,56 @@ describe("C22 §3 — construction order", () => {
     route = "app";
     graph.graph.router.dispatch(ctrlC);
     expect(cancelled, "a value captured at step 9 would still read null").toBe(1);
+  });
+});
+
+describe("C16 I49 — a shell delegation consumes at the child rung (review batch 2, M5 item 8)", () => {
+  it("T4.84 (C16 I49, ruling 62): F1 during a shell delegation submits nothing", async () => {
+    // **A delegation registers no `child` handler**, which is the difference
+    // from an attached surface (T1.106): every key passed at the rung and fell
+    // to `global`, where `F1` is `/help keys`, so a reader pressing it inside a
+    // delegated `vim` submitted a host command behind it. Built through the
+    // graph with the route as a pull — the rung reads the route, and a real PTY
+    // would add nothing the row is about.
+    let route: "app" | "local" | "shell" | null = null;
+    const emitted: string[] = [];
+    const graph = await build({
+      pipeline: () => ({
+        submit: () => undefined,
+        emitLocal: async (line: string) => void emitted.push(line),
+        seal: () => undefined,
+        sealed: true,
+        liveStreams: 0,
+        faults: [],
+        cancelNewestStream: () => false,
+        get inFlight() {
+          return route;
+        },
+        cancel: () => undefined,
+        register: () => undefined,
+        onAction: () => undefined,
+        identityNotice: () => undefined,
+        refuse: () => undefined,
+        visibilityChanged: () => undefined,
+        resized: () => undefined,
+        producerContext: () => producerContext(),
+        greeting: () => undefined,
+        reserveGreeting: () => null,
+        abandonGreeting: () => undefined,
+        dispose: () => undefined,
+      }),
+    });
+    const f1 = { kind: "key", key: { name: "f1", ctrl: false, meta: false, shift: false, sequence: "" } } as never;
+
+    // **The control**: with nothing delegated, `F1` is `/help keys`.
+    graph.graph.router.dispatch(f1);
+    expect(emitted, "idle: the help route").toEqual(["/help keys"]);
+
+    route = "shell";
+    expect(graph.graph.router.target, "delegated: the child rung").toBe("child");
+    expect(graph.graph.router.dispatch(f1), "consumed").toBe(true);
+    expect(emitted, "and nothing was submitted behind the child").toEqual(["/help keys"]);
+    expect(graph.graph.router.lastStages.at(-1)).toBe("child:consumed");
   });
 });
 
@@ -915,13 +983,13 @@ describe("C22 §2b — the completion sources", () => {
     const notices = JSON.stringify(graph.transcript.entries);
     expect(notices, "and the repair still says so").toContain("theme preference ignored");
     // **F215** — the set's own names, not the two literals that outlived C10 I27.
-    expect(notices).toContain("high-contrast");
+    expect(notices).toContain("hcDark");
   });
 
   it("T1.20f (I68): a polarity no theme in the set declares keeps the default, silently", async () => {
     // §6h.2 row 4. The set is the app author's, so a notice would be the
     // framework reporting on their choice to their user.
-    const noLight = { dark: defaultTheme["dark"]!, "high-contrast": defaultTheme["high-contrast"]! };
+    const noLight = { dark: defaultTheme["dark"]!, hcDark: defaultTheme["hcDark"]! };
     const { graph } = await build({
       fs: seeded().fs,
       theme: noLight,

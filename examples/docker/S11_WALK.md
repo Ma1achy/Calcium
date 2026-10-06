@@ -72,7 +72,7 @@ interesting about it.
 *`docker diff` on a container that has written nothing prints nothing and exits 0*
 (measured: `dtui-quiet`, an `alpine sleep`, zero lines, rc 0).
 
-Fourth instance of the empty-block class — after `/drift`'s all-identical frame, `/config`'s
+Fourth instance of the empty-block class — after `/drift`'s all-identical frame, `/filediff`'s
 two sides agreeing, and `/logs`' container with no output. **Ruling: an empty result
 renders a muted notice saying so in words, never an empty block.** `b.table`'s
 `emptyMessage` carries it for `/images` and `/top`; `/diff` and `/port` build the notice

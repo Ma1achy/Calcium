@@ -11,7 +11,7 @@ import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { measurable, FULL_CAPS, ASCII_CAPS } from "../support/render.js";
 import { measureSequence, rowsDoc } from "../support/viewport.js";
-import { REGION, anchored, centred, placeIn, registry, rows, view } from "../support/overlay.js";
+import { REGION, anchored, centred, covering, placeIn, registry, rows } from "../support/overlay.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 
@@ -56,18 +56,6 @@ describe("C15 integration — measurement", () => {
 });
 
 describe("C15 integration — against the viewport", () => {
-  it("T4.4 (with C14): a view occupies exactly the region the viewport reports", () => {
-    const store = createTranscriptStore();
-    for (let i = 0; i < 5; i += 1) store.append(rowsDoc(4, `e${i}`));
-    const viewport = createViewport(store, { width: 60, height: 14, measureSequence });
-
-    const region = { width: 60, height: viewport.scroll.viewportHeight };
-    const [p] = placeIn([view("dash")], region);
-
-    expect(p).toMatchObject({ top: 0, left: 0, height: region.height, width: region.width });
-    viewport.dispose();
-  });
-
   it("T4.5 (with C14, I14): an anchored layer follows a scrolling row through update", () => {
     // C15 is *driven* here, not subscribed. The owner translates a transcript
     // row into a region row and calls `update`; C15 learns nothing about C13.
@@ -112,20 +100,27 @@ describe("C15 integration — against the viewport", () => {
     const rung = (): "dismissed" | "noop" | "fellThrough" => {
       const top = m.top;
       if (top === null) return "fellThrough";
-      if (!top.dismissable) return "noop";
+      if (top.dismissal !== "escape") return "noop";
       m.pop();
       return "dismissed";
     };
 
     expect(rung()).toBe("fellThrough");
 
-    m.push(view("dash"));
-    m.push(centred("confirm", 3, { dismissable: false }));
+    // **An escapable advisory, not a panel.** It was a dashboard (R-EXA-082,
+    // F1254) and a panel is the obvious replacement and the wrong one: I28
+    // closes every open panel when a blocking layer arrives, so the state this
+    // row needs — something dismissable still sitting under an unanswered
+    // question — is one this component will not hold with a panel in it. An
+    // overlay is untouched by the arrival, which is the state the ladder has
+    // to get right.
+    m.push(centred("advisory", 3));
+    m.push(centred("confirm", 3, { blocking: true, dismissal: "answer" }));
     expect(rung()).toBe("noop");
-    // The whole point: the dashboard is still there. The collapsed form —
+    // The whole point: the layer beneath is still there. The collapsed form —
     // `if (pop()) …` — falls to the next rung and pops it out from under an
     // unanswered confirm.
-    expect(m.stack.map((l) => l.id)).toEqual(["dash", "confirm"]);
+    expect(m.stack.map((l) => l.id)).toEqual(["advisory", "confirm"]);
 
     m.dismiss("confirm");
     expect(rung()).toBe("dismissed");
@@ -160,19 +155,21 @@ describe("C15 integration — against its consumers", () => {
     expect(kinds.filter((k) => k === "content")).toHaveLength(7);
   });
 
-  it("T4.9 (with C25): a fullscreen patch is a view of one block, paged by update", () => {
+  it("T4.9 (with C25): a layer of one oversized block is reported truncated, and `Placed` never gains an offset", () => {
+    // **Re-aimed off the fullscreen patch** (R-EXA-082, F1254). That layer was
+    // C25 §3b's pushed view and its `n`/`p` paging went with it. What the row
+    // was ever about is this component holding no offset of its own: content
+    // taller than the region is **reported** rather than clipped, and the
+    // remedy is the owner replacing the content, not C15 growing a scroll.
     const hunk = (n: number): readonly Block[] => rows(n, "patch");
     const m = createOverlayManager({ registry });
-    m.push({ ...view("patch"), content: hunk(40) });
+    m.push({ ...covering("patch"), content: hunk(40) });
 
     const first = m.layout(REGION)[0];
     expect(first?.height).toBe(REGION.height);
-    // Taller than the region, and reported rather than clipped — C15 has no
-    // scroll offset for views and must not grow one (§4).
     expect(first?.truncated).toBe(true);
 
-    // `n`, the next hunk: the owner rewindows and calls update. `Placed` gains
-    // nothing.
+    // The owner rewindows and calls update. `Placed` gains nothing.
     m.update("patch", { content: hunk(40) });
     expect(m.layout(REGION)[0]).toMatchObject({ top: 0, left: 0 });
   });

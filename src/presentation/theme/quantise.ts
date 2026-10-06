@@ -92,6 +92,15 @@ function deltaE(a: readonly [number, number, number], b: readonly [number, numbe
 const TIE = 0.02;
 
 /**
+ * Which cube entries a slot may take, asked of the entry's hex (C10 I69). A slot
+ * with no entry takes any: the floor is where the gate is, and a slot the gate
+ * does not measure on this ground is not held to anything here.
+ */
+export type Admits = Readonly<Record<string, (hex: string) => boolean>>;
+
+const everything = (): boolean => true;
+
+/**
  * Assign the whole palette at once so that no genuinely-ranked pair inverts.
  * That is what "rank order preserved" (I6) buys: if `dim` was darker than
  * `default` in 24-bit, it stays darker after quantisation.
@@ -100,9 +109,12 @@ const TIE = 0.02;
  * taken (I17). `ok` and `error` landing together is a failed row that reads as a
  * passing one; two quiet greys colliding costs nothing and is allowed.
  */
-export function computeQuantisation(slots: Readonly<Record<string, string>>): Readonly<Record<string, number>> {
+export function computeQuantisation(
+  slots: Readonly<Record<string, string>>,
+  admits?: Admits,
+): Readonly<Record<string, number>> {
   const ordered = Object.entries(slots)
-    .map(([slot, hex]) => ({ slot, lum: luminance(hex), lab: toLab(hex) }))
+    .map(([slot, hex]) => ({ slot, hex: hex.toLowerCase(), lum: luminance(hex), lab: toLab(hex), admits: admits?.[slot] ?? everything }))
     .sort((a, b) => a.lum - b.lum);
 
   // I6 — rank order, by level rather than by neighbour.
@@ -145,7 +157,10 @@ export function computeQuantisation(slots: Readonly<Record<string, string>>): Re
     levels[levels.length - 1]!.push(entry);
   }
 
-  const rows = levels.map((members) => members.map((m) => BY_LUM.map((c) => deltaE(m.lab, c.lab))));
+  // I69 — an entry a member's floor refuses is not a distance at all, so the
+  // DP places the floor exactly as it places rank: as a constraint on the one
+  // problem, never as a pass after it.
+  const rows = levels.map((members) => members.map((m) => BY_LUM.map((c) => (m.admits(c.hex) ? deltaE(m.lab, c.lab) : Infinity))));
 
   // dp[u] — the cheapest way to place every level so far with nothing above u.
   let dp = new Array(BY_LUM.length).fill(0) as number[];
@@ -184,31 +199,51 @@ export function computeQuantisation(slots: Readonly<Record<string, string>>): Re
   let at = 0;
   for (let u = 1; u < dp.length; u++) if (dp[u]! < dp[at]!) at = u;
 
-  const ceilings: number[] = new Array(levels.length).fill(0);
-  for (let i = levels.length - 1; i >= 0; i--) {
-    ceilings[i] = at;
-    at = back[i]![at]!;
-  }
-
-  let floorAt = 0;
-  for (let i = 0; i < levels.length; i++) {
-    const lower = BY_LUM[floorAt]!.lum;
-    const upper = BY_LUM[ceilings[i]!]!.lum;
-    for (const member of levels[i]!) {
-      member.pick = nearest(member.lab, (c) => c.lum >= lower && c.lum <= upper);
+  if (Number.isFinite(dp[at]!)) {
+    const ceilings: number[] = new Array(levels.length).fill(0);
+    for (let i = levels.length - 1; i >= 0; i--) {
+      ceilings[i] = at;
+      at = back[i]![at]!;
     }
-    floorAt = ceilings[i]!;
+
+    let floorAt = 0;
+    for (let i = 0; i < levels.length; i++) {
+      const lower = BY_LUM[floorAt]!.lum;
+      const upper = BY_LUM[ceilings[i]!]!.lum;
+      for (const member of levels[i]!) {
+        member.pick = nearest(member.lab, (c) => c.lum >= lower && c.lum <= upper && member.admits(c.hex));
+      }
+      floorAt = ceilings[i]!;
+    }
+  } else {
+    // **No assignment holds both the floor and rank** (I69, §4c.4 row 5). Two
+    // ways in: a member no entry admits — a ground whose inks sit on both sides
+    // at a floor no cube ground gives both — or a lower-ranked member admitting
+    // only the light side of its ground and a higher-ranked one only the dark
+    // side of its own, which one set holds only with members on different
+    // grounds, the hue inks. The floor holds and rank yields: each member takes
+    // its nearest admitted entry, and one admitted nowhere its nearest. Measured
+    // on the shipped themes it is never reached; `resolve` is total (I1), so it
+    // is answered rather than thrown.
+    for (const member of chosen) member.pick = nearest(member.lab, (c) => member.admits(c.hex));
   }
 
   // I17 at 8-bit — the five tones whose confusion would mislead. Invisible in
   // truecolour, which is where every value was authored and every golden will be
   // reviewed, so nothing but this check would ever report it.
-  const taken = new Set<number>();
+  //
+  // **Two slots the set gives one value are one ink, not a collision** (§4c.4
+  // row 6). I17's premise is that no two slots carry the same 24-bit value, and
+  // a band breaks it on purpose: every slot on it is the band's one ink
+  // (R-THM-005), so separating them split `hcLight`'s black focus ink into five
+  // near-blacks and its selection white into five near-whites.
+  const taken = new Map<number, string>();
   for (let i = 0; i < chosen.length; i++) {
     const entry = chosen[i]!;
     if (!MUST_STAY_DISTINCT.includes(entry.slot)) continue;
-    if (!taken.has(entry.pick.index)) {
-      taken.add(entry.pick.index);
+    const holder = taken.get(entry.pick.index);
+    if (holder === undefined || holder === entry.hex) {
+      taken.set(entry.pick.index, entry.hex);
       continue;
     }
 
@@ -216,10 +251,21 @@ export function computeQuantisation(slots: Readonly<Record<string, string>>): Re
     // separating two tones cannot reintroduce the inversion the DP just ruled
     // out. A distinctness fix that broke rank order would trade one invariant
     // for another and pass both tests separately.
+    //
+    // **Where the floor leaves that window empty, the order of what yields is
+    // ruled, not found** (I69, §4c.4 row 4): the floor holds first, distinctness
+    // second and rank last. `paper`'s `ok` is the case — on its page the DP gives
+    // it and `info` one grey, and the window its neighbours leave has no free
+    // entry that clears, so the nearest-overall fallback this line used to reach
+    // put it back on the green that misses, at 3.54 against 4.5.
     const lower = chosen[i - 1]?.pick.lum ?? -Infinity;
     const upper = chosen[i + 1]?.pick.lum ?? Infinity;
-    entry.pick = nearest(entry.lab, (c) => !taken.has(c.index) && c.lum >= lower && c.lum <= upper);
-    taken.add(entry.pick.index);
+    const free = (c: (typeof CUBE)[number]): boolean => !taken.has(c.index) && entry.admits(c.hex);
+    entry.pick =
+      closest(entry.lab, (c) => free(c) && c.lum >= lower && c.lum <= upper) ??
+      closest(entry.lab, free) ??
+      nearest(entry.lab, (c) => entry.admits(c.hex));
+    taken.set(entry.pick.index, entry.hex);
   }
 
   const out: Record<string, number> = {};
@@ -242,25 +288,27 @@ function nearest(
   lab: readonly [number, number, number],
   allowed?: (candidate: (typeof CUBE)[number]) => boolean,
 ): (typeof CUBE)[number] {
+  return closest(lab, allowed) ?? closest(lab)!;
+}
+
+/** Nearest cube entry satisfying `allowed`, or `undefined` where none does. */
+function closest(
+  lab: readonly [number, number, number],
+  allowed?: (candidate: (typeof CUBE)[number]) => boolean,
+): (typeof CUBE)[number] | undefined {
   let best: (typeof CUBE)[number] | undefined;
   let bestDistance = Infinity;
-  let fallback = CUBE[0]!;
-  let fallbackDistance = Infinity;
 
   for (const candidate of CUBE) {
-    const d = deltaE(lab, candidate.lab);
-    if (d < fallbackDistance) {
-      fallbackDistance = d;
-      fallback = candidate;
-    }
     if (allowed !== undefined && !allowed(candidate)) continue;
+    const d = deltaE(lab, candidate.lab);
     if (d < bestDistance) {
       bestDistance = d;
       best = candidate;
     }
   }
 
-  return best ?? fallback;
+  return best;
 }
 
 // --- the shipped table ------------------------------------------------------

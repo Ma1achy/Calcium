@@ -37,7 +37,7 @@
  * out the same id from different modules.
  */
 
-import { HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, block, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
+import { CALL_HEAD_GLYPH, HAS_CALLOUT, HAS_DETAIL_RUNGS, HAS_Y_GUTTER, HIERARCHY_ROLE, HONOURS_AXIS_CROSS, IS_FIELD_FORM, IS_MATRIX, ORIGIN_DEFAULT, STYLE_ARMS, block, cell, hierarchyFault, markdownBlocks, rebuild } from "../../data/viewmodel/index.js";
 import { samplesChildren, samplesLayout, type Sample, type SamplesOptions, samplesScale } from "./samples.js";
 import { readFileSync } from "node:fs";
 import { digestOf, intralineLines, overlayFault, parseAreas } from "../../data/viewmodel/index.js";
@@ -69,6 +69,15 @@ import type {
   Scroll,
   Patch,
   Pills,
+  Choice,
+  Control,
+  Tape,
+  Tree,
+  Split,
+  Form,
+  FormField,
+  FormButton,
+  TreeNode,
   Plot,
   Progress,
   Ramp,
@@ -91,6 +100,7 @@ import type {
   NoticeOpts,
   CellInput,
   ChipInput,
+  TapeMember,
   ComparisonRow,
   EventLine,
   KeyValueInput,
@@ -192,7 +202,10 @@ function rule(label: string, meta?: string, opts?: RuleOpts): Rule {
 }
 
 function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: NoticeOpts): Notice {
-  const g = glyphFor(tone, glyph);
+  // **A call head's glyph is its state's** (C04 I141): derived here when the
+  // caller names none, so an author states the state and never the mark. A
+  // stated tone or glyph that disagrees is refused by construction, not fixed.
+  const g = opts?.state !== undefined && glyph === undefined ? CALL_HEAD_GLYPH[opts.state] : glyphFor(tone, glyph);
   return finish<Notice>(
     {
       kind: "notice",
@@ -205,6 +218,15 @@ function noticeOf(tone: Tone, text: string, glyph?: Glyph, opts?: NoticeOpts): N
       // The one button (C04 §3, arc 6 §5) — written only when supplied, so a
       // notice without one is byte-identical to what this built before.
       ...(opts?.action === undefined ? {} : { action: opts.action }),
+      // **The call state, and it is what makes the notice a head** (C09 I45):
+      // present, the renderer resolves the mark by capability and the row joins
+      // the focus ring; absent, the notice is an ordinary line.
+      ...(opts?.state === undefined ? {} : { state: opts.state }),
+      // **The stream's two members** (C04 I122, C04 I123): written only when
+      // supplied, so a settled notice is byte-identical to what this built
+      // before and the band costs nothing it does not draw.
+      ...(opts?.streaming === undefined ? {} : { streaming: opts.streaming }),
+      ...(opts?.trail === undefined ? {} : { trail: opts.trail }),
     } as Notice,
     opts,
     false,
@@ -311,7 +333,13 @@ function col(key: string, spec?: Partial<Omit<ColumnDef, "key">>): ColumnDef {
   return Object.freeze({
     key,
     label: key,
-    align: "left" as const,
+    // **No alignment declared, so C11 derives it from the cells** (C11 I27,
+    // §078 `R-TBL-001`). `left` sat here beside `priority` and `minWidth` and
+    // was described in the same sentence as them — *a surface that cares sets
+    // them* — so it was already a default rather than a declaration. The
+    // difference is that the other two have no better answer and this one does:
+    // the column's own values. A surface that means `left` over numbers still
+    // says so through `spec`.
     priority: 50,
     minWidth: 8,
     sortable: false,
@@ -1033,9 +1061,19 @@ function spark(values: readonly number[], opts?: BlockOpts): Plot {
  * decoration over a number that is already correct.
  */
 function progress(
-  spec: BlockOpts & { label: string; current: number; total: number; style?: string; ramp?: Ramp },
+  spec: BlockOpts & {
+    label: string;
+    current: number;
+    total: number;
+    style?: string;
+    ramp?: Ramp;
+    painted?: boolean;
+    quantity?: Progress["quantity"];
+    granularity?: Progress["granularity"];
+    liveness?: Progress["liveness"];
+  },
 ): Progress {
-  const { label, current, total, style, ramp } = spec;
+  const { label, current, total, style, ramp, painted, quantity, granularity, liveness } = spec;
   return finish<Progress>(
     {
       kind: "progress",
@@ -1046,6 +1084,14 @@ function progress(
       ...(style === undefined ? {} : { style }),
       // An ink over the bar's `on` cells, along the axis (C04 I108).
       ...(ramp === undefined ? {} : { ramp }),
+      // §034's painted rung (C09 I96): the fill is a ground, and the alphabet
+      // `style` names is where it degrades to rather than a peer of it.
+      ...(painted === undefined ? {} : { painted }),
+      // §035's three axes (C09 I97) — independent, each with one consequence,
+      // and each outranked by the explicit declaration it stands in for.
+      ...(quantity === undefined ? {} : { quantity }),
+      ...(granularity === undefined ? {} : { granularity }),
+      ...(liveness === undefined ? {} : { liveness }),
     } as Progress,
     spec,
     false,
@@ -1105,9 +1151,17 @@ function patch(
      * the one a hand audit walks past.
      */
     actions?: readonly Action[];
+    /**
+     * The collapsed form's row budget (C25 I14, D12) — passed through, never
+     * defaulted. **No route here knows a viewport**: `ProducerContext.height`
+     * is `null` on every route (C07 I18), so a default would be a constant
+     * standing in for one, which C25 §3a argues is wrong at both ends. A
+     * producer that knows how many rows it wants to spend states it.
+     */
+    cap?: number;
   },
 ): Patch {
-  const { path, language, hunks, layout, collapsedAfter, actions } = spec;
+  const { path, language, hunks, layout, collapsedAfter, actions, cap } = spec;
   return finish<Patch>(
     {
       kind: "patch",
@@ -1122,6 +1176,7 @@ function patch(
       ...(layout === undefined ? {} : { layout }),
       ...(collapsedAfter === undefined ? {} : { collapsedAfter }),
       ...(actions === undefined ? {} : { actions }),
+      ...(cap === undefined ? {} : { cap }),
     } as Patch,
     spec,
     true,
@@ -1130,6 +1185,122 @@ function patch(
 
 function pills(chips: readonly ChipInput[], opts?: BlockOpts): Pills {
   return finish<Pills>({ kind: "pills", id: idOf(opts, "pills"), chips } as Pills, opts, false);
+}
+
+/**
+ * A checkbox, or one radio group — §018's two forms of one shape (C09 I105).
+ *
+ * `exclusive` picks the marks and nothing else: `●`/`○` for one of a set,
+ * `✓`/`✗` for a thing you turn on and off. **Focus is not a parameter** — it
+ * arrives in the render context, per frame, which is what keeps a producer
+ * from ever writing one; `chosen` is the datum and the wash is not.
+ */
+function choice(
+  options: readonly Readonly<{ id: string; label: string; chosen?: boolean }>[],
+  opts?: BlockOpts & { exclusive?: boolean; label?: string },
+): Choice {
+  return finish<Choice>(
+    {
+      kind: "choice",
+      id: idOf(opts, "choice"),
+      options,
+      ...(opts?.exclusive === undefined ? {} : { exclusive: opts.exclusive }),
+      ...(opts?.label === undefined ? {} : { label: opts.label }),
+    } as Choice,
+    opts,
+    false,
+  );
+}
+
+/**
+ * A continuous control — §018's slider (C09 I106).
+ *
+ * **`value` is a string and not a formatting of `at`.** The domain the reader
+ * is choosing in and the position on the track are two quantities: §018 draws
+ * `3e-4` against a handle a little left of centre, which no format of a
+ * fraction produces, and deriving one from the other would be a linear slider
+ * with a lie on the end of it.
+ */
+function control(label: string, at: number, value: string, opts?: BlockOpts): Control {
+  return finish<Control>({ kind: "control", id: idOf(opts, "control"), label, at, value } as Control, opts, false);
+}
+
+/**
+ * A row of peers you navigate, which slides rather than sheds (C04 §3ao, §095).
+ *
+ * `current` is a member's **id** and not an index (C04 I124): a tape's members
+ * arrive and settle while a reader is in it, and an index names a different
+ * member the moment one is inserted before it. An id naming no member is valid
+ * and draws no mark — a tape nobody is in is still a tape.
+ */
+function tape(members: readonly TapeMember[], current?: string, opts?: BlockOpts): Tape {
+  return finish<Tape>(
+    {
+      kind: "tape",
+      id: idOf(opts, "tape"),
+      members,
+      ...(current === undefined ? {} : { current }),
+    } as Tape,
+    opts,
+    false,
+  );
+}
+
+/**
+ * A tree — the twisty is content, the guides are decoration (C04 §3ap, §105).
+ *
+ * `children` present, even empty, is a node with a twisty; `expanded` absent is
+ * collapsed. Node ids are unique within the tree at any depth (C04 I129),
+ * because each visible node is an element and `expand` names one.
+ */
+function tree(nodes: readonly TreeNode[], opts?: BlockOpts): Tree {
+  return finish<Tree>({ kind: "tree", id: idOf(opts, "tree"), nodes } as Tree, opts, true);
+}
+
+/**
+ * Two peer panes and a divider that is a control (C04 §3aq, §105).
+ *
+ * One block per pane — stack several in `b.group("column", …)`. `divider` is
+ * the left pane's width in cells, absent for half; the reader moves it, and a
+ * producer that sets it is stating where it opens (C04 I133).
+ */
+function split(
+  height: number,
+  left: Block,
+  right: Block,
+  opts?: BlockOpts & { divider?: number },
+): Split {
+  if (!Number.isInteger(height) || height < 1) {
+    throw new TypeError(`b.split: height is a positive integer — got ${JSON.stringify(height)} (C04 I132)`);
+  }
+  return finish<Split>(
+    {
+      kind: "split",
+      id: idOf(opts, "split"),
+      height,
+      children: [left, right],
+      ...(opts?.divider === undefined ? {} : { divider: opts.divider }),
+    } as Split,
+    opts,
+    true,
+  );
+}
+
+/**
+ * §105's form (C04 §3ar): labelled fields and the buttons that act on them. A
+ * section, as a table is — so it takes `gapBefore` (C24 §4).
+ */
+function form(fields: readonly FormField[], buttons?: readonly FormButton[], opts?: BlockOpts): Form {
+  return finish<Form>(
+    {
+      kind: "form",
+      id: idOf(opts, "form"),
+      fields,
+      ...(buttons === undefined ? {} : { buttons }),
+    } as Form,
+    opts,
+    true,
+  );
 }
 
 function tip(text: string, actions?: readonly Action[], opts?: BlockOpts): Tip {
@@ -1205,6 +1376,9 @@ function image(
       `b.image: exactly one of "data" or "path" — got ${data === undefined ? "neither" : "both"} (C04 I73)`,
     );
   }
+  // The validator's rule, before the read — not whatever `readFileSync("")`
+  // happens to throw (C04 I143).
+  if (path === "") throw new TypeError('b.image: "path" cannot be empty (C04 I143)');
   if (!Number.isInteger(height) || height < 1) {
     throw new TypeError(`b.image: height is a positive integer — got ${JSON.stringify(height)} (C04 I73)`);
   }
@@ -1240,6 +1414,9 @@ function image(
       // different overlays should decode once. The *picture's* identity is
       // `imageKey`, derived where it is needed and by one function.
       digest: digestOf(bytes),
+      // **Kept as a record beside the bytes** (C04 I142) — the copy's second
+      // line. Nothing below this function opens it.
+      ...(path === undefined ? {} : { path }),
       ...(overlay === undefined ? {} : { overlay }),
     } as Image,
     opts,
@@ -1546,20 +1723,24 @@ function spinner(label: string, opts?: BlockOpts): Steps {
  * `status` — the kind both framework defaults return, and the one no builder made
  * (C24 I30, §4b, §8d).
  *
- * **The parameters are `renderError`'s own, in its own order**, so the null
- * override is `renderError: b.status` and the useful one wraps it:
- * `b.group("column", [history, b.status(err, retryInMs, attempt)])`, which keeps
- * the data the default replaces outright.
+ * **The parameters are `renderError`'s own, in its own order**, and the useful
+ * override wraps it: `b.group("column", [history, b.status(err, retryInMs,
+ * attempt)])`, which keeps the data the default replaces outright.
+ * `renderError: b.status` is **not** the null override (C24 §4b): the default is
+ * the framed figure, and this is the free-standing one, so inside a live panel it
+ * draws a border within the border.
  *
  * **What is relayed and what is derived, which is the whole of the ruling.** A
  * consumer is *handed* the error, the countdown and the attempt by the driver, so
  * passing them back is relaying rather than claiming — the thing MG27 refuses is a
  * `state` asserted against a fetch that never failed, and `state` is derived here
- * from whether a countdown is present. `height` is derived too, and it is the one
- * the scoping does not reach: 1 and 2 are C23's frame read about sitting inside
- * `b.live`'s panel (F234, F235), so a consumer choosing 3 puts a second border
- * inside the first and a consumer choosing 2 draws `loading` over `⠋ loading`.
- * `elapsedMs` and `spinner` are never parameters at all.
+ * from whether a countdown is present. `height` is **fitted** and never a
+ * parameter (C09 §3a-quater): the box carries none, and `measure` sizes it at the
+ * width the layout hands it — border, banner, the message wrapped whole, the
+ * detail within its cap. It used to declare 1 or 2, read from a frame inside
+ * `b.live`'s panel and applied here to a box in no panel, which cut every message
+ * longer than a row and dropped `details` whole. `elapsedMs` and `spinner` are
+ * never parameters at all.
  *
  * **One implementation, and that is the other half.** This kind was constructed in
  * three places — here, `execution.ts`'s default `renderError`, and the registry's
@@ -1574,6 +1755,50 @@ function statusBlock(
   opts?: BlockOpts,
 ): Status {
   return framedStatus(err, retryInMs, attempt, false, opts);
+}
+
+/**
+ * `ErrorLike.details` as the detail part's lines, or `""` when there are none.
+ *
+ * **One `key: value` per line and no nesting**, because the part *truncates*: a
+ * cut has to take whole facts, and a pretty-printed object cut at three rows
+ * leaves a reader holding an open brace. A value that is itself structured is
+ * `JSON.stringify`d onto its own line and cut at the width like any other, which
+ * is honest about being evidence rather than a document.
+ */
+function detailFrom(err: ErrorLike): string {
+  const held = err.details;
+  if (held === undefined) return "";
+  return Object.entries(held)
+    .map(([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`)
+    .join("\n");
+}
+
+/**
+ * The fourth state, and the one that is not a failure (C09 I85, §047).
+ *
+ * **A correct block about nothing, never an error.** No banner, no mark, no red,
+ * and the message centred on both axes. It takes a message rather than deriving
+ * one because *it says what it searched* is half of §047's figure — `No matches
+ * for "elementsIn" in src/.` is a better empty block than `No data.`, and only
+ * the caller knows what it looked for.
+ *
+ * **The height is the caller's on `plot`'s argument** (C09 I31), with a default
+ * of three: a border and the one row, which is §047's own picture.
+ */
+function statusEmpty(message: string, height = 3, opts?: BlockOpts, framed = false): Status {
+  return finish<Status>(
+    block({
+      kind: "status",
+      id: idOf(opts, "status"),
+      state: "empty",
+      message,
+      height,
+      ...(framed ? { framed } : {}),
+    }) as Status,
+    opts,
+    false,
+  );
 }
 
 /**
@@ -1608,20 +1833,29 @@ export function framedStatus(
   // **parameterised**, which is what it is — all three states are reachable from
   // the published surface, two through here and `loading` through the door below.
   const state = retryInMs === null ? "error" : "retrying";
-  // **Framed heights are one row taller, and the row buys the tag** (F406, C09
-  // I31). Free-standing the numbers are 1 and 2 — the rungs below the ladder's
-  // first border — and inside `b.live`'s panel they read as a red line of text,
-  // which is what a reader with two screenshots reported. Framed, two rows are
-  // *tag and message* and three buy `retrying` its activity line.
-  const height = framed ? (retryInMs === null ? 2 : 3) : retryInMs === null ? 1 : 2;
+  // **The detail is relayed, which is the same distinction `state` draws above**
+  // (MG27, C24 I5). `ErrorLike.details` is the far side's structured payload —
+  // *what a `message` cannot carry*, its own docblock — and it has been declared
+  // and read by nothing since it was written. §096 gives it the part it was
+  // always the subject of: code, which truncates and is bounded with a residue
+  // row, where as prose it would have been joined onto the end of a sentence and
+  // then cut. One `key: value` per line, so a cut takes whole facts.
+  const detail = detailFrom(err);
+  // **No `height`: the box is fitted** (C09 §3a-quater, C04 I66). The numbers
+  // this used to declare — 2 and 3 framed, 1 and 2 free-standing, plus the
+  // detail's rows — were computed from everything except the message, because
+  // a producer has no width to wrap at. `measure` has one. Framed, a one-row
+  // message still measures the 2 and 3 C23 I51 read from a frame (tag and
+  // message, and the activity line), so the figure survives as a consequence of
+  // the fit rather than as a number written beside it.
   return finish<Status>(
     block({
       kind: "status",
       id: idOf(opts, "status"),
       message: err.message,
       state,
-      height,
       ...(framed ? { framed } : {}),
+      ...(detail === "" ? {} : { detail }),
       ...(retryInMs === null ? {} : { retryInMs, attempt }),
     }) as Status,
     opts,
@@ -1656,7 +1890,7 @@ function statusLoading(opts?: BlockOpts, framed = false): Status {
   );
 }
 
-const status = Object.assign(statusBlock, { loading: statusLoading });
+const status = Object.assign(statusBlock, { loading: statusLoading, empty: statusEmpty });
 
 // --- cells and actions ----------------------------------------------------
 
@@ -1698,11 +1932,12 @@ export type {
  * `rev`s for one logical refresh, and a frame composable half-way through
  * (C23 I34). A part wanting several returns a `group`.
  *
- * *A `panel`*, because `Panel` is the only kind with a `title` — and the title is
- * where a live part says what state it is in: `· 14s ago` stale, `· unavailable`
- * failing, both drawn that way by S13 §3 and §4 already. A part rendering a bare
- * `table` has nowhere to put either, so the guarantees would hold for some
- * consumers and not others, which is not a guarantee.
+ * *A `panel`*, because `Panel` is the only kind with a frame — and the frame is
+ * where a live part says what state it is in: `updated 4m ago` at the top
+ * border's inline end when stale (C04 I127, §047). A failing part is the
+ * framework's error box inside it, not a title suffix; this said `· unavailable`
+ * and nothing ever wrote it. A part rendering a bare `table` has nowhere to put
+ * the notice, so the guarantee would hold for some consumers and not others.
  *
  * **What this returns is the loading state**, and that is why C23 has no
  * `renderLoading`: the first block exists before the driver runs. C23 renders the
@@ -1806,6 +2041,12 @@ export const b = {
   comparison,
   patch,
   pills,
+  choice,
+  control,
+  tape,
+  tree,
+  split,
+  form,
   tip,
   panel,
   group,

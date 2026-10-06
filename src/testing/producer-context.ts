@@ -26,7 +26,7 @@
  * one most callers want (C07 I18). A view's producer passes the region's.
  */
 import { fullRegistry } from "./expect-document.js";
-import { defaultStart } from "../shell/choice-selection.js";
+import { defaultStart, invalidChoices } from "../shell/choice-selection.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import type { LocalContext } from "../shell/local/registry.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
@@ -43,6 +43,11 @@ export const FULL_CAPABILITIES: TerminalCapabilities = Object.freeze({
   imageProtocol: "none",
   keyboardProtocol: "none",
   altScreen: true,
+  renderMode: "rich",
+  notification: "none",
+  clipboard: "none",
+  editor: null,
+  notify: [],
 });
 
 let registry: ReturnType<typeof fullRegistry> | null = null;
@@ -88,7 +93,14 @@ export function localContext(over: Partial<LocalContext> = {}): LocalContext {
   return Object.freeze({
     ...producerContext(over),
     command: "/probe",
-    ask: (opts) => Promise.resolve(opts.choices[defaultStart(opts.choices)]?.key ?? ""),
+    // **Refuses what the shell's `ask` refuses** (C23 I93, F1495), with the same
+    // message: a stand-in that accepted a set the shell throws on would pass the
+    // handler's test and fail its first real question.
+    ask: (opts) => {
+      const invalid = invalidChoices(opts.choices);
+      if (invalid !== null) return Promise.reject(new Error(invalid));
+      return Promise.resolve({ key: opts.choices[defaultStart(opts.choices)]?.key ?? "", outcome: "answered" as const });
+    },
     // **Empty by default, which is the failed-validation arm** (C22 I66). A
     // handler tested without saying what was parsed takes the path a malformed
     // invocation takes, and a test meaning to exercise the other arm says so.

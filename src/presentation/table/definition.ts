@@ -23,13 +23,92 @@ import { NO_SPAN } from "../../data/viewmodel/index.js";
 import { atLeastOne, insetWidth, normaliseWidth, sequenceHeight } from "../../data/viewmodel/index.js";
 import type { Block, MeasureFn, Table, TableRow } from "../../data/viewmodel/index.js";
 import { cells } from "../text.js";
-import { fitRow } from "../rows.js";
-import { clampSpans, paint, selectionStyle, tone, type Span } from "../blocks/paint.js";
+import { fitRow, rowCells } from "../rows.js";
+import { glyphCells, glyphFor } from "../blocks/glyphs.js";
+import { background, based, clampSpans, focusStyle, groundSequence, paint, selectionStyle, slot, tone, withBackground, type Span } from "../blocks/paint.js";
 import type { BlockDefinition, NavElement, Rendered, RenderContext, Windowed } from "../blocks/types.js";
-import { emptySpans, headerSpans, markedSeriesColumns, rowSpans } from "./cells.js";
+import { decimalEnds, decimalPoints, emptySpans, headerSpans, markedSeriesColumns, rowSpans, trendMark, type CurrentLead } from "./cells.js";
+import { columnAlignments, groupingColumns, unknownColumns } from "./kind.js";
 import { detailBlocks, isExpandable } from "./detail.js";
-import { planColumns } from "./plan.js";
+import { planDisclosed, type PlannedColumns } from "./plan.js";
 import { sortedRows } from "./sort.js";
+
+/**
+ * The columns the plan is made from: the declarations, with every number or
+ * duration column's `minWidth` raised to its widest bare value (C11 I31,
+ * `R-TBL-005`).
+ *
+ * **The planner stays pure** (I7) and I10 does the work: a column whose
+ * `minWidth` equals its longest value is shown whole or dropped, never cut —
+ * *half a number is a different number*. Bare and not grouped, because I28
+ * decides grouping from the plan. A cell's glyph lead counts, since it is
+ * drawn inside the planned width (I23).
+ *
+ * **Memoised on the block**, which is immutable: `measure`, `width`, `render`
+ * and the row detail each plan, and four walks of every cell for one answer is
+ * the cost this avoids. A window's block is a new object whose declarations
+ * already carry the table's figure (`window` pins it), so its own walk can only
+ * agree.
+ */
+const EFFECTIVE = new WeakMap<Table, Table["columns"]>();
+
+function effectiveColumns(block: Table): Table["columns"] {
+  const known = EFFECTIVE.get(block);
+  if (known !== undefined) return known;
+  const numbers = unknownColumns(block);
+  // **Under `wide`**, since `measure` receives no capabilities and every reader
+  // must plan the same columns. For a minimum that is the safe direction:
+  // over-counting drops the column one width early, and under-counting cuts a
+  // number, which is the defect itself.
+  const ambiguous = "wide";
+  const columns = block.columns.map((c) => {
+    if (!numbers.has(c.key)) return c;
+    let widest = 0;
+    for (const row of block.rows) {
+      const cell = row.cells[c.key];
+      if (cell === undefined || cell.text.trim() === "") continue;
+      // A trend's arrow is a lead too (C11 I30), resolved at the same `wide`.
+      const arrow = trendMark(cell, c, { unicode: "full", ambiguousWidth: ambiguous })?.mark ?? "";
+      const lead =
+        cell.glyph !== undefined ? glyphCells(cell.glyph) + 1 : arrow === "" ? 0 : cells(arrow, ambiguous) + 1;
+      widest = Math.max(widest, lead + cells(cell.text.trim(), ambiguous));
+    }
+    return widest > c.minWidth ? { ...c, minWidth: widest } : c;
+  });
+  EFFECTIVE.set(block, columns);
+  return columns;
+}
+
+/**
+ * What expanding a row reveals — its hidden count, `+N` beside a collapsed
+ * row's mark (C11 I32, rulings 69 and 82): the columns dropped at this width
+ * and the row's own detail blocks.
+ */
+export function hiddenCount(row: TableRow, plan: PlannedColumns): number {
+  return plan.dropped.length + (row.detail?.length ?? 0); // cells-ok — a count, not a width
+}
+
+/**
+ * **A window's reservation, pinned to the table's** (C11 I32, I18's shape). The
+ * count reads the rows, so a slice holding none of the rows with detail would
+ * reserve fewer cells and start every column after the marker at a different
+ * cell on scroll — the same argument as the alignments and the number minimums
+ * `window` already pins. **The rows are pinned rather than the cells**, because
+ * the table plans at more than one width (the body, the inner width) and the
+ * reservation is a function of the width: a window's count is read from the
+ * table it was cut from.
+ */
+const PINNED = new WeakMap<Table, Table>();
+
+/** The one plan every reader takes (I31): `measure`, `width`, `render`, `window` and the row detail. */
+function plannedColumns(block: Table, width: number): PlannedColumns {
+  const cols = effectiveColumns(block);
+  // **The widest detail the marker counts** (C11 I32): read from the table a
+  // window was cut from, so every slice reserves what the whole does.
+  let detail = 0;
+  for (const row of (PINNED.get(block) ?? block).rows) detail = Math.max(detail, row.detail?.length ?? 0); // cells-ok — a count of blocks
+  return planDisclosed(cols, width, detail);
+}
 
 /**
  * Whether the action bar is drawn (I17).
@@ -66,18 +145,42 @@ function hasBody(block: Table): boolean {
   return block.columns.length > 0 && block.rows.length > 0; // cells-ok
 }
 
+/**
+ * **The plan a walk over the rows reads, taken once for the walk**.
+ * `measure`, `unitsOf` and `tableElements` ask for every row's detail height at
+ * one width, and the plan is a function of the block and the width alone — so
+ * planning per row planned the same table once per expanded row, and ruling 82's
+ * second pass doubled that. Planned on first ask, so a walk with no expanded row
+ * plans nothing, as before. Held for one call and dropped with it: C11 holds no
+ * state (I11), and this is a local, not a memo.
+ */
+type DetailPlan = () => PlannedColumns;
+function detailPlanOf(block: Table, width: number): DetailPlan {
+  let plan: PlannedColumns | null = null;
+  return () => (plan ??= plannedColumns(block, bodyWidth(width)));
+}
+
 /** The rows an expanded row's detail occupies at this width. */
 function detailHeight(
   block: Table,
   row: TableRow,
   width: number,
   measureChild: MeasureFn,
+  planOf: DetailPlan = detailPlanOf(block, width),
 ): number {
   if (row.expanded !== true) return 0;
-  const plan = planColumns(block.columns, width);
+  // **The gutter comes off here and nowhere else** (I15). Four callers ask for a
+  // detail's height — `measure`, `unitsOf`, `window` and the render — and a
+  // subtraction at each of them is four chances to disagree by two cells, which
+  // is the disagreement `measure(block, width) == rows rendered` forbids. It was
+  // three of four for one commit, and `window-height` caught it at 353 of 42.
+  // `detailPlanOf` takes the plan at the same `bodyWidth(width)`, from the width
+  // the walk hands both.
+  const inner = bodyWidth(width);
+  const plan = planOf();
   // A sequence, so a detail block declaring `gapBefore` contributes its blank row
   // here exactly as it would at a document's top level (C04 §3a).
-  return sequenceHeight(detailBlocks(block, row, plan), insetWidth(width), measureChild);
+  return sequenceHeight(detailBlocks(block, row, plan), insetWidth(inner), measureChild);
 }
 
 /**
@@ -99,15 +202,71 @@ type Unit = Readonly<{ rows: number; row: TableRow | null; bar: boolean }>;
 function unitsOf(block: Table, width: number, measureChild: MeasureFn): readonly Unit[] {
   const out: Unit[] = [];
   if (hasHeader(block)) out.push({ rows: 1, row: null, bar: false });
+  const planOf = detailPlanOf(block, width);
   for (const row of sortedRows(block)) {
-    out.push({ rows: 1 + detailHeight(block, row, width, measureChild), row, bar: false });
+    out.push({ rows: 1 + detailHeight(block, row, width, measureChild, planOf), row, bar: false });
   }
   if (hasActionBar(block)) out.push({ rows: 2, row: null, bar: true });
   return out;
 }
 
+/**
+ * The gutter this block reserves on every row, for the focus mark (I15, §5b).
+ *
+ * **Reserved and not conditional**, because `measure` sees no focus: a column
+ * that appeared with the mark would put the measurer and the render in
+ * disagreement on exactly the frames a reader is looking at. Derived from the
+ * glyph rather than written as a number, so the ASCII rung cannot make the two
+ * halves disagree — C09 §4's 1:1 rule is what lets `measure` be correct without
+ * seeing a capability.
+ *
+ * **One column, and the second is owed to a glyph slot rather than to this
+ * component**: §044's `▌` carries selected elements, and `▌` is the `live`
+ * slot which `containers.ts` already draws on a live panel's title (F161).
+ *
+ * **Exported for the suite, which is the one consumer and deliberately so.**
+ * Twenty rows about this block's geometry need the number; twenty literal `2`s
+ * is the copied-constant shape that drifts the first time the glyph changes
+ * width, and C09 §4's 1:1 rule is exactly what a literal would stop honouring.
+ */
+export const GUTTER_CELLS = glyphCells("focus") + 1;
+
+/**
+ * The width the plan and every clamp see — never `ctx.width` (I15).
+ *
+ * **Zero, not one, where the gutter fills the width.** `max(1, …)` handed the
+ * body a cell the row did not have, so at widths 1 and 2 every row drew three
+ * cells — a row the terminal wraps into rows nothing measured. The reservation
+ * outranks the data: a table narrower than its gutter has no column to show,
+ * and the mark is the one fact left to act on.
+ */
+function bodyWidth(width: number): number {
+  return Math.max(0, width - GUTTER_CELLS);
+}
+
 export const tableDefinition: BlockDefinition<Table> = {
   kind: "table",
+  // C09 I137 — a row with the `▸` column (C11 I15, `R-SEL-006`).
+  focusShape: "row",
+
+  // §7a — *a table as TSV with its header* (C09 I86, `R-SEL-004`).
+  //
+  // **Built from `rowCopyText`, which is what stops this being a second
+  // source.** The private `copyTextOf` this seam replaces said `table` was
+  // *deliberately absent, because C11 already declares a richer `copy` per row
+  // and a second answer here would be two sources for one fact* — a correct
+  // argument about sources and the wrong conclusion about granularity. A row's
+  // copy and the block's are one source at two sizes, and the block having none
+  // is why a `scroll` holding a table copied blank.
+  //
+  // Every **declared** column, including the ones a width dropped — the whole
+  // point of taking the source. The sort, the marker column and the residue row
+  // are this component's and do not appear.
+  copy: (block) =>
+    [
+      block.columns.map((c) => c.label).join("\t"),
+      ...block.rows.map((r) => rowCopyText(block, r)),
+    ].join("\n"),
 
   elements: tableElements,
 
@@ -126,9 +285,11 @@ export const tableDefinition: BlockDefinition<Table> = {
   width(block: Table, width: number): number {
     const w = normaliseWidth(width);
     if (!hasBody(block) || hasActionBar(block) || block.rows.some((row) => row.expanded === true)) return w;
-    const plan = planColumns(block.columns, w);
+    const plan = plannedColumns(block, bodyWidth(w));
     if (plan.overflowed) return w;
-    let total = 0;
+    // **The gutter is part of the answer** (I15): it is drawn on every row, so a
+    // width that left it out would be narrower than what `render` emits.
+    let total = GUTTER_CELLS;
     plan.visible.forEach((column, i) => { total += column.width + (i > 0 ? plan.gap : 0); });
     return Math.max(1, Math.min(w, total));
   },
@@ -142,7 +303,8 @@ export const tableDefinition: BlockDefinition<Table> = {
     if (!hasBody(block)) return atLeastOne(header + 1);
 
     let total = header + block.rows.length; // cells-ok
-    for (const row of block.rows) total += detailHeight(block, row, w, measureChild);
+    const planOf = detailPlanOf(block, w);
+    for (const row of block.rows) total += detailHeight(block, row, w, measureChild, planOf);
     // I17 — a blank separator and a label row when any row has actions. Two,
     // because every surface drawing a bar draws a blank above it and the gap
     // cannot come from `gapBefore`: that applies *between* blocks in a sequence
@@ -233,14 +395,41 @@ export const tableDefinition: BlockDefinition<Table> = {
     }
 
     const kept = units.slice(first, last + 1);
-    return Object.freeze({
-      block: {
+    const wholeAligns = columnAlignments(block);
+    const windowed: Table = {
         ...block,
         rows: kept.map((u) => u.row).filter((r): r is TableRow => r !== null),
         showHeader: first === 0 && hasHeader(block),
         actionBar: kept.some((u) => u.bar),
         presorted: true,
-      },
+        // **The window pins each column's alignment, resolved over the whole
+        // table** (I27, I18, I19). A derived alignment reads *the values
+        // present*, so a slice that dropped the only non-numeric value in a
+        // numeric-looking column re-classifies it — and where F429's version of
+        // that reverses an order, this one flips a column from `left` to
+        // `decimal` between two scroll positions, with every count, every width
+        // and every `skipRows` correct. I18 pins the action bar's presence and
+        // I19 pins the sort for exactly this shape; this is the third instance
+        // of one argument rather than a new mechanism. A resolved alignment is
+        // an ordinary declaration by the time the renderer sees it, so no field
+        // is added to `Table`.
+        // **And each number column's effective minimum** (I31), for the same
+        // reason: resolved over the slice, a window whose rows are narrower
+        // than the table's widest number would plan the column narrower and
+        // start every column after it at a different cell on scroll.
+        columns: effectiveColumns(block).map((c) => {
+          if (c.align !== undefined) return c;
+          const align = wholeAligns.get(c.key);
+          // Every column key is in the map by construction; the guard is what
+          // `exactOptionalPropertyTypes` wants rather than a case that arises.
+          return align === undefined ? c : { ...c, align };
+        }),
+    };
+    // **And the disclosure reservation** (C11 I32): read from the table the
+    // window was cut from, whatever window this one was cut from in turn.
+    PINNED.set(windowed, PINNED.get(block) ?? block);
+    return Object.freeze({
+      block: windowed,
       skipRows: lo - (tops[first] ?? 0), // cells-ok
       dropRows: bottomOf(last) - hi, // cells-ok
     });
@@ -248,6 +437,15 @@ export const tableDefinition: BlockDefinition<Table> = {
 
   render(block: Table, ctx: RenderContext): Rendered {
     const width = normaliseWidth(ctx.width);
+    // **The reserved focus column** (I15, §5b). Every row of the block is inset
+    // by it — header, body, detail and action bar alike — so the columns beneath
+    // stay one axis and nothing moves when a row gains or loses focus. The plan
+    // and every clamp see `inner`, never `width`.
+    const inner = bodyWidth(width);
+    // **Every row is cut to the width at the exit** (I15, F1211's net): the
+    // gutter alone is two cells, so at width 1 no arm's arithmetic can fit it,
+    // and a row over the width is one the terminal wraps. Cuts, never pads.
+    const cut = (row: string): string => fitRow(row, width);
     const probe = ctx.probe;
     // **Rows and columns separately, because they are different failures.** A
     // table slow in `plan` is wide — the plan is a function of the declarations
@@ -260,7 +458,7 @@ export const tableDefinition: BlockDefinition<Table> = {
     let plan;
     {
       using _p = probe?.span("table.plan") ?? NO_SPAN;
-      plan = planColumns(block.columns, width);
+      plan = plannedColumns(block, inner);
     }
     const focused = ctx.focus !== null && ctx.focus.blockId === block.id ? ctx.focus.rowId : null;
     // **The extent is the entry's, kept to this block** (I14). The pairs are
@@ -275,22 +473,117 @@ export const tableDefinition: BlockDefinition<Table> = {
     // (C22 §6e's own distinction for the prompt). The ink under it is `default`,
     // decided in `rowSpans`; this adds the ground.
     const wash = selectionStyle(ctx.theme, ctx.capabilities);
-    const washed = (spans: readonly Span[]): readonly Span[] =>
-      spans.map((s) => ({ ...s, style: { ...(s.style ?? {}), ...wash } }));
+    // **Focus has a ground of its own** (C10 I47, R-SEL-006, §4k). The head was
+    // `accent` over nothing and the extent `default` over the wash, so the two
+    // facts were told apart by ink on one ground; they are told apart by two
+    // grounds now, and the head keeps `accent` as the ink — which is what
+    // carries focus at 1-bit, where a ground answers `NO_STYLE` and a table has
+    // no column to put a mark in (C11 I15, C09 I83).
+    const focusGround = focusStyle(ctx.theme, ctx.capabilities);
+    const grounded = (spans: readonly Span[], ground: Span["style"]): readonly Span[] =>
+      spans.map((s) => ({ ...s, style: { ...(s.style ?? {}), ...ground } }));
+    // **The current row** (I33, §5d, §097): the `pick` ground and its matched
+    // ink, **one pair resolved together** as the button's is (C10 I51) — a
+    // ground taken without its ink borrows a foreground nothing measured
+    // against it. Carried as the row's ground, so `grounded` re-inks every run
+    // on the row, the mark and the hint included, which is R-BLK-775's
+    // `c-pickInk` on both cells. **Where `pick` does not resolve** — one bit, a
+    // theme declaring none — the row takes no ground and no padding, the
+    // header's guard (I24), and the mark's accent and the weight carry it.
+    const pick = background("surface.pick", ctx.theme, ctx.capabilities);
+    const pickGround =
+      pick.background === undefined ? null : withBackground(slot("surface.pickInk", ctx.theme, ctx.capabilities), pick);
+    // The lead goes in the first visible column C11 does not fill itself. The
+    // reservation follows the field's **presence**, so a current that names no
+    // row — a chooser scrolled past it — keeps every label where it was.
+    const leadKey =
+      block.current === undefined
+        ? undefined
+        : plan.visible.find((p) => block.columns.find((c) => c.key === p.key)?.role !== "expand")?.key;
+    const leadFor = (on: boolean): CurrentLead | undefined => (leadKey === undefined ? undefined : { key: leadKey, on });
 
     // **Every part is a row** (C09 I73). There was a `finishTable` here that
     // answered rows when they all were and lifted them into a column of `Text`
     // when one was not; a detail child is the only part that could be the
     // second, and since F1209 it cannot be.
     const parts: string[] = [];
+    // **The lead takes the row's ground** (§5c, I14, I15). It used to be painted
+    // on the page, on the argument that *a ground running under the gutter
+    // would make the two one block of colour, which is the frame §044 does not
+    // draw* — and §044 draws exactly that frame: its focused-and-selected row is
+    // one run of `bg-selection` opening with `▸ `. Four more figures agree
+    // across three grounds (§082, §072, §043, §071). The sentence was true about
+    // a risk and false about its source, and R-SEL-006 is silent on the mark's
+    // cell. The header has always run its ground gutter-inclusive (I24, §073)
+    // and one block cannot hold two answers about one column.
+    const blank = " ".repeat(GUTTER_CELLS); // cells-ok — the reserved gutter
+    const lead = (marked: boolean): readonly Span[] =>
+      marked
+        ? [{ text: `${glyphFor("focus", ctx.capabilities)} `, style: tone("accent", ctx.theme, ctx.capabilities) }]
+        : [{ text: blank }];
+    /** One exit, so no emitted row can forget the gutter (I15). */
+    const emit = (spans: readonly Span[], marked = false, ground: Span["style"] | null = null): void => {
+      const row = [...lead(marked), ...clampSpans(spans, inner, ctx.capabilities)];
+      if (ground === null) {
+        parts.push(paint(row));
+        return;
+      }
+      // **A ground runs to the block's edge, so the row is padded to it** — the
+      // header's arithmetic (I24), for the same reason and on the same guard:
+      // the pad exists only to give the ground cells to paint, so it is taken
+      // here where a ground is known and nowhere else. Reading §082's frame is
+      // what found this: the ground opened under the mark correctly and stopped
+      // at the last column, which the mask shows and a string assertion about
+      // the mark cannot.
+      const drawn = row.reduce((n, sp) => n + cells(sp.text, ctx.capabilities.ambiguousWidth), 0);
+      const tail = Math.max(0, width - drawn); // cells-ok — the row's own residue
+      parts.push(paint(grounded(tail === 0 ? row : [...row, { text: " ".repeat(tail) }], ground)));
+    };
 
     if (hasHeader(block)) {
-      parts.push(paint(clampSpans(headerSpans(block, plan, ctx), width, ctx.capabilities)));
+      // **`bgElev` across the whole row, gutter included** (I24, §073, §072).
+      // §073 names this *the one place a full-width ground is right* and gives
+      // the reason the rule turns on: the header is a **surface the rows sit
+      // under**, not a status. So the ground runs to the block's edge rather
+      // than stopping where the last label ends — a ground that stopped at the
+      // text would say *these words* are the surface, where the claim is that
+      // the row is.
+      //
+      // It degrades to nothing and loses nothing: at one bit
+      // `resolveBackground` answers `NO_STYLE`, the header is `muted` text over
+      // the page as it always was, and the header never carried a fact — the
+      // column names are the carrier and they are still drawn.
+      const elev = background("surface.bgElev", ctx.theme, ctx.capabilities);
+      if (elev.background === undefined) {
+        // **No ground, so no padding either**, and the difference matters: the
+        // pad exists only to give the ground cells to paint. Padding anyway
+        // would put trailing blanks on every monochrome frame in the corpus for
+        // a surface that is not there — which is what the first draft did, and
+        // four goldens that carry no colour at all moved to say so.
+        emit(headerSpans(block, plan, ctx, columnAlignments(block), undefined, leadFor(false)));
+      } else {
+        const spans = clampSpans(
+          headerSpans(block, plan, ctx, columnAlignments(block), "bgElev", leadFor(false)),
+          inner,
+          ctx.capabilities,
+        );
+        const drawn = spans.reduce((n, sp) => n + cells(sp.text, ctx.capabilities.ambiguousWidth), 0);
+        const tail = Math.max(0, inner - drawn); // cells-ok — the row's own residue
+        parts.push(
+          paint(
+            [
+              { text: blank },
+              ...spans,
+              ...(tail === 0 ? [] : [{ text: " ".repeat(tail) }]),
+            ].map((sp) => ({ text: sp.text, style: withBackground(sp.style, elev) })),
+          ),
+        );
+      }
     }
 
     if (!hasBody(block)) {
-      parts.push(paint(clampSpans(emptySpans(block, width, ctx), width, ctx.capabilities)));
-      return parts;
+      emit(emptySpans(block, inner, ctx));
+      return parts.map(cut);
     }
 
     // Sorting is a permutation, so this changes the order of what follows and
@@ -306,20 +599,62 @@ export const tableDefinition: BlockDefinition<Table> = {
     // column's allowance, so the answer is a property of the block; deriving it
     // inside the loop would be quadratic and memoising it would be state (I11).
     const marked = markedSeriesColumns(block);
+    // **Once per block, not once per row** (I26): `rowSpans` holds the whole
+    // table, so taking the decimal points there would walk every cell for every
+    // row — the same reason the marked set is hoisted here.
+    // **Once per block, beside the points and the marked set** (I26, I27). A
+    // column's alignment is derived from its own cells, so `rowSpans` could take
+    // it every time it draws a row — the same walk once per row, which is the
+    // reason the other two are already hoisted here.
+    const aligns = columnAlignments(block);
+    // **The grouping set before the points, because the points measure what
+    // will be drawn** (I28, I26). A separator is part of an integer part, so
+    // the order is plan, then grouping, then points.
+    const grouping = groupingColumns(
+      block,
+      aligns,
+      new Map(plan.visible.map((c) => [c.key, c.width])),
+      (text) => cells(text, ctx.capabilities.ambiguousWidth),
+    );
+    const points = decimalPoints(block, plan, ctx.capabilities.ambiguousWidth, aligns, grouping);
+    // The columns a missing cell draws `—` in, and where a decimal column's
+    // values end (I29), once per block.
+    const unknown = unknownColumns(block);
+    const ends = decimalEnds(block, plan, ctx.capabilities.ambiguousWidth, aligns, grouping);
     for (const row of sortedRows(block)) {
       const expandable = isExpandable(row, plan);
       const isHead = focused !== null && focused === row.id;
-      // **The head is never washed** — it keeps `accent`, which is what makes it
-      // distinguishable inside its own extent, and what makes a one-element
-      // extent draw exactly as no selection with no branch on the count (I14).
+      const isCurrent = block.current !== undefined && block.current === row.id;
+      // **The head is told from the extent by its own ground**, not by ink
+      // inside a shared one (I14 as amended, R-SEL-006).
       const isSelected = !isHead && selected.has(row.id);
-      const spans = clampSpans(
-        rowSpans(block, row, plan, ctx, { expandable, focused: isHead, selected: isSelected, marked }),
-        width,
-        ctx.capabilities,
-      );
-
-      parts.push(paint(isSelected ? washed(spans) : spans));
+      // **One expression, and it answers both halves** (C10 I48, F1240): which
+      // ground the row takes, and which ground its inks resolve against. Two
+      // expressions is how the gate and the painter stopped agreeing — a row
+      // washed with one surface and inked for another is exactly the value the
+      // contrast gate measures as wrong.
+      //
+      // **Selection wins the ground where both hold** (R-SEL-006), and the head
+      // keeps `▸`. **`has` and never a size**: `selected` *absent* is C26 I16's
+      // head-alone sentinel and any *present* extent is a real selection, one
+      // element included — a test on the size paints a real single-row selection
+      // as focus and calls that the sentinel (I14, T2.12).
+      const on = isSelected || (isHead && selected.has(row.id))
+        ? "selection"
+        : isHead
+          ? "focusGround"
+          : undefined;
+      const hidden = hiddenCount(row, plan);
+      const spans = rowSpans(block, row, plan, ctx, { expandable, hidden, on, marked, points, aligns, grouping, unknown, ends, current: leadFor(isCurrent) });
+      // **The ground goes to `emit`, not to the spans** (§5c). Applied here it
+      // stopped at the gutter, which is the divergence: the reserved column is
+      // part of the row it leads, so the ground has to be put on where the
+      // gutter is known and that is the one exit.
+      // **Reader state wins the ground** (I33, §5c): the extent and the head are
+      // what the reader did, and `current` is what the producer is on. The mark
+      // and the weight stay under either.
+      const ground = on === "selection" ? wash : on === "focusGround" ? focusGround : isCurrent ? pickGround : null;
+      emit(spans, isHead, ground);
 
       if (row.expanded !== true) continue;
       // **A count, not a span.** Each detail child goes through `renderChild`,
@@ -334,13 +669,50 @@ export const tableDefinition: BlockDefinition<Table> = {
       // content box of exactly `insetWidth`, so the two halves see one number.
       // **The detail's rows padded left by the inset** (C09 I73), one part per
       // row; a child that answers an element is its padded box, as before.
-      const inset = width - insetWidth(width);
+      // **Floored at zero**: `insetWidth` answers at least one cell, so over a
+      // zero body (I15, widths 1–2) the indent was `0 − 1`. Measure and render
+      // both still ask `insetWidth(inner)`, so the heights agree; the rows the
+      // children draw are cut to the zero body below and the gutter carries them.
+      const inset = Math.max(0, inner - insetWidth(inner)); // cells-ok — the detail's own indent, inside the gutter
       const pad = " ".repeat(inset);
+      // **The detail sits on `bgElev`, the block's whole width, gutter
+      // included** (I25, §082 `R-BLK-941`). `based` and not a span pass,
+      // because a child has already painted its own line and the ground has to
+      // survive every reset inside it — which is the mechanism `shell/paint.ts`
+      // has used for the session's base colour since F889, moved down to L1 so
+      // there is one of it. **A blank line stays blank**: a ground on a row the
+      // detail did not draw would run past the detail's own extent, and I25's
+      // second half — *the rows below carry on underneath* — is the half §082
+      // rests on, because a ground that leaked downward draws the pushed frame
+      // the section refuses.
+      // **No ground, so no padding either** — the header's own guard, and for
+      // its reason (I24): the pad exists only to give the ground cells to
+      // paint, and padding a monochrome frame puts trailing blanks in the
+      // corpus for a surface that is not there.
+      const detailElev = background("surface.bgElev", ctx.theme, ctx.capabilities);
+      const elevBase =
+        detailElev.background === undefined
+          ? ""
+          : groundSequence("surface.bgElev", ctx.theme, ctx.capabilities);
       detailBlocks(block, row, plan, ctx.capabilities).forEach((child) => {
         // **Cut to the width** (F1211): a detail child answering a row wider
         // than its inset used to become a padded Ink box, which wrapped.
-        for (const line of ctx.renderChild(child, insetWidth(width))) {
-          parts.push(line === "" ? "" : fitRow(pad + line, width));
+        for (const line of ctx.renderChild(child, insetWidth(inner))) {
+          if (line === "") {
+            // **A blank line stays blank** (I25): a ground on a row the detail
+            // did not draw runs past the detail's own extent, and *the rows
+            // below carry on underneath* is the half §082 rests on.
+            parts.push("");
+            continue;
+          }
+          const body = fitRow(pad + line, inner);
+          if (elevBase === "") {
+            parts.push(`${blank}${body}`);
+            continue;
+          }
+          const tail = Math.max(0, inner - rowCells(body)); // cells-ok — the row's own residue
+          const [drawn] = based([`${blank}${body}${" ".repeat(tail)}`], elevBase);
+          parts.push(drawn ?? `${blank}${body}`);
         }
       });
     }
@@ -353,14 +725,10 @@ export const tableDefinition: BlockDefinition<Table> = {
       const row = focused === null ? undefined : block.rows.find((r) => r.id === focused);
       const labels = (row?.actions ?? []).map((a) => a.label).join("   ");
       parts.push("");
-      parts.push(
-        paint(
-          clampSpans([{ text: labels, style: tone("meta", ctx.theme, ctx.capabilities) }], width, ctx.capabilities),
-        ),
-      );
+      emit([{ text: labels, style: tone("meta", ctx.theme, ctx.capabilities) }]);
     }
 
-    return parts;
+    return parts.map(cut);
   },
 };
 
@@ -429,8 +797,11 @@ function rowCopyText(block: Table, r: TableRow): string {
  * wide under the terminal's ambiguous-width setting, may be cut by the painter
  * without declaring a detail here.
  */
-function rowDetail(block: Table, r: TableRow, width: number): Block | null {
-  const plan = planColumns(block.columns, width);
+function rowDetail(block: Table, r: TableRow, width: number, planOf: DetailPlan = detailPlanOf(block, width)): Block | null {
+  // **The same plan the render draws** (I15): the gutter comes off here too, or
+  // this answers *what was lost* against a plan two cells wider than the one on
+  // screen, and a row that fits would declare a detail for a column it shows.
+  const plan = planOf();
   const planned = new Map(plan.visible.map((v) => [v.key, v.width]));
   const dropped = new Set(plan.dropped);
   const rows: { label: string; value: string }[] = [];
@@ -460,10 +831,11 @@ export function tableElements(
   const out: NavElement[] = [];
   let row = hasHeader(block) ? 1 : 0; // cells-ok — a row cursor, not a width
 
+  const planOf = detailPlanOf(block, w);
   for (const r of sortedRows(block)) {
-    const height = 1 + detailHeight(block, r, w, measureChild);
+    const height = 1 + detailHeight(block, r, w, measureChild, planOf);
     const action = r.actions?.[0];
-    const detail = rowDetail(block, r, w);
+    const detail = rowDetail(block, r, w, planOf);
     out.push(
       Object.freeze({
         id: r.id,

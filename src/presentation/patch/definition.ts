@@ -16,13 +16,16 @@
  * so a row built any other way is both unclamped and ragged.
  */
 import { NO_SPAN } from "../../data/viewmodel/index.js";
+import { glyphs } from "../blocks/glyphs.js";
 import { rows } from "../blocks/paint.js";
 import { cells } from "../text.js";
 import { atLeastOne, changedRuns, normaliseWidth, type ChangedRun } from "../../data/viewmodel/index.js";
-import { collapseText } from "./collapse.js";
+import { capOf, foldPatch, shownBlock } from "./cap.js";
+import { collapseText, moreText } from "./collapse.js";
 import { hunkRows, isCollapsed, layoutFor, patchHeight, type Layout } from "./height.js";
 import { planFrom, windowRows } from "./window.js";
-import { blankSide, dress, gutterSpans, line, textSpans } from "./lines.js";
+import { blankSide, dress, gutterSpans, line, REST, textSpans, type Mark } from "./lines.js";
+import { lineId, patchElements } from "./elements.js";
 import { patchLayout, type PatchLayout } from "./layout.js";
 import type { Hunk, Patch } from "../../data/viewmodel/index.js";
 import type { Span } from "../blocks/paint.js";
@@ -30,8 +33,42 @@ import type { BlockDefinition, RenderContext, Rendered } from "../blocks/types.j
 
 type Line = Hunk["lines"][number];
 
-/** The one cell split spends on telling the two halves apart. */
-const SEPARATOR = "\u2502";
+/** What focus says about each line, asked once per line in drawing order (I25). */
+type MarkOf = (line: Line) => Mark;
+
+/**
+ * The marks for one render (C25 I25, §3d).
+ *
+ * **The extent is filtered by its own block id, never gated on the head's** —
+ * a selection whose head sits in a sibling block still names lines here, which
+ * is C11 I14's T6.17 lesson. **Claimed in drawing order**, the order
+ * `patchElements` places them in, so a repeated id marks the one line that
+ * declared it and not both (I24).
+ */
+function marksFor(block: Patch, ctx: RenderContext): MarkOf {
+  const focus = ctx.focus;
+  if (focus === null) return () => REST;
+  const head = focus.blockId === block.id ? focus.rowId : null;
+  const selected = new Set((focus.selected ?? []).filter((s) => s.blockId === block.id).map((s) => s.rowId));
+  if (head === null && selected.size === 0) return () => REST;
+  const claimed = new Set<string>();
+  return (item) => {
+    const id = lineId(item);
+    if (id === null || claimed.has(id)) return REST;
+    claimed.add(id);
+    const isSelected = selected.has(id);
+    const isHead = id === head;
+    return isSelected || isHead ? { selected: isSelected, head: isHead } : REST;
+  };
+}
+
+/**
+ * The one cell split spends on telling the two halves apart — C09's `vertical`,
+ * so it degrades with every other rule on the screen: `|` at the ASCII rung and
+ * on a terminal that draws `│` two cells wide (C25 §3, F1313). It was a literal
+ * `│`, and the split drew it at the rung no row rendered wide enough to reach.
+ */
+const separator = (ctx: RenderContext): string => glyphs(ctx.capabilities).vertical;
 
 /**
  * A run of consecutive changed lines, and the rows it pairs into. **C04's
@@ -49,7 +86,9 @@ type Run = ChangedRun;
  * the block dropping its header (C25 §9's Q1, settled that way).
  */
 function header(block: Patch, layout: PatchLayout, ctx: RenderContext): string {
-  const rule = ctx.capabilities.unicode === "ascii" ? "-" : "─";
+  // C09's `horizontal`, for the separator's reason — an ascii-only ternary here
+  // drew `─` on a wide-ambiguous terminal, two cells a glyph (C25 §3, F1313).
+  const rule = glyphs(ctx.capabilities).horizontal;
   const label = ` ${block.path} `;
   const lead = `${rule}${rule}${label}`;
 
@@ -63,12 +102,16 @@ function header(block: Patch, layout: PatchLayout, ctx: RenderContext): string {
 }
 
 /** Unified: both number columns, then the marker, then the text. */
-function unifiedRow(item: Line, block: Patch, layout: PatchLayout, ctx: RenderContext): string {
+function unifiedRow(item: Line, block: Patch, layout: PatchLayout, ctx: RenderContext, mark: Mark): string {
   return line(
-    [...gutterSpans(item, layout, ctx), ...textSpans(item.text, block.language, layout.text, ctx, item.spans)],
+    [
+      ...gutterSpans(item, layout, ctx, undefined, mark),
+      ...textSpans(item.text, block.language, layout.text, ctx, item.spans, item.kind, mark),
+    ],
     item.kind,
     layout,
     ctx,
+    mark,
   );
 }
 
@@ -80,22 +123,31 @@ function unifiedRow(item: Line, block: Patch, layout: PatchLayout, ctx: RenderCo
  * carries that, and `pairedRows` computes the same number this loop draws — the two
  * are written as a pair for I1's sake, exactly as every other kind's halves are.
  */
-function splitRows(run: Run, block: Patch, layout: PatchLayout, ctx: RenderContext): readonly string[] {
+function splitRows(run: Run, block: Patch, layout: PatchLayout, ctx: RenderContext, markOf: MarkOf): readonly string[] {
   const height = Math.max(run.removes.length, run.adds.length); // cells-ok — a row count
   const out: string[] = [];
 
   for (let i = 0; i < height; i += 1) {
     const left = run.removes[i];
     const right = run.adds[i];
+    // Left before right, as `patchElements` places them.
+    const leftMark = left === undefined ? REST : markOf(left);
+    const rightMark = right === undefined ? REST : markOf(right);
 
     const leftSpans =
       left === undefined
         ? blankSide(layout)
-        : [...gutterSpans(left, layout, ctx, "old"), ...textSpans(left.text, block.language, layout.text, ctx, left.spans)];
+        : [
+            ...gutterSpans(left, layout, ctx, "old", leftMark),
+            ...textSpans(left.text, block.language, layout.text, ctx, left.spans, left.kind, leftMark),
+          ];
     const rightSpans =
       right === undefined
         ? blankSide(layout)
-        : [...gutterSpans(right, layout, ctx, "new"), ...textSpans(right.text, block.language, layout.text, ctx, right.spans)];
+        : [
+            ...gutterSpans(right, layout, ctx, "new", rightMark),
+            ...textSpans(right.text, block.language, layout.text, ctx, right.spans, right.kind, rightMark),
+          ];
 
     // **Each side carries its own background**, and the row carries none. A paired
     // row changed on both sides in different directions, so one colour across it
@@ -105,9 +157,9 @@ function splitRows(run: Run, block: Patch, layout: PatchLayout, ctx: RenderConte
     out.push(
       line(
         [
-          ...dress(padTo(leftSpans, layout), left === undefined ? "context" : "remove", ctx),
-          { text: SEPARATOR },
-          ...dress(padTo(rightSpans, layout), right === undefined ? "context" : "add", ctx),
+          ...dress(padTo(leftSpans, layout), left === undefined ? "context" : "remove", ctx, leftMark),
+          { text: separator(ctx) },
+          ...dress(padTo(rightSpans, layout), right === undefined ? "context" : "add", ctx, rightMark),
         ],
         "context",
         layout,
@@ -126,7 +178,7 @@ function padTo(spans: readonly Span[], layout: PatchLayout): readonly Span[] {
   return short <= 0 ? spans : [...spans, { text: " ".repeat(short) }];
 }
 
-function hunkLines(hunk: Hunk, block: Patch, layout: PatchLayout, ctx: RenderContext): readonly string[] {
+function hunkLines(hunk: Hunk, block: Patch, layout: PatchLayout, ctx: RenderContext, markOf: MarkOf): readonly string[] {
   const out: string[] = [];
 
   if (isCollapsed(hunk.collapsedBefore)) {
@@ -136,7 +188,7 @@ function hunkLines(hunk: Hunk, block: Patch, layout: PatchLayout, ctx: RenderCon
   out.push(line([{ text: hunk.header }], "context", layout, ctx));
 
   if (layout.layout === "unified") {
-    for (const item of hunk.lines) out.push(unifiedRow(item, block, layout, ctx));
+    for (const item of hunk.lines) out.push(unifiedRow(item, block, layout, ctx, markOf(item)));
     return out;
   }
 
@@ -144,25 +196,31 @@ function hunkLines(hunk: Hunk, block: Patch, layout: PatchLayout, ctx: RenderCon
     if ("kind" in group) {
       // A context line is one row in both layouts, and in split it is the same text
       // on both sides — which is what makes the eye track across the separator.
+      // One element across the row (I24), so one mark and one ground for it.
+      const mark = markOf(group);
       out.push(
         line(
           [
             ...padTo(
-              [...gutterSpans(group, layout, ctx, "old"), ...textSpans(group.text, block.language, layout.text, ctx)],
+              [
+                ...gutterSpans(group, layout, ctx, "old", mark),
+                ...textSpans(group.text, block.language, layout.text, ctx, undefined, "context", mark),
+              ],
               layout,
             ),
-            { text: SEPARATOR },
-            ...gutterSpans(group, layout, ctx, "new"),
-            ...textSpans(group.text, block.language, layout.text, ctx),
+            { text: separator(ctx) },
+            ...gutterSpans(group, layout, ctx, "new", mark),
+            ...textSpans(group.text, block.language, layout.text, ctx, undefined, "context", mark),
           ],
           "context",
           layout,
           ctx,
+          mark,
         ),
       );
       continue;
     }
-    out.push(...splitRows(group, block, layout, ctx));
+    out.push(...splitRows(group, block, layout, ctx, markOf));
   }
 
   return out;
@@ -170,12 +228,42 @@ function hunkLines(hunk: Hunk, block: Patch, layout: PatchLayout, ctx: RenderCon
 
 export const patchDefinition: BlockDefinition<Patch> = {
   kind: "patch",
+  // C09 I137 — a line with weight for its mark (C25 I25, `R-SEL-006`).
+  focusShape: "row",
+
+  // §7a — *a patch as unified diff rather than the rendered two-column view*
+  // (C09 I86, `R-SEL-004`). The rule names the hazard exactly: `layout: "split"`
+  // is a rendering, and a copy taken from it is two half-lines per line and
+  // pastes as nothing anyone can apply. So the hunks, in their own form, with
+  // the marker each line already is.
+  copy: (block) =>
+    [
+      `--- a/${block.path}`,
+      `+++ b/${block.path}`,
+      ...block.hunks.flatMap((h) => [
+        h.header,
+        ...h.lines.map((l) => `${l.kind === "add" ? "+" : l.kind === "remove" ? "-" : " "}${l.text}`),
+      ]),
+    ].join("\n"),
+
+  // C25 I24, §3d — every numbered line, where `render` draws it.
+  elements: (block: Patch, width: number) => patchElements(block, width),
+
+  // C09 I124, C25 I14 — `expanded` toggled where a `cap` withholds hunks.
+  fold: foldPatch,
 
   // Exact at every width, constant within a layout, and it never tokenises (I3).
   // `collapsedBefore` is a field, so measuring a collapsed region reads it rather
   // than deriving anything — which is what keeps this cheap enough for C14 to call
   // per block per frame.
-  measure: (block: Patch, width: number): number => atLeastOne(patchHeight(block, normaliseWidth(width))),
+  //
+  // **The cap is read here and never a viewport** (C25 I14, D12): capped, the
+  // admitted hunks and the marker row; expanded or uncapped, the whole block.
+  measure: (block: Patch, width: number): number => {
+    const w = normaliseWidth(width);
+    const capped = capOf(block, w);
+    return atLeastOne(capped === null ? patchHeight(block, w) : patchHeight(shownBlock(block, capped), w) + 1);
+  },
 
   /**
    * C09 I25 — rows `[from, to)`, as a smaller `patch` plus leading slack.
@@ -190,14 +278,34 @@ export const patchDefinition: BlockDefinition<Patch> = {
    * than a budget the caller never asked to spend. The gutter travels pinned
    * (C25 I21a), which is what stops the window narrowing it from its own slice.
    */
-  window: (block: Patch, width: number, from: number, to: number, _measure, scratch) =>
+  window: (block: Patch, width: number, from: number, to: number, _measure, scratch) => {
+    const w = normaliseWidth(width);
+    const capped = capOf(block, w);
     // **The plan from the caller's scratch** (I22, C09 I76): derived once per
     // block and width and read back at every window after — F1191 measured
     // the derivation at 2.2 ms a frame beside a 20,000-line patch.
-    windowRows(block, normaliseWidth(width), from, to, planFrom(scratch, block, normaliseWidth(width))),
+    if (capped === null) return windowRows(block, w, from, to, planFrom(scratch, block, w));
+    // **Capped (C25 I14): a range above the marker is a window of the body,
+    // and one reaching it is the whole capped form with its head as slack.**
+    // The body is an ordinary patch — its gutter pinned from the block — so
+    // `windowRows` takes it unchanged. The marker is not a row that model
+    // knows, and a piece carrying it has to be the block itself; the cost is
+    // the capped form, which is the cap's rows and no more. C09 I26's equality
+    // holds either way: the range reaching the marker ends at the last row.
+    const body = shownBlock(block, capped);
+    const bodyRows = patchHeight(body, w);
+    if (to > bodyRows) return Object.freeze({ block, skipRows: Math.max(0, Math.trunc(from)), dropRows: 0 });
+    return windowRows(body, w, from, to);
+  },
 
-  render(block: Patch, ctx: RenderContext): Rendered {
+  render(whole: Patch, ctx: RenderContext): Rendered {
     const width = normaliseWidth(ctx.width);
+    // **The capped form draws its body and then its marker** (C25 I14): the
+    // body is an ordinary patch, so everything below reads it unchanged and the
+    // marker row is the one addition — measured by `measure` from the same
+    // `capOf`, which is what keeps the two agreeing.
+    const capped = capOf(whole, width);
+    const block = capped === null ? whole : shownBlock(whole, capped);
     const probe = ctx.probe;
     // **F134's kind, and the split that says which half.** A 5,000-line diff
     // takes 3.7 s to open against `logs`'s 85.9 ms under identical load. The
@@ -220,7 +328,8 @@ export const patchDefinition: BlockDefinition<Patch> = {
     using _lines = probe?.span("patch.lines") ?? NO_SPAN;
 
     const out: string[] = [header(block, columns, ctx)];
-    for (const hunk of block.hunks) out.push(...hunkLines(hunk, block, columns, ctx));
+    const markOf = marksFor(block, ctx);
+    for (const hunk of block.hunks) out.push(...hunkLines(hunk, block, columns, ctx, markOf));
 
     // The tail, below everything (C04 §3). The same row a `collapsedBefore` draws,
     // from the block's field rather than a hunk's — which is why `collapseText` takes
@@ -229,6 +338,12 @@ export const patchDefinition: BlockDefinition<Patch> = {
       out.push(
         line([{ text: collapseText(block.collapsedAfter as number, ctx.capabilities) }], "context", columns, ctx),
       );
+    }
+
+    // The cap's marker, in the tail's place (C25 I14): the body carries no
+    // tail, because the tail sits below hunks this form does not draw.
+    if (capped !== null) {
+      out.push(line([{ text: moreText(capped.dropped, ctx.capabilities) }], "context", columns, ctx));
     }
 
     return rows(out);

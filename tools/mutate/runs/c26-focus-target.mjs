@@ -47,15 +47,20 @@ const MUTATIONS = [
     expect: "T2.5",
   },
   {
-    // The copy-mode-above-overlay contradiction with a different subject: a
+    // The native-selection-above-overlay contradiction with a different subject: a
     // block being interacted with taking keys from a confirm that must be
     // answered. T2.5 compares FOCUS_ORDER to the reached set — which this
-    // satisfies, both being the same seven — and then pins the first and last
+    // satisfies, both being the same nine — and then pins the first and last
     // positions, which is what catches it.
+    //
+    // **Re-anchored in M8**: `"panel"` joined the array between `nativeSelection` and
+    // `pushedView`, and the anchor reached across the pair. It anchors on the
+    // two rows that bracket the insertion point instead, which is the least
+    // context that stays unique.
     name: "interaction placed above every layer",
     file: FOCUS,
-    from: '  "overlay",\n  "copyMode",\n  "pushedView",',
-    to: '  "interaction",\n  "overlay",\n  "copyMode",\n  "pushedView",',
+    from: '  "child",\n  "overlay",\n  "nativeSelection",',
+    to: '  "child",\n  "interaction",\n  "overlay",\n  "nativeSelection",',
     expect: "T2.5",
   },
   {
@@ -63,31 +68,28 @@ const MUTATIONS = [
     // disagree, which is why T1.3d asserts the comparison rather than the slot.
     name: "activeTarget answers interaction before it consults the layers",
     file: FOCUS,
-    from: '  if (deps.overlayTop?.kind === "overlay") return "overlay";\n  if (deps.copyMode) return "copyMode";',
+    // Re-anchored in review batch 2: the layer's rung is read once (C16 I63).
+    from: '  if (layerRung === "question") return "overlay";\n  if (deps.nativeSelection) return "nativeSelection";',
     to:
       '  if (deps.stored.at === "liveBlock" && deps.stored.mode === "interact") return "interaction";\n' +
-      '  if (deps.overlayTop?.kind === "overlay") return "overlay";\n  if (deps.copyMode) return "copyMode";',
+      '  if (layerRung === "question") return "overlay";\n  if (deps.nativeSelection) return "nativeSelection";',
     expect: "T1.3d",
   },
   {
-    // **Freezing is a mode exit nobody signals.** Drop the gate and a settled
-    // entry keeps every keystroke: the prompt stops receiving input and the
-    // block cannot act on it either.
-    //
-    // **Re-anchored, and the gate is two clauses now** (F1118). The condition
-    // grew `deps.stored.entryId === deps.liveEntry.id` under §4g row d — a
-    // settled entry can hold focus with the mode stored — and that clause reads
-    // `deps.liveEntry.id`, so removing only the null check would not compile.
-    // Dropping the liveness test means dropping both: what shipped without it
-    // is a stored mode answering `interaction` for an entry that is gone.
-    name: "the liveEntry gate dropped, so a frozen entry stays interactable",
+    // **Re-anchored 2026-09-24, and it inverted with its subject** (§102, C26
+    // I2, §8b.9). The mutation was *drop the liveEntry gate, so a frozen entry
+    // stays interactable*, and the design withdrew that gate: §102's heading is
+    // *VIEW STATE IS NOT LIVENESS*, and *Settled an hour ago, from a call that
+    // finished — it STILL ORBITS.* So the live mutation is the gate coming
+    // back, and T1.3e is the row that now dies on it — inverted rather than
+    // retired, because the thing worth watching is unchanged: whether liveness
+    // decides who may be inside a block.
+    name: "the liveness gate restored, so a frozen entry stops being interactable",
     file: FOCUS,
-    from:
-      '    deps.stored.mode === "interact" &&\n' +
-      '    deps.liveEntry !== null &&\n' +
-      '    deps.stored.entryId === deps.liveEntry.id\n' +
-      "  ) {",
-    to: '    deps.stored.mode === "interact"\n  ) {',
+    from: '  if (deps.stored.at === "liveBlock" && deps.stored.mode === "interact") {',
+    to:
+      '  if (\n    deps.stored.at === "liveBlock" &&\n    deps.stored.mode === "interact" &&\n' +
+      '    deps.liveEntry !== null &&\n    deps.stored.entryId === deps.liveEntry.id\n  ) {',
     expect: "T1.3e",
   },
   {
@@ -141,8 +143,8 @@ const results = runPass({
   run,
   control: {
     file: FOCUS,
-    from: '  if (deps.overlayTop?.kind === "overlay") return "overlay";',
-    to: '  if (deps.overlayTop?.kind === "overlay") return "prompt";',
+    from: '  if (layerRung === "question") return "overlay";',
+    to: '  if (layerRung === "question") return "prompt";',
     why:
       "the highest row of A02 §2 answering with the wrong target — if this survives, the " +
       "suite is not reading activeTarget at all and every kill below is unearned",

@@ -1,0 +1,17 @@
+a bar's fill is an extent, so active liveness can carry a ramp. The
+OPERATION preset is progress · segmented · active and uses the slant alphabet.
+
+  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱   62%   sweep — a band running the fill
+  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱   62%   wave — the whole fill breathing
+  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱   62%   chase — throughput, three dots
+  ███████████████░░░░░░░░░   62%   capacity · continuous · still — the BUDGET preset
+
+  ▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱   38%   pulse — stalled, nothing moved in 30s
+  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰   100%   sweep once, then stop
+
+and an indeterminate bar is not a bar
+  ✦ 12s                        a spinner and elapsed — never a fake fill
+
+the same, painted rather than drawn in glyphs
+                             62%
+  the ground is the extent and the glyphs are the 1-bit rung.

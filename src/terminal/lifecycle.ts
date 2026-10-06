@@ -15,9 +15,12 @@ import {
   BRACKET_PASTE,
   CURSOR,
   CURSOR_SHAPE,
+  FOCUS_REPORT,
   KITTY_KEYBOARD,
   MOUSE,
   MOUSE_ANY,
+  TITLE_STACK,
+  windowTitle,
   cursorTo,
 } from "./escapes.js";
 import type { CursorStyle } from "./escapes.js";
@@ -93,7 +96,7 @@ export interface TerminalLifecycle {
    */
   size(): TerminalSize;
   /**
-   * Mouse tracking on or off, while acquired (C22's copy mode).
+   * Mouse tracking on or off, while acquired (C22's native selection).
    *
    * **Here because nowhere else may write an escape sequence.** `MOUSE` is a
    * mode this component takes at `acquire()` and restores at `release()`, and a
@@ -110,6 +113,13 @@ export interface TerminalLifecycle {
    * predicate answering both is how they come to disagree.
    */
   setMouseTracking(on: boolean): void;
+  /**
+   * The window title (I24, C22 I128): pushes the reader's title on the first
+   * write, then `OSC 2`, its controls shown (I26). A no-op unless acquired.
+   */
+  title(text: string): void;
+  /** Pops what `title` pushed, once; nothing when nothing was (I24). */
+  restoreTitle(): void;
   readonly writer: NodeJS.WriteStream;
   readonly acquired: boolean;
   readonly suspended: boolean;
@@ -171,7 +181,9 @@ type HeldKey =
   | "rawMode"
   | "bracketedPaste"
   | "mouse"
-  | "keyboardProtocol";
+  | "keyboardProtocol"
+  | "focusReport"
+  | "title";
 
 /**
  * §5's transition table, as data. Every cell, including the nine that throw.
@@ -250,11 +262,14 @@ export function terminalSize(stream: Readonly<{ columns: number; rows: number }>
 export function createTerminalLifecycle(opts: TerminalLifecycleOptions): TerminalLifecycle {
   const { stdout, stdin, capabilities, onFatal } = opts;
   const debug = opts.debug ?? ((): void => {});
-  // **One pair, chosen once** (I21). Acquisition, release and the copy-mode
+  // **One pair, chosen once** (I21). Acquisition, release and the native-selection
   // toggle all read this binding, so the mode that leaves is the mode that was
   // entered — a toggle reading `MOUSE` while acquisition took `MOUSE_ANY` would
   // emit `1002l` for a 1003 the terminal still holds.
   const mouseMode = opts.hover === true ? MOUSE_ANY : MOUSE;
+  // **The route, read once** (I22, C02 I15): the profile a session acquires
+  // under is the profile it releases, suspends and resumes under.
+  const linear = capabilities.renderMode === "linear";
 
   let state: LifecycleState = "constructed";
   const held = new Set<HeldKey>();
@@ -400,6 +415,8 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     bracketedPaste: () => emit(BRACKET_PASTE.enter),
     mouse: () => emit(mouseMode.enter),
     keyboardProtocol: () => emit(KITTY_KEYBOARD.enter),
+    focusReport: () => emit(FOCUS_REPORT.enter),
+    title: () => emit(TITLE_STACK.enter),
   });
 
   const RELEASE: Readonly<Record<Exclude<HeldKey, "stdout">, () => void>> = Object.freeze({
@@ -412,6 +429,9 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     // (C02 §3). Last taken and so first released — the terminal is on legacy
     // key reporting before the mouse and paste modes leave.
     keyboardProtocol: () => emit(KITTY_KEYBOARD.leave),
+    focusReport: () => emit(FOCUS_REPORT.leave),
+    // The pop (I24): the title the reader had comes back.
+    title: () => emit(TITLE_STACK.leave),
   });
 
   function setRawMode(on: boolean): void {
@@ -436,6 +456,7 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
    */
   function setMouseTracking(on: boolean): void {
     if (!capabilities.mouse) return; // I10 — never taken; nothing to toggle.
+    if (linear) return; // I22 — a report would arrive as typing nobody asked for.
     if (state !== "acquired") return; // suspended or released: not ours to change.
     if (on === held.has("mouse")) return; // idempotent (T3.x, the second call).
     if (on) {
@@ -444,6 +465,24 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     }
     emit(mouseMode.leave);
     held.delete("mouse");
+  }
+
+  /**
+   * The title, **a mode taken late** (I24): the first write pushes the
+   * reader's title and every later one only writes, so one pop restores it
+   * however many facts arrived while they were away.
+   */
+  function title(text: string): void {
+    if (state !== "acquired") return; // suspended: the child's title is its own
+    if (!held.has("title")) take("title");
+    emit(windowTitle(text));
+  }
+
+  /** The pop, once (I24); nothing when nothing was pushed. */
+  function restoreTitle(): void {
+    if (!held.has("title")) return;
+    emit(TITLE_STACK.leave);
+    held.delete("title");
   }
 
   // --- the transition guard -------------------------------------------------
@@ -631,28 +670,36 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     if (state === "acquired") return; // T3.5 — no-op, not an error.
 
     // I14 — the record has already concluded the shell cannot open. Fatal
-    // before anything is emitted (T3.15).
-    if (!capabilities.altScreen) {
+    // before anything is emitted (T3.15). **On the rich route only** (I22): the
+    // refusal exists because a frame needs the alternate screen, and linear
+    // draws none.
+    if (!linear && !capabilities.altScreen) {
       unwind();
       onFatal(new Error("alternate screen unsupported — the shell cannot open"));
     }
 
-    try {
-      take("altScreen");
-    } catch (err) {
-      // §5 — the fatal path unwinds first. onFatal returns `never`, so nothing
-      // runs after it; otherwise the only fatal case in the system would be the
-      // one case that leaves state behind.
-      unwind();
-      onFatal(err);
+    // **The linear profile** (I22, C22 §6m): the stream is appended to the
+    // terminal's own scrollback, a mouse report would arrive as typing, and a
+    // screen reader follows the cursor — so none of the three is taken.
+    if (!linear) {
+      try {
+        take("altScreen");
+      } catch (err) {
+        // §5 — the fatal path unwinds first. onFatal returns `never`, so nothing
+        // runs after it; otherwise the only fatal case in the system would be the
+        // one case that leaves state behind.
+        unwind();
+        onFatal(err);
+      }
     }
 
     try {
-      take("cursor");
+      if (!linear) take("cursor");
       take("rawMode");
       if (capabilities.bracketedPaste) take("bracketedPaste"); // I10
-      if (capabilities.mouse) take("mouse"); // I10
+      if (!linear && capabilities.mouse) take("mouse"); // I10, C01 I22
       if (capabilities.keyboardProtocol === "kitty") take("keyboardProtocol"); // I10, C02 I12
+      if (capabilities.notify.length > 0) take("focusReport"); // I23, C02 I17
     } catch (err) {
       // T3.7 — partial acquisition never leaves partial state.
       unwind();
@@ -773,6 +820,8 @@ export function createTerminalLifecycle(opts: TerminalLifecycleOptions): Termina
     // terminal nobody has entered is still the size of the terminal.
     size: snapshotSize,
     setMouseTracking,
+    title,
+    restoreTitle,
     writer,
     // Getters, not stored booleans: two booleans for four states admits two
     // combinations that cannot happen (T2.1).

@@ -58,7 +58,7 @@ const results = runPass({
     {
       name: "frame: read the clock per chrome function instead of per frame",
       file: "src/shell/frame.ts",
-      // **Re-anchored** (F1118): the literal grew `copyMode` and a spread
+      // **Re-anchored** (F1118): the literal grew `nativeSelection` and a spread
       // `lastFrame` and was reflowed, so the one-line anchor rotted for reasons
       // that had nothing to do with the clock. Anchored on the three lines the
       // mutation is about.

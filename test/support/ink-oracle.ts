@@ -59,6 +59,91 @@ const LADDER =
   "C09 I81 (F1233): the kind's narrow ladder replaced a cut taken from every part at once";
 const HEADER =
   "C09 I82 (F1236): the header reserves the verdict's cells, so its label names the column its values are in";
+const LIVE_SPINNER =
+  "C04 I39 / R-GLY-003 (M4): a live region is marked by a spinner frame, where Ink drew `Glyph.live`'s static `▌` — a token the design has no slot for, on a character the design spends on the selection rail";
+const RESIDUE_ASCII =
+  "R-GLY-003 / §095 (M4): the residue mark's ASCII half is the design's `...` where Ink drew a one-cell `~` — and only the ASCII half, because `⋯` is both what Ink drew and what the design draws";
+const SCROLLBAR =
+  "C09 I92 and C09 I93 / §7f / §021 (M14): a scroll whose content overflows spends its last column on a bar, so its content is laid out one cell narrower and every interior row gains a track or thumb glyph";
+const RESIDUE_AND_SCROLLBAR = `${RESIDUE_ASCII} — and, at this rung too, ${SCROLLBAR}`;
+const BAR_EMPTY =
+  "C09 I94 / R-PRG-001 / §033 (M16): the ASCII bar's empty cell is the registry's `-` where Ink drew `.` — a track against an absence, and the pair shipped wrong from the day `BAR_STYLES` existed because every row over the table measured a width and none named an `off`";
+const SPINNER_ASCII =
+  "C09 I98 / R-MOT-010 / R-MOT-011 / §038 (M16): a spinner set's ASCII rung is the registry's `asciiPattern`, fitted to the set's own frame count, where Ink drew one of three shared alphabets — so a running lead is `|` where it was `-`, and the rung keeps the set's cycle instead of running two and a half times faster";
+const FAILURE_MARK =
+  "C09 I138 / ruling 85 / §048 / §096 (F1461): a failed status leads its message with the failure mark `✗`/`x` where Ink drew the warning's `▲`/`!` — the mark an error shared with a warning at the rungs where it is one of two carriers";
+const SPINNER_AND_FAILURE_MARK = `${SPINNER_ASCII} — and, at this rung too, ${FAILURE_MARK}`;
+const SHARED_DIGEST =
+  "F1473 (C04 I73): T2.144's `img-fault` kept the corpus image's `digest` while overriding its `data`, and the decode cache is keyed on the digest — so the recorder was handed the corpus picture and Ink drew `▀▀`. The capture is of the picture and never of the fault arm; with a digest of its own the fixture draws the fault, which T2.144 asserts by shape because no capture of it exists or can be made";
+const BAR_PERCENT =
+  "C09 I96 / §034 (M16): the bar's percentage is `muted` where Ink drew `meta` — all five of §034's bars read it in `c-muted`, painted and drawn alike, and the tree drew `meta` from the day the kind landed with no row naming the tone";
+
+/**
+ * Kinds that landed **after** Ink was removed, and why each is not a retirement.
+ *
+ * **A third disposition, and it had to be one.** A retirement says *Ink drew
+ * this and a ruling changed it*, and it is driven by asserting the bytes still
+ * differ — which needs bytes. A kind registered after the producer was deleted
+ * has no capture and can never have one, so there is nothing to differ from:
+ * the byte-equality half of the sweep is simply unavailable for it.
+ *
+ * **Driven the only way it can be**: a row reaching one of these asserts that
+ * no capture exists under its key. The day a capture appears the entry is
+ * wrong and says so, which is the same expiry a retirement has, inverted.
+ * What the sweep keeps for these kinds is the other half of its subject — that
+ * exactly one `rows` arm opens — so they are swept and not skipped.
+ */
+export const POST_INK: ReadonlyMap<string, string> = new Map([
+  [
+    "form",
+    "C04 I136 / §3ar / §105 (ruling 20): the form is a kind §105 asks for and Ink never "
+    + "drew — it was registered after the producer was deleted, so no capture of it "
+    + "exists and none can be made",
+  ],
+  [
+    "split",
+    "C04 I132 / §3aq / §105 (ruling 20): the split is a kind §105 asks for and Ink never "
+    + "drew — it was registered after the producer was deleted, so no capture of it "
+    + "exists and none can be made",
+  ],
+  [
+    "tree",
+    "C04 I129 / §3ap / §105 (ruling 20): the tree is a kind §105 asks for and Ink never "
+    + "drew — it was registered after the producer was deleted, so no capture of it "
+    + "exists and none can be made",
+  ],
+  [
+    "tape",
+    "C04 I124 / §3ao / §095 (M14): the tape is a kind §095 asks for and Ink never "
+    + "drew — it was registered after the producer was deleted, so no capture of it "
+    + "exists and none can be made",
+  ],
+  [
+    "choice",
+    "C09 I105 / R-FOC-003 / \u00a7018 (M3): a checkbox or radio group \u2014 a kind \u00a7018 asks for "
+    + "and Ink never drew, registered after the producer was deleted, so no capture of "
+    + "it exists and none can be made",
+  ],
+  [
+    "control",
+    "C09 I106 / R-FOC-002 / \u00a7018 (M3): a continuous control \u2014 a kind \u00a7018 asks for and "
+    + "Ink never drew, registered after the producer was deleted, so no capture of it "
+    + "exists and none can be made",
+  ],
+]);
+
+/** Every width the two sweeps render at, so a rung-wide ruling is not a hand-copied list. */
+const ALL_WIDTHS = [2, 12, 24, 32, 40, 60, 80, 100, 120, 160, 200] as const;
+/**
+ * Every width a bar is drawn at — `ALL_WIDTHS` without 2.
+ *
+ * **Measured, not reasoned**: a sweep of the capture directory for a run of the
+ * empty cell returns exactly these ten widths under `ascii` and `mono`, for the
+ * two progress keys and no others. At two columns there is no run left to draw,
+ * so those captures are byte-identical and stay off the list — which is what
+ * makes it a driven exemption rather than a cross product.
+ */
+const BAR_WIDTHS = [12, 24, 32, 40, 60, 80, 100, 120, 160, 200] as const;
 
 const RETIRED: ReadonlyMap<string, string> = new Map(
   (
@@ -68,19 +153,112 @@ const RETIRED: ReadonlyMap<string, string> = new Map(
       // arrived, and a shared reason would have said `C09 I81` over captures
       // that ruling never touched — a claim about a frame that nothing would re-read
       // (F1236).
-      ["keyValue-kv-1", [2, 12], LADDER],
-      ["events-events-1", [2, 12, 24], LADDER],
-      ["comparison-comparison-1", [2, 12], LADDER],
+      ["t2143-keyValue-kv-1", [2, 12], LADDER],
+      ["t2143-events-events-1", [2, 12, 24], LADDER],
+      ["t2143-comparison-comparison-1", [2, 12], LADDER],
       // **Every width the ladder did not already take**, which is what makes
       // this list a measurement rather than a guess: the header moves wherever
       // the `b` column is drawn at all, and below 24 the ladder had already
       // shed it. Named before the run and read after — 27 entries, and the diff
       // is one row of each.
-      ["comparison-comparison-1", [24, 32, 40, 60, 80, 100, 120, 160, 200], HEADER],
+      ["t2143-comparison-comparison-1", [24, 32, 40, 60, 80, 100, 120, 160, 200], HEADER],
+      // **The four blocks that draw a residue row, at the two rungs that take
+      // the ASCII set.** Named from a measured sweep and read after: 88
+      // captures, every width, `ascii` and `mono` only.
+      //
+      // **The `full` arm is deliberately absent, and its absence is the
+      // measurement that corrected an earlier ruling.** A first pass padded the
+      // mark into a three-cell slot at every rung, which moved the Unicode arm
+      // too and put 128 captures on this list. `reservedCells` at every rung is
+      // a rule about marks in **fixed columns**, where following content aligns
+      // to the column; a residue lead is followed only by its own count, so
+      // nothing aligns to it. With the padding gone the Unicode arm draws `⋯`
+      // exactly as Ink did, agrees again, and comes off the list — which is
+      // this list working as a driven exemption rather than as a note.
+      // **The bar is not a colour, so it moves every rung.** The four keys are
+      // the corpus's overflowing scrolls and no others: a box whose content
+      // fits draws no bar (C09 I92), which is why this list is the same four
+      // the residue ruling already named rather than every scroll in the
+      // corpus. Named before the run and read after.
+      ["t2143-scroll-scroll-1", ALL_WIDTHS, RESIDUE_AND_SCROLLBAR, ["ascii", "mono"]],
+      ["t2143-scroll-scroll-1", ALL_WIDTHS, SCROLLBAR, ["full"]],
+      ["t2143-scroll-adv-overfull-scroll", ALL_WIDTHS, RESIDUE_AND_SCROLLBAR, ["ascii", "mono"]],
+      ["t2143-scroll-adv-overfull-scroll", ALL_WIDTHS, SCROLLBAR, ["full"]],
+      // T2.144's container corpus draws the same row from two more scrolls, at
+      // the same two rungs and the same eleven widths — the measurement
+      // agreeing with itself across two independent sweeps.
+      ["t2144-scroll-sc-residue", ALL_WIDTHS, RESIDUE_AND_SCROLLBAR, ["ascii", "mono"]],
+      ["t2144-scroll-sc-residue", ALL_WIDTHS, SCROLLBAR, ["full"]],
+      ["t2144-scroll-sc-off", ALL_WIDTHS, RESIDUE_AND_SCROLLBAR, ["ascii", "mono"]],
+      ["t2144-scroll-sc-off", ALL_WIDTHS, SCROLLBAR, ["full"]],
+      // The one panel that declares `live`. Width 2 is absent for a different
+      // reason than the scrolls': at two columns the title is gone entirely, so
+      // there is no mark to change.
+      //
+      // **And the ASCII arm came off the list without anyone touching it**
+      // (C09 I98). Ink drew `Glyph.live`'s `▌`, whose ASCII half is `|`; the
+      // tree drew a spinner frame, whose ASCII rung was `TURN_ASCII` and opened
+      // on `-`. Porting the rung to the registry moved the rotation sets onto
+      // `|`, so at tick 0 the two now agree **byte for byte at both ASCII rungs, for different
+      // reasons** — a static rail mark and the first frame of a turn.
+      //
+      // The ruling behind the retirement is untouched: the mark still means
+      // something else. What is gone is the **divergence**, and an entry
+      // claiming one that no longer exists is a dead exemption outliving its
+      // reason — which is precisely what T2.144's *and still matches* arm is
+      // for, and it is what reported this rather than anything noticing.
+      ["t2144-panel-p-live", [12, 24, 32, 40, 60, 80, 100, 120, 160, 200], LIVE_SPINNER, ["full"]],
+      // **The two progress keys, at the two rungs that take the ASCII pair.**
+      // The `full` arm is absent because it draws `█░` and never the ASCII
+      // pair, and `adv-zero-total` is on the list beside `prog-1` because a
+      // bar at 0% is all empty cells — the one capture where the changed
+      // character is the *whole* run rather than its tail.
+      // **The two blocks that draw a spinner frame, at the two rungs that take
+      // the ASCII set.** Measured with the sweep rather than reasoned: 44
+      // captures, every width including 2 — a `steps` lead and a `status`
+      // activity mark are one cell and survive where a title does not — and
+      // `ascii` and `mono` only, because the Unicode frames did not move and
+      // the `full` arm agrees with Ink exactly as it did.
+      ["t2143-steps-steps-1", ALL_WIDTHS, SPINNER_ASCII, ["ascii", "mono"]],
+      // **And the status's mark, at every rung and every width** (C09 I138).
+      // Measured before the run: the corpus's one failed status is `retrying`,
+      // and its mark survives at every captured width including 2, where it is
+      // the whole first row. Its ASCII and mono captures already differed by
+      // the spinner rung, so they carry both rulings; `full` joins on this one
+      // alone. No other capture draws a failed status — a sweep for `ERROR`
+      // and for a leading `▲`/`!` returns this key and nothing else. The
+      // image fault's key (`t2144-image-img-fault`) is not one, and not because
+      // the fault draws no status: the fixture kept the corpus image's
+      // `digest`, so once T2.143 had decoded that image the decode cache handed
+      // the fault arm the picture — its capture is `▀▀`, not the fault.
+      ["t2143-status-status-1", ALL_WIDTHS, SPINNER_AND_FAILURE_MARK, ["ascii", "mono"]],
+      ["t2143-status-status-1", ALL_WIDTHS, FAILURE_MARK, ["full"]],
+      // **Every capture of that key, at every rung and width** (F1473): each is
+      // the corpus picture, so none can hold the fault. Retired rather than
+      // deleted, because the files are the record of what the shared digest
+      // produced; the row asserts they still differ, and asserts the fault arm's
+      // shape separately since no capture of it can be made.
+      ["t2144-image-img-fault", ALL_WIDTHS, SHARED_DIGEST],
+      ["t2143-progress-prog-1", BAR_WIDTHS, BAR_EMPTY, ["ascii", "mono"]],
+      ["t2143-progress-adv-zero-total", BAR_WIDTHS, BAR_EMPTY, ["ascii", "mono"]],
+      // **The percentage's tone, and the shape of the list is the measurement.**
+      // `full` at every width, because the tone is a colour and the colour is
+      // in every capture that has one. `ascii` and `mono` at **two columns
+      // only** — not because the typographic collapse spares them, but because
+      // `BAR_EMPTY` already retired those two rungs at the other ten widths,
+      // and two is the width where there is no bar left to have an empty cell.
+      // So the union of the two rulings is the full grid and neither list is a
+      // cross product: 26 captures, swept before the run and read after.
+      ["t2143-progress-prog-1", ALL_WIDTHS, BAR_PERCENT, ["full"]],
+      ["t2143-progress-adv-zero-total", ALL_WIDTHS, BAR_PERCENT, ["full"]],
+      ["t2143-progress-prog-1", [2], BAR_PERCENT, ["ascii", "mono"]],
+      ["t2143-progress-adv-zero-total", [2], BAR_PERCENT, ["ascii", "mono"]],
     ] as const
-  ).flatMap(([key, widths, why]) =>
+  ).flatMap(([key, widths, why, only]) =>
     widths.flatMap((width) =>
-      ["full", "ascii", "mono"].map((caps) => [oracleName(`t2143-${key}`, caps, width), why] as const),
+      (only ?? ["full", "ascii", "mono"]).map(
+        (caps) => [oracleName(key, caps, width), why] as const,
+      ),
     ),
   ),
 );
@@ -124,6 +302,21 @@ export class InkOracle {
   retired(name: string): string | null {
     this.#seen.add(name);
     return RETIRED.get(name) ?? null;
+  }
+
+  /**
+   * The ruling that puts this kind beyond Ink's reach, or `null`.
+   *
+   * Not counted as asked: there is no capture to ask for, and counting one
+   * would make {@link settle}'s equality demand a file nothing can write.
+   */
+  postInk(kind: string): string | null {
+    return POST_INK.get(kind) ?? null;
+  }
+
+  /** Whether a capture exists — what drives {@link postInk}'s entries. */
+  has(name: string): boolean {
+    return existsSync(join(this.#dir, name));
   }
 
   /** A capture. Its producer is deleted, so a missing file cannot be restored. */

@@ -272,7 +272,14 @@ export function createProcessRunner(deps: ProcessRunnerDeps): ProcessRunner {
           // F924). Left as a cast it read `SIG0` for every clean exit, and
           // C23's `exit.signal !== null` made every successful command on this
           // arm an error, under a correct screen.
-          resolve({ code: exitCode, signal: signalName(signal) });
+          //
+          // **And the code goes with the signal** (I19, F1491). The port says
+          // `exitCode: 0` beside every signal — `sh -c 'kill -9 $$'` answers
+          // `{exitCode: 0, signal: 9}` on node-pty 1.1.0 — where the pipe arm
+          // says `null`, and C07 I14's `exitCodeOf` reads the code before the
+          // signal: a killed PTY child was recorded as a success.
+          const name = signalName(signal);
+          resolve({ code: name === null ? exitCode : null, signal: name });
         });
       });
 

@@ -1,0 +1,69 @@
+THE CELL GRID IS A PROJECTION. IT IS NOT THE INTERFACE.
+
+everything drawn also exists as a semantic node
+
+  id          the same stable id used by focus, patches and pointer arms
+  role        entry · question · button · link · table · row · figure…
+  name        what it is, without colour, position or punctuation
+  description context needed to understand it, without repeating the name
+  value       source value plus a human valueText, not the painted string
+  state       focused · selected · expanded · busy · stale · invalid…
+  position    3 of 18, when membership has an order
+  actions     the same action ids the keymap resolves
+  relations   owns · describes · labelled-by, when needed
+
+a repaint changes CELLS, not identity. A resize changes representation,
+not the name. A patch never arbitrarily moves focus; if it removes the focused
+node, focus re-resolves by the declared stable-id fallback.
+
+the semantic tree has two renderings
+
+  rich      the cursor-addressed interface in this document
+  linear    an append-only stream of semantic events
+
+linear is selectable before the first frame through --linear, the
+CALCIUM_RENDER_MODE=linear environment setting, or persistent config.
+accessibility.screenReader=auto chooses linear when no rich semantic bridge
+is available. The chosen route appears in /capabilities.
+
+linear mode uses no alternate screen, mouse tracking, cursor-addressed repaint
+or animation. It never rewrites emitted semantic events; only the active input
+line edits in place. Choice questions emit a numbered question event and later
+a resolution event: replace/float is rich placement, never history mutation.
+Choice questions use numbered choices;
+text questions use a labelled line editor; mixed forms add an explicit text arm.
+A running call announces start, useful elapsed milestones, blockage and
+completion — not spinner frames. Streaming prose arrives in coherent batches.
+
+ANNOUNCEMENTS COME FROM SEMANTIC EVENTS, NEVER FROM DIFFING THE SCREEN.
+announce is none / polite / assertive, with deduplication and rate limits.
+A repaint of the same fact does not say it twice.
+Their transport is declared: linear stdout or a named local semantic bridge.
+If no rich-mode bridge exists, auto falls back to linear; it never claims that
+an internal tree alone is exposed to a terminal screen reader.
+
+a figure owes accessibleName, summary, a data view and, when the summary
+cannot be safe, a long description. Nothing important is hover-only.
+An image without authored alternative text says so and offers metadata and
+a description action; braille art is a rendering, not an alternative.
+
+ONLY THE RENDERER WRITES TERMINAL CONTROL SEQUENCES.
+
+model text, tool output, filenames, branches, URLs, logs and errors are
+UNTRUSTED TEXT — even when they came from this machine.
+
+  C0 / C1 controls   shown as visible escapes
+  ESC / CSI / OSC    parsed, never replayed
+  ANSI colour         allowlisted into semantic spans
+  OSC 8 links         rebuilt from a validated destination
+  bidi controls       isolated or shown; never reorder neighbours
+  BEL · title · OSC 52only through named notify, title and copy actions
+
+a payload cannot forge chrome, close a panel, create a question, change the
+title, write the clipboard or ring the bell. Attached PTY emulation is the
+bounded exception: display controls stay inside its rectangle and host-scoped
+effects do not escape it.
+
+conformance fixtures include hostile filenames, forged hyperlinks, OSC 52,
+bidi text and ANSI-shaped logs. “Copy source” escapes control bytes; an
+explicit COPY RAW action may exist only with an unsafe-data warning.

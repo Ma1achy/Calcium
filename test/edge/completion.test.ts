@@ -249,18 +249,18 @@ describe("C19 §6 — the menu", () => {
   it("T3.13: a large set still produces one block tree and a declared width", () => {
     const many = Array.from({ length: 5_000 }, (_, i) => ({ value: `candidate-${String(i)}` }));
     const blocks = menuBlocks(many.slice(0, 40), 0, many.length - 40);
-    // An edge, the body, the indicator, an edge (C19 I23).
-    expect(blocks).toHaveLength(4);
+    // An edge, the body, the indicator (C19 I23). The bottom edge is the
+    // prompt's own rule since ruling 90, so the indicator is the last row.
+    expect(blocks).toHaveLength(3);
     expect(blocks[0]).toMatchObject({ kind: "rule" });
     // ASCII, because C19 is L3 and the substitution happens at L1 (C09 I22,
     // F122). A `raw` block carries text rather than a slot, so `…` here could
     // never have been resolved against the capability.
     expect(blocks[2]).toMatchObject({ kind: "raw", text: "+ 4960 more" });
-    expect(blocks[3]).toMatchObject({ kind: "rule" });
     expect(menuWidth(many.slice(0, 40))).toBeGreaterThan(0);
   });
 
-  it("T4.8b: moving the selection changes one glyph and nothing else", () => {
+  it("T4.8b (C19 I8, I29): moving the selection changes the table's current and nothing else", () => {
     const candidates = [
       { value: "running", detail: "up" },
       { value: "failed", detail: "down" },
@@ -274,17 +274,26 @@ describe("C19 §6 — the menu", () => {
     // table out from under it — a row that describes the body by where it sits
     // breaks whenever the chrome around it changes, which is not what it is
     // about.
-    const glyphs = (blocks: readonly unknown[]): unknown[] => {
-      const table = blocks.find((b) => (b as { kind: string }).kind === "table") as {
-        rows: { cells: { value: { glyph?: string } } }[];
+    // **The current is the table's, not a cell's** (C19 I29, C04 I150): the
+    // rows are identical and one field moves, so C11 draws the mark, the
+    // ground and the weight and no label moves.
+    const tableOf = (blocks: readonly unknown[]) =>
+      blocks.find((b) => (b as { kind: string }).kind === "table") as {
+        current?: string;
+        rows: { id: string }[];
       };
-      return table.rows.map((r) => r.cells.value.glyph);
-    };
-    expect(glyphs(first)).toEqual(["bullet", undefined]);
-    expect(glyphs(second)).toEqual([undefined, "bullet"]);
+    expect(tableOf(first).current).toBe(tableOf(first).rows[0]?.id);
+    expect(tableOf(second).current).toBe(tableOf(second).rows[1]?.id);
+    expect({ ...tableOf(first), current: null }, "the rows and every other field are identical").toEqual({
+      ...tableOf(second),
+      current: null,
+    });
+    expect(first.filter((b) => (b as { kind: string }).kind !== "table")).toEqual(
+      second.filter((b) => (b as { kind: string }).kind !== "table"),
+    );
   });
 
-  it("T3.29 (I18): a candidate with a detail renders its label and its hint, at every width", () => {
+  it("T3.29 (I18, I30): a candidate with a detail renders its label and its hint, at every width", () => {
     // **Asserted on the rendered rows rather than on the block**, because the
     // block was correct throughout. C11 hands residual width only to columns
     // declaring `flex: true` (plan.ts step 8), the menu's table declared
@@ -297,7 +306,7 @@ describe("C19 §6 — the menu", () => {
       { value: "/promote", detail: "Promote a build" },
       { value: "/ps", detail: "List processes" },
     ];
-    const plain = [{ value: "/serving" }];
+    const plain = [{ value: "/serving" }, { value: "/status" }];
 
     const rowsAt = (candidates: readonly Candidate[], width: number): readonly string[] =>
       renderSequenceToLines(registry, menuBlocks(candidates, 0, 0), width, {
@@ -308,10 +317,11 @@ describe("C19 §6 — the menu", () => {
 
     for (const width of [menuWidth(detailed), 60, 100]) {
       const rows = rowsAt(detailed, width);
-      // One row per candidate, with an edge above and below them (C19 I23).
-      expect(rows, `${String(width)}: one row per candidate, plus two edges`).toHaveLength(4);
+      // One row per candidate, under an edge (C19 I23); the edge below is
+      // the prompt's rule since ruling 90, which this row does not draw.
+      expect(rows, `${String(width)}: one row per candidate, plus the top edge`).toHaveLength(3);
       expect(rows[0], `${String(width)}: the first row is an edge`).toMatch(/^[─-]/);
-      expect(rows[3], `${String(width)}: and so is the last`).toMatch(/^[─-]/);
+      expect(rows[2], `${String(width)}: and the last is a candidate`).not.toMatch(/^[─-]/);
       for (const [i, candidate] of detailed.entries()) {
         expect(rows[i + 1], `${String(width)}: ${candidate.value} is legible`).toContain(
           candidate.value,
@@ -331,10 +341,19 @@ describe("C19 §6 — the menu", () => {
       .toContain("/promote");
 
     // **The control, and it is why this survived four components.** A candidate
-    // with no `detail` takes the pills path, which never had the defect — so a
-    // row asserting only that the menu appears passed against it.
-    expect(rowsAt(plain, menuWidth(plain))[1], "the pills path drew correctly all along")
-      .toContain("/serving");
+    // with no `detail` took the pills path, which never had the defect — so a
+    // row asserting only that the menu appears passed against it. Since ruling
+    // 99 it is a table row too (C19 I30): the label whole, one row a
+    // candidate, and nothing in the hint cell.
+    for (const width of [menuWidth(plain), 60, 100]) {
+      const rows = rowsAt(plain, width);
+      expect(rows, `${String(width)}: the edge and one row a candidate`).toHaveLength(1 + plain.length);
+      for (const [i, candidate] of plain.entries()) {
+        expect(rows[i + 1]?.replace(/^\s*[›*]?\s*/u, "").trimEnd(), `${String(width)}: ${candidate.value}, and no hint`).toBe(
+          candidate.value,
+        );
+      }
+    }
   });
 
   it("T3.19b (I18): at a width too narrow for both columns, the label survives", () => {
@@ -357,7 +376,8 @@ describe("C19 §6 — the menu", () => {
       // eslint-disable-next-line no-control-regex
     }).map((l) => l.replace(/\u001b\[[0-9;]*m/g, ""));
 
-    const body = rows.slice(1, -1).join("\n");
+    // Everything under the top edge: the bottom edge is the prompt's (ruling 90).
+    const body = rows.slice(1).join("\n");
     expect(body, "the value is what the user is choosing").toContain("/container");
     expect(body, "and so is this one").toContain("/config");
     expect(body, "the hint is what goes").not.toContain("One container in full");

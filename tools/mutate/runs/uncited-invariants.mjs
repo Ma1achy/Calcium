@@ -10,6 +10,10 @@
 // `PILLS-WRAP` turns the first-fit packing into the `ceil(totalWidth / w)` wrap
 // this spec's §3 table claimed for it (F928), and `HUNK-MARKER` removes the row
 // a collapse marker costs, which is the only observable of C25 I11.
+//
+// **Two mutations went in M9b**: the offset ceiling and `clampOffset`'s snap.
+// Both named the two retired offset rules, gone with their one caller when the pushed
+// patch view was deleted (C25 §3b, F1251).
 import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
@@ -17,7 +21,7 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/contract/view-model.test.ts test/contract/patch-window.test.ts " +
-  "test/contract/patch-view.test.ts test/contract/block-elements.test.ts";
+  "test/contract/patch-window.test.ts test/contract/block-elements.test.ts";
 const PATCHOP = "src/data/viewmodel/patch.ts";
 const VALIDATE = "src/data/viewmodel/validate.ts";
 const SIMPLE = "src/presentation/blocks/kinds/simple.ts";
@@ -133,23 +137,6 @@ const results = runPass({
       expect: "T2.11",
     },
     {
-      // The arithmetic ceiling — the first one, and the one that put the
-      // bottom of the document out of reach.
-      name: "the offset ceiling is total minus height",
-      file: WINDOW,
-      from: "  return starts[lo] ?? 0;",
-      to: "  return Math.max(0, rows.length - height);",
-      expect: "T2.12",
-    },
-    {
-      // Snapping up rather than down, so a clamped offset is not itself valid.
-      name: "clampOffset does not snap",
-      file: WINDOW,
-      from: "  return Math.min(bottom, snapDown(rows, wanted));",
-      to: "  return Math.min(bottom, wanted);",
-      expect: "T2.13",
-    },
-    {
       // A fifth level makes the scope stack five deep, and nothing else in the
       // tree would say so.
       name: "the level vocabulary gains a value",
@@ -194,12 +181,12 @@ const results = runPass({
       // every behavioural row would agree with until the two parted.
       name: "a second element resolver",
       file: CONSTRUCT,
-      from: "    return elementsOfEntry(built.blocks, entry.doc.blocks, deps.frame.overlayRegion().width, entry.doc.command);",
+      from: "    const own = elementsOfEntry(built.blocks, entry.doc.blocks, width, entry.doc.command);",
       to:
         "    if (entry.doc.blocks.length === 0) {\n" +
-        "      return elementsOfEntry(built.blocks, [], deps.frame.overlayRegion().width, entry.doc.command);\n" +
+        "      return elementsOfEntry(built.blocks, [], width, entry.doc.command);\n" +
         "    }\n" +
-        "    return elementsOfEntry(built.blocks, entry.doc.blocks, deps.frame.overlayRegion().width, entry.doc.command);",
+        "    const own = elementsOfEntry(built.blocks, entry.doc.blocks, width, entry.doc.command);",
       expect: "T2.33",
     },
   ],

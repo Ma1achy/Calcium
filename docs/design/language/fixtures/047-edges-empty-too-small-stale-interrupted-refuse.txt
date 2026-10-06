@@ -1,0 +1,31 @@
+an empty block is a correct block about nothing — never an error
+  ┌───────────────────────────┐
+  │        No matches.        │
+  └───────────────────────────┘
+  and it says what it searched: No matches for "elementsIn" in src/.
+
+a frame too small to draw — and it says WHICH constraint
+  ┌────────────────────────┐
+  │ ▲ 34×8                 │
+  │ needs 60×16            │
+  └────────────────────────┘
+
+stale, and it says when rather than pretending
+  ┌ workers ────────────── updated 4m ago ─┐
+  │ build   running   2d 4h     │
+  └──────────────────────────────────────┘
+  the CONTENT dims when it is stale. The chrome does not, because the
+  staleness notice is the one thing that must stay legible.
+
+interrupted mid-stream
+  ● The parser tracks quotes with a boolean, so a nested quo
+  ▲ interrupted · 312 of ~900 tokens
+
+a refused figure — a plot that cannot honestly be drawn
+  ┌───────────────────────────────────────┐
+  │                                       │
+  │  this arm draws no density — the      │
+  │  estimate needs the terminal's width  │
+  │                                       │
+  └───────────────────────────────────────┘
+  a refusal states its reason. It is not an error and never red.

@@ -37,7 +37,7 @@ At 100 columns, fully resolved:
 
    v1.0.0
 
-   Connected to prism.fmx.io as malachy.doherty@fmx.io
+   Connected to prism.example.com as sam.taylor@example.com
    Teams        vision · ml-platform-readonly
    Token        expires in 30d
 

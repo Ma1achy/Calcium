@@ -350,7 +350,7 @@ describe("C06 contract", () => {
 });
 
 describe("C06 §2 — the constructors are on the runtime entry (C24 §3)", () => {
-  it("T2.11: every arm of TransportDeps is constructible from `@fmx/calcium`, and a router from the result", async () => {
+  it("T2.11: every arm of TransportDeps is constructible from `calcium-tui`, and a router from the result", async () => {
     // **This row is the consumer** the export needs (CLAUDE.md: an export nothing
     // consumes is forbidden), and it is written against the entry rather than
     // the barrel because the barrel already had all four. The defect was that a

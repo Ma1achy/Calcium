@@ -30,7 +30,7 @@ caption:
 | `profile-verdict` | the framework measuring itself and answering yes or no |
 | `profile-frame` | where a frame's time went, per site, self time |
 | `profile-memory` | the heap over the session, sampled |
-| `profile-view` | `/profile` as a pushed view, walked card by card |
+| `profile-view` | `/profile app` as an entry, scrolled card by card |
 
 **`probe.py` beside this file is how every still below was chosen.** It drives
 one verb and prints the frame a reader would have seen, which is the step that
@@ -47,6 +47,7 @@ as this file; the card ids here are read off `CARDS`.
 """
 
 import os
+import shutil
 import subprocess
 import sys
 
@@ -114,18 +115,13 @@ SHOTS: list[tuple[str, int, int, bytes, float, dict[str, str], float | None, lis
     ("profile-frame", 100, 36, b"/report where-the-frame-went", 12.0, TRUE, 10.0, [], None),
     ("profile-memory", 100, 36, b"/report memory", 12.0, TRUE, 10.0, [], None),
 
-    # 8 — `/profile`, the framework's own seventh verb, as a pushed view rather
-    #     than an entry. Animated, because the card walk is the surface: `n`
-    #     steps a card and `tab` steps a group, and a still of one card is a
-    #     picture of `/report`.
-    #
-    #     **Four `n` and no `tab`, which keeps the walk inside `app`.** With a
-    #     `tab` in it the last frame was `framework · composition` — a chart
-    #     mirrored about zero, correct and unreadable as a thumbnail to anyone
-    #     who has not met it, under the window's own *this block is taller than
-    #     the screen* notice. The walk is the claim; the card it stops on is
-    #     what a reader sees first, and those are two decisions rather than one.
-    ("profile-view", 100, 34, b"/profile", 18.0, TRUE, None, [b"n", b"n", b"n", b"n"], None),
+    # 8 — `/profile app`, the framework's own seventh verb, as an **entry**
+    #     (M9, R-EXA-082: there are no pushed views). It was `/profile` walked
+    #     with `n` four times, and `n` binds nothing now — a typed letter lands
+    #     in the prompt. The section's cards are one document in the transcript,
+    #     so the walk is the transcript's own: a page-up per beat. Animated,
+    #     because the scroll through the cards is the surface.
+    ("profile-view", 100, 34, b"/profile app", 18.0, TRUE, None, [PAGE_UP, PAGE_UP, PAGE_UP, PAGE_UP], None),
 ]
 
 FONT = "13"
@@ -171,12 +167,17 @@ if __name__ == "__main__":
         if still is not None:
             collapse(cast, still)
         gif = os.path.join(out, name + ".gif")
+        os.remove(raw)
+        os.remove(raw + ".teardown")
+        # A missing `agg` skips the GIF with a message and keeps the cast: the
+        # recording is the evidence and the render can happen where `agg` is.
+        if shutil.which("agg") is None:
+            print(f"  -> {cast} (no agg here: the GIF is skipped; render it where agg is)")
+            continue
         subprocess.run(
             ["agg", "--font-size", FONT, "--theme", "asciinema",
              *(["--last-frame-duration", "1"] if still is not None else ["--speed", "1.3"]),
              cast, gif],
             check=True, capture_output=True,
         )
-        os.remove(raw)
-        os.remove(raw + ".teardown")
         print(f"  -> {gif} ({os.path.getsize(gif) // 1024} KiB)")

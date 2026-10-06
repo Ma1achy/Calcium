@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.1 <23"
   },
   "bin": {
     "plots-tui": "./bin/plots-tui.js"
@@ -16,8 +16,8 @@
     "test": "vitest run --dir test"
   },
   "dependencies": {
-    "@fmx/calcium": "file:../..",
-    "sharp": "0.35.4"
+    "calcium-tui": "file:../..",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@types/node": "26.1.2",

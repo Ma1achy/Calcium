@@ -19,12 +19,13 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/contract/continuation.test.ts test/unit/execution.test.ts "
-  + "test/contract/blocks.test.ts test/golden/continuation.test.ts";
+  + "test/contract/blocks.test.ts test/golden/continuation.test.ts test/unit/frame-budget.test.ts";
 const DOCS = "src/shell/documents.ts";
 const GLYPHS = "src/presentation/blocks/glyphs.ts";
 const REFRESH = "src/shell/refresh.ts";
 const VALIDATE = "src/data/viewmodel/validate.ts";
 const SIMPLE = "src/presentation/blocks/kinds/simple.ts";
+const LAYOUT = "src/shell/entry-layout.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -42,7 +43,7 @@ const results = runPass({
   run,
   control: {
     file: GLYPHS,
-    from: '    continuation: ["⎿", "`"],',
+    from: '    continuation: ["⎿", "`-"],',
     to: '    continuation: ["", ""],',
     why: "with no rendering at all, T2.94 and T2.95 both fail; a run where this survives cannot see a kill",
   },
@@ -53,10 +54,20 @@ const results = runPass({
       // state the tree was actually in.
       name: "THE DEFECT: the validator's vocabulary is a Set literal again, and the token is missing from it",
       file: VALIDATE,
-      // Re-anchored 2026-09-05: `step` joined the row (C09 §4), applied by hand
-      // and T3.18 died.
-      from: "  continuation: true, step: true,\n} satisfies Record<Glyph, true>;",
-      to: "} as Record<string, true>;",
+      // **Re-anchored three times at the same line end, and the third is why
+      // the shape changed.** 2026-09-05 `step` joined the row, 2026-09-22 it
+      // left again, 2026-09-23 `question` and `current` arrived — none of them
+      // anything to do with `continuation`. An anchor that reaches a record's
+      // closing line rots every time the record gains a member, so it takes
+      // the token and the least context that makes it unique instead.
+      //
+      // **And the `satisfies` clause was never part of the kill.** It was in
+      // the pattern because the measured defect was a `Set` literal, but the
+      // runtime strips types: what T3.18 sees is the token missing from the
+      // vocabulary, which is the whole of the mutation and all of it that
+      // could ever have fired.
+      from: "\n  continuation: true,",
+      to: "",
       expect: "T3.18",
     },
     {
@@ -65,8 +76,8 @@ const results = runPass({
       // the reading that names four consumers and finds six.
       name: "the mark ignores the command, so a notice with no line above it takes one",
       file: DOCS,
-      from: '    tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone];',
-      to: '    tone === "muted" ? "continuation" : GLYPH_OF[tone];',
+      from: 'tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone]',
+      to: 'tone === "muted" ? "continuation" : GLYPH_OF[tone]',
       expect: "T2.96",
     },
     {
@@ -75,8 +86,8 @@ const results = runPass({
       // subordination mark is the cancelled notice's exact failure.
       name: "the mark displaces an obliged glyph, so `warn` and `error` lose theirs",
       file: DOCS,
-      from: '    tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone];',
-      to: '    command === "" ? GLYPH_OF[tone] : "continuation";',
+      from: 'tone === "muted" ? (command === "" ? undefined : "continuation") : GLYPH_OF[tone]',
+      to: 'command === "" ? GLYPH_OF[tone] : "continuation"',
       expect: "T2.97",
     },
     {
@@ -85,8 +96,8 @@ const results = runPass({
       // width row measured against the other convention can tell the two apart.
       name: "the mark is the box-drawing corner, which is Ambiguous and draws two cells at wide",
       file: GLYPHS,
-      from: '    continuation: ["⎿", "`"],',
-      to: '    continuation: ["└", "`"],',
+      from: '    continuation: ["⎿", "`-"],',
+      to: '    continuation: ["└", "`-"],',
       expect: "T2.94",
     },
     {
@@ -131,6 +142,41 @@ const results = runPass({
       from: 'b.notice("muted", `no output for ${String(quiet)}m`, "continuation", { id: STALL_BLOCK })',
       to: 'b.notice("muted", `no output for ${String(quiet)}m`, undefined, { id: STALL_BLOCK })',
       expect: "T3.22",
+    },
+    // **Review batch 2, M4 item 6** (C09 I5, R-GLY-003, C22 I83): the slot
+    // reserves two cells and the renderer pads to it. Each mutation restores a
+    // shape that shipped or one step of it, and T2.188 is the row written
+    // against all three of the first: the narrow widths are where a lead one
+    // cell off is a row `measure` did not count.
+    {
+      name: "the ASCII hook one character again, as shipped — half the registry's mark",
+      file: GLYPHS,
+      from: '    continuation: ["⎿", "`-"],',
+      to: '    continuation: ["⎿", "`"],',
+      expect: "T2.188",
+    },
+    {
+      name: "the reservation read from the Unicode half alone, as shipped",
+      file: GLYPHS,
+      from: "  return Math.max(cells(unicode), cells(ascii)); // narrow-ok",
+      to: "  return cells(unicode); // narrow-ok",
+      expect: "T2.188",
+    },
+    {
+      name: "the lead not padded to the reservation, so `⎿` puts its text a column left of `` `- ``",
+      file: SIMPLE,
+      from: "  const pad = \" \".repeat(Math.max(0, glyphCells(glyph) - cells(drawn))); // narrow-ok",
+      to: '  const pad = "";',
+      expect: "T2.188",
+    },
+    {
+      // The card's half: C09's lead moved and the shell's constant did not —
+      // two forms of one mark putting text in two columns (C22 I84).
+      name: "the card body four cells in, written rather than derived from the reservation",
+      file: LAYOUT,
+      from: 'export const BODY_INDENT = HOOK_INDENT + glyphCells("continuation") + 1;',
+      to: "export const BODY_INDENT = HOOK_INDENT + 2;",
+      expect: "T1.44",
     },
   ],
 });

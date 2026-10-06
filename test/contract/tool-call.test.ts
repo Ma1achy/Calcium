@@ -9,11 +9,11 @@ import { describe, expect, it } from "vitest";
 import { block, validateDocument } from "../../src/data/viewmodel/index.js";
 import { cardBody, entryLayout } from "../../src/shell/entry-layout.js";
 import type { Action, Block, TextSpan } from "../../src/data/viewmodel/index.js";
-import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { GLYPH_TOKENS, glyphCells, glyphFor } from "../../src/presentation/blocks/glyphs.js";
+import { createBlockRegistry, glyphs } from "../../src/presentation/blocks/index.js";
+import { glyphFor, headMark } from "../../src/presentation/blocks/glyphs.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
 import { toolCallDoc, toolCallHeader } from "../../src/shell/documents.js";
-import { spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
+import { scrollbarSet, spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, visible } from "../support/render.js";
 import { cells } from "../../src/presentation/text.js";
 
@@ -26,21 +26,17 @@ const frame = (blocks: readonly Block[], width: number, ascii = false): readonly
   renderSequenceToLines(registry, blocks, width, { theme: DARK_THEME, capabilities: ascii ? ASCII_CAPS : FULL_CAPS })
     .map((l) => visible(l).trimEnd());
 
-describe("C09 §4 — the `step` glyph", () => {
-  it("T2.45 (C09 I5, I45): `step` is in the vocabulary, `⏺︎` under unicode and `*` under ASCII, one cell each and neither an emoji base", () => {
-    expect(GLYPH_TOKENS).toContain("step");
-    expect(glyphFor("step", FULL_CAPS)).toBe("⏺︎");
-    expect(glyphFor("step", { ...FULL_CAPS, ambiguousWidth: "wide" }), "Neutral: no tier at wide").toBe("⏺︎");
-    expect(glyphFor("step", ASCII_CAPS)).toBe("*");
-    expect(glyphCells("step")).toBe(1);
-  });
-});
+// **The head mark's row moved to `call-state.test.ts` as C09 T2.187** (C04
+// I141). It asked `headMark` for a slot name and asserted `●` for all five
+// states, which was green while every head drew `info` and a queued head drew
+// filled — a resolver asserted in isolation cannot see the tone the block
+// carries. T2.187 renders the head and reads the cell and its colour.
 
 describe("§9c — the header, the body, and the row the body already has", () => {
   it("C23 T1.50 (C23 I57, F821): entryLayout clears the body's first leading gap in the body run, keeps the rest, and the stored document keeps its blocks by identity", () => {
     const first = block({ kind: "notice", id: "a", tone: "muted", text: "first", padding: { t: 1 } });
     const second = block({ kind: "notice", id: "b", tone: "muted", text: "second", padding: { t: 1 } });
-    const step = block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: "ps · ok" });
+    const step = block({ kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: "ps · ok" });
 
     // The body run: the first block's gap is dropped, the second keeps its gap.
     const body = cardBody([first, second]);
@@ -64,7 +60,7 @@ describe("§9c — the header, the body, and the row the body already has", () =
   });
 
   it("C22 T1.62 (C22 I107, F1203): entryLayout over one card array hands out the same body objects every call, and a fresh array a fresh body", () => {
-    const step = block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: "ps · ok" });
+    const step = block({ kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: "ps · ok" });
     const first = block({ kind: "notice", id: "a", tone: "muted", text: "first", padding: { t: 1 } });
     const second = block({ kind: "notice", id: "b", tone: "muted", text: "second", padding: { t: 1 } });
     const card = Object.freeze([step, first, second]);
@@ -135,7 +131,7 @@ describe("§9c — the header, the body, and the row the body already has", () =
     const failed = toolCallDoc("run_command", { name: "run_command", args: "npm test", outcome: "exit 1" }, META, FULL_CAPS, "error");
     for (const doc of [running, settled, folded, failed]) expect(validateDocument(doc).ok, doc.command).toBe(true);
     expect(failed.error?.message).toBe("run_command(npm test) · exit 1");
-    expect(running.blocks[0]?.kind === "notice" && running.blocks[0].glyph).toBe("step");
+    expect(running.blocks[0]?.kind === "notice" && running.blocks[0].glyph).toBe("work-unit");
     expect(settled.blocks[1]?.kind === "notice" && settled.blocks[1].glyph).toBe("continuation");
     expect(running.blocks[1]?.kind === "scroll" && running.blocks[1].follow).toBe(true);
   });
@@ -148,23 +144,44 @@ describe("§9c — the header, the body, and the row the body already has", () =
       const running = toolCallDoc("run_command", { name: "run_command", args: "npm test", elapsedMs: 4_000, output: out(12), height: 3 }, META, caps).blocks;
       const settled = toolCallDoc("run_command", { name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0", result: "118 passed, 2 todo" }, META, caps).blocks;
       const folded = toolCallDoc("run_command", { name: "run_command", args: "npm test", output: out(392), height: 3, collapsed: true }, META, caps).blocks;
-      const mark = ascii ? "*" : "⏺︎";
-      const hook = ascii ? "`" : "⎿";
-      const more = ascii ? "~" : "⋯";
+      // **The head mark is a function of the state, and in ASCII that shows**
+      // (C09 I45, §030). At 24-bit every state draws `●` and tone says which;
+      // in ASCII tone is gone, so the running and folded frames take `*` and
+      // the settled one takes `+` — which is R-COR-003 holding on the shape.
+      const mark = (state: Parameters<typeof headMark>[0]): string => glyphFor(headMark(state, caps), caps);
+      const run = mark("running");
+      // The result's lead is the slot's two-cell reservation at both rungs
+      // (C09 I5, R-GLY-003): `⎿` padded, `` `- `` whole.
+      const hook = ascii ? "`-" : "⎿ ";
+      // The residue lead at its natural width (§095, R-BLK-867, T2.5): `⋯` in
+      // Unicode, `...` in ASCII. It is not a fixed column — only its own count
+      // follows it — so it is not padded to a slot.
+      const more = glyphs(ascii ? ASCII_CAPS : FULL_CAPS).residue;
       const sep = ascii ? ":" : "·";
       const spin = spinnerFrames(caps)[0] ?? "";
 
       const r = frame(running, width, ascii);
-      expect(r[0], "running: the spinner in the duration slot (C23 I58)").toBe(`${mark} run_command(npm test) ${sep} ${spin} 4s`);
+      expect(r[0], "running: the spinner in the duration slot (C23 I58)").toBe(`${run} run_command(npm test) ${sep} ${spin} 4s`);
+      // **The body's box overflows, so it spends its last column on a bar**
+      // (C09 I92, §7f, §021) — and the bar is glyphs rather than colour, so it
+      // is there at both rungs and takes each rung's own set. Three rows over
+      // twelve puts the thumb at the foot: a half-row form where the set has
+      // one, a whole row where it has not.
+      const bar = scrollbarSet(ascii ? ASCII_CAPS : FULL_CAPS);
+      const at = (text: string, glyph: string): string =>
+        `${text}${" ".repeat(width - text.length - 1)}${glyph}`; // cells-ok — an ASCII fixture
       expect(r.slice(1), "the streamed body shows its tail, the hidden rows above").toEqual([
-        "line 10", "line 11", "line 12", `${more} 9 above, 0 below`,
+        at("line 10", bar.track),
+        at("line 11", bar.track),
+        at("line 12", bar.half ? bar.thumbStart : bar.thumb),
+        `${more} 9 above, 0 below`,
       ]);
 
       const s = frame(settled, width, ascii);
-      expect(s).toEqual([`${mark} run_command(npm test) ${sep} 4s ${sep} exit 0`, `  ${hook} 118 passed, 2 todo`]);
+      expect(s, "settled: the mark says succeeded where tone cannot").toEqual([`${mark("succeeded")} run_command(npm test) ${sep} 4s ${sep} exit 0`, `  ${hook} 118 passed, 2 todo`]);
 
       const f = frame(folded, width, ascii);
-      expect(f, "+N more is the residue row (C04 I104)").toEqual([`${mark} run_command(npm test) ${sep} ${spin}`, `${more} +392 more`]);
+      expect(f, "+N more is the residue row (C04 I104)").toEqual([`${run} run_command(npm test) ${sep} ${spin}`, `${more} +392 more`]);
 
       captured.push(
         `--- ${String(width)} cols · ${ascii ? "ascii" : "24-bit"}`,
@@ -179,10 +196,10 @@ describe("C09 §4 — the head is fitted and is an element", () => {
   const LONG = "run_command(pytest tests/unit/test_something_rather_long.py --maxfail=1 -k not_slow) · 4s · exit 0";
   const ARGS = { from: LONG.indexOf("(") + 1, to: LONG.indexOf(")") };
   const head = (spans?: readonly TextSpan[], action?: Action): Block =>
-    block({ kind: "notice", id: "h", tone: "info", glyph: "step", text: LONG, ...(spans === undefined ? {} : { spans }), ...(action === undefined ? {} : { action }) });
+    block({ kind: "notice", id: "h", tone: "default", glyph: "work-unit", state: "running", text: LONG, ...(spans === undefined ? {} : { spans }), ...(action === undefined ? {} : { action }) });
   const rows = (b: Block, width: number, ascii = false): readonly string[] => frame([b], width, ascii);
 
-  it("T2.113 (C09 I46): a step notice is one row at 80, 40 and 20 in both alphabets; the elide run gives way first and the control wraps", () => {
+  it("T2.113 (C09 I46): a call head is one row at 80, 40 and 20 in both alphabets; the elide run gives way first and the control wraps", () => {
     for (const ascii of [false, true]) {
       const marker = ascii ? "~" : "…";
       for (const width of [80, 40, 20]) {
@@ -192,15 +209,23 @@ describe("C09 §4 — the head is fitted and is an element", () => {
         expect(cells(visible(rows(plain, width, ascii)[0] ?? ""), "narrow"), "and it fits").toBeLessThanOrEqual(width);
 
         const marked = rows(head([{ ...ARGS, elide: true }]), width, ascii)[0] ?? "";
-        expect(marked.startsWith(`${ascii ? "*" : "⏺︎"} run_command(`), `the verb is intact at ${String(width)}`).toBe(true);
+        expect(marked.startsWith(`${ascii ? "*" : "●"} run_command(`), `the verb is intact at ${String(width)}`).toBe(true);
         expect(cells(visible(marked), "narrow"), `and the marked row fits at ${String(width)}`).toBeLessThanOrEqual(width);
         if (width >= 40) {
           // The row can hold verb, marker, duration and outcome: the argument
           // alone gives way, and everything outside it is intact.
           expect(marked.endsWith(") · 4s · exit 0"), `duration and outcome are intact at ${String(width)}`).toBe(true);
-          if (width < 80) expect(marked, `the argument ends in the marker at ${String(width)}`).toContain(`${marker}) · 4s · exit 0`);
+          // **The marker is inside the argument** (C09 I103, §099): a path
+          // shortens from its middle, so it ends in its own tail and not in the
+          // marker. The claim here is unchanged — the argument alone gives way
+          // — and `endsWith` above still carries it.
+          if (width < 80) {
+            const at = marked.indexOf(marker);
+            expect(at, `the argument carries a marker at ${String(width)}`).toBeGreaterThan(0);
+            expect(at, `and it is inside the argument at ${String(width)}`).toBeLessThan(marked.indexOf(") · 4s"));
+          }
         } else {
-          // Twenty cells cannot hold `⏺︎ run_command(…) · 4s · exit 0` (29), so
+          // Twenty cells cannot hold `● run_command(…) · 4s · exit 0` (29), so
           // the whole row is cut last — after the argument is down to its marker.
           expect(marked, "the argument is its marker before the row is cut").toContain(`(${marker}`);
         }
@@ -213,7 +238,7 @@ describe("C09 §4 — the head is fitted and is an element", () => {
     expect(rows(control, 40)).toHaveLength(registry.measure(control, 40));
   });
 
-  it("T2.114 (C09 I47): a step notice is one element with or without an action; an info notice without one is none", () => {
+  it("T2.114 (C09 I47): a call head is one element with or without an action; an info notice without one is none", () => {
     const bare = registry.elementsIn([head()], 80);
     expect(bare).toHaveLength(1);
     expect(bare[0]?.element.copy).toBe(LONG);

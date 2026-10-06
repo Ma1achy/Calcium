@@ -95,7 +95,7 @@ const MUTATIONS = [
     // that does not tile.
     name: "the detail's rows are not counted, so offsets are collectively short",
     file: TABLE,
-    from: "    const height = 1 + detailHeight(block, r, w, measureChild);",
+    from: "    const height = 1 + detailHeight(block, r, w, measureChild, planOf);",
     to: "    const height = 1;",
     expect: "T2.24",
   },

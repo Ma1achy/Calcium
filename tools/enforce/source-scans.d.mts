@@ -101,3 +101,109 @@ export declare function checkMarks(
   readFile?: (file: string) => string,
   exemptions?: Readonly<Record<string, string>>,
 ): (Violation & { line: number })[];
+
+/**
+ * SS65 — where a registry glyph lives when it is not in `glyphs.ts`, and why.
+ * The premise is recorded so it can be re-checked rather than inherited, and an
+ * entry whose mark has arrived is itself a violation (C09 I88).
+ */
+export declare const GLYPH_HOMES: Readonly<Record<string, string>>;
+
+/**
+ * SS65 — every `current` registry glyph resolves to a mark `glyphs.ts` can draw,
+ * or is named in `GLYPH_HOMES`. SS64 is a collision rule and cannot see a mark
+ * with no character at all (C09 I88, R-TAB-001, R-COR-003).
+ */
+export declare function checkGlyphPresence(
+  registrySource?: string,
+  glyphSource?: string,
+  homes?: Readonly<Record<string, string>>,
+): Violation[];
+
+/** SS67 — one surface's disposition against the floor's table (C10 I60). */
+export interface SurfaceRole {
+  readonly role: "text" | "gated" | "ink" | "excluded";
+  readonly gate?: string;
+  readonly why?: string;
+}
+
+/** SS67 — every surface a renderer names, and what the floor does about it (C10 I60, R-THM-004). */
+export declare const SURFACE_ROLES: Readonly<Record<string, SurfaceRole>>;
+
+/**
+ * SS67 — every `"surface.X"` a renderer names outside `theme/` has a disposition
+ * in `SURFACE_ROLES`, and every entry is named by some renderer (C10 I60).
+ */
+export declare function checkTextGrounds(
+  files: readonly string[],
+  readFile?: (file: string) => string,
+  roles?: Readonly<Record<string, SurfaceRole>>,
+): (Violation & { line: number })[];
+
+/** SS68 — the directories whose `R-XXX-NNN` citations must resolve against the design registry. */
+export declare const RULE_CITATION_DIRS: readonly string[];
+
+/** SS68 — the Markdown files under `RULE_CITATION_DIRS`, sorted. */
+export declare function ruleCitationCorpus(dirs?: readonly string[]): string[];
+
+/**
+ * SS68 — every `R-XXX-NNN` a spec cites is a rule id the registry holds, in any
+ * status; a corpus citing nothing or a registry holding nothing is reported.
+ */
+export declare function checkRuleCitations(
+  docs?: readonly string[],
+  readFile?: (file: string) => string,
+  registrySource?: string,
+): (Violation & { line: number })[];
+
+/** SS63 — the hex ranges of a named table in `text.ts`, parsed out of its source (C09 I48). */
+export declare function parseRangeTable(textSource: string, name: string): number[];
+
+/** SS63 — a glyph's recorded `widthClass` against what `cells()` measures (C09 I48, R-GLY-003). */
+export declare function checkGlyphWidthClass(
+  registrySource?: string,
+  textSource?: string,
+): Violation[];
+
+/** SS64 — a domain table in `glyphs.ts`, read as `token: ["domain", …],` lines (R-GLY-003). */
+export declare function parseDomainTable(source: string, name: string): Record<string, string[]>;
+/**
+ * `GLYPH_TABLE`'s two halves keyed by token, as SS64 reads them — exported so
+ * the suite holds the keys equal to `GLYPH_TOKENS` (question 57).
+ */
+export declare function parseGlyphTable(glyphSource: string): {
+  ascii: Record<string, string>;
+  unicode: Record<string, string>;
+};
+
+/**
+ * SS64 — a mark unique inside the domains it appears in, across the registry,
+ * `GLYPH_TABLE` and `GlyphSet` (R-GLY-003, R-GLY-002).
+ */
+export declare function checkMarkDomains(
+  registrySource?: string,
+  glyphSource?: string,
+): Violation[];
+
+/** SS69 — the files allowed to hold a literal bidi format character, each with its reason. */
+export declare const BIDI_LITERAL_EXEMPTIONS: Readonly<Record<string, string>>;
+
+/** SS69 — the code points `text.ts`'s `isBidiFormat` answers true for, parsed from its source, sorted. */
+export declare function bidiFormatCodePoints(textSource?: string): number[];
+
+/** SS69 — the tracked text files holding any of `codePoints`, by `git grep`, and the tracked count. */
+export declare function trackedBidiCandidates(
+  codePoints: readonly number[],
+  cwd?: string,
+): { tracked: number; files: string[] };
+
+/**
+ * SS69 — a literal bidi format character in a tracked text file, with the
+ * exemptions compared by equality; an unread set or corpus is reported alone.
+ */
+export declare function checkBidiLiterals(options?: {
+  codePoints?: readonly number[];
+  candidates?: { tracked: number; files: readonly string[] };
+  readFile?: (file: string) => string;
+  exemptions?: Readonly<Record<string, string>>;
+}): (Violation & { line: number })[];

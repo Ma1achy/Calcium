@@ -13,7 +13,7 @@
 
 | Deliverable | Where it lives | Contains | Publishes |
 |---|---|---|---|
-| Calcium | `Calcium/` | C01–C25, the framework | A package to GitHub Packages, private |
+| Calcium | `Calcium/` | C01–C25, the framework | The `calcium-tui` package — not published yet (§9) |
 | `docker-tui` | `Calcium/examples/docker/` | R01, the reference app | Nothing — proof, plus an import manifest |
 | `plots-tui` | `Calcium/examples/plots/` | C12's forms in a terminal, built through `b.plot` | Nothing — the one gate that reads a frame rather than comparing bytes |
 | `prism-tui` | its own repository | Prism's adapters, manifest, theme, world, surfaces | Nothing — an internal app |
@@ -42,7 +42,7 @@ Separate rather than a monorepo because R01 §8's argument generalises: **a work
 
 **`docker-tui` resolved differently, and the argument above is why it could.** R01 §8 moved it to `Calcium/examples/docker/` on the finding that separation was never the goal — *building against the packaged artefact* was, and separation was one way to get it. Two mechanisms buy the same guarantee inside the workspace:
 
-- **The seal.** `"@fmx/calcium": "file:../.."` plus `"files": ["dist"]` and an `exports` map locked to its entry points — six at C24 I37, every one resolving into `dist/bundle/` (§5, F1193) — so `import "@fmx/calcium/src/…"` is a resolution error enforced by npm rather than by discipline.
+- **The seal.** `"calcium-tui": "file:../.."` plus `"files": ["dist"]` and an `exports` map locked to its entry points — six at C24 I37, every one resolving into `dist/bundle/` (§5, F1193) — so `import "calcium-tui/src/…"` is a resolution error enforced by npm rather than by discipline.
 - **The proof.** `make proof` packs the real tarball, installs it into a tree that has never seen this repository, and runs the app's suite against it — refusing to proceed if npm resolved a symlink instead.
 
 **The distinction that makes this safe is what a repository boundary was actually protecting.** It was never the file layout; it was the resolution path. A boundary enforced by `exports` fails the same way a boundary enforced by separation does — at install, not at review — and it fails on every developer's machine rather than only in CI.
@@ -99,6 +99,7 @@ Dev dependencies are looser but not free: `typescript`, `vitest`, `node-pty` (C0
 | SBOM per release | CycloneDX, attached to the release |
 | Build attestation | GitHub Actions attestation links the artefact to its commit and workflow. **Not npm `--provenance`** — that is a public-registry feature |
 | Publish from CI only, using `GITHUB_TOKEN` | No laptop holds a publish credential; the token is workflow-scoped and expires with the run |
+| **A binary fetched outside npm is pinned by version and SHA-256, in an explicit step** | `make chromium` downloads the design page's browser into `.cache/`, checks the digest before unpacking, and refuses on a mismatch; nothing fetches it implicitly. The row in `DEPENDENCIES.md` §Fetched outside npm carries both digests, and the tool asserts that it does |
 
 **`--ignore-scripts` is the one that matters most.** It is also the one that breaks builds that assumed a postinstall, which is why it is set from the first commit rather than retrofitted.
 
@@ -144,7 +145,7 @@ to be on `PATH`.
 **The separation is in what is installed, not in where the file sits.** Both
 configs live under `.devcontainer/`, because a devcontainer config in a
 subdirectory makes that subdirectory the workspace — and the example's
-dependency is `"@fmx/calcium": "file:../.."`, which then points outside the
+dependency is `"calcium-tui": "file:../.."`, which then points outside the
 mount and fails to install. `.devcontainer/<name>/devcontainer.json` is the
 supported multi-container layout and each mounts the repository root, so the
 path resolves to the thing it names. **This is the rule's cheapest possible
@@ -191,10 +192,20 @@ containers.
 `typescript-node:22` image can still resolve a different default through nvm, and
 the symptom is `EBADENGINE` warnings at install rather than a failure.
 `engine-strict=true` in `.npmrc` turns that warning into an error, which is what
-you want — Ink 7 requires Node ≥ 22 and a silently-20 container fails later and
-less clearly.
+you want — `engines` is `>=22.22.1 <23`, the first Node 22 shipping Unicode 17
+(A01 §Host assumptions), and a container on an older 22 measures width differently
+and fails later and less clearly. `engine-strict` binds an install in this checkout
+and nothing at run time, so `test/unit/node-floor.test.ts` asserts
+`process.versions.unicode` is `17.0` wherever the suite runs.
 
 Each declares its terminal as `xterm-256color` with a UTF-8 locale, and each also runs the suite under `TERM=dumb` and `LANG=C` — the degradation axes are not tested by hoping someone's laptop is misconfigured.
+
+**The design page's browser needs five system libraries and the container installs them
+by name** — `libnspr4 libnss3 libatk1.0-0t64 libatspi2.0-0t64 libxdamage1`, in
+`onCreateCommand` beside the emulator packages. Measured on 2026-09-27: the aarch64
+headless shell's `ldd` named six missing objects from those five packages, and with them
+installed it reports none. The browser itself is not in the image: `make chromium` fetches
+it, pinned, into `.cache/` (§3), so a container rebuild does not change which Chromium runs.
 
 ---
 
@@ -211,16 +222,14 @@ Each declares its terminal as `xterm-256color` with a UTF-8 locale, and each als
 | `make golden` | Golden frames, four widths × two themes × two unicode modes | minutes |
 | `make e2e` | Tier 5, PTY harness | minutes |
 | `make audit` | `npm audit --audit-level=high`, dependency-manifest check | < 10 s |
-| `make hooks` | Points `core.hooksPath` at `.githooks`; run by `make install` | — |
+| `make check-fast` | Typecheck, tests related to the changed files, flow tests for the touched area | < 2 min |
 | `make all` | Everything above | — |
 | `make conformance` | `prism-tui` only — the boundary contract (A01 §6) | — |
 | `make record` | `prism-tui`, `docker-tui` — fixture recording and `--diff` | — |
 
 **The one named build has two halves, and the second is what a consumer imports** (F1193). `tsc -p tsconfig.build.json` emits one file per source module into `dist/` with its declarations and maps — the tree every tier-5 child, probe and tool reads by relative path, and the tree the bundle is built from. `tools/bundle.mjs` then runs esbuild over the six entries C24 §2 names, code-split into one chunk graph (`splitting`), every package external, ESM, unminified, with linked source maps and no embedded sources, into `dist/bundle/`; `exports` points every entry's `default` there and every `types` at `dist/*.d.ts`. The loader's unit is the file and it was two thirds of a cold import — 207 of 310 sampled ms over 1,130 modules, 820 of them ours — so one chunk per entry is a third of the import and a quarter of the heap after it, six of six pairs with and without the compile cache. What the bundle must keep is C24 I38's list: one instance of every module across every entry, the same names as the file entry, the emulator and the Mermaid renderer still off the runtime's graph, and a sampled frame still named (C28 I65). Minification is not done — the compile cache holds the compiled form, and a minified stack is a card nobody can read.
 
-**A `pre-commit` hook runs `make enforce` too, and running it three times is the point.** CI catches it, the pre-MR habit catches it, and the hook catches it before either — because the two gates above it are discipline and discipline is what fails on the commit where someone is concentrating on something else. That is not hypothetical here: a commit landed on a red `make enforce` during C16's build, because the only gate was an `&&` chain in a typed command and the chain ran past the failure.
-
-A layer violation committed is a layer violation that has had time to be depended upon, and five seconds is cheaper than the revert. `--no-verify` still works deliberately: a hook that cannot be bypassed gets uninstalled, and one that can be bypassed gets bypassed visibly, in a flag someone has to type.
+**There is no pre-commit hook.** `make check-fast` is the local loop and CI runs everything else on push, so a violation is caught within minutes of the push instead of at every commit.
 
 `make enforce` is the target that makes A03 real. Seventy-one assertions specified and never executed are an honour system; a five-second target that fails an MR is a rule.
 
@@ -238,7 +247,7 @@ install → check → enforce → audit → test → golden → e2e → [repo-sp
 
 | Trigger | Stages |
 |---|---|
-| Every push to a branch | `install → check → enforce → audit → test` — **nine minutes on the runner, measured**, and Calcium's job adds `instruments` and `regime` to that list (F1090) |
+| Every push to a branch | `install → check → enforce → audit → test` — **nine minutes on the runner, measured**, and Calcium's job adds `instruments`, `regime`, `released`, `chromium` and `design-browser` to that list (F1090). `chromium` is the pinned browser's install step and `design-browser` loads the generated design page in it and fails unless every conformance flag reads pass with no console error (AUTHORITY.md §Browser conformance). `released` compares the design baseline with `origin/main`'s copy (AUTHORITY.md §Release 4) after a step fetching `main` by its full refspec — the checkout is one commit deep and holds no `origin/main`, and the check fails on a ref it cannot resolve rather than passing on nothing |
 | **Pull request**, push to `main`, and tags | The above plus `golden → e2e → [repo-specific]`, and **`proof` in a job of its own** — the reuse claim, which is not a stage in the chain (F807, F1095) |
 | **Weekly** (Sunday 03:00 UTC), and on dispatch | `mutation-sweep` — every run under `tools/mutate/runs/` through `tools/mutate/sweep.mjs`, six shards, the anchors sweep first. A survivor, a stale exemption, an anchor miss off the debt list or a run that leaves the tree mutated is red where nobody was running the pass by hand (F952, F990) |
 
@@ -298,7 +307,7 @@ The budget argument survives intact, because a PR runs the expensive tier once p
 
 | Repo | Last stage |
 |---|---|
-| Calcium | Publish on tag to GitHub Packages, with attestation and SBOM |
+| Calcium | `make proof` (pack, install clean, examples against the tarball). Publish on tag is **held** until a registry is chosen (§9); the job keeps its attestation step |
 | `docker-tui` | Real-docker run **where available; the skip is recorded, not silent** (R01 §8) · publish the import manifest on release |
 | `prism-tui` | Conformance against the real CLI where available; `record --diff` reporting structural drift. **No CI yet — local `make all` for now** |
 
@@ -358,7 +367,28 @@ It encodes: read the spec's commitments and invariants first; one test per invar
 
 ## 9. Distribution
 
-**Not published publicly.** Calcium publishes on tag from CI to **GitHub Packages**, private.
+**Not published yet — held, 2026-09-29, by the person's ruling.** The package was renamed
+`calcium-tui` (169f8cc8), and the name is **unscoped**. GitHub Packages accepts only scoped
+names (`@owner/name`), so the arrangement below cannot publish it, and the registry is not
+yet chosen. Until it is:
+
+- `package.json` carries **no `publishConfig`**, and CI's `publish` job is **held off** with
+  its reason beside it, so no tag publishes anything anywhere.
+- `make proof` still proves the package is a package: publish is not refused, the tarball
+  installs into clean trees, and the examples run against it. With no `publishConfig`, the
+  plain `--registry` override is the one that takes, which is what the script passes and then
+  asserts (F12's rule — assert the line, do not trust the flag — is unchanged).
+- A consumer clones the repository, runs `npm install` and `npm run build`, and depends on
+  the folder with `"calcium-tui": "file:<path>"`, as the examples do. **Not a git
+  dependency**, for the reason below.
+- The name was checked free on the public npm registry on 2026-09-29, with the variants npm
+  treats as the same name (`calciumtui`, `calcium_tui`, `calcium.tui`). That is a reading, not
+  a reservation.
+
+What follows is the arrangement this replaced, kept because the reasoning about git
+dependencies and local iteration still holds whichever registry is chosen.
+
+**Formerly: not published publicly.** Calcium published on tag from CI to **GitHub Packages**, private.
 
 Consumers install it as an ordinary npm dependency pointed at that registry:
 
@@ -378,7 +408,7 @@ This is unchanged in every way that matters for R01's argument. Installing from 
 
 ### Why not a git dependency
 
-`"@fmx/calcium": "git+ssh://git@gitlab.fmx/…#v0.3.0"` avoids a registry entirely and is tempting. It does not work here.
+`"calcium-tui": "git+ssh://git@gitlab.example/…#v0.3.0"` avoids a registry entirely and is tempting. It does not work here.
 
 **Git dependencies install from source and need a `prepare` script to build** — and A04 §3 bans install scripts outright, because postinstall is the primary npm attack vector. Allowing one for this would be trading the single most valuable supply-chain control for the convenience of not configuring a registry.
 
@@ -399,7 +429,9 @@ Calcium publishes on tag from CI, never a laptop.
 | Attestation | GitHub Actions attestation, linking artefact to workflow. Not npm provenance |
 | SBOM | CycloneDX, attached to the release |
 | Credential | `GITHUB_TOKEN`, workflow-scoped, expiring with the run |
-| Changelog | Generated from commits; breaking changes named explicitly |
+| Changelog | `CHANGELOG.md` at the root, **kept by hand under `## Unreleased` until a generator exists**; breaking changes named explicitly, each entry naming the commit that made it |
+
+**The changelog row said *generated from commits*, and nothing generated it** (question 58): no file existed, and the two commits that removed public `Glyph` members carried no breaking-change marker for a generator to find. A row naming a mechanism that does not exist is a claim with no source, so the row now says what the repository does. When a generator lands it replaces the hand-kept section and this row changes with it.
 
 The reference app bumping is the release gate. It lives in another repo precisely so that bumping it is a real test rather than a compile check.
 
@@ -418,7 +450,7 @@ The reference app bumping is the release gate. It lives in another repo precisel
 9. CI runs the same Makefile targets a developer runs — not equivalents.
 10. `make enforce` executes A03; it runs before the test suite so violations fail in seconds.
 11. A skipped real-integration run is recorded, never silent.
-12. Distribution is to GitHub Packages, private, from CI on tag using `GITHUB_TOKEN`; no laptop holds a credential.
+12. Nothing is published until a registry is chosen (§9). When it is, distribution is from CI on tag, and no laptop holds a credential.
 13. Not a git dependency — that would require an install script, trading the most valuable supply-chain control for a saved configuration step.
 14. GitHub Actions attestation is not npm provenance, and is not described as it.
 15. `npm link` locally, registry install in CI — the packaging test runs where a link cannot mask it.

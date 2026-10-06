@@ -10,15 +10,18 @@
 //
 // So the unit under test here is the **entry** — the command chrome C22 draws
 // plus the document's blocks — rather than a block, which is the only framing in
-// which the mark's column means anything. The `warn` row is beside it on
-// purpose: it is the notice that shares every other property and takes no mark,
-// so the two gutters differing is visible rather than described.
+// which the mark's column means anything. The `failed` and `cancelled` rows are
+// beside it on purpose: each shares every other property and takes no
+// continuation — the first because C04 I6 spends its slot on ✗, the second
+// because the `cancelled` state's own mark takes it (C23 I96) — so the gutters
+// differing is visible rather than described. The cancelled row was `warn` and ▲
+// until ruling 92.
 import { describe, expect, it } from "vitest";
 
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
 import { PROMPT_GUTTER } from "../../src/shell/config.js";
 import { commandRows } from "../../src/shell/paint.js";
-import { noticeDoc } from "../../src/shell/documents.js";
+import { cancelledDoc, noticeDoc } from "../../src/shell/documents.js";
 
 const WIDTHS = [40, 56] as const;
 
@@ -27,12 +30,23 @@ const VARIANTS = [
   { name: "ascii", capabilities: ASCII_CAPS },
 ] as const;
 
-/** The four states an entry reports about itself, plus the one that cannot. */
+const USER = { origin: "user" } as const;
+
+/** Three states an entry reports under the mark, and two it reports under a mark of their own. */
 const CASES = [
-  ["queued", "muted", "queued behind /logs"],
-  ["stalled", "muted", "no output for 2m"],
-  ["wrapped", "muted", "a queued line long enough to wrap, so the hanging gutter is visible under the mark"],
-  ["cancelled", "warn", "cancelled before it ran"],
+  ["queued", noticeDoc("/ps --all", "queued behind /logs", "muted", USER)],
+  ["stalled", noticeDoc("/ps --all", "no output for 2m", "muted", USER)],
+  [
+    "wrapped",
+    noticeDoc(
+      "/ps --all",
+      "a queued line long enough to wrap, so the hanging gutter is visible under the mark",
+      "muted",
+      USER,
+    ),
+  ],
+  ["failed", noticeDoc("/ps --all", "ps exited 1", "error", USER, "error")],
+  ["cancelled", cancelledDoc("/ps --all", "cancelled before it ran", USER)],
 ] as const;
 
 describe("the continuation mark, in an entry", () => {
@@ -40,8 +54,7 @@ describe("the continuation mark, in an entry", () => {
     for (const width of WIDTHS) {
       it(`${variant.name} at ${width}`, () => {
         const kit = measurable({ theme: DARK_THEME, capabilities: variant.capabilities });
-        const frame = CASES.map(([name, tone, text]) => {
-          const doc = noticeDoc("/ps --all", text, tone, { origin: "user" });
+        const frame = CASES.map(([name, doc]) => {
           const chrome = commandRows(doc.command, width, variant.capabilities);
           const body = doc.blocks.flatMap((b) => kit.renderToLines(b, width));
           // Stripped of SGR: this file is about columns, and C10's golden

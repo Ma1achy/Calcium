@@ -1,0 +1,51 @@
+REPLACE OR FLOAT — does the ANSWER need the prompt?
+
+one rule for every popup consumer, and it settles a question the
+dismissable axis could not.
+
+   consumer        prompt      so it
+   an approval     not needed  REPLACES · blocks
+   a choice        not needed  REPLACES · blocks
+   a typed reply   NEEDED      FLOATS   · blocks
+   a peek          NEEDED      FLOATS   · does not block
+   completion      NEEDED      FLOATS   · does not block
+   find            NEEDED      FLOATS   · does not block
+
+  a choice-only question REPLACES the prompt because the prompt has no
+  job: there is nothing to type. The moment reply… is chosen the prompt
+  HAS one, so the question moves UP and the prompt goes live beneath it.
+
+  ⟩  seams  may I write to package.json?
+  approve    › deny    reply…
+  ↓ → to reply…
+
+  ⟩  seams  may I write to package.json?
+  approve    deny    › reply…
+──────────────────────────────────────────────────────────────────────────────
+  ❯ it also needs an escape flag▌
+──────────────────────────────────────────────────────────────────────────────
+
+  ★ BLOCKING AND REPLACING ARE INDEPENDENT. A typed reply BLOCKS and
+  FLOATS, which is the combination that proves it — and it never becomes
+  dismissable, because an owner is still waiting. FLOATS is placement, not
+  PANEL semantics; this uses overlay ownership at the prompt anchor.
+
+★ A CHIP PREVIEWS IN TWO PLACES, and FOCUS decides which
+
+  focus in the TRANSCRIPT   a PEEK, anchored BESIDE the element
+  focus in the PROMPT       a MENU PANEL above the prompt,
+                            where completion and find already are
+
+  a chip is INLINE in a wrapping editor, so anchoring beside it puts the
+  preview somewhere different on every keystroke. While composing, every
+  transient panel belongs in ONE PLACE.
+
+──────────────────────────────────────────────────────────────────────────────
+   #1 package.json  47L
+   {                                          █
+     "name": "calcium",                      █
+     "version": "0.14.2",                   ░
+   ↑↓ scroll   ⏎ open in the editor   ←→ other chips
+──────────────────────────────────────────────────────────────────────────────
+  ❯  #1 package.json   #2 loss-curve.png ▌
+──────────────────────────────────────────────────────────────────────────────

@@ -8,7 +8,7 @@
 // text (§2, I1, I4).
 import { describe, expect, it } from "vitest";
 
-import { createEditor } from "../../src/interaction/editor/index.js";
+import { chipLabel, chipSpans, createEditor, cursorCell, layout } from "../../src/interaction/editor/index.js";
 import { selectionSpans } from "../../src/interaction/editor/index.js";
 import { UNDO_LIMIT } from "../../src/interaction/editor/undo.js";
 import type { LineEditor } from "../../src/interaction/editor/index.js";
@@ -19,7 +19,17 @@ const G = { first: 2, cont: 2 } as const;
 const FAMILY = "👨‍👩‍👧";
 
 describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
-  const CHIP = { label: "[#1 parse.ts · 184L]", content: "line one\nline two" } as const;
+  const CHIP = { ordinal: 1, kind: "file", name: "parse.ts", lines: 184, content: "line one\nline two" } as const;
+  /**
+   * The rung these rows draw at, stated rather than defaulted (C17 I25, §5c).
+   *
+   * **The label is composed now**, so a row asserting a literal would be
+   * asserting `construct.ts`'s old string. These rows are about the *width* and
+   * the atomicity, so they ask the composer what it drew; the form itself is
+   * T1.44's subject and is pinned against literals there.
+   */
+  const LOOK = { separator: "\u00b7", painted: true, unicode: "full" } as const;
+  const CHIP_LABEL = chipLabel(CHIP, LOOK);
   const GUTTER = { first: 0, cont: 0 } as const;
 
   const withChip = (): LineEditor => {
@@ -42,11 +52,11 @@ describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
     expect(e.cursor, "one position past the chip").toBe(6);
 
     const rows = e.layout(200, GUTTER);
-    expect(rows.join(""), "the label is drawn").toContain(CHIP.label);
+    expect(rows.join(""), "the label is drawn").toContain(CHIP_LABEL);
     expect(rows.join(""), "and the sentinel is not").not.toMatch(/[\u{e000}-\u{f8ff}]/u);
 
     // **The cursor sits past the label, not past one cell.**
-    expect(e.cursorCell(200, GUTTER).col).toBe("read ".length + cells(CHIP.label));
+    expect(e.cursorCell(200, GUTTER).col).toBe("read ".length + cells(CHIP_LABEL));
   });
 
   it("T2.41 (roadmap 30): a chip is one character to motion and to deletion", () => {
@@ -107,7 +117,7 @@ describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
     // sentinel — which is U+FFFC's shape, and the reason the PUA is allocated
     // per chip rather than a single OBJECT REPLACEMENT CHARACTER used twice.
     // With one chip the side map cannot be observed to be a map at all.
-    const second = { label: "[#2 notes.md · 12L]", content: "second" } as const;
+    const second = { ordinal: 2, kind: "file", name: "notes.md", lines: 12, content: "second" } as const;
     const e = withChip();
     e.insert(" and ");
     e.insertChip(second);
@@ -116,8 +126,8 @@ describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
       `read ${CHIP.content} and ${second.content}`,
     );
     const drawn = e.layout(400, GUTTER).join("");
-    expect(drawn, "and each draws its own label").toContain(CHIP.label);
-    expect(drawn).toContain(second.label);
+    expect(drawn, "and each draws its own label").toContain(CHIP_LABEL);
+    expect(drawn).toContain(chipLabel(second, LOOK));
   });
 
   it("T2.45 (roadmap 30): the wash is measured on what is drawn", () => {
@@ -138,7 +148,7 @@ describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
       e.drawAs,
     );
     expect(spans[0]?.to, "to the end of the label, not of the sentinel").toBe(
-      "read ".length + cells(CHIP.label),
+      "read ".length + cells(CHIP_LABEL),
     );
   });
 
@@ -148,15 +158,15 @@ describe("roadmap 30 — a paste chip is one grapheme to the editor", () => {
     // alone. The chip does not fit beside `read `, so it moves whole — and
     // `cursorCell` has to agree with the row the label was actually drawn on.
     const e = withChip();
-    const width = "read ".length + cells(CHIP.label) - 2;
+    const width = "read ".length + cells(CHIP_LABEL) - 2;
 
     const rows = e.layout(width, GUTTER);
     expect(rows.length, "the chip moved to its own row").toBe(2);
-    expect(rows[1], "whole, not split").toContain(CHIP.label);
+    expect(rows[1], "whole, not split").toContain(CHIP_LABEL);
 
     const at = e.cursorCell(width, GUTTER);
     expect(at.row, "and the cursor is on the row the label is on").toBe(1);
-    expect(at.col, "past the whole label").toBe(cells(CHIP.label));
+    expect(at.col, "past the whole label").toBe(cells(CHIP_LABEL));
   });
 });
 
@@ -996,7 +1006,151 @@ describe("C17 §5b — the region's cells (roadmap entry 23)", () => {
     const chipped = createEditor();
     chipped.insert("read ");
     const beforeChip = chipped.text;
-    chipped.insertChip({ label: "[#1 parse.ts \u00b7 184L]", content: "line one" });
+    chipped.insertChip({ kind: "file", name: "parse.ts", lines: 184, content: "line one" });
     expect(chipped.text, "insertChip moves the buffer in the same call").not.toBe(beforeChip);
+  });
+});
+
+describe("C17 I35 — a chip is edited by re-minting it, owed at the spec commit", () => {
+  it("T1.60 (C17 I35, I34): editChip re-mints a chip in place under its ordinal, as one undo unit, and refuses a chip the buffer does not hold", () => {
+    const GUTTER = { first: 0, cont: 0 } as const;
+    const e = createEditor();
+    e.insert("read ");
+    e.insertChip({ kind: "file", name: "a.ts", lines: 1, content: "first" });
+    e.insert(" and ");
+    e.insertChip({ kind: "file", name: "b.ts", lines: 3, content: "one\ntwo\nthree" });
+    e.move("charLeft");
+    const old = e.chipAt();
+    expect(old?.ordinal, "the second chip").toBe(2);
+    const [text, cursor, resolved] = [e.text, e.cursor, e.resolved];
+    const drawn = e.layout(200, GUTTER).join("");
+
+    expect(e.editChip(old!, { kind: "file", name: "b.ts", lines: 2, content: "one\nthree" })).toBe(true);
+    const fresh = e.chipAt();
+    expect([fresh?.ordinal, fresh?.lines, fresh?.content], "same ordinal, new count and content").toEqual([2, 2, "one\nthree"]);
+    expect(e.cursor, "one grapheme for one: the caret is where it was").toBe(cursor);
+    expect(e.text, "a fresh sentinel, never the old one rebound (I34)").not.toBe(text);
+    expect(e.resolved).toBe("read first and one\nthree");
+    const redrawn = e.layout(200, GUTTER).join("");
+    expect([drawn, redrawn], "the label is drawn anew, and only it").toEqual([
+      "read  a.ts · 1L  and  b.ts · 3L ",
+      "read  a.ts · 1L  and  b.ts · 2L ",
+    ]);
+
+    // **One undo unit** (I5): the old chip, its content and its sentinel.
+    e.undo();
+    expect([e.text, e.cursor, e.resolved]).toEqual([text, cursor, resolved]);
+    expect(e.chipAt()?.lines).toBe(3);
+    expect(e.layout(200, GUTTER).join("")).toBe(drawn);
+
+    // **A chip not in the buffer** — the re-minted one, now undone — answers
+    // false and moves nothing: not the text, not the history.
+    expect(e.editChip(fresh!, { kind: "file", name: "b.ts", lines: 9, content: "x" })).toBe(false);
+    expect([e.text, e.resolved]).toEqual([text, resolved]);
+    e.redo();
+    expect(e.chipAt()?.lines, "redo reaches the re-mint, so the refusal pushed no unit").toBe(2);
+  });
+});
+
+describe("C17 I36 — the reader's own bidi characters, drawn visible and kept as typed (§5g, F1401)", () => {
+  // Escapes, never literals (A03 SS69): an override in this file would
+  // reorder what a reviewer reads against what the compiler reads.
+  const LRI = "\u2066";
+  const RLO = "\u202e";
+  const BIDI = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u;
+  const LOOK = { separator: "\u00b7", painted: true, unicode: "full" } as const;
+
+  it("T1.61 (C17 I36, I18, I4, I26): the walk draws U+2066 and U+202E as their forms, the caret either side of each is eight cells apart, no chip span, the wash covers the form, and the buffer keeps both raw", () => {
+    const typed = `/show a${LRI}b${RLO}c`;
+    const e = createEditor({ chips: LOOK });
+    e.insert(typed);
+
+    // **The row, as drawn** — both forms, and nothing a terminal would reorder.
+    const rows = e.layout(30, G);
+    expect(rows, "one row, both characters shown").toEqual(["/show a<U+2066>b<U+202E>c"]);
+    for (const r of rows) expect(BIDI.test(r), `${JSON.stringify(r)} holds a bidi character`).toBe(false);
+
+    // **The caret, one grapheme a step** (§5g row 2). Indices: `a` is 6, U+2066
+    // is 7, `b` 8, U+202E 9, `c` 10, and the end 11. Walked from the end by
+    // the editor's own motion, so a step that crossed half a form would show.
+    const at: number[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      e.move("charLeft");
+      at.push(e.cursor);
+    }
+    expect(at, "one press, one character").toEqual([10, 9, 8, 7]);
+    const col = (i: number): number => cursorCell(e.text, i, 30, G, e.drawAs).col;
+    const row = rows[0] ?? "";
+    // The row carries no gutter (T4.3b) and is ASCII, so a column less the
+    // gutter indexes it.
+    expect(row[col(7) - G.first], "before U+2066: on its `<`").toBe("<");
+    expect(row.slice(col(7) - G.first, col(8) - G.first), "U+2066's cells").toBe("<U+2066>");
+    expect(row[col(9) - G.first], "before U+202E: on its `<`").toBe("<");
+    expect(row.slice(col(9) - G.first, col(10) - G.first), "U+202E's cells").toBe("<U+202E>");
+    expect([col(8) - col(7), col(10) - col(9)], "eight apart, where the raw walk answered zero").toEqual([8, 8]);
+    expect(e.cursorCell(30, G), "the editor's own answer is the walk's").toEqual({ row: 0, col: col(7) });
+
+    // **Not a chip** (§5g row 4), and the wash over the character alone covers its form.
+    expect(chipSpans(e.text, 30, G, e.drawAs), "the form takes no chip ground").toEqual([]);
+    expect(selectionSpans(e.text, 9, 10, 30, G, e.drawAs)).toEqual([{ row: 0, from: col(9), to: col(10) }]);
+
+    // **The buffer is the reader's** (§5g row 8): nothing neutralised there.
+    expect([e.text, e.resolved], "text and resolved hold both characters raw").toEqual([typed, typed]);
+
+    // **One wrap unit**: the form reaching the row's end moves whole.
+    expect(layout(`xxxxx${RLO}y`, 12, G), "moved whole, never split").toEqual(["xxxxx", "<U+202E>y"]);
+
+    // **The control**: a clean buffer draws as itself.
+    expect(layout("/show abc", 30, G)).toEqual(["/show abc"]);
+  });
+
+  it("T1.62 (C17 I36, I25, I32): a file chip whose name holds U+202E draws the form in its label, elided exactly to its limit, and chipAt keeps the name raw", () => {
+    const name = `a${RLO}gpj.exe`;
+    const parts = { kind: "file", name, lines: 3, content: "x" } as const;
+    const label = chipLabel({ ...parts, ordinal: 1 }, LOOK);
+    expect(label, "the label shows the override").toContain("a<U+202E>gpj.exe");
+    expect(BIDI.test(label), "and does not carry it").toBe(false);
+    // **Measured as drawn** (I32): the elision cuts the form as text and lands
+    // exactly on the limit.
+    const elided = chipLabel({ ...parts, ordinal: 1 }, LOOK, 12);
+    expect([cells(elided), BIDI.test(elided)], "exactly twelve cells, and no bidi character").toEqual([12, false]);
+
+    const e = createEditor({ chips: LOOK });
+    e.insertChip(parts);
+    expect(e.layout(80, G).join(""), "the prompt draws the label's form").toContain("<U+202E>");
+    expect(e.chipAt()?.name, "the chip keeps its name").toBe(name);
+  });
+});
+
+describe("C17 I37 — resolvedChips (ruling 104 c)", () => {
+  it("T1.63 (C17 I37): resolvedChips ranges index resolved, past a surrogate pair, in buffer order, and come back with undo", () => {
+    const e = createEditor();
+    // Escapes, never literals (A03 SS69): U+1F600 is a surrogate pair.
+    const first = "\u{1F600}\nb";
+    e.insert("echo ");
+    e.insertChip({ kind: "paste", name: "pasted", lines: 2, content: first });
+    e.insert(" x ");
+    e.insertChip({ kind: "paste", name: "pasted", lines: 1, content: "z" });
+
+    const chips = e.resolvedChips;
+    expect(e.resolved).toBe(`echo ${first} x z`);
+    expect(chips.map((c) => [c.from, c.to, c.chip.ordinal]), "two ranges in buffer order").toEqual([
+      [5, 5 + first.length, 1],
+      // **Counted past the pair**: two code units for the emoji, one for `\n`, one
+      // for `b` — a range advanced by the sentinel's one unit would say 9.
+      [5 + first.length + 3, 5 + first.length + 4, 2],
+    ]);
+    for (const c of chips) expect(e.resolved.slice(c.from, c.to), `chip #${String(c.chip.ordinal)}`).toBe(c.chip.content);
+
+    // A buffer with no chip answers none.
+    const plain = createEditor();
+    plain.insert("echo hi");
+    expect(plain.resolvedChips).toEqual([]);
+
+    // Deleted and brought back by undo: present again, because the table keeps it (I34).
+    e.deleteBackward();
+    expect(e.resolvedChips.length, "the second chip deleted").toBe(1);
+    e.undo();
+    expect(e.resolvedChips.map((c) => c.chip.content), "and restored").toEqual([first, "z"]);
   });
 });

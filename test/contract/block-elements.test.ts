@@ -19,6 +19,7 @@
 // already covers expanded rows, details and a sort — the three things that move
 // every offset beneath them.
 import { describe, expect, it } from "vitest";
+import { GUTTER_CELLS } from "../support/table-gutter.js";
 
 import { checkElements, formatElementReport } from "../../src/testing/navigation-conformance.js";
 import { fullRegistry } from "../../src/testing/expect-document.js";
@@ -62,6 +63,25 @@ describe("C26 §5 — one declaration, keyboard and pointer", () => {
     // empty sweep clean, and this is the assertion that makes the refusal moot.
     expect(report.checked, "elements were actually walked").toBeGreaterThan(50);
     expect(report.kinds, "the kind that declares them is covered").toContain("table");
+  });
+
+  it("T2.174 (C26 I26, §018): an inside and an action are exclusive, and the predicate has a subject", () => {
+    // **The fabricated violation, because the ruling would otherwise be prose.**
+    // §018 says *direct-action toggles and choices act without an inside state*,
+    // so `⏎` never has to choose — and with no check, a block declaring both
+    // loses its action silently, the entry arm simply winning.
+    const real = nav();
+    const both: NavigableRegistry = {
+      measure: (b, w) => real.measure(b, w),
+      elementsOf: (b, w) =>
+        real.elementsOf(b, w).map((e) => ({ ...e, viewState: true, activate: { kind: "fill", label: "x", command: "x" } as const })),
+      get: (k) => real.get(k),
+    };
+    expect(checkElements(both, TABLE_CORPUS).failures.map((f) => f.predicate)).toContain("inside-or-action");
+
+    // The control: the real corpus does not trip it, so the row above is about
+    // the predicate rather than about every element in the tree.
+    expect(checkElements(real, TABLE_CORPUS).failures.map((f) => f.predicate)).not.toContain("inside-or-action");
   });
 
   it("T2.17 (C26 I7): the window × elements agreement is live, and it holds", () => {
@@ -392,10 +412,19 @@ describe("C26 §5 — the lifted list, in both axes (C09 §2)", () => {
     expect(at(found, "a", "r1")).toEqual({ rows: [1, 2], cols: [0, 39] });
     expect(at(found, "b", "r1"), "lifted by the first's share plus the gutter").toEqual({ rows: [1, 2], cols: [40, 79] });
 
-    // Read from the frame: the second header begins at the column the element does.
+    // Read from the frame: the second header begins where the element does, plus
+    // the block's own reserved gutter (C11 I15, §5b) — the element covers the
+    // whole row, gutter included, and the ink starts after it.
+    //
+    // **Searched from past the first occurrence and not from index 1.** The
+    // first table's `Name` used to sit at 0, so `indexOf(…, 1)` skipped it by
+    // accident of the layout; with a gutter it sits at 2 and the same call finds
+    // it again. An offset that means *the second one* has to be derived from the
+    // first one's position, not from a constant that happened to work.
     const frame = plain(k.renderToLines(g, 80));
-    expect(frame[0]?.indexOf("Name", 1), "the second `Name` on the header row").toBe(40);
-    expect(frame[1]?.indexOf("row 1", 1), "and the second `row 1` beneath it").toBe(40);
+    const second = (line: string, text: string): number => line.indexOf(text, line.indexOf(text) + 1);
+    expect(second(frame[0] ?? "", "Name"), "the second `Name` on the header row").toBe(40 + GUTTER_CELLS);
+    expect(second(frame[1] ?? "", "row 1"), "and the second `row 1` beneath it").toBe(40 + GUTTER_CELLS);
   });
 
   it("T2.30 (C26 I4, I5, I6): containment, disjointness and stability hold of the lifted list across blocks; order within each — and a fabricated old walk fails disjointness", () => {
@@ -471,10 +500,10 @@ describe("C26 §5 — the lifted list, in both axes (C09 §2)", () => {
     const inPanel = k.registry.elementsIn([p], 40);
     expect(at(inPanel, "a", "r1")).toEqual({ rows: [2, 3], cols: [1, 39] });
     const frame = plain(k.renderToLines(p, 40));
-    expect(frame[2]?.indexOf("row 1"), "the frame draws it there").toBe(1);
+    expect(frame[2]?.indexOf("row 1"), "the frame draws it there").toBe(1 + GUTTER_CELLS);
     // The second child begins where the first's measured rows end.
     expect(at(inPanel, "b", "r1").rows, "after a's three rows").toEqual([5, 6]);
-    expect(frame[5]?.indexOf("row 1"), "the frame's second `row 1`").toBe(1);
+    expect(frame[5]?.indexOf("row 1"), "the frame's second `row 1`").toBe(1 + GUTTER_CELLS);
 
     // Below three columns the rails are dropped and the child is at column 0.
     expect(at(k.registry.elementsIn([panel([a])], 2), "a", "r1")).toEqual({ rows: [2, 3], cols: [0, 1] });
@@ -639,3 +668,4 @@ describe("C26 §7 — the scope stack, the one resolver, and the vocabulary with
     expect(decl, "no escape field").not.toMatch(/^\s+escape\??:/mu);
   });
 });
+

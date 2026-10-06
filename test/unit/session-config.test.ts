@@ -156,8 +156,8 @@ describe("C22 §2 — config", () => {
     // The two fields with no writer. They enter here or nowhere, which is what
     // makes "set at construction and never written after" constructible.
     expect(resolveConfig(minimal(), AMBIENT).cluster).toBe("");
-    const r = resolveConfig({ ...minimal(), cluster: "fmx-prod", version: "1.0.0" }, AMBIENT);
-    expect([r.cluster, r.version]).toEqual(["fmx-prod", "1.0.0"]);
+    const r = resolveConfig({ ...minimal(), cluster: "corp-prod", version: "1.0.0" }, AMBIENT);
+    expect([r.cluster, r.version]).toEqual(["corp-prod", "1.0.0"]);
   });
 
   it("the numbers C22 owns are C22's, and stated once", () => {
@@ -174,7 +174,8 @@ describe("C22 §2 — config", () => {
     // one entry — and only on a terminal nobody develops on.
     expect(promptFor({ unicode: "full" })).toBe("❯ ");
     expect(promptFor({ unicode: "bmp" })).toBe("❯ ");
-    expect(promptFor({ unicode: "ascii" })).toBe("> ");
+    // `$`, the registry's `reader` record (C09 I123) — `>` is `focus`'s ASCII mark.
+    expect(promptFor({ unicode: "ascii" })).toBe("$ ");
     expect(PROMPT_SUBSTITUTION.map((f) => cells(f))).toEqual([2, 2]);
   });
 });

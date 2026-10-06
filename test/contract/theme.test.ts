@@ -9,24 +9,43 @@ import {
   loadTheme,
   decorationTextPairs,
   diffPairs,
+  DEFAULT_FLOOR,
   errorTagPairs,
+  pickPairs,
   validateTokens,
   selectionPairs,
   floorFor,
+  inkOn,
   ratio,
   resolve,
   resolveBackground,
   resolveTone,
+  textGrounds,
   textSurfaces,
   collisions,
   OKABE_ITO_CANONICAL,
   type ColourRef,
+  type ThemeTokens,
 } from "../../src/presentation/theme/index.js";
+import { BAND_VS_BAND, BAND_VS_PAGE, FOCUS_VS_PAGE, validateBands } from "../../src/presentation/theme/contrast.js";
 import { OKABE_ITO } from "../../src/data/colormaps/qualitative/okabe-ito.js";
 import { plotToSvg } from "../../src/presentation/plot/svg.js";
 import { CATALOGUE_FORMS } from "../../tools/catalogue-forms.js";
-import { checkSourceScans, SCANS } from "../../tools/enforce/source-scans.mjs";
+import { checkSourceScans, checkTextGrounds, SCANS, SURFACE_ROLES } from "../../tools/enforce/source-scans.mjs";
+import * as contrastModule from "../../src/presentation/theme/contrast.js";
 import { caps, DEPTHS, store, SURFACES, SYNTAX_SLOTS, TONES } from "../support/theme.js";
+// **The composition harness is imported inside the rows that use it, never at
+// the top.** `render.ts` loads the shipped dark theme when it is imported, so a
+// top-level import made this whole file fail to load — zero tests, and a
+// mutation pass reading *no summary* — on exactly the mutations that stop a
+// theme loading, which are the ones this file exists to catch (review batch 1,
+// item 22: c10-ground-table went blind on both of its rows).
+const harness = async () => ({
+  ...(await import("../support/compositions.js")),
+  ...(await import("../support/render.js")),
+});
+import { background, focusStyle, selectionStyle } from "../../src/presentation/blocks/paint.js";
+import { sgr } from "../../src/terminal/escapes.js";
 
 // This file walks `src/`; `budget.ts` carries the measurement and why the 5 s
 // default is not a margin. Re-measure before raising it.
@@ -46,6 +65,14 @@ const VARIANTS = Object.keys(defaultTheme);
 
 /** The tokens beside the name, so no row indexes a record and finds `undefined`. */
 const SHIPPED = Object.entries(defaultTheme);
+/** The registry's own statement of the floor's scope (C10 I60), read as JSON so a row can check the projection against it. */
+const REGISTRY = JSON.parse(
+  readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
+) as {
+  terminalPalettes: {
+    textGrounds: { grounds: readonly { ground: string; pairing: string; refs: "meaning" | Record<string, string[]> }[] };
+  };
+};
 
 /**
  * Every hex a theme's palettes carry, with **every** slot that carries it — so
@@ -212,21 +239,366 @@ describe("C10 contract", () => {
    * which slot was in question — and this one has 5% of headroom, which is the
    * answer to *would anything notice if it stopped clearing*.
    */
+  /**
+   * **T2.42 (C10 I45, R-THM-005) — each of the four, broken on its own.**
+   *
+   * A gate that passes on the shipped set has been read, not verified: every one
+   * of these four constraints holds today, so a sweep over the shipped themes
+   * agrees with a gate that checks none of them. Each row moves exactly one value
+   * and asserts that the failure names the *path* that has to move — which is what
+   * makes the message the reason rather than the number.
+   */
+  /**
+   * **T2.59 — the table is the registry's, read from the registry.** Not from
+   * `TEXT_GROUNDS`: a row reading the projection it checks agrees with whatever
+   * the generator wrote. This row named `diffAdd`, `diffRemove` and `bgDeep` by
+   * hand until C10 I60 moved the table into the registry — a fourth copy.
+   */
+  it("T2.59 (C10 I60, R-THM-004): textGrounds is the registry's terminalPalettes.textGrounds, row by row, for every theme", () => {
+    const table = REGISTRY.terminalPalettes.textGrounds.grounds;
+    expect(table.map((r) => r.ground), "the registry's six").toEqual(["bg", "bgElev", "focusGround", "diffAdd", "diffRemove", "bgDeep"]);
+    for (const [variant, tokens] of SHIPPED) {
+      const meaning = Object.entries(tokens.palettes)
+        .filter(([, p]) => p.carries === "meaning")
+        .flatMap(([n, p]) => Object.keys(p.slots).map((slot) => `${n}.${slot}`));
+      const want = table
+        .filter((r) => (tokens.surfaces as Record<string, string | undefined>)[r.ground] !== undefined)
+        .map((r) => [
+          r.ground,
+          (tokens.surfaces as Record<string, string>)[r.ground],
+          r.refs === "meaning" ? meaning : Object.entries(r.refs).flatMap(([p, names]) => names.map((n) => `${p}.${n}`)),
+        ]);
+      expect(textGrounds(tokens).map((row) => [...row]), `${variant}: the registry's rows, in its order`).toEqual(want);
+      // **Every theme has all six** — a row that silently drops a ground a theme
+      // lacks would pass for a theme that forgot one.
+      expect(want, `${variant} has every ground`).toHaveLength(table.length);
+    }
+  });
+
+  it("T2.71 (C10 I60): each walker selects by pairing, and every shipped theme validates clean over the table", () => {
+    const table = REGISTRY.terminalPalettes.textGrounds.grounds;
+    const of = (pairing: string) => table.filter((r) => r.pairing === pairing).map((r) => r.ground);
+    expect(of("page"), "the control: the table has page rows").not.toEqual([]);
+    expect(of("diff"), "and diff rows").not.toEqual([]);
+    for (const [variant, tokens] of SHIPPED) {
+      expect(textSurfaces(tokens).map(([n]) => n), `${variant}: textSurfaces is the page rows`).toEqual(of("page"));
+      const pairs = diffPairs(tokens);
+      expect([...new Set(pairs.map(([, , surface]) => surface))], `${variant}: diffPairs' grounds are the diff rows`).toEqual(of("diff"));
+      const diffRefs = table.find((r) => r.pairing === "diff")!.refs as Record<string, string[]>;
+      expect(
+        [...new Set(pairs.map(([palette, slot]) => `${palette}.${slot}`))].sort(),
+        `${variant}: and its refs are theirs`,
+      ).toEqual(Object.entries(diffRefs).flatMap(([p, names]) => names.map((n) => `${p}.${n}`)).sort());
+      // **The half that makes the scope the registry's**: a ground the registry
+      // adds is measured here with no edit to the validator (C10 T6.123).
+      expect(validateTokens(tokens), `${variant} validates over the whole table`).toEqual([]);
+    }
+  });
+
+  /**
+   * **T2.60 (C10 I60, R-THM-002) — the promise over the whole table, and the
+   * gate's reason for each ground.** Measured before the compositions landed:
+   * hcDark 4.77–4.82 on `diffAdd`, both themes 6.38/6.51 for `tone.meta` on
+   * `bgDeep`. Each composition removed must be named by path and ground.
+   */
+  it("T2.60 (C10 I60, R-THM-002): a theme that declares a floor keeps it over textGrounds, and removing a composition names its path and ground", () => {
+    let promised = 0; // cells-ok — a theme count
+    for (const [variant, tokens] of SHIPPED) {
+      if (tokens.floor === undefined) continue;
+      promised += 1;
+      for (const [surface, ground, refs] of textGrounds(tokens)) {
+        for (const ref of refs) {
+          const need = Math.max(tokens.floor, floorFor(ref.split(".")[1]!));
+          expect(ratio(inkOn(tokens, ref, surface), ground), `${variant} ${ref} on ${surface}`).toBeGreaterThanOrEqual(need);
+        }
+      }
+      expect(validateTokens(tokens), `${variant} validates`).toEqual([]);
+    }
+    expect(promised, "both high-contrast themes declare a floor").toBe(2);
+
+    const without = (tokens: ThemeTokens, ground: string, ref: string): ThemeTokens => ({
+      ...tokens,
+      composed: Object.freeze({
+        ...tokens.composed,
+        [`surface.${ground}`]: Object.freeze(
+          Object.fromEntries(Object.entries(tokens.composed?.[`surface.${ground}`] ?? {}).filter(([r]) => r !== ref)),
+        ),
+      }),
+    });
+    const hc = defaultTheme["hcDark"]!;
+    for (const [ground, ref] of [["diffAdd", "tone.ok"], ["diffAdd", "syntax.keyword"], ["bgDeep", "tone.meta"]] as const) {
+      expect(hc.composed?.[`surface.${ground}`]?.[ref], `hcDark composes ${ref} on ${ground}`).toBeDefined();
+      const errors = validateTokens(without(hc, ground, ref));
+      const [palette, slot] = ref.split(".");
+      expect(
+        errors.some((e) => e.path === `palettes.${palette}.${slot}` && e.message.includes(`against ${ground}`)),
+        `removing ${ref} on ${ground} is reported: ${JSON.stringify(errors)}`,
+      ).toBe(true);
+    }
+  });
+
+  it("T2.61 (C10 I60, SS67): SURFACE_ROLES' text entries are textGrounds' names, and every gate it names is a contrast.ts export", () => {
+    const text = Object.entries(SURFACE_ROLES).filter(([, r]) => r.role === "text").map(([n]) => n).sort();
+    const grounds = new Set<string>();
+    for (const [, tokens] of SHIPPED) for (const [n] of textGrounds(tokens)) grounds.add(n);
+    expect(text, "the scan's copy of the table, by equality").toEqual([...grounds].sort());
+    const exported = contrastModule as unknown as Readonly<Record<string, unknown>>;
+    for (const [name, r] of Object.entries(SURFACE_ROLES)) {
+      if (r.role === "gated") expect(typeof exported[r.gate ?? ""], `${name}'s gate ${String(r.gate)}`).toBe("function");
+      if (r.role !== "text") expect(r.why ?? "", `${name} says why`).not.toBe("");
+    }
+  });
+
+  /**
+   * **T2.62 (C10 I60, SS67) — the scan, asserted by breaking it.** Four states:
+   * the tree, an undispositioned ground, a dead entry, and a corpus that did not
+   * read. The fabricated renderer names `surface.chosen`, a registry surface no
+   * renderer paints today — the next ground a renderer would reach for.
+   */
+  it("T2.62 (C10 I60, SS67): SS67 is clean on the tree, and fires on an undispositioned ground, a dead entry and an unread corpus", () => {
+    const files = sourceFiles();
+    expect(checkTextGrounds(files), "the tree as it stands").toEqual([]);
+
+    const FAKE = "src/presentation/blocks/kinds/fabricated.ts";
+    const withFake = (text: string) => (f: string): string => (f === FAKE ? text : readFileSync(f, "utf8"));
+    const fired = checkTextGrounds([...files, FAKE], withFake('const x = 1;\nconst g = background("surface.chosen", t, c);\n'));
+    expect(fired.map((v) => [v.rule, v.file, v.line])).toEqual([["SS67", FAKE, 2]]);
+    expect(fired[0]!.message).toContain("surface.chosen");
+    // A comment line names nothing.
+    expect(checkTextGrounds([...files, FAKE], withFake('// background("surface.chosen")\n'))).toEqual([]);
+
+    const dead = checkTextGrounds(files, undefined, { ...SURFACE_ROLES, chosen: { role: "excluded", why: "never drawn" } });
+    expect(dead.map((v) => v.message.slice(0, 33))).toEqual(["SURFACE_ROLES names chosen, which"]);
+
+    const { meterFill: _meter, ...withoutMeter } = SURFACE_ROLES;
+    expect(checkTextGrounds(files, undefined, withoutMeter).map((v) => v.file), "a ground whose entry is removed")
+      .toEqual(["src/presentation/blocks/kinds/simple.ts"]);
+
+    const unread = checkTextGrounds(files, () => "");
+    expect(unread.map((v) => v.message.slice(0, 30)), "the control, alone").toEqual(["the corpus names no `surface.d"]);
+  });
+
+  /**
+   * **T2.44 (C10 I46, R-THM-004) — the scope, asserted as a membership rather than
+   * as a sweep.**
+   *
+   * Every ratio row in this file passes over a narrower `textSurfaces`; that is
+   * how `focusGround` went unmeasured for as long as it did. So the surfaces are
+   * named, and the one palette deliberately outside the scope is named with them —
+   * an exclusion stated in a comment is an exclusion nothing checks.
+   */
+  it("T2.44 (I46, R-THM-004): the floor's scope is three named surfaces, and spectrum is outside it", () => {
+    for (const [variant, tokens] of SHIPPED) {
+      const names = textSurfaces(tokens).map(([n]) => n);
+      expect(names, `${variant}: every ground this theme paints text on`).toEqual(["bg", "bgElev", "focusGround"]);
+      // `bgDeep` is not a *page*: the prompt chip's ink lands on it, and that
+      // pairing is measured by `textGrounds` (C10 I60, T2.59) rather than by
+      // sweeping every meaning slot over a ground only one of them meets.
+      expect(names, `${variant}: bgDeep is not a page`).not.toContain("bgDeep");
+    }
+    // **`spectrum` is outside the scope, and the design is why** (R-FOC-004): a
+    // plot, picture or image takes focus on its border or axes rather than
+    // painting its data, so a series colour never meets the focus ground. Measured
+    // when the scope widened: 22 spectrum slots across four themes sit below 4.5
+    // on `focusGround`, and every one of them is a pairing nothing draws.
+    const pairs = decorationTextPairs(defaultTheme["light"]!);
+    expect([...new Set(pairs.map(([palette]) => palette))], "one decoration palette meets text").toEqual(["categorical"]);
+    expect(pairs.some(([, , surface]) => surface === "focusGround"), "and it meets the focus ground").toBe(true);
+  });
+
+  it("T2.56 (C10 I55, §070, R-THM-001): a hue resolves through `resolve`, and the palette is the `hues` record", () => {
+    const THEMES = defaultTheme as unknown as Readonly<Record<string, ThemeTokens>>;
+    const HUES = ["blue", "orange", "cyan", "pink", "lime", "violet", "yellow", "green", "red", "purple"];
+
+    let resolved = 0;
+    for (const [themeId, tokens] of Object.entries(THEMES)) {
+      const theme = { name: themeId, variant: tokens.variant, tokens } as unknown as Parameters<typeof resolve>[1];
+      const palette = tokens.palettes["hue"];
+      expect(palette, `${themeId}: the ink tier is a palette`).toBeDefined();
+
+      // §070's own first line settles both: *the tones mean something; this is
+      // you choosing what your terminal looks like*, and *chrome only — a
+      // painted label is furniture*.
+      expect(palette!.carries, `${themeId}: a hue is not meaning`).toBe("decoration");
+      expect(palette!.monochrome, `${themeId}: and so it may degrade to nothing`).toBe("foreground");
+
+      // **Equal in both directions.** The palette and `hues` are one fact written
+      // twice, and only the generator knows they share a source — which is I53's
+      // lesson applied to the projection rather than to the collector.
+      expect(Object.keys(palette!.slots), `${themeId}: §093's order, in the palette too`)
+        .toEqual(Object.keys(tokens.hues!));
+
+      for (const name of HUES) {
+        expect(palette!.slots[name], `${themeId} ${name}: the palette carries the ink tier`)
+          .toBe(tokens.hues![name]!.ink);
+
+        // Through the PUBLIC resolver, not a field read: the defect I55 exists
+        // about was values present and `resolve` answering `{}`.
+        const style = resolve(`hue.${name}`, theme, { colourDepth: 24 });
+        expect(style.colour, `${themeId} ${name}: resolves at 24-bit`)
+          .toEqual({ kind: "rgb", hex: tokens.hues![name]!.ink });
+        resolved += 1;
+
+        // Decoration collapses to the default foreground at 1-bit and there is
+        // no 4-bit entry for a hue — both asserted rather than assumed, because
+        // "it degrades" and "it was never wired" read the same from outside.
+        expect(resolve(`hue.${name}`, theme, { colourDepth: 1 }), `${themeId} ${name}: 1-bit`).toEqual({});
+        expect(resolve(`hue.${name}`, theme, { colourDepth: 4 }), `${themeId} ${name}: 4-bit`).toEqual({});
+      }
+
+      // **At 8-bit all ten survive as ten, and the reason is the mechanism.**
+      // `quantiseSet` quantises a palette as a SET (§3), so rank order and
+      // distinctness are properties it can hold; a per-slot neighbour can see
+      // neither. This is what makes 4-bit the only rung where the identities
+      // collapse — sixteen colours leave no room for a set to spread into —
+      // and it is why PARKED 21 is about one rung rather than about low depth.
+      const eightBit = HUES.map((n) => {
+        const c = resolve(`hue.${n}`, theme, { colourDepth: 8 }).colour;
+        return c !== undefined && c.kind === "ansi256" ? c.index : -1;
+      });
+      expect(new Set(eightBit).size, `${themeId}: ten hues, ten 8-bit indices`).toBe(10);
+
+      // The control: a name the palette does not carry resolves to nothing
+      // rather than to a neighbour.
+      expect(resolve("hue.chartreuse", theme, { colourDepth: 24 }), `${themeId}: an unknown hue`).toEqual({});
+    }
+    expect(resolved, "ten hues through the resolver in ten themes").toBe(100);
+  });
+
+  it("T2.55 (C10 I45, R-THM-005): a third band is measured against ITS OWN ground, not selection's", () => {
+    const hc = defaultTheme["hcDark"]!;
+    expect(validateBands(hc), "the shipped band clears every constraint").toEqual([]);
+
+    // A third band, whose ground is its own. `groundOf` read *`focusGround` if
+    // the name is `focusGround`, otherwise `selection`* — correct for the two
+    // entries that exist and wrong for a third, silently.
+    const band = (ground: string, ink: string) => ({
+      ...hc,
+      surfaces: { ...hc.surfaces, probe: ground },
+      bandInk: { ...hc.bandInk, probe: ink },
+      // Every band carries its 4-bit pair (C10 I61) — without one the probe is
+      // refused for that, and this row's subject is the hex ground.
+      bandFourBit: { ...hc.bandFourBit, probe: { ground: 0, ink: 15 } },
+    });
+
+    // **The direction that matters: a defect the old lookup let through.** Black
+    // ink on a near-black band is 1.19 : 1 and unreadable; measured against
+    // `selection` instead it clears the floor, so the gate said nothing.
+    const unreadable = band("#111111", "#000000");
+    expect(ratio("#000000", "#111111"), "black on near-black").toBeLessThan(DEFAULT_FLOOR);
+    expect(ratio("#000000", hc.surfaces["selection"]!), "and the ground it was being measured against is fine")
+      .toBeGreaterThanOrEqual(hc.floor ?? DEFAULT_FLOOR);
+    expect(validateBands(unreadable).map((e) => e.path), "the band is reported against its own ground")
+      .toContain("bandInk.probe");
+
+    // **And the other direction, which the old lookup reported wrongly.** A band
+    // whose ink is right on its own ground and wrong on selection's must be
+    // silent — a gate that fires here is naming a ground the band never lands on.
+    const fine = band("#000000", "#ffffff");
+    expect(validateBands(fine).map((e) => e.path), "a correct third band says nothing")
+      .not.toContain("bandInk.probe");
+
+    // The two named bands are unchanged by the generalisation, because their keys
+    // were surface names already — which is what the conditional was approximating.
+    expect(validateBands(fine), "and nothing else moved").toEqual([]);
+  });
+
+  it("T2.42 (I45, R-THM-005): the four band contrasts each fire on their own", () => {
+    const hc = defaultTheme["hcDark"]!;
+    expect(validateBands(hc), "the shipped band clears every constraint").toEqual([]);
+    expect(hc.bandInk, "and it is a banded theme, so the gate is not vacuous").toBeDefined();
+
+    const withSurface = (name: "focusGround" | "selection", hex: string) => ({
+      ...hc,
+      surfaces: { ...hc.surfaces, [name]: hex },
+    });
+
+    // 1 — the ink on its own band. `#767676` on the focus band is far below 7.
+    const dullInk = { ...hc, bandInk: { ...hc.bandInk, focusGround: "#767676" } };
+    expect(validateBands(dullInk).map((e) => e.path)).toEqual(["bandInk.focusGround"]);
+
+    // 2 — the selection band against the page. Moved to a near-black, so it keeps
+    //     its ink's ratio and loses the page's: the one constraint fails alone.
+    const faintSelection = withSurface("selection", "#0a0a0a");
+    const sel = validateBands(faintSelection).filter((e) => e.path === "surfaces.selection");
+    expect(sel, "the selection band must read against the page").toHaveLength(1);
+    expect(sel[0]!.message).toContain("only ground-level carrier");
+
+    // 3 and 4 — the focus band's two constraints, and **they fail in opposite
+    //     directions**, which is why they are two constraints and not one. The
+    //     first draft of this row expected a single move to break both; it cannot.
+    //     Sliding the focus band onto the page moves it *away* from the selection
+    //     band, and sliding it onto selection moves it away from the page. The
+    //     band is pinned between them, and each end has its own reason.
+    const ontoPage = withSurface("focusGround", "#050505");
+    const pageSaid = validateBands(ontoPage).filter((e) => e.path === "surfaces.focusGround");
+    expect(pageSaid, "against the page, alone").toHaveLength(1);
+    expect(pageSaid[0]!.message).toContain("read as an extent");
+
+    const ontoSelection = withSurface("focusGround", "#e0c030");
+    const nearSaid = validateBands(ontoSelection).filter((e) => e.path === "surfaces.focusGround");
+    expect(nearSaid, "against the other band, alone").toHaveLength(1);
+    expect(nearSaid[0]!.message).toContain("adjacent rows");
+
+    // The figures are named rather than left to the constants, so a constant
+    // edited to make a failure go away fails here instead.
+    expect([BAND_VS_PAGE, FOCUS_VS_PAGE, BAND_VS_BAND]).toEqual([3, 2, 3]);
+  });
+
+  /**
+   * **T2.43 (C10 I45) — a band's ink is total, which is the whole of why it exists.**
+   */
+  it("T2.43 (I45, R-THM-005): every meaning ink on a band resolves to the band's ink", () => {
+    for (const id of ["hcDark", "hcLight"]) {
+      const t = defaultTheme[id]!;
+      for (const band of ["focusGround", "selection"] as const) {
+        const ink = t.bandInk?.[band];
+        expect(ink, `${id}.${band} declares a band ink`).toBeDefined();
+        let seen = 0; // cells-ok — a slot count
+        for (const [pn, p] of Object.entries(t.palettes)) {
+          if (p.carries !== "meaning") continue;
+          for (const slot of Object.keys(p.slots)) {
+            // **Including a slot the band never enumerated**, which is the property
+            // an enumeration cannot have: `hcDark`'s selection shipped a group of
+            // nine where the theme has nineteen, and the ten omitted fell through
+            // to flat inks below the promise with nothing to report it.
+            expect(inkOn(t, `${pn}.${slot}`, band), `${id} ${pn}.${slot} on ${band}`).toBe(ink);
+            seen += 1; // cells-ok — a slot count
+          }
+        }
+        expect(seen, `${id}.${band} covers every meaning slot`).toBe(19);
+      }
+    }
+  });
+
   it("T2.29a (I35, §4g): every decoration text pair clears the meaning floor, tightest named", () => {
     let tightest = { pair: "", measured: Number.POSITIVE_INFINITY };
     let checked = 0; // cells-ok — a pair count
     for (const [variant, tokens] of SHIPPED) {
       for (const [palette, slot, surface, hex] of decorationTextPairs(tokens)) {
-        const value = tokens.palettes[palette]?.slots[slot] ?? "";
-        const measured = ratio(value, hex);
+        // `inkOn`, not the flat slot: a theme may compose a different ink for this
+        // ground (R-THM-001), and a floor is a claim about the pair that lands.
+        const measured = ratio(inkOn(tokens, `${palette}.${slot}`, surface), hex);
         expect(measured, `${variant} ${palette}.${slot} on ${surface}`).toBeGreaterThanOrEqual(4.5);
         if (measured < tightest.measured) tightest = { pair: `${variant} ${palette}.${slot} on ${surface}`, measured };
         checked += 1; // cells-ok — a pair count
       }
     }
-    expect(checked, "eight slots on two surfaces on every shipped theme").toBe(8 * 2 * SHIPPED.length);
-    expect(tightest.pair).toBe("light categorical.c4 on bgElev");
-    expect(tightest.measured).toBeCloseTo(4.74, 2);
+    // **Three surfaces, not two** (R-THM-004): `focusGround` joined `textSurfaces`
+    // when the floor's scope was stated as *every ground the theme paints text on*
+    // rather than as a list. The count is asserted because it is the half that
+    // notices a surface leaving the pairing — every ratio row would still pass
+    // over a narrower sweep.
+    expect(checked, "eight slots on three surfaces on every shipped theme").toBe(8 * 3 * SHIPPED.length);
+    // **The tightest pair moved theme and got very much tighter.** It was
+    // `light categorical.c4 on bgElev` at 4.74 — 5% of headroom, and the answer
+    // to *would anything notice if it stopped clearing*. Over the registry's ten
+    // it is `nord categorical.c4 on bgElev` at **4.5010**, which is 0.02% of
+    // headroom: the design cut this one to the floor rather than above it. It
+    // clears, and it is worth naming that it clears by a fifth of a thousandth,
+    // because the next figure recorded here will be the one that does not.
+    expect(tightest.pair).toBe("nord categorical.c4 on bgElev");
+    expect(tightest.measured).toBeCloseTo(4.5010, 3);
   });
 
   /**
@@ -421,10 +793,13 @@ describe("C10 contract", () => {
         if (palette.carries !== "meaning") continue;
 
         for (const [slot, value] of Object.entries(palette.slots)) {
-          for (const surface of [tokens.surfaces.bg, tokens.surfaces.bgElev]) {
+          // **By NAME as well as value**, because composition is keyed on the
+          // surface's name — `textSurfaces` yields both and the literal pair did not.
+          for (const [surfaceName, surface] of textSurfaces(tokens)) {
+            const ink = inkOn(tokens, `${name}.${slot}`, surfaceName);
             expect(
-              ratio(value, surface),
-              `${variant} ${name}.${slot} (${value}) against ${surface}`,
+              ratio(ink, surface),
+              `${variant} ${name}.${slot} (${value}${ink === value ? "" : ` composed ${ink}`}) against ${surface}`,
             ).toBeGreaterThanOrEqual(floorFor(slot));
           }
         }
@@ -489,9 +864,10 @@ describe("C10 contract", () => {
     // requirement, not a compromise on it.
     for (const [variant, tokens] of SHIPPED) {
       for (const slot of SYNTAX_SLOTS) {
-        const value = tokens.palettes["syntax"]!.slots[slot]!;
-        for (const surface of [tokens.surfaces.bg, tokens.surfaces.bgElev]) {
-          expect(ratio(value, surface), `${variant} syntax.${slot}`).toBeGreaterThanOrEqual(floorFor(slot));
+        for (const [surfaceName, surface] of textSurfaces(tokens)) {
+          const ink = inkOn(tokens, `syntax.${slot}`, surfaceName);
+          expect(ratio(ink, surface), `${variant} syntax.${slot} on ${surfaceName}`)
+            .toBeGreaterThanOrEqual(floorFor(slot));
         }
       }
     }
@@ -578,8 +954,25 @@ describe("C10 contract", () => {
 
   it("every slot and surface has a 4-bit entry, so nothing silently loses colour at depth 4", () => {
     for (const [variant, tokens] of SHIPPED) {
+      // **The exemptions, compared by equality rather than tested by membership**
+      // — a `continue` per name lets a dead entry outlive its subject, and a
+      // silent exemption is the failure this gate is named after.
+      //
+      //   spectrum  decoration; the art is not themed at 4-bit
+      //   hue       PARKED 21. Not *no answer needed* but *no answer the design
+      //             records*: `nearestAnsi16` over the ten inks returns six
+      //             distinct indices in `dark` and seven in `light`, with `blue`
+      //             and `green` both landing on 6 and `orange`, `lime` and
+      //             `yellow` all on 11. A mechanical map satisfies this gate and
+      //             destroys the identities it exists to keep, and a curated one
+      //             is ten visible choices the registry does not carry. Nothing
+      //             is silent: C10 I55 records the measurement and T2.56 asserts
+      //             the 4-bit answer is `NO_STYLE` rather than a wrong colour.
+      const EXEMPT = ["hue", "spectrum"];
+      expect(Object.keys(tokens.palettes).filter((n) => EXEMPT.includes(n)).sort(),
+        `${variant}: every exemption still names a palette this theme carries`).toEqual(EXEMPT);
       for (const [name, palette] of Object.entries(tokens.palettes)) {
-        if (name === "spectrum") continue; // decoration; the art is not themed at 4-bit
+        if (EXEMPT.includes(name)) continue;
         for (const slot of Object.keys(palette.slots)) {
           expect(tokens.fourBit[`${name}.${slot}`], `${variant} ${name}.${slot}`).toBeTypeOf("number");
         }
@@ -602,8 +995,7 @@ describe("C10 contract", () => {
     for (const [variant, tokens] of SHIPPED) {
       for (const [palette, slot, surface, hex] of diffPairs(tokens)) {
         checked += 1;
-        const value = tokens.palettes[palette]?.slots[slot];
-        const measured = ratio(value as string, hex);
+        const measured = ratio(inkOn(tokens, `${palette}.${slot}`, surface), hex);
         const floor = floorFor(slot);
         if (measured < floor) {
           failures.push(`${variant} ${palette}.${slot} on ${surface}: ${measured.toFixed(2)} < ${floor}`);
@@ -620,54 +1012,90 @@ describe("C10 contract", () => {
     expect(failures, failures.join("\n")).toEqual([]);
   });
 
-  it("T2.24 (roadmap 24): high-contrast keeps its own promise, which the framework cannot", () => {
-    // **The promise is 7 : 1 and it is nowhere expressible.** `FLOORS` is a
-    // module constant naming the *minimum* every theme must clear, so a theme
-    // that promises more has no way to declare it and no way to be held to it —
-    // which makes this row the only thing standing between "high-contrast" and a
-    // name. Asserted here rather than in the tokens, because a value that meets
-    // a target and a value that was nudged past one are the same value.
-    const hc = defaultTheme["high-contrast"];
-    expect(hc, "the set holds it").toBeDefined();
-    if (hc === undefined) return;
-
+  it("T2.24 (I43, roadmap 24, R-THM-002): both high-contrast themes keep the floor they declare", () => {
+    // **The promise is 7 : 1 and it used to be nowhere expressible.** `FLOORS`
+    // is a module constant naming the *minimum* every theme must clear, so a
+    // theme that promised more had no way to declare it and no way to be held to
+    // it — which made this row the only thing standing between "high-contrast"
+    // and a name.
+    //
+    // **That is exactly how it went stale.** A claim asserted in one row against
+    // the tokens as they stood is not a constraint on the tokens that follow:
+    // porting the themes to the registry left `hcLight` at 6.55 : 1 on `bgElev`
+    // for eight refs, under a promise nothing could read. R-THM-002 registers
+    // the ratio in the design and `ThemeTokens.floor` makes it declarable, so
+    // `validateHighContrast` refuses it at load like every other floor.
+    //
+    // **So this row's subject moved and is sharper for it.** It no longer *is*
+    // the check — it asserts the themes declare the floor, that the declaration
+    // is what the check reads, and the three things a floor cannot say: that
+    // `muted` is still recessive, that the tones stay distinct, and where the
+    // claim stops.
+    const HC = ["hcDark", "hcLight"] as const;
     const PROMISE = 7;
-    const failures: string[] = [];
-    for (const [name, palette] of Object.entries(hc.palettes)) {
-      if (palette.carries !== "meaning") continue;
-      for (const [slot, value] of Object.entries(palette.slots)) {
-        for (const [surface, ground] of textSurfaces(hc)) {
-          const measured = ratio(value, ground);
-          if (measured < PROMISE) {
-            failures.push(`${name}.${slot} on ${surface}: ${measured.toFixed(2)} < ${PROMISE}`);
+
+    for (const name of HC) {
+      const hc = defaultTheme[name];
+      expect(hc, `the set holds ${name}`).toBeDefined();
+      if (hc === undefined) continue;
+
+      // **The declaration, not a literal in this file.** A row that carried its
+      // own 7 would agree with itself for ever — which is what the first
+      // version of this did.
+      expect(hc.floor, `${name} declares what it promises`).toBe(PROMISE);
+      expect(validateTokens(hc), `${name} keeps it`).toEqual([]);
+
+      // And the sweep, so the row says which pair is tightest rather than only
+      // that none failed. `hcLight` sits exactly on the floor, because it was
+      // composed to.
+      let tightest = { pair: "", measured: Number.POSITIVE_INFINITY };
+      for (const [palette, spec] of Object.entries(hc.palettes)) {
+        if (spec.carries !== "meaning") continue;
+        for (const slot of Object.keys(spec.slots)) {
+          for (const [surface, ground] of textSurfaces(hc)) {
+            const measured = ratio(inkOn(hc, `${palette}.${slot}`, surface), ground);
+            if (measured < tightest.measured) tightest = { pair: `${palette}.${slot} on ${surface}`, measured };
           }
         }
       }
+      expect(tightest.measured, `${name} tightest: ${tightest.pair}`).toBeGreaterThanOrEqual(PROMISE);
+
+      // **`muted` is the slot this theme exists to answer** — 2.14–2.42 on the
+      // light variant against every candidate wash, under its own 2.5 floor, and
+      // recorded during the selection work as a reason not to pair it. Named
+      // rather than left to the sweep above, because the sweep passing does not
+      // say which slot was in question.
+      const muted = hc.palettes["tone"]?.slots["muted"];
+      expect(ratio(muted!, hc.surfaces.bg), `${name} muted, the quietest slot here`)
+        .toBeGreaterThanOrEqual(PROMISE);
+
+      // And it is still recessive: quieter than `dim`, which is quieter than
+      // `default`. A promise that flattened the three would have bought the
+      // floor by losing what the tones are for — which is the risk the moment
+      // you start darkening inks to clear a ratio, and is why it is asserted on
+      // both themes rather than on the one that was darkened.
+      const tone = (slot: string): number => ratio(hc.palettes["tone"]!.slots[slot]!, hc.surfaces.bg);
+      expect(tone("muted"), `${name}: muted under dim`).toBeLessThan(tone("dim"));
+      expect(tone("dim"), `${name}: dim under default`).toBeLessThan(tone("default"));
+
+      // **And they stay ten**, on the ground they were composed for. Darkening
+      // four inks toward a floor is exactly the edit that converges a palette,
+      // and a ratio check cannot see two slots arriving at one colour.
+      const onElev = Object.keys(hc.palettes["tone"]!.slots)
+        .map((slot) => inkOn(hc, `tone.${slot}`, "bgElev"));
+      expect(new Set(onElev).size, `${name}: ten tones on bgElev, still ten colours`).toBe(onElev.length);
+
+      // **The rung where the claim stops.** At 4-bit the values are the
+      // emulator's, so contrast is unprovable and only distinctness survives —
+      // which is what the curated map promises instead (C10 I26).
+      const five = ["ok", "warn", "error", "info", "accent"].map((t) => hc.fourBit[`tone.${t}`]);
+      expect(new Set(five).size, `${name}: distinctness is what this depth can keep`).toBe(5);
     }
-    expect(failures, failures.join("\n")).toEqual([]);
 
-    // **`muted` is the slot this theme exists to answer** — 2.14–2.42 on the
-    // light variant against every candidate wash, under its own 2.5 floor, and
-    // recorded during the selection work as a reason not to pair it. Named
-    // rather than left to the sweep above, because the sweep passing does not
-    // say which slot was in question.
-    const muted = hc.palettes["tone"]?.slots["muted"];
-    expect(ratio(muted!, hc.surfaces.bg), "muted, the quietest slot here").toBeGreaterThanOrEqual(
-      PROMISE,
-    );
-
-    // And it is still recessive: quieter than `dim`, which is quieter than
-    // `default`. A promise that flattened the three would have bought the floor
-    // by losing what the tones are for.
-    const tone = (slot: string): number => ratio(hc.palettes["tone"]!.slots[slot]!, hc.surfaces.bg);
-    expect(tone("muted")).toBeLessThan(tone("dim"));
-    expect(tone("dim")).toBeLessThan(tone("default"));
-
-    // **The rung where the claim stops.** At 4-bit the values are the
-    // emulator's, so contrast is unprovable and only distinctness survives —
-    // which is what the curated map promises instead (C10 I26).
-    const five = ["ok", "warn", "error", "info", "accent"].map((t) => hc.fourBit[`tone.${t}`]);
-    expect(new Set(five).size, "distinctness is what this depth can keep").toBe(5);
+    // **And nothing else declares one**, so the field is not drifting into a
+    // second way of writing the ordinary floor.
+    const declaring = Object.entries(defaultTheme).filter(([, t]) => t.floor !== undefined).map(([n]) => n);
+    expect(declaring.sort(), "only the two themes named for a ratio declare one").toEqual([...HC].sort());
   });
 
   it("T2.14b (I22): the diff surfaces are paired with exactly those twelve slots", () => {
@@ -696,21 +1124,45 @@ describe("C10 contract", () => {
     expect([...new Set(pairs.map(([, , surface]) => surface))].sort()).toEqual(["diffAdd", "diffRemove"]);
   });
 
-  it("T2.14e (C10 I32, §4d): the tag's ground IS `tone.error`, in every theme", () => {
-    // **Two hex literals that must agree is a pair waiting to drift**, and this
-    // one drifted four times in one sitting — hue 0 against hue 9, then a
-    // hue-matched ground that read brick, then a tone the loader refused, then a
-    // ground and a tone one lightness step apart. Every round was two numbers
-    // being tuned toward each other by eye.
+  it("T2.14e (C10 I32, §4d, R-THM-001): the tag's ground and the tone are two values, each held to its own pair", () => {
+    // **The equality is retired and this row is its inverse.** I32 made
+    // `surfaces.errorGround` take `tone.error`'s own value because two hex
+    // literals that must agree is a pair waiting to drift — and it drifted four
+    // times in one sitting before the equality settled it. What the equality
+    // cost was the floor: one value serving as ink on the page *and* as a ground
+    // behind white text cannot clear 4.5 in both directions, so `error` got a
+    // 2.5 exception and kept it.
     //
-    // They are one colour and this is what says so. The rule, the message and
-    // the tag's ground are the same value by assertion rather than by
-    // agreement, so a change to either has to be a change to both.
+    // R-THM-001 splits them, and the split is strictly better: `tone.error` is
+    // ink and clears 4.5 against the grounds it lands on, `surfaces.errorGround`
+    // is a ground and holds `errorInk` at 4.5, and the exception is retired
+    // across all ten themes with the tightest tone at 4.78 (`dark` on `bgElev`).
+    //
+    // **The drift hazard the equality answered is answered differently now.**
+    // Not by the two values being one, but by each being measured against what
+    // it actually sits on — `validateTokens` for the tone, `errorTagPairs` for
+    // the pair — so a change to either is caught by the check that owns it
+    // rather than by an assertion that they match.
+    let same = 0; // cells-ok — a theme count
     for (const [variant, tokens] of SHIPPED) {
-      expect(tokens.surfaces.errorGround, `${variant}: ground is the tone`).toBe(
-        tokens.palettes.tone?.slots["error"],
-      );
+      const tone = tokens.palettes.tone?.slots["error"];
+      const ground = tokens.surfaces.errorGround;
+      const ink = tokens.surfaces.errorInk;
+      expect(tone, `${variant}: a tone`).toBeDefined();
+      expect(ground, `${variant}: a ground`).toBeDefined();
+
+      // The ground holds its ink, which is the pair the tag draws.
+      expect(ratio(ink, ground), `${variant}: the tag's own pair`).toBeGreaterThanOrEqual(4.5);
+      if (tone === ground) same += 1; // cells-ok — a theme count
     }
+
+    // **Two themes still have them equal and it is not a leftover.** `hcDark`
+    // and `hcLight` are the high-contrast pair, where the tone is already loud
+    // enough to be a ground — so the equality survives where it is a
+    // consequence of the palette rather than a constraint on it, which is the
+    // whole of what changed. Asserted as a count so it cannot silently become
+    // ten again.
+    expect(same, "the equality is a consequence in two themes, not a rule in ten").toBe(2);
   });
 
   it("T2.14f (C10 I32, §4d): the tag's own check fires, and it reads both halves from `surfaces`", () => {
@@ -754,11 +1206,24 @@ describe("C10 contract", () => {
     }
   });
 
-  it("T2.14c (C10 I22, §4a, §4b, §4d): ten surfaces, and the withdrawn strong pair is absent", () => {
+  it("T2.14c (C10 I22, §4a, §4b, §4d, R-THM-001): twenty-five surfaces, and the withdrawn strong pair is absent", () => {
     // The pair that was specified, measured and removed. Asserted absent rather
     // than merely unmentioned: a spec that measured something out and a token
     // file that quietly kept it is exactly the drift this suite exists to stop,
     // and an unused surface with no floor behind it is what someone reaches for.
+    //
+    // **Ten became twenty-five and the count is still the row's whole subject.**
+    // R-THM-001 assigns fifteen more, every one of which the design draws — the
+    // focus ground, the four selection-adjacent ground/ink pairs, the skip pair,
+    // the meter fill and the four mode grounds with their shared ink. A ground
+    // and its ink are both surfaces, which is the placement `errorInk` already
+    // had (§4d): an ink put in `tone` would be measured against `bg`, where a
+    // black ink for a red ground fails every floor for a pairing nothing draws.
+    //
+    // **`.bg-error` is not a twenty-sixth.** The registry carries it as a second
+    // name for `.bg-errorGround` with the same declaration in all ten themes,
+    // and `surface.error` beside `tone.error` is two colours reachable by one
+    // word. The generator drops the alias and asserts the two are equal first.
     for (const [variant, tokens] of SHIPPED) {
       const names = Object.keys(tokens.surfaces).sort();
       expect(names, variant).toEqual([
@@ -767,6 +1232,10 @@ describe("C10 contract", () => {
         "bgElev",
         "border",
         "borderStrong",
+        // R-THM-001 — the chosen/pick/link triple: three grounds a reader can be
+        // pointed at, each with an ink of its own rather than borrowing one.
+        "chosen",
+        "chosenInk",
         "diffAdd",
         "diffRemove",
         // §4a — the error tag's pair. **Two entries, and they are one thing**:
@@ -775,30 +1244,65 @@ describe("C10 contract", () => {
         // arrive alone. Sorted order puts the ground before the ink.
         "errorGround",
         "errorInk",
+        // R-THM-001 — the ground focus takes, which C10 §4c's *the shipped
+        // default paints nothing* had no room for. M3's precedence stack is what
+        // consumes it.
+        "focusGround",
+        "link",
+        "linkInk",
+        // R-THM-001 — the four mode grounds and the one ink they share. The ink
+        // is shared because the four grounds are chosen to hold it, which is a
+        // property of the set rather than of any one of them.
+        "mAccept",
+        "mAuto",
+        "mInk",
+        "mManual",
+        "mPlan",
+        // R-THM-001 — a fill rather than a ground: the part of a meter that is
+        // full, which carries no text and is paired with nothing.
+        "meterFill",
+        "pick",
+        "pickInk",
         // §4b — the selection wash. A text-bearing surface with a pairing of
         // its own (`selectionPairs`), not an eighth entry in the diff one.
         "selection",
+        "skipGround",
+        "skipInk",
       ]);
     }
   });
 
-  it("T2.14d (§4b): the selection pairing is `tone.default` alone, and is not the diff one", () => {
+  it("T2.14d (§4b, §4b.1, I49): the selection pairing is derived from the theme's own compositions, and is not the diff one", () => {
     // **Written because widening `diffPairs` was the first attempt and four
     // rows refused it** — T2.14b above states outright that `tone.default`
     // must not be in the diff pairing, and it was right: a function whose name
     // says one thing and whose contents say two stops being readable. The
     // sibling is asserted here so the split cannot quietly become a merge.
+    //
+    // **The row asserted `tone.default` alone, and that clause is retired**
+    // (C10 §4b.1). It was right about the prompt — ghost text is `muted` and is
+    // drawn after the buffer's last cluster — and the design's selection is the
+    // transcript's too: the registry repaints nine tones on this ground across
+    // nine themes, `muted` among them in six. A composed value *is* the design
+    // saying the ref lands here, so the scope rule is unchanged and only its
+    // premise moved. What stays asserted is the split from `diffPairs` and the
+    // one pairing every theme has whether or not it composes anything.
     for (const [variant, tokens] of SHIPPED) {
       const pairs = selectionPairs(tokens);
-      expect(pairs.map(([palette, slot]) => palette + "." + slot), variant).toEqual([
-        "tone.default",
-      ]);
+      const refs = pairs.map(([palette, slot]) => palette + "." + slot);
+      expect(refs, variant).toContain("tone.default");
       expect([...new Set(pairs.map(([, , surface]) => surface))]).toEqual(["selection"]);
-      // `muted` is deliberately not paired, and C10 §4b carries the measured
-      // reason: on light it sits under its own floor against every candidate
-      // wash. Ghost text is muted and is drawn after the buffer's last
-      // cluster, so it is adjacent to a selection and never inside one.
-      expect(pairs.map(([, slot]) => slot), variant).not.toContain("muted");
+      // **Derived, so it is exactly the theme's compositions plus the base.** An
+      // equality rather than a membership test: a derivation that quietly
+      // returned every slot in the palette would satisfy `toContain` on all of
+      // them, which is the shape this row's first version was guarding against
+      // from the other side.
+      const composed = Object.keys(tokens.composed?.["surface.selection"] ?? {})
+        .filter((ref) => {
+          const [family, slot] = ref.split(".");
+          return tokens.palettes[family ?? ""]?.slots[slot ?? ""] !== undefined;
+        });
+      expect(refs.slice().sort(), variant).toEqual([...new Set(["tone.default", ...composed])].sort());
     }
   });
 
@@ -864,19 +1368,60 @@ describe("C10 §4j — the categorical separation debt", () => {
    * directions: a new pair fails this row and a repaired one fails it too.
    */
   const DEBT: Readonly<Record<string, readonly string[]>> = {
-    light: [
+    "dark": [
+      "protan c2/c5 5.4", "deutan c1/c6 6.3", "deutan c2/c5 3.4", "tritan c1/c7 6.8",
+      "tritan c2/c3 1.5", "tritan c2/c5 6.5", "tritan c3/c5 5.1",
+    ],
+    "light": [
       "protan c1/c4 2.6", "deutan c1/c4 0.6", "deutan c1/c6 3.5", "deutan c4/c6 4.0",
       "tritan c1/c7 5.3", "tritan c2/c3 5.1", "tritan c6/c7 6.5",
     ],
-    dark: [
+    "hcDark": [
       "protan c2/c5 5.4", "deutan c1/c6 6.3", "deutan c2/c5 3.4", "tritan c1/c7 6.8",
       "tritan c2/c3 1.5", "tritan c2/c5 6.5", "tritan c3/c5 5.1",
     ],
-    "high-contrast": [
-      "protan c2/c5 5.4", "deutan c1/c6 6.3", "deutan c2/c5 3.4", "tritan c1/c7 6.8",
-      "tritan c2/c3 1.5", "tritan c2/c5 6.5", "tritan c3/c5 5.1",
+    "hcLight": [
+      "protan c1/c4 5.9", "protan c2/c3 5.4", "protan c3/c7 4.9", "deutan c1/c6 3.8",
+      "deutan c2/c3 2.5", "deutan c3/c7 6.2", "deutan c4/c5 4.4", "tritan c1/c5 6.8",
+      "tritan c2/c5 3.6",
+    ],
+    "ink": [
+      "protan c2/c3 6.2", "protan c3/c6 4.9", "deutan c1/c4 5.4", "deutan c2/c7 2.4",
+      "deutan c3/c6 2.3", "tritan c1/c5 3.1", "tritan c6/c7 2.2",
+    ],
+    "warm": [
+      "protan c1/c4 5.3", "protan c2/c3 5.4", "protan c2/c6 3.8", "protan c3/c6 3.5",
+      "protan c7/c8 4.5", "deutan c1/c4 1.9", "deutan c2/c6 6.9", "deutan c2/c7 2.4",
+      "deutan c3/c6 1.8", "tritan c1/c5 3.9", "tritan c3/c6 4.0", "tritan c4/c8 6.7",
+      "tritan c6/c7 6.4",
+    ],
+    "nord": [
+      "protan c1/c4 3.7", "protan c2/c3 6.4", "protan c2/c6 4.0", "protan c3/c6 6.4",
+      "protan c4/c8 5.8", "protan c5/c8 3.8", "deutan c2/c7 4.2", "deutan c3/c6 4.7",
+      "deutan c4/c8 3.4", "deutan c5/c8 4.1", "deutan c6/c7 5.5", "tritan c2/c8 2.0",
+      "tritan c6/c7 5.3",
+    ],
+    "viol": [
+      "protan c1/c4 4.7", "protan c4/c8 5.6", "deutan c1/c6 2.3", "deutan c2/c7 4.7",
+      "deutan c4/c5 2.8", "tritan c1/c2 3.9", "tritan c1/c5 5.5", "tritan c2/c5 5.5",
+      "tritan c3/c4 5.6", "tritan c4/c7 6.1",
+    ],
+    "mono": [
+      "normal c1/c2 4.5", "normal c1/c8 4.3", "normal c2/c3 6.1", "normal c2/c5 3.1",
+      "normal c3/c5 3.0", "normal c4/c8 4.0", "normal c6/c7 3.0", "protan c1/c2 4.5",
+      "protan c1/c8 4.3", "protan c2/c3 6.1", "protan c2/c5 3.1", "protan c3/c5 3.0",
+      "protan c4/c8 4.0", "protan c6/c7 3.0", "deutan c1/c2 4.5", "deutan c1/c8 4.3",
+      "deutan c2/c3 6.1", "deutan c2/c5 3.1", "deutan c3/c5 3.0", "deutan c4/c8 4.0",
+      "deutan c6/c7 3.0", "tritan c1/c2 4.5", "tritan c1/c8 4.3", "tritan c2/c3 6.1",
+      "tritan c2/c5 3.1", "tritan c3/c5 3.0", "tritan c4/c8 4.0", "tritan c6/c7 3.0",
+    ],
+    "paper": [
+      "deutan c1/c4 2.2", "deutan c1/c5 6.6", "deutan c3/c7 1.4", "deutan c4/c5 4.8",
+      "tritan c1/c5 1.7", "tritan c1/c6 5.4", "tritan c3/c4 3.1", "tritan c5/c6 5.6",
     ],
   };
+
+
 
   it("T2.38 (I39, §4j): every shipped theme's collisions are its debt list exactly", () => {
     // The variant set itself, by equality — a theme added with no entry would
@@ -891,11 +1436,32 @@ describe("C10 §4j — the categorical separation debt", () => {
         .toEqual(DEBT[variant]);
     }
 
-    // **`high-contrast` ships `dark`'s list and not a list of the same length.**
-    // The theme exists to maximise distinguishability and its palette is the
-    // dark theme's, so the two are asserted identical rather than separately
+    // **`hcDark` ships `dark`'s list and not a list of the same length.** The
+    // theme exists to maximise distinguishability and its categorical palette is
+    // the dark theme's, so the two are asserted identical rather than separately
     // correct — a divergence in either is a finding about a deliberate copy.
-    expect(DEBT["high-contrast"], "the same pairs, not merely as many").toEqual(DEBT["dark"]);
+    // `hcLight` is *not* in this pair and has a list of its own, which is the
+    // half the old three-theme set could not show: the high-contrast themes are
+    // two palettes, not one palette in two polarities.
+    expect(DEBT["hcDark"], "the same pairs, not merely as many").toEqual(DEBT["dark"]);
+    expect(DEBT["hcLight"], "and the light half is its own palette").not.toEqual(DEBT["dark"]);
+
+    // **`mono` collides in `normal` vision and that is the theme working.** It
+    // is the only entry here whose list carries `normal` rows, because its eight
+    // categorical slots are eight greys and ΔE2000 between two greys is a
+    // lightness difference — there is no hue left to separate them with. Seven
+    // pairs under the floor in ordinary vision is not debt a repair could clear;
+    // it is what a monochrome theme costs, and `classes` is where a monochrome
+    // theme carries meaning instead (I16). Named so the row is not read as
+    // eight themes with debt and one with a defect.
+    expect(
+      DEBT["mono"]!.filter((c) => c.startsWith("normal")).length,
+      "mono is the only theme that collides before any dichromacy",
+    ).toBe(7);
+    for (const [name, list] of Object.entries(DEBT)) {
+      if (name === "mono") continue;
+      expect(list.filter((c) => c.startsWith("normal")), `${name} separates in normal vision`).toEqual([]);
+    }
 
     // The control. Without it a floor of seven and a floor of seventy are the
     // same rule here: every shipped palette fails both.
@@ -925,5 +1491,650 @@ describe("C10 §4j — the categorical separation debt", () => {
     // And the substitution is the whole debt: one pair, and `m8` is in it.
     expect(collisions(slots).map((c) => `${c.vision} ${c.a}/${c.b} ${c.deltaE.toFixed(1)}`))
       .toEqual(["tritan m2/m8 1.5"]);
+  });
+});
+
+/**
+ * C10 §4k — the six compositions, owed at the spec commit.
+ *
+ * **Three of the four rows are `it.todo` and the fourth is not**, which is the
+ * point of the set. T2.45–T2.47 wait on M3's code; T2.48 asserts the *absence*
+ * that makes three of the six golden frames undrawable, and an absence asserted
+ * later is an absence nobody watched — the gap would widen silently in exactly
+ * the window where somebody is building painters.
+ */
+describe("C10 §4k — focus, selection and the facts that contest a ground", () => {
+  it("T2.45 (I47, R-SEL-006): focused and selected take two grounds and one mark, at every rung", async () => {
+    const { COMPOSITIONS, DARK_THEME, RUNGS, visible } = await harness();
+    const c = COMPOSITIONS.find((k) => k.row === 1)!;
+    // The row the head is on, and the same row with focus alone: the pair is the
+    // assertion, because one ground told apart by ink satisfies any row that
+    // names a single fact.
+    const bravo = (lines: readonly string[]): string => lines.find((l) => visible(l).includes("bravo"))!;
+    const open = (style: Parameters<typeof sgr>[0]): string => sgr(style);
+    for (const rung of RUNGS) {
+      const both = bravo(c.draw(rung.capabilities, new Set(c.facts)));
+      const focusOnly = bravo(c.draw(rung.capabilities, new Set(["focus", "failure"])));
+      const mark = rung.capabilities.unicode === "ascii" ? ">" : "\u25b8";
+      expect(visible(both).trimStart().startsWith(`${mark} `), `${rung.name}: the head row carries ${mark}`).toBe(true);
+      expect(visible(focusOnly).trimStart().startsWith(`${mark} `), `${rung.name}: and so does focus alone`).toBe(true);
+      const wash = selectionStyle(DARK_THEME, rung.capabilities);
+      const ground = focusStyle(DARK_THEME, rung.capabilities);
+      if (rung.capabilities.colourDepth === 1) {
+        // No ground at 1-bit: selection falls to `inverse` and focus to nothing,
+        // so the mark is the whole of focus there.
+        expect(wash, "selection's 1-bit rung").toEqual({ inverse: true });
+        expect(both, `${rung.name}: the selected row inverts`).toContain(open({ inverse: true }));
+        expect(focusOnly, `${rung.name}: focus alone does not`).not.toContain(open({ inverse: true }));
+      } else {
+        expect(both, `${rung.name}: selection takes the ground`).toContain(open(wash));
+        expect(both, `${rung.name}: and focus's ground is displaced`).not.toContain(open(ground));
+        expect(focusOnly, `${rung.name}: focus alone takes a ground of its own`).toContain(open(ground));
+        expect(open(ground), "two grounds, not one").not.toEqual(open(wash));
+      }
+    }
+  });
+  it.todo(
+    "T2.46 (I47, R-STA-003): hover and focus hold disjoint carrier sets at every rung — focus has `\u25b8` at all three and hover never does; at 1-bit, where hover's ground is gone, hover holds bold and focus does not. A disjointness over sets, because two rows each naming one carrier agree while the two facts render identically — not deferred on a component: it lands with §4k's resolver change, and its hover half is exercised through a constructed state until a block declares `hovered`. **This clause used to name mouse mode 1003 and that was the wrong condition** — `lifecycle.ts:125` takes 1003 behind a `hover?: boolean` option and the decoder reads a no-button move, so a pointer move already arrives; the router discards it by rule (§4a row t) and no block carries the field, which is what T2.48 watches",
+  );
+  it("T2.47 (I47, R-STA-004): where availability meets validity the well takes the ground and the error keeps its mark and its word, on case 5", async () => {
+    const { COMPOSITIONS, DARK_THEME, RUNGS, visible } = await harness();
+    const c = COMPOSITIONS.find((k) => k.row === 5)!;
+    for (const rung of RUNGS) {
+      const lines = c.draw(rung.capabilities, new Set(c.facts));
+      const field = lines.find((l) => visible(l).includes("port"))!;
+      const error = lines.find((l) => visible(l).includes("not a port number"))!;
+      const well = background("surface.bgDeep", DARK_THEME, rung.capabilities);
+      if (well.background !== undefined) {
+        expect(field, `${rung.name}: the field stands in the well`).toContain(sgr(well));
+        expect(error, `${rung.name}: and the error row does not`).not.toContain(sgr(well));
+      }
+      // **The count, not just the winner**: the displaced fact keeps two
+      // carriers at every rung, neither of them colour.
+      const mark = rung.capabilities.unicode === "ascii" ? "x" : "\u2717";
+      expect(visible(error).trim(), `${rung.name}: mark and word`).toBe(`${mark} not a port number`);
+    }
+  });
+
+  it("T2.48 (I47, §4k.4): every composition §4k.2 rules is in one case table, every drawn case responds to both its facts, and every owed case is attempted", async () => {
+    const { COMPOSITIONS, RUNGS, responds } = await harness();
+    // §4k.2's rows as the document names them, bold in the first column.
+    const spec = readFileSync(new URL("../../docs/components/C10_theme_resolution.md", import.meta.url), "utf8");
+    const section = /### 4k\.2 [\s\S]*?\n### /u.exec(spec)?.[0] ?? "";
+    const ruled = [...section.matchAll(/^\|\s*\*\*([^*]+)\*\*\s*\|/gmu)].map((m) => m[1]!.trim());
+    expect(ruled, "§4k.2 rules six").toHaveLength(6);
+    expect(COMPOSITIONS.map((c) => c.name).sort(), "the case table is §4k.2's rows").toEqual([...ruled].sort());
+
+    for (const c of COMPOSITIONS) {
+      for (const rung of RUNGS) {
+        const answers = responds(c, rung.capabilities);
+        if (c.owed === undefined) {
+          // A drawn case answers every fact, or its frame is drawn on a state
+          // nothing constructs.
+          for (const a of answers) {
+            expect(a.answers, `case ${String(c.row)} at ${rung.name}: removing ${a.fact} changes the frame${a.why === undefined ? "" : ` (${a.why})`}`).toBe(true);
+          }
+        } else {
+          // **The attempt.** Both facts answering is a composition a producer
+          // can construct with no golden frame — draw it, and take `owed` off.
+          expect(
+            answers.every((a) => a.answers),
+            `case ${String(c.row)} at ${rung.name} is constructible with no golden — draw it (owed: ${c.owed})`,
+          ).toBe(false);
+        }
+      }
+    }
+    // Drawn and owed partition the six, and the golden file draws the first set.
+    expect(COMPOSITIONS.filter((c) => c.owed === undefined).map((c) => c.row), "drawn today").toEqual([1, 3, 4, 5, 6]);
+  });
+});
+
+/**
+ * C10 I52 — every state axis the registry carries is declared here.
+ *
+ * **The gate two records named as their watcher and neither could see.** §4k.4
+ * says *what M11 owes them is the declaration, since a fact with no declared
+ * carrier is a build failure under M11's gate*, and `MILESTONES.md`'s M11 row
+ * gives *M11's own gate, on the day a fact arrives with no declaration* as what
+ * goes red. Measured before this row existed: **nothing in `src/`, `tools/` or
+ * `test/` read `stateAxes` at all**, so the population was never enumerated and
+ * neither watcher existed. A deferral whose watcher is imaginary is the
+ * strongest form of the class this repository names about itself, because the
+ * citation reads as coverage.
+ *
+ * **Both sides are read, so neither is a transcription.** The registry is the
+ * population and the spec is the declaration; a row holding its own copy of
+ * twelve names would be a third record to drift (F1240's shape).
+ */
+describe("C10 I52 — the registry's state axes and the spec's declarations", () => {
+  it("T2.53 (C10 I53, §070, §093): the ten hues are three tiers per theme, and the order is a sequence", () => {
+    const registry = JSON.parse(
+      readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
+    ) as { themes: readonly { id: string }[]; themeRules: readonly { selector: string; declarations: string; status: string }[] };
+
+    // The registry side, read out of the 300 tokens rather than written down here.
+    // `c-h-X` is the hue's ink, `bg-h-X` its ground, `c-hi-X` the ink ON that ground.
+    const expected = new Map<string, Map<string, Record<string, string>>>();
+    const order: string[] = [];
+    for (const rule of registry.themeRules.filter((r) => r.status === "current")) {
+      const colour = /(?:^|[;{\s])color:\s*(#[0-9a-fA-F]{3,8})/u.exec(rule.declarations);
+      const ground = /background(?:-color)?:\s*(#[0-9a-fA-F]{3,8})/u.exec(rule.declarations);
+      // The theme is in the selector and not a field — `[data-theme="dark"] .c-h-blue`.
+      const themeOf = /^\[data-theme="([a-zA-Z]+)"\]/u.exec(rule.selector);
+      if (themeOf === null) continue;
+      for (const m of rule.selector.matchAll(/\.(c-h|bg-h|c-hi)-([a-z0-9]+)\b/gu)) {
+        const [, kind, hue] = m as unknown as [string, string, string];
+        if (kind === "c-h" && !order.includes(hue)) order.push(hue);
+        const perTheme = expected.get(themeOf[1]!) ?? new Map<string, Record<string, string>>();
+        expected.set(themeOf[1]!, perTheme);
+        const rec = perTheme.get(hue) ?? {};
+        perTheme.set(hue, rec);
+        if (kind === "c-h" && colour !== null) rec["ink"] = colour[1]!.toLowerCase();
+        if (kind === "c-hi" && colour !== null) rec["on"] = colour[1]!.toLowerCase();
+        if (kind === "bg-h" && ground !== null) rec["ground"] = ground[1]!.toLowerCase();
+      }
+    }
+
+    // The population is measured, not quoted — ten hues over ten themes, three
+    // tiers each, which is the 300 the generator called theme-independent.
+    expect(order.length, "hues").toBe(10);
+    expect(expected.size, "themes carrying hues").toBe(registry.themes.length);
+
+    const THEMES = defaultTheme as unknown as Readonly<Record<string, ThemeTokens>>;
+    expect(Object.keys(THEMES).length, "themes shipped").toBe(registry.themes.length);
+
+    for (const [themeId, perTheme] of expected) {
+      const hues = THEMES[themeId]?.hues;
+      expect(hues, `${themeId}: the projection carries its hues`).toBeDefined();
+
+      // **A sequence and not a set.** §093 replaced a spectral assignment whose
+      // failure was that five identities a deuteranope cannot separate sat next
+      // to each other; a set comparison passes the arrangement it retired.
+      expect(Object.keys(hues!), `${themeId}: §093's order`).toEqual(order);
+
+      // Equality in BOTH directions: no hue in the registry that the projection
+      // lacks, and no hue in the projection the registry does not hold.
+      expect(new Set(Object.keys(hues!)), `${themeId}: no hue either side invented`).toEqual(new Set(perTheme.keys()));
+
+      for (const [hue, rec] of perTheme) {
+        for (const tier of ["ink", "ground", "on"] as const) {
+          expect(rec[tier], `${themeId} ${hue}: the registry records its ${tier}`).toBeDefined();
+          expect(hues![hue]?.[tier].toLowerCase(), `${themeId} ${hue}: ${tier}`).toBe(rec[tier]);
+        }
+      }
+    }
+
+    // **The control: the pair of themes that lift the ink, and the nine grounds.**
+    // Without these the row passes against a projection that collected the hues
+    // once and wrote one theme's vocabulary out ten times — which is exactly what
+    // the generator's own comment said it did. Both figures are what makes the
+    // per-theme claim have something to be wrong about (A03 §2).
+    const blueInks = new Set(Object.values(THEMES).map((t) => t.hues!["blue"]!.ink.toLowerCase()));
+    expect(blueInks.size, "blue's ink takes three values across the ten themes").toBe(3);
+    expect(THEMES["light"]!.hues!["blue"]!.ink.toLowerCase(), "light lifts a mid blue off a light ground").toBe("#4e8ef6");
+    expect(THEMES["paper"]!.hues!["blue"]!.ink.toLowerCase(), "paper does the same, and not identically").toBe("#4e8df5");
+    const blueGrounds = new Set(Object.values(THEMES).map((t) => t.hues!["blue"]!.ground.toLowerCase()));
+    expect(blueGrounds.size, "blue's ground is nine distinct values across ten themes").toBe(9);
+
+    // **`mono` keeps its hues chromatic, and it is the row worth naming.** Every
+    // tone and every surface it carries is grey — measured below — and its ten
+    // hues are the registry's saturated ones, blue's ink identical to `dark`'s.
+    // Ten identities cannot degrade to one grey, so identity is the single axis
+    // the greyscale theme does not flatten.
+    const grey = (hex: string): boolean => {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      return r === g && g === b;
+    };
+    const mono = THEMES["mono"]!;
+    expect(Object.values(mono.surfaces).every(grey), "mono's surfaces are grey").toBe(true);
+    expect(Object.values(mono.palettes["tone"]!.slots).every(grey), "mono's tones are grey").toBe(true);
+    expect(Object.values(mono.hues!).some((h) => grey(h.ink)), "and not one of its hues is").toBe(false);
+    expect(mono.hues!["blue"]!.ink, "mono's blue ink is dark's").toBe(THEMES["dark"]!.hues!["blue"]!.ink);
+  });
+
+  it("T2.54 (C10 I54, §070): the ink on a hue's band is DERIVED — the higher-contrast of black and white", () => {
+    const THEMES = defaultTheme as unknown as Readonly<Record<string, ThemeTokens>>;
+
+    // §070's own rule, in its own words: *the ink on each is chosen by CONTRAST
+    // against that hue, so yellow takes black and blue takes white without
+    // anyone deciding per theme*. It is a computation, so it is checkable — and
+    // a tier that is checkable should not be asserted by copying the registry.
+    let pairs = 0;
+    let worst = Infinity;
+    let white = 0;
+    for (const [themeId, tokens] of Object.entries(THEMES)) {
+      for (const [hue, rec] of Object.entries(tokens.hues ?? {})) {
+        pairs += 1;
+        const onBlack = ratio(rec.ground, "#000000");
+        const onWhite = ratio(rec.ground, "#ffffff");
+        const want = onBlack >= onWhite ? "#000000" : "#ffffff";
+        expect(rec.on.toLowerCase(), `${themeId} ${hue}: ${onBlack.toFixed(2)} on black vs ${onWhite.toFixed(2)} on white`)
+          .toBe(want);
+        if (want === "#ffffff") white += 1;
+        worst = Math.min(worst, Math.max(onBlack, onWhite));
+      }
+    }
+    expect(pairs, "ten hues over ten themes").toBe(100);
+
+    // **The floor holds BY the derivation, not beside it** (measured 2026-09-24):
+    // the winning ink clears 4.5:1 in all 100, and the worst is 4.62 — `purple`
+    // on `nord` and `blue` on `hcDark`, where the two inks are within 2% of each
+    // other and the rule is a tie-break. So the assertion is on the *minimum*
+    // rather than on a count: a hue whose ground drifted darker would lose the
+    // floor before it lost the tie, and only this figure would say so.
+    expect(worst, "the winning ink's contrast, at its worst").toBeGreaterThanOrEqual(DEFAULT_FLOOR);
+
+    // **The control, and it is the sentence §070 got wrong.** White wins seven
+    // times of a hundred — `purple` in six themes and `blue` in `hcDark` alone.
+    // §070 illustrates its rule with *blue takes white*, which is true in one
+    // theme of ten and reads as a general claim; the rule it illustrates holds
+    // 100 of 100. Without this figure the row passes against a build that
+    // hard-coded black, which is 93 of the 100 answers.
+    expect(white, "white wins seven times — purple six, blue once").toBe(7);
+    expect(THEMES["hcDark"]!.hues!["blue"]!.on.toLowerCase(), "§070's own example, where it is true").toBe("#ffffff");
+    expect(THEMES["dark"]!.hues!["blue"]!.on.toLowerCase(), "and where it is not").toBe("#000000");
+  });
+
+
+  it("T2.172 (C10 I57, MILESTONES): every recorded deliverable still resolves — the sweep, made a command", () => {
+    const md = readFileSync(new URL("../../docs/archive/records/MILESTONES.md", import.meta.url), "utf8");
+    // **The whole heading line**, for T2.58's reason two sections up: a prefix
+    // anchor let a rename survive the control twice, in two different gates,
+    // an hour apart.
+    const HEADING = "## The deliverable record \u2014 the named deliverables, not the seam\n";
+    const at = md.indexOf(HEADING);
+    const section = at < 0 ? "" : md.slice(at, md.indexOf("\n## ", at + HEADING.length));
+    expect(section, "the deliverable record exists").not.toBe("");
+
+    // Five cells: MR, the plan's words, the tree's answer, symbol, file. The
+    // two prose cells are not parsed — a row is a claim about a symbol in a
+    // file, and reading its wording would make the gate sensitive to prose.
+    const rows = [...section.matchAll(/^\|\s*\*\*(M\d+[a-z]?)\*\*\s*\|[^|]*\|[^|]*\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|/gmu)]
+      .map((m) => ({ mr: m[1]!, symbol: m[2]!, file: m[3]! }));
+
+    // **A floor would be useless here exactly as it was for T2.58**, and the
+    // shape of the claim differs: an MR may record several deliverables, so
+    // the population is the MRs that carry one rather than a fixed span. What
+    // must not happen is the table quietly emptying, so the set is compared.
+    expect(new Set(rows.map((r) => r.mr)), "the MRs whose deliverables are recorded")
+      .toEqual(new Set(["M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16"]));
+    expect(rows.length, "and every row of the table parsed").toBe(20);
+
+    const root = new URL("../../", import.meta.url);
+    const missing: string[] = [];
+    for (const row of rows) {
+      let text = "";
+      try {
+        text = readFileSync(new URL(row.file, root), "utf8");
+      } catch {
+        missing.push(`${row.mr}: ${row.file} does not exist`);
+        continue;
+      }
+      if (!text.includes(row.symbol)) missing.push(`${row.mr}: ${row.symbol} is no longer in ${row.file}`);
+    }
+    expect(missing, "every recorded deliverable resolves against the tree").toEqual([]);
+  });
+
+  it("T2.58 (C10 I57, MILESTONES): every MR's seam still resolves — the revert detector", () => {
+    const md = readFileSync(new URL("../../docs/archive/records/MILESTONES.md", import.meta.url), "utf8");
+    // **The WHOLE heading line, and this is the second time.** §4k.5's gate was
+    // anchored on `### 4k.5` and matched `### 4k.5x`, so its control — rename
+    // the heading — survived; the lesson was written into §4k.5 and then the
+    // same unanchored prefix was written here an hour later, where the control
+    // survived again for the identical reason. **A correction stops at its own
+    // sentence unless the next instance is looked for.** Matching the heading
+    // through to its newline is what makes a rename unfindable.
+    const HEADING = "## The landing record \u2014 one row per MR, and the symbol that proves it\n";
+    const at = md.indexOf(HEADING);
+    const section = at < 0 ? "" : md.slice(at, md.indexOf("\n**Gated by", at));
+    expect(section, "the landing record exists").not.toBe("");
+
+    /**
+     * `| **M5** | the seam | `symbol` | `file` |` — the last two cells only.
+     * The prose cells are deliberately not parsed: a row is a claim about a
+     * symbol in a file, and reading its description would make the gate
+     * sensitive to wording.
+     */
+    const rows = [...section.matchAll(/^\|\s*\*\*(M\d+[a-z]?)\*\*\s*\|[^|]*\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|/gmu)]
+      .map((m) => ({ mr: m[1]!, symbol: m[2]!, file: m[3]! }));
+
+    // **The population is the sixteen-MR plan, not a row count — and the first
+    // draft was a floor.** `toBeGreaterThanOrEqual(15)` over sixteen rows let a
+    // row be deleted and the mutation survived: every row that remained still
+    // resolved, which is true and useless. A count is not a population. The
+    // claim is that **every MR from 4 to 16 has a seam recorded**, so losing
+    // one is losing an MR rather than losing a row.
+    const covered = new Set(rows.map((r) => Number(/\d+/u.exec(r.mr)?.[0])));
+    expect([...covered].sort((a, b) => a - b), "every MR of the plan has a seam")
+      .toEqual([4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+    expect(new Set(rows.map((r) => r.mr)).size, "no row claimed twice").toBe(rows.length);
+
+    const root = new URL("../../", import.meta.url);
+    const missing: string[] = [];
+    for (const row of rows) {
+      let text = "";
+      try {
+        text = readFileSync(new URL(row.file, root), "utf8");
+      } catch {
+        missing.push(`${row.mr}: ${row.file} does not exist`);
+        continue;
+      }
+      if (!text.includes(row.symbol)) missing.push(`${row.mr}: ${row.symbol} is no longer in ${row.file}`);
+    }
+
+    // **What this asserts and what it does not.** A symbol resolving does not
+    // mean the MR is correct — that is what its own invariants and rows are
+    // for. It means the seam is still there, so a revert, a rename or a merge
+    // that drops it goes red here rather than being found by a survey. The
+    // limit is the point: a revert detector, not a completeness proof.
+    expect(missing, missing.join("\n")).toEqual([]);
+
+    // **The control, because sixteen true statements pass exactly like a
+    // checker that reads nothing.** A fabricated row must be reported, in both
+    // of the ways a row can be wrong.
+    const check = (symbol: string, file: string): boolean => {
+      try {
+        return readFileSync(new URL(file, root), "utf8").includes(symbol);
+      } catch {
+        return false;
+      }
+    };
+    expect(check("ChildSurface", "src/shell/surface.ts"), "a true row").toBe(true);
+    expect(check("ChildSurface", "src/shell/nowhere.ts"), "a row naming no file").toBe(false);
+    expect(check("PushedSurface", "src/shell/surface.ts"), "a row naming the name M9 retired").toBe(false);
+  });
+
+  it("T2.57 (C10 I56, C10 I71, §4k.5, R-COR-003, M11): every axis has a carrier row, and every fact has two carriers, one surviving 1-bit", () => {
+    const registry = JSON.parse(
+      readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
+    ) as { stateAxes: readonly { id: string }[] };
+    const spec = readFileSync(new URL("../../docs/components/C10_theme_resolution.md", import.meta.url), "utf8");
+
+    /**
+     * §4k.5's rows, as `{ axis, field, renderer, carriers }`.
+     *
+     * Read out of the document rather than listed here, for I52's reason: a
+     * second copy of the population is a second thing to go stale, and the one
+     * that goes stale quietly is always the copy.
+     */
+    // **Anchored on the space after the number**, because `4k.5` is a prefix of
+    // `4k.5x` and the unanchored form found a renamed section and parsed its
+    // table happily. The mutation pass's control is what said so: renaming the
+    // heading was written as a change the corpus could not survive, and it
+    // survived — a control that cannot fail reports thoroughness.
+    const section = /### 4k\.5 [\s\S]*?\n### /u.exec(spec)?.[0] ?? "";
+    expect(section, "§4k.5 exists").not.toBe("");
+    const rows = [...section.matchAll(/^\|\s*\*\*([a-z]+)\*\*\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|/gmu)]
+      .map((m) => ({
+        axis: m[1]!,
+        field: m[2]!.trim(),
+        renderer: m[3]!.trim(),
+        carriers: m[4]!.trim(),
+        survives: m[5]!.trim(),
+      }));
+    // **The sites table** (I71): a site carrying an axis differently from its
+    // row — six cells, the second naming the axis. Two words allowed in the
+    // name, which is what keeps the axis rows' single-word pattern from
+    // reading it.
+    const sites = [...section.matchAll(/^\|\s*\*\*([a-z]+ [a-z]+)\*\*\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|/gmu)]
+      .map((m) => ({
+        axis: m[1]!,
+        field: m[3]!.trim(),
+        renderer: m[4]!.trim(),
+        carriers: m[5]!.trim(),
+        survives: m[6]!.trim(),
+      }));
+
+    // **Equal as sets, both ways.** An axis added to the design fails until it
+    // has a row; a row naming an axis the registry dropped fails too, because a
+    // subset lets a dead entry outlive its subject.
+    expect(rows.map((r) => r.axis).sort(), "§4k.5's rows and the registry's axes")
+      .toEqual(registry.stateAxes.map((a) => a.id).sort());
+
+    // **The gate counts per fact** (I71, ruling 69). The carriers are a
+    // `+`-separated list over a closed vocabulary: a word the gate does not
+    // know is refused rather than counted, and `tone + ground` fails because
+    // nothing in it survives 1-bit — not by a special case. The surviving
+    // carrier must be NAMED in the row's *survives* column, which is why that
+    // column says `mark and word` and not `both`: `both` was satisfied by any
+    // row and said nothing about which.
+    const SURVIVE = ["mark", "word", "weight", "position", "inverse", "border"];
+    const DIE = ["tone", "ground"];
+    const carriersOf = (text: string): string[] => text.split("+").map((c) => c.trim());
+    const failure = (row: Readonly<{ carriers: string; survives: string }>): string | null => {
+      const named = carriersOf(row.carriers);
+      const unknown = named.filter((c) => !SURVIVE.includes(c) && !DIE.includes(c));
+      if (unknown.length > 0) return `unknown carrier ${JSON.stringify(unknown)}`;
+      if (new Set(named).size < 2) return "fewer than two distinct carriers";
+      const lead = row.survives.split(" — ")[0] ?? "";
+      const surviving = named.filter((c) => SURVIVE.includes(c) && new RegExp(`\\b${c}\\b`, "u").test(lead));
+      if (surviving.length === 0) return "no carrier that survives 1-bit is named as surviving";
+      return null;
+    };
+
+    let withSubject = 0;
+    const failing: string[] = [];
+    for (const row of rows) {
+      if (row.carriers.includes("no subject")) {
+        // **An axis with no subject cannot lose a carrier**, so demanding two
+        // of it would be asserting over an empty set — A03 §2's class
+        // manufactured by the gate rather than found by it. What IS demanded is
+        // the reason, so the row goes red the day a field arrives.
+        expect(row.field, `${row.axis}: no subject, so no field`).toBe("—");
+        continue;
+      }
+      withSubject += 1;
+      expect(row.field, `${row.axis}: names a field`).not.toBe("");
+      expect(row.renderer, `${row.axis}: names the renderer that reads it`).toMatch(/\.ts:\d+|T2\.\d+|\.ts`/u);
+      if (failure(row) !== null) failing.push(row.axis);
+    }
+    for (const site of sites) {
+      expect(site.renderer, `${site.axis}: names the renderer that reads it`).toMatch(/\.ts:\d+/u);
+      if (failure(site) !== null) failing.push(site.axis);
+    }
+
+    // **The exception list, by equality** (I71). A second exception cannot
+    // join quietly, and this one cannot stay once it is carried.
+    expect(failing.sort(), "the rows that fail the gate are exactly the ruled exceptions").toEqual(["prompt selection"]);
+
+    // The population is measured, not quoted — ten of the twelve have a
+    // subject, and a table that lost them all would otherwise pass.
+    expect(withSubject, "axes with a subject in this tree").toBe(10);
+    expect(rows.length - withSubject, "and the two with none").toBe(2);
+    expect(sites.map((s) => s.axis), "the sites table was read").toEqual(["prompt selection"]);
+
+    // **The fabricated violations, both ways**, because the shipped table
+    // passes: a rule with nothing to be wrong about passes exactly like one
+    // that is satisfied. `mark` alone is disclosure before ruling 69, which
+    // the old gate passed because it was never written `alone`.
+    const row = (carriers: string, survives: string) => ({ carriers, survives });
+    expect(failure(row("mark", "mark")), "one carrier").not.toBeNull();
+    expect(failure(row("mark + mark", "mark")), "one carrier written twice").not.toBeNull();
+    expect(failure(row("tone + ground", "tone")), "the forbidden pair — nothing survives").not.toBeNull();
+    expect(failure(row("mark + glow", "mark")), "a carrier the gate does not know").not.toBeNull();
+    expect(failure(row("mark + tone", "tone — the mark is gone")), "the surviving carrier not named").not.toBeNull();
+    expect(failure(row("mark + tone", "mark — the head")), "one surviving, named").toBeNull();
+    expect(failure(row("word + border", "word and border")), "both surviving, named").toBeNull();
+  });
+
+  it("T2.52 (I52, §4k.4, M11, R-STA-001): the axes and the declarations are equal as sets", () => {
+    const registry = JSON.parse(
+      readFileSync(new URL("../../docs/design/language/calcium-registry.json", import.meta.url), "utf8"),
+    ) as { stateAxes: readonly { id: string }[] };
+    const axes = registry.stateAxes.map((a) => a.id).sort();
+    expect(axes.length, "the population is the registry's, counted not quoted").toBeGreaterThan(0);
+
+    const spec = readFileSync(new URL("../../docs/components/C10_theme_resolution.md", import.meta.url), "utf8");
+
+    // §4k.3's partition — three rows, each a comma-separated list of axes.
+    const partition = ["ranked by name", "reaching a ground only through `semantic extent`", "no rung at all"].map(
+      (label) => {
+        const row = new RegExp(`^\\s*\\|\\s*\\*\\*${label.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\*\\*\\s*\\|([^|]*)\\|`, "mu").exec(spec);
+        expect(row, `§4k.3 has a row for ${label}`).not.toBeNull();
+        return (row?.[1] ?? "").split(",").map((n) => n.trim()).filter((n) => n !== "");
+      },
+    );
+    const ranked = [...new Set(partition.flat())].sort();
+
+    // **Equality, not containment** (F1113's discipline): a subset test passes
+    // an axis dropped from the registry while a declaration for it lives on,
+    // which is a declaration for a fact that no longer exists and reads exactly
+    // like coverage.
+    expect(ranked, "§4k.3 partitions exactly the registry's axes").toEqual(axes);
+
+    // §4k.4's carrier table — one row per axis with no rung, and it must be
+    // exactly the partition's third row rather than a superset of it.
+    const carriers = [...spec.matchAll(/^\s*\|\s*\*\*([a-z]+)\*\*\s*\|\s*\*\*(?:mark|weight|word)/gmu)].map(
+      (m) => m[1] as string,
+    );
+    expect([...new Set(carriers)].sort(), "§4k.4 declares a carrier for exactly the axes with no rung").toEqual(
+      [...(partition[2] ?? [])].sort(),
+    );
+  });
+});
+
+/**
+ * C10 I48 — the resolver takes the ground, owed at the spec commit.
+ *
+ * **The row is an equality between two functions and not a table of hexes**,
+ * because the defect it closes was two records of one rule disagreeing (F1240):
+ * a third record would be a third thing to drift.
+ */
+describe("C10 I48 — the ink a slot takes on the ground it lands on", () => {
+  /**
+   * **An equality between two functions, and not a table of hexes.** The defect
+   * this closes was two records of one rule disagreeing (F1240), so a third
+   * record would be a third thing to drift. The pair count is asserted with it
+   * for the reason T2.14c's count is: a ground or a slot leaving the sweep is
+   * otherwise a smaller green run.
+   */
+  it("T2.49 (I48, R-THM-001, R-THM-005, F1240): the painter's ink and the gate's ink are one value", () => {
+    const grounds = ["selection", "focusGround"] as const;
+    const wrong: string[] = [];
+    let pairs = 0;
+    let composed = 0;
+    for (const name of Object.keys(defaultTheme)) {
+      const theme = store(name).current;
+      const tokens = theme.tokens;
+      for (const ground of grounds) {
+        for (const family of ["tone", "syntax"] as const) {
+          const palette = tokens.palettes[family];
+          if (palette === undefined) continue;
+          for (const slotName of Object.keys(palette.slots)) {
+            const ref = `${family}.${slotName}` as ColourRef;
+            const want = inkOn(tokens, ref, ground);
+            const got = resolve(ref, theme, caps(24), ground).colour;
+            pairs += 1;
+            if (want !== palette.slots[slotName]) composed += 1;
+            const hex = got !== undefined && got.kind === "rgb" ? got.hex : "(none)";
+            if (hex !== want) wrong.push(`${name} ${ground} ${ref}: painter ${hex}, gate ${want}`);
+          }
+        }
+      }
+    }
+    expect(wrong, "the painter emits the ink the gate measures").toEqual([]);
+    // Ten themes × two grounds × nineteen meaning slots.
+    expect(pairs, "the sweep's own size").toBe(380);
+    // **And the sweep is not vacuous**, which is the half a pass cannot report:
+    // an equality that held because nothing composes is A03 §2's vacuity class
+    // wearing this row's name. **178 of the 380 pairs move**, pinned rather than
+    // bounded — 72 of them are the two banded themes, where every slot takes the
+    // band's single ink, and the other 106 are per-slot compositions across
+    // `dark`, `light`, `ink`, `warm`, `nord`, `viol`, `mono` and `paper`. A
+    // theme that stops composing for a ground is what this catches, and a bound
+    // would let the last one go quietly.
+    //
+    // **166 until the generator read every selector in a rule** (C10 §4b.1). It
+    // took one pairing per registry rule under a comment that was true about the
+    // two selector forms and wrong about the rule, and dropped seven declared
+    // values — which `withDerived` then failed to propagate, so thirteen token
+    // entries were missing. Twelve of the thirteen are meaning slots and land in
+    // this figure; `mono`'s `categorical.c4` is decoration and outside the
+    // nineteen. The figure moving is the fix arriving, and it moves by exactly
+    // what the loss was.
+    expect(composed, "pairs where the ground moves the ink").toBe(178);
+  });
+
+  it("T2.50 (I50, §074, R-BLK-590): the weight ladder is the design's, over every theme", () => {
+    // **`classes` has existed since I15 and nothing compared it to anything.**
+    // Three source tables declare ten entries each by hand and `classesOf`
+    // lends them to all ten themes; the only check refuses a *missing* table,
+    // which a wrong one satisfies exactly. §079's table drawn at one bit is
+    // nothing but this column, and reading it is what found `identifier`.
+    const LADDER: Readonly<Record<string, readonly string[]>> = {
+      emphasised: ["ok", "warn", "error", "accent", "identifier"],
+      normal: ["default", "info", "meta"],
+      deemphasised: ["dim", "muted"],
+    };
+
+    for (const name of Object.keys(defaultTheme)) {
+      const tone = defaultTheme[name]?.palettes["tone"];
+      const classes = tone?.classes;
+      expect(classes, `${name} declares tone classes`).toBeDefined();
+
+      // **Equality both ways, per class.** A containment check is satisfied by
+      // the failure this exists to catch — a tone missing from `emphasised`
+      // reads as covered by the two it is not in.
+      const grouped: Record<string, string[]> = { emphasised: [], normal: [], deemphasised: [] };
+      for (const [slot, cls] of Object.entries(classes ?? {})) grouped[cls]?.push(slot);
+      for (const cls of Object.keys(LADDER)) {
+        expect([...(grouped[cls] ?? [])].sort(), `${name} · ${cls}`).toEqual(
+          [...(LADDER[cls] ?? [])].sort(),
+        );
+      }
+    }
+
+    // **The syntax palette is asserted separately and never merged**, on §074's
+    // own sentence: *syntax roles resolve first — `syntax.keyword` → bold;
+    // every other syntax slot → plain*. Folding the two tables together would
+    // let a generic alias answer for a syntax slot, which is the thing that
+    // sentence forbids.
+    for (const name of Object.keys(defaultTheme)) {
+      const classes = defaultTheme[name]?.palettes["syntax"]?.classes ?? {};
+      const bold = Object.entries(classes).filter(([, c]) => c === "emphasised").map(([k]) => k);
+      expect(bold.sort(), `${name} · syntax, bold`).toEqual(["keyword"]);
+    }
+  });
+});
+
+describe("C10 §073 — the chosen pair", () => {
+  it("T2.51 (C10 I51, §073, R-THM-001): `pick` and `pickInk` resolve in every theme, clear the meaning floor, and the check can fire", () => {
+    const THEMES = defaultTheme as unknown as Readonly<Record<string, ThemeTokens>>;
+    const names = Object.keys(THEMES);
+    // **The premise, asserted first.** A theme losing the pair must fail as a
+    // missing value rather than pass as a pair nobody measured — which is the
+    // state all ten were in before I51, with the values shipping undeclared.
+    expect(names.length, "ten themes").toBe(10);
+    for (const name of names) {
+      const tokens = THEMES[name]!;
+      const pairs = pickPairs(tokens);
+      expect(pairs.length, `${String(name)} declares the pair`).toBe(1);
+      const [inkName, ink, groundName, ground] = pairs[0]!;
+      expect(inkName).toBe("pickInk");
+      expect(groundName).toBe("pick");
+      expect(
+        ratio(ink, ground),
+        `${String(name)}: ${ink} on ${ground}`,
+      ).toBeGreaterThanOrEqual(DEFAULT_FLOOR);
+    }
+  });
+
+  it("T2.51b (C10 I51, A03 §2): the pair reaches `validateTokens`, not merely `pickPairs`", () => {
+    // **`errorTagPairs`' sibling defect was a check that could not fire** — its
+    // ink lives in `surfaces` and the diff walk reads `palettes`, so the pair
+    // was skipped in silence. A row calling `pickPairs` directly passes under
+    // exactly that, so this one drives the validator instead.
+    const base = (defaultTheme as unknown as Readonly<Record<string, ThemeTokens>>)["dark"]!;
+    const broken = {
+      ...base,
+      surfaces: { ...base.surfaces, pickInk: base.surfaces.pick },
+    };
+    const errors = validateTokens(broken as never);
+    expect(
+      errors.some((e) => e.path === "surfaces.pickInk"),
+      `an ink equal to its own ground must fail; got ${JSON.stringify(errors.map((e) => e.path))}`,
+    ).toBe(true);
+    // And the tree's own themes are clean through the same door.
+    expect(validateTokens(base as never).filter((e) => e.path === "surfaces.pickInk")).toEqual([]);
   });
 });

@@ -9,8 +9,8 @@ import { describe, expect, it } from "vitest";
 
 import { block } from "../../src/data/viewmodel/index.js";
 import { spinnerFrames } from "../../src/presentation/blocks/index.js";
-import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
-import { MESSAGE_LINE_CAP, statusRowsFor } from "../../src/presentation/blocks/kinds/status.js";
+import { ASCII_CAPS, FULL_CAPS, MONO_UNICODE_CAPS, measurable } from "../support/render.js";
+import { CONTENT_LINE_CAP, DETAIL_LINE_CAP, statusRowsFor } from "../../src/presentation/blocks/kinds/status.js";
 import { cells } from "../../src/presentation/text.js";
 
 const ESC = String.fromCharCode(27);
@@ -156,6 +156,19 @@ describe("C09 §3a — the box occupies what measure committed", () => {
         kit.renderToLines(status({ height: 6 }), width).length,
         `width ${String(width)} draws six rows`,
       ).toBe(6);
+      // **And no row is wider than the width, which is the half this row was
+      // missing.** The mutation it was written against — the width ladder not
+      // deciding whether the border is affordable — survived the pass for as
+      // long as this file has existed, because every assertion here is about the
+      // row *count* and the tag's shape, and what a five-cell border in a
+      // three-cell frame changes is the row's *cells*. The ladder's own frame
+      // read says so: *five cells of furniture in a three-cell frame*.
+      for (const row of kit.renderToLines(status({ height: 6 }), width)) {
+        expect(
+          cells(plain(row), "narrow"), // narrow-ok — FULL_CAPS is the default convention
+          `width ${String(width)}: no row outruns it — ${JSON.stringify(plain(row))}`,
+        ).toBeLessThanOrEqual(width);
+      }
     }
 
     const tagOf = (w: number): string => {
@@ -210,8 +223,8 @@ describe("C09 §3a — the box occupies what measure committed", () => {
 });
 
 describe("C09 §3a — the spinner", () => {
-  it("T3.43 (C09 I32): ten ticks give ten frames, in all three states", () => {
-    // **`error` included, which is what says the kind animates unconditionally
+  it("T3.43 (C09 I32): ten ticks give ten frames in loading and retrying, and one in error", () => {
+    // **`error` included, which is what says the kind draws unconditionally
     // rather than by state.** `retrying` is the error box plus a spinner line,
     // so a rule excluding `error` breaks the state composed out of it.
     for (const state of ["error", "retrying", "loading"] as const) {
@@ -259,6 +272,82 @@ describe("C09 §3a — the spinner", () => {
       { tick: 0 },
     );
     expect(unknown.some((r) => r.includes(frames[0] ?? "\u0000")), "unknown falls back").toBe(true);
+  });
+
+  it("T2.170 (C09 I108, I81, R-GLY-003): a shed row keeps its mark whole at both rungs, and every shedding kind draws one", () => {
+    // **Read from the drawn row, not from `shedRow`'s return**, because the
+    // defect is downstream of the plan: the plan named `...2` and the clamp cut
+    // it to `..~` on the way into the frame. A row asserting the plan is green
+    // against the picture that shipped. The lead is `+` at both rungs now
+    // (parked 19), so the rungs are two conventions over one mark.
+    //
+    // **The first version could not see three of its four kinds.** It cast
+    // each fixture `as never` and skipped any that threw, and `keyValue`
+    // (`pairs`/`key`) and `comparison` (`left`/`right`) threw at every one of
+    // the 55 widths — the sweep that read as four kinds was `events` and a
+    // `steps` fixture on states the type does not have. So the blocks go
+    // through the view model here, nothing is caught, and the count of marks
+    // is asserted **per kind**: a kind that stops drawing one fails rather than
+    // drops out of the total.
+    const BLOCKS = [
+      block({ kind: "events", id: "e", events: [
+        { ts: "22:13:20", type: "deploy", message: "rolled the fleet forward" },
+        { ts: "22:14:02", type: "warn", message: "one node lagged" }] }),
+      block({ kind: "keyValue", id: "k", rows: [
+        { label: "endpoint", value: "https://api.internal.example/v2" },
+        { label: "region", value: "eu-west-1" }] }),
+      block({ kind: "comparison", id: "c", rows: [
+        { field: "latency", a: "412 ms", b: "119 ms", change: "changed" },
+        { field: "throughput", a: "3.2k/s", b: "9.8k/s", change: "changed" }] }),
+      block({ kind: "steps", id: "s", steps: [
+        { label: "install dependencies", state: "done", detail: "412 packages in 9s" },
+        { label: "run the whole suite", state: "active", detail: "unit, contract, edge" }] }),
+      // **East-Asian Ambiguous values, for the `wide` convention** (F1257): the
+      // key column was measured at `narrow` while `truncate` cut at the
+      // terminal's, and a key ending in `…` took its extra cell from the mark.
+      block({ kind: "keyValue", id: "w", rows: [
+        { label: "tolerance", value: "±±" },
+        { label: "drift", value: "±±" }] }),
+    ];
+
+    const problems: string[] = [];
+    const marks = new Map<string, number>(BLOCKS.map((b) => [b.id, 0]));
+    for (const b of BLOCKS) {
+      for (let width = 6; width <= 60; width += 1) {
+        for (const [rung, caps] of [
+          ["unicode", FULL_CAPS],
+          ["ascii", ASCII_CAPS],
+          ["wide", { ...FULL_CAPS, ambiguousWidth: "wide" as const }],
+        ] as const) {
+          const rows = measurable({ capabilities: caps }).renderToLines(b, width).map(plain);
+          // **The plan is the block's, so the mark is on every row or on none**
+          // (C09 I81). A clamp that takes the whole mark leaves a row whose last
+          // token is not a lead at all — `tole… …` — which the per-row check
+          // below reads as a row that shed nothing; beside a sibling that kept
+          // its `+1` it is the damage F1257 found.
+          const marked = rows.filter((row) => /^\+[0-9]+$/u.test(row.trimEnd().split(" ").at(-1) ?? "")).length;
+          if (marked !== 0 && marked !== rows.length) {
+            problems.push(`partial ${b.id} ${rung} w${String(width)} ${JSON.stringify(rows)}`);
+          }
+          for (const row of rows) {
+            // A mark whose cells were never reserved is paid for out of the
+            // clamp, so this and the mark check are two halves of one fact.
+            if (cells(row) > width) problems.push(`overflow ${b.kind} ${rung} w${String(width)} |${row}|`);
+            // The mark is the row's last token. A last token that opens with the
+            // lead and is not the lead and a count is the damaged form — `+~`,
+            // the clamp's cut where the count was.
+            const last = row.trimEnd().split(" ").at(-1) ?? "";
+            if (!last.startsWith("+")) continue;
+            if (/^\+[0-9]+$/u.test(last)) marks.set(b.id, (marks.get(b.id) ?? 0) + 1);
+            else problems.push(`damaged ${b.kind} ${rung} w${String(width)} |${row}|`);
+          }
+        }
+      }
+    }
+
+    expect(problems).toEqual([]);
+    // The fixture responds to the thing under test, kind by kind.
+    for (const [id, n] of marks) expect(n, `${id} sheds, so it draws marks to read`).toBeGreaterThan(0);
   });
 
   it("T3.45 (C09 I32): the default is width-stable, and a narrow-only set takes its ASCII pair", () => {
@@ -329,11 +418,14 @@ describe("C09 §3a — paint and degradation", () => {
     const mono = measurable({ capabilities: { ...FULL_CAPS, colourDepth: 1 } as never })
       .renderToLines(status({ height: 6 }), 46)
       .map(plain);
-    expect(mono.some((r) => r.includes("▲")), "the mark survives one bit").toBe(true);
+    // The failure mark, never the warning's (C09 I138): at one bit it is one of
+    // the two carriers, so sharing it with a warning would leave one.
+    expect(mono.some((r) => r.includes("✗ ")), "the mark survives one bit").toBe(true);
+    expect(mono.some((r) => r.includes("▲")), "and it is not the warning's").toBe(false);
     expect(mono.some((r) => r.includes(" ERROR ")), "and the word in its gap").toBe(true);
   });
 
-  it("T3.47 (C09 I31, C09 §3a): the ascii arm draws + - | and !, and no box drawing anywhere", () => {
+  it("T3.47 (C09 I31, C09 I138, C09 §3a): the ascii arm draws + - | and the failure mark x, never the warning's !, and no box drawing anywhere", () => {
     // **Over the whole frame rather than over the corners**, because a border is
     // four glyphs and a mistake is usually one of them.
     const rows = measurable({ capabilities: ASCII_CAPS })
@@ -341,8 +433,9 @@ describe("C09 §3a — paint and degradation", () => {
       .map(plain);
     const all = rows.join("\n");
     expect(all.includes("+"), "corners").toBe(true);
-    expect(all.includes("!"), "the mark").toBe(true);
-    expect(/[┌┐└┘─│▲]/u.test(all), "no box drawing and no unicode mark").toBe(false);
+    expect(rows.some((r) => /^\|?\s*x boom/u.test(r)), "the failure mark leads the message").toBe(true);
+    expect(all.includes("!"), "and never the warning's").toBe(false);
+    expect(/[┌┐└┘─│▲✗]/u.test(all), "no box drawing and no unicode mark").toBe(false);
   });
 });
 
@@ -423,12 +516,18 @@ describe("C09 I34 — the height fits the message and the width does not", () =>
   // number, `measure` and `render` still agree on it, and the only thing that
   // says otherwise is the last line of the message being absent. That is the
   // class this component keeps producing (F235, and the width ladder before it).
-  const CAP = MESSAGE_LINE_CAP;
+  // **The cap moved onto the box and these rows followed it** (C09 I84,
+  // §3a-ter). They were written about `MESSAGE_LINE_CAP` and they are about the
+  // boundary rather than the figure: a message of exactly the cap carries no
+  // mark and one line more carries one. With no `detail` the box's content rows
+  // *are* the message's, so the boundary is `CONTENT_LINE_CAP` and the rows are
+  // unchanged in everything but the constant they read it from.
+  const CAP = CONTENT_LINE_CAP;
   const errStatus = (message: string, height: number): never =>
     block({ kind: "status", id: "s", state: "error", message, height } as never) as never;
 
   const framed = (message: string, w: number, caps = FULL_CAPS): readonly string[] => {
-    const rows = statusRowsFor(errStatus(message, 1), w, caps);
+    const rows = statusRowsFor(errStatus(message, 1), w);
     return measurable({ capabilities: caps }).renderToLines(errStatus(message, rows), w).map(plain);
   };
 
@@ -478,7 +577,7 @@ describe("C09 I34 — the height fits the message and the width does not", () =>
     const r = measurable({ capabilities: FULL_CAPS });
     for (const w of [12, 20, 40, 80, 120]) {
       for (const msg of ["ENOENT", "a message that needs a second line at eighty columns and several at twelve", "x\ny\nz\nq\nw"]) {
-        const asked = statusRowsFor(errStatus(msg, 1), w, FULL_CAPS);
+        const asked = statusRowsFor(errStatus(msg, 1), w);
         const drawn = r.renderToLines(errStatus(msg, asked), w).length;
         expect(drawn, `w=${w} asked ${asked} for ${JSON.stringify(msg.slice(0, 24))}`).toBe(asked);
       }
@@ -563,14 +662,14 @@ describe("C09 I34 — the height fits the message and the width does not", () =>
     // At a width that cannot hold ` ERROR ` and a rule, `widthRung` drops the tag
     // — so the sum must drop it too, or the box asks for a row it will not draw.
     const msg = "ENOENT";
-    expect(statusRowsFor(errStatus(msg, 1), 40, FULL_CAPS), "border, tag, one message row").toBe(4);
+    expect(statusRowsFor(errStatus(msg, 1), 40), "border, tag, one message row").toBe(4);
 
     // **The property is that the tag is not *counted*, not that the box is
     // shorter.** The first draft asserted the height shrinks and it grows: at
     // eight columns the content is four cells wide, so `ENOENT` wraps to two
     // rows and the wrap costs more than the dropped tag saves. A number moving
     // the way you expected is not evidence about the rule you meant.
-    const narrow = statusRowsFor(errStatus(msg, 1), 8, FULL_CAPS);
+    const narrow = statusRowsFor(errStatus(msg, 1), 8);
     const drawn = framed(msg, 8);
     expect(drawn, "and the frame is the height that was asked for").toHaveLength(narrow);
     expect(drawn.some((r) => r.includes("ERROR")), "no tag at this width").toBe(false);
@@ -594,17 +693,170 @@ describe("C09 I34 — the height fits the message and the width does not", () =>
     // Counting it gives six, which turns the gutter on, narrows the content to
     // four, and splits `ENOENT` across two rows to pay for a tag that is never
     // drawn.
-    expect(statusRowsFor(errStatus(msg, 1), 8, FULL_CAPS), "border and two wrapped rows").toBe(5);
+    expect(statusRowsFor(errStatus(msg, 1), 8), "border and two wrapped rows").toBe(5);
 
     // And the half that is a property rather than a figure: the granted height
     // shows the whole message at every width.
     const r = measurable({ capabilities: FULL_CAPS });
     for (const w of [8, 12, 20, 40, 80]) {
-      const asked = statusRowsFor(errStatus(msg, 1), w, FULL_CAPS);
+      const asked = statusRowsFor(errStatus(msg, 1), w);
       expect(
         r.renderToLines(errStatus(msg, asked), w).map(plain).join(""),
         `w=${w}: the granted height shows it all`,
       ).not.toContain("…");
+    }
+  });
+});
+
+/**
+ * C09 §3a-ter — the three parts, and the state that is not a failure.
+ *
+ * Owed at the spec commit; the mechanism lands in the code commit that follows
+ * it. Each row names the blocker rather than the component, because no component
+ * is missing — `detail` and `state: "empty"` are fields this kind does not carry
+ * yet and both are written in the same change as these rows.
+ */
+describe("C09 §3a-ter — a status has three parts", () => {
+  const DETAIL = ["at planColumns (plan.ts:118)", "at render (definition.ts:337)", "at Registry.render (registry.ts:1047)", "at renderToLines (render-lines.ts:98)"].join("\n");
+  const rowsOf = (over: Over, width = 60): readonly string[] => draw(over, width);
+
+  it("T3.96 (C09 I84, §3a-ter): the three allocation clauses hold one at a time", () => {
+    // A message that would take the whole interior on its own, so clause 1 has
+    // something to take a row *from*.
+    const long = Array.from({ length: 12 }, (_u, i) => `message line ${String(i)} ${"y".repeat(30)}`).join(" ");
+
+    // **1 · a present detail reserves one row.** The same box, the same height,
+    // the same message: the only difference is the detail, and the message loses
+    // exactly one row to it. Without the reservation the message would take
+    // everything and the detail would draw nothing at all — which is the silent
+    // slice, one part along from where F230 closed it.
+    const without = rowsOf({ message: long, height: 6 });
+    const with_ = rowsOf({ message: long, height: 6, detail: DETAIL });
+    const body = (lines: readonly string[]): number => lines.filter((l) => l.includes("message line")).length;
+    expect(body(without), "no detail: the message has the interior").toBeGreaterThan(0);
+    expect(body(with_), "a detail costs the message exactly one row").toBe(body(without) - 1);
+    // **And at one row the detail is entirely residue** — `⋯ +4 more`, all four
+    // lines counted and none shown. That is the reservation doing its whole job:
+    // the part cannot vanish, and what it says when it has nowhere to stand is
+    // how much there was.
+    expect(with_.some((l) => l.includes("⋯ +4 more")), "the reserved row is the residue").toBe(true);
+
+    // **2 · the message is served before the detail expands.** A short message
+    // in a tall box: the detail may grow, and it grows to its own cap and not
+    // past it, while the message keeps every row it asked for.
+    const short = rowsOf({ message: "decode failed", height: 8, detail: DETAIL });
+    expect(short.filter((l) => l.includes("decode failed")), "the message is whole").toHaveLength(1);
+    const drawn = short.filter((l) => l.includes(" at ") || l.includes("more")).length;
+    expect(drawn, "the detail expands to its cap and stops").toBe(DETAIL_LINE_CAP);
+
+    // **3 · the detail takes the rows the message left**, and not more. Growing
+    // the message by two rows in the same box takes two rows off the detail —
+    // the clause that a reservation alone does not give you.
+    const medium = Array.from({ length: 3 }, (_u, i) => `line ${String(i)} ${"z".repeat(46)}`).join(" ");
+    const squeezed = rowsOf({ message: medium, height: 8, detail: DETAIL });
+    const detailRows = squeezed.filter((l) => l.includes(" at ") || l.includes("more")).length;
+    expect(detailRows, "the detail gets what is left").toBeLessThan(DETAIL_LINE_CAP);
+    expect(detailRows, "and still at least its reserved row").toBeGreaterThanOrEqual(1);
+  });
+
+  it("T3.97 (C09 I84): a detail that is present and empty reserves nothing", () => {
+    const long = Array.from({ length: 12 }, (_u, i) => `message line ${String(i)} ${"y".repeat(30)}`).join(" ");
+    const shrug = rowsOf({ message: long, height: 6, detail: "" });
+    const absent = rowsOf({ message: long, height: 6 });
+    // Byte-identical, because the clause says *non-empty*: a producer writing
+    // `detail: ""` has said nothing, and a row taken for nothing is a row of the
+    // message lost to a field's presence rather than to its content.
+    expect(shrug, "an empty detail is not a part").toEqual(absent);
+  });
+});
+
+describe("C09 §3a-quater — a status with no height is fitted", () => {
+  const SHORT = "the far side is gone";
+  // 158 cells — the message §3a-quater measured `b.status` cutting at `4099bb6e`.
+  const LONG =
+    "plot failed to render: series 'loss' has 0 points after filtering by the window you asked " +
+    "for, and the fallback axis could not be derived from an empty domain";
+  const HUGE = `${LONG} ${LONG} ${LONG}`;
+  const DETAIL = "code: ENOENT\npath: /var/run/docker.sock";
+  type State = "error" | "retrying" | "loading" | "empty";
+
+  const fitted = (state: State, message: string, framed: boolean, detail?: string): never =>
+    block({
+      kind: "status",
+      id: "s",
+      state,
+      message,
+      ...(framed ? { framed } : {}),
+      ...(detail === undefined ? {} : { detail }),
+      ...(state === "retrying" ? { retryInMs: 4000, attempt: 2 } : {}),
+      ...(state === "loading" ? { elapsedMs: 3000 } : {}),
+    } as never) as never;
+
+  it("T3.98 (C09 I31, C09 I34, §3a-quater): measure is the fit, render draws it, and no capability moves it", () => {
+    // **The classification table's axes, swept whole** — framed × state ×
+    // message × detail — at every width 1–120 and at three capability sets.
+    // `measure` takes no capability record, so the fit has to be the same number
+    // at `FULL`, `ASCII` and 1-bit; `render` does take one, and draws the mark
+    // and the spinner each set resolves — so row-count agreement at all three is
+    // what says the capability-free count was not a guess.
+    //
+    // **Row agreement alone is a tautology here**, and the first draft was only
+    // that: `render` allocates from the same `statusHeight`, so it draws exactly
+    // the fit whatever the fit is. A fit one row short shows up as a *cut* — the
+    // message's tail replaced by `…` — so the second half asks for every word and
+    // every detail line wherever the content fits the cap: from 40 columns, for
+    // the short and the long message (table rows F1–F8).
+    const kits = [FULL_CAPS, ASCII_CAPS, MONO_UNICODE_CAPS].map((capabilities) => ({
+      name: capabilities === FULL_CAPS ? "full" : capabilities === ASCII_CAPS ? "ascii" : "1-bit",
+      kit: measurable({ capabilities }),
+    }));
+    const wrong: string[] = [];
+    let checked = 0;
+    for (const framed of [false, true]) {
+      for (const state of ["error", "retrying", "loading", "empty"] as const) {
+        for (const [mname, message] of [["short", SHORT], ["long", LONG], ["huge", HUGE]] as const) {
+          for (const detail of [undefined, DETAIL]) {
+            const blk = fitted(state, message, framed, detail);
+            for (let w = 1; w <= 120; w += 1) {
+              const fit = statusRowsFor(blk, w);
+              const at = `${framed ? "framed" : "free"} ${state} ${mname} ${detail === undefined ? "-" : "detail"} w=${String(w)}`;
+              for (const { name, kit } of kits) {
+                const measured = kit.measure(blk, w);
+                const lines = kit.renderToLines(blk, w);
+                const drawn = lines.length;
+                if (measured !== fit || drawn !== fit) {
+                  wrong.push(`${at} ${name}: fit ${String(fit)}, measure ${String(measured)}, drawn ${String(drawn)}`);
+                }
+                if (w >= 40 && mname !== "huge") {
+                  const text = lines.map(plain).join(" ");
+                  const missing = [...message.split(" "), ...(detail === undefined ? [] : detail.split("\n"))].filter(
+                    (part) => !text.includes(part),
+                  );
+                  if (missing.length > 0) wrong.push(`${at} ${name}: cut — missing ${missing.slice(0, 3).join(" | ")}`);
+                }
+                checked += 1;
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(checked, "the sweep ran").toBe(2 * 4 * 3 * 2 * 120 * 3);
+    expect(wrong.slice(0, 10), `${String(wrong.length)} disagreements`).toEqual([]);
+  });
+
+  it("T3.98 (C09 I34, F10): an `empty` box counts no banner, and the table's figures hold", () => {
+    const kit = measurable({ capabilities: FULL_CAPS });
+    // F10 — the banner an `empty` box never draws. Border and one message row,
+    // not a fourth row of centred slack.
+    expect(kit.measure(fitted("empty", SHORT, false), 80), "border, message, border").toBe(3);
+    expect(kit.measure(fitted("empty", SHORT, true), 80), "framed: the message alone").toBe(1);
+    // F1–F4 at 80 and 40, the figures C23 I51 read from a frame among them.
+    for (const w of [80, 40]) {
+      expect(kit.measure(fitted("error", SHORT, false), w), `F1 w=${String(w)}`).toBe(4);
+      expect(kit.measure(fitted("retrying", SHORT, false), w), `F2 w=${String(w)}`).toBe(5);
+      expect(kit.measure(fitted("error", SHORT, true), w), `F3 w=${String(w)}`).toBe(2);
+      expect(kit.measure(fitted("retrying", SHORT, true), w), `F4 w=${String(w)}`).toBe(3);
     }
   });
 });

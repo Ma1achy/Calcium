@@ -17,9 +17,11 @@
 import { describe, expect, it } from "vitest";
 
 import { interactivePty } from "../support/pty.js";
+import { GUTTER_CELLS } from "../support/table-gutter.js";
 import { createDecoder } from "../../src/interaction/router/decode.js";
 import { MOUSE, MOUSE_ANY } from "../../src/terminal/escapes.js";
 import {
+  type Capture,
   captureFromEmulator,
   type Emulator,
   emulatorMissing,
@@ -86,22 +88,45 @@ describe("C16 e2e — the mouse through a PTY (I31, §4a)", () => {
 
         // The column is inside the uuid cell; row is 0-based here and 1-based on
         // the wire, which is the translation the decoder owns (`Number(y) - 1`).
-        pty.type(click(4, b1));
+        // **Read from the frame, not written**: it was `4`, which sat in the
+        // uuid cell while a card body was four cells in and in the gutter the
+        // day it became five (C09 I5, C22 I83). The claim is *a click on the
+        // row*, so the input follows where the row's content is drawn.
+        const uuidAt = text[b1]?.indexOf("7c2d4e1") ?? -1;
+        expect(uuidAt, "the target's uuid is on the frame").toBeGreaterThan(0);
+        pty.type(click(uuidAt, b1));
         await pty.waitForFrame(() => pty.styledFrame[b1] !== before[b1], 15_000);
         await beat(200);
         const after = pty.styledFrame;
 
-        // **Which row, not that one.** The target's pen changed; the other three
-        // did not; and no stripped text moved anywhere on the screen — focus is a
-        // tone and nothing else (C11 I14).
+        // **Which row, not that one.** The target's pen changed and the other
+        // three did not.
         expect(after[b1], "the clicked row carries a new tone").not.toBe(before[b1]);
         for (const other of [a1, a2, b2]) {
           expect(after[other], `row ${String(other)} is untouched`).toBe(before[other]);
         }
+        // **And a mark, which is not a move** (C11 §5b, R-SEL-006, R-STA-003).
+        // Focus keeps a carrier that is not colour, so the click writes `▸` as
+        // well as a ground. The earlier form of this row asserted the stripped
+        // frame byte-identical — true of focus-as-a-tone, false of the design —
+        // and it could not have told a mark landing in its reserved column from
+        // one shoving the row two cells right, which is the defect C09 I83's
+        // first form shipped. So the gutter and the content are asserted apart.
+        //
         // **Row 0 is chrome and carries a clock**, repainted on the click's frame;
         // whole-frame equality included it and T5.6 died once under a wheel
         // mutation that cannot touch a click (2026-09-05). The region is the subject.
-        expect(pty.frame.slice(1), "the stripped region is unchanged — a highlight, not a move").toEqual(text.slice(1));
+        const moved = pty.frame.slice(1).flatMap((l, i) => (l === text[i + 1] ? [] : [i + 1]));
+        expect(moved, "the only row whose text changed at all is the one clicked").toEqual([b1]);
+        // The table sits under an entry's rail, so its gutter is not the screen's
+        // column 0; the content edge is what locates it, and the content edge is
+        // what must not move.
+        const edge = (line: string): number => line.indexOf("7c2d4e1");
+        const at = edge(text[b1] ?? "");
+        expect(at, "the target's content edge is found").toBeGreaterThan(GUTTER_CELLS);
+        expect(edge(pty.frame[b1] ?? ""), "and it does not move under the mark").toBe(at);
+        expect(pty.frame[b1]?.slice(at - GUTTER_CELLS, at), "the reserved column carries ▸").toBe("▸ ");
+        expect(text[b1]?.slice(at - GUTTER_CELLS, at), "where before it was blank").toBe("  ");
       } finally {
         pty.kill();
       }
@@ -193,7 +218,9 @@ describe("C16 e2e — the mouse through a PTY (I31, §4a)", () => {
         // record with `mouse: false` (`decode.ts`), so nothing downstream sees a
         // gesture — and nothing lands in the prompt as text either, which is the
         // other way a control can fail while looking like "nothing happened".
-        pty.type(click(4, b1));
+        const uuidAt = beforeText[b1]?.indexOf("7c2d4e1") ?? -1;
+        expect(uuidAt, "the same column T5.6 clicks, read the same way").toBeGreaterThan(0);
+        pty.type(click(uuidAt, b1));
         pty.type(wheelUp(2, b1));
         await beat(600);
 
@@ -234,16 +261,47 @@ const MEASURED: readonly Emulator[] = ["kitty", "xterm"];
 
 describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808, F1039)", () => {
   // **F808's hand measurement, as a gate**, now on a second emulator (F1039).
-  // Under Xvfb both answer in bytes. Three rests, a drag, a typed `k` as the
-  // control in every capture. Skips by name where the emulator, Xvfb or xdotool
+  // Under Xvfb both answer in bytes. Three rests and a drag; the control byte
+  // is typed by the harness at the end of every phase (F1039), not here — a
+  // phase the drive does not touch has one too, and used to sit out the whole
+  // backstop waiting for a `k` nobody was going to send. Skips by name where the emulator, Xvfb or xdotool
   // is absent.
   const gesture = async (xdo: (...a: readonly string[]) => void, w: string): Promise<void> => {
     for (const x of ["100", "130", "160"]) { xdo("mousemove", "--window", w, x, "100"); await sleep(200); }
     xdo("mousedown", "1"); await sleep(150);
     for (const x of ["200", "240"]) { xdo("mousemove", "--window", w, x, "100"); await sleep(150); }
     xdo("mouseup", "1"); await sleep(250);
-    xdo("type", "k"); await sleep(200);
   };
+  /**
+   * **A phase's bytes, or a failure that says which thing went wrong** (F1039).
+   *
+   * The sentinel `k` is the last byte the drive types, so a capture that ended
+   * early loses it first — and the assertion that then fires is
+   * `expected '…' to contain 'k'`, which reads as the terminal getting the
+   * protocol wrong. It was the harness running out of clock. The two are now
+   * separate failures with separate words, and the timeout arm prints the bytes
+   * that *did* arrive, because a truncated capture's contents are the evidence
+   * for which of the two it was.
+   */
+  const phase = (cap: Capture, which: "a" | "b", program: Emulator): string => {
+    const bytes = which === "a" ? cap.a : cap.b;
+    const timedOut = which === "a" ? cap.aTimedOut : cap.bTimedOut;
+    if (timedOut) {
+      throw new Error(
+        `${program}: harness timeout, sentinel never arrived in phase ${which} — ` +
+          `the drive did not finish inside the backstop. ` +
+          `${String([...bytes].length)} bytes did arrive: ${JSON.stringify(bytes)}`,
+      );
+    }
+    if (!bytes.includes("k")) {
+      throw new Error(
+        `${program}: the capture ended without the sentinel and without timing out in ` +
+          `phase ${which} — the shell closed the read early: ${JSON.stringify(bytes)}`,
+      );
+    }
+    return bytes;
+  };
+
   const count = (s: string, re: RegExp): number => (s.match(re) ?? []).length;
   const REST = /\x1b\[<35;\d+;\d+M/gu;
   const DRAG = /\x1b\[<32;\d+;\d+M/gu;
@@ -268,16 +326,18 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808
 
         const only1003 = await captureFromEmulator({
           program, enter: MOUSE_ANY.enter, leave: MOUSE_ANY.leave,
+          sentinel: "k",
           drive: async (xdo, w, phase) => { if (phase === 1) await gesture(xdo, w); },
         });
-        expect(only1003.a, `${program}: the control byte`).toContain("k");
+        phase(only1003, "a", program);
         expect(count(only1003.a, REST), `${program}: rests are reported under 1003 — \`Cb & 3 === 3\`, motion with no button`).toBeGreaterThan(0);
 
         const only1002 = await captureFromEmulator({
           program, enter: MOUSE.enter, leave: MOUSE.leave,
+          sentinel: "k",
           drive: async (xdo, w, phase) => { if (phase === 1) await gesture(xdo, w); },
         });
-        expect(only1002.a, `${program}: the control byte`).toContain("k");
+        phase(only1002, "a", program);
         expect(count(only1002.a, REST), `${program}: 1002 reports no rest`).toBe(0);
 
         // 1002 then 1003, then 1003 released: if the terminal held two modes, 1002 would still
@@ -286,6 +346,7 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808
         // are composed from `escapes.ts`, the one owner of every mode literal (C01 T2.8).
         const order = await captureFromEmulator({
           program, enter: MOUSE.enter + MOUSE_ANY.enter, mid: MOUSE_ANY.leave, leave: MOUSE.leave,
+          sentinel: "k",
           drive: async (xdo, w) => { await gesture(xdo, w); },
         });
         expect(count(order.a, REST), `${program}: 1003 in force, the later select wins`).toBeGreaterThan(0);
@@ -294,7 +355,7 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808
         // **The decoder, on this emulator's own rest byte** (C16 I30): `35` is
         // no button. Two emulators now write the byte the arm was built for.
         const rest = /\x1b\[<35;\d+;\d+M/u.exec(only1003.a)?.[0] ?? "";
-        const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true }, now: () => 0 });
+        const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true, keyboardProtocol: "none" }, now: () => 0 });
         const ev = d.push(new TextEncoder().encode(rest))[0];
         expect(ev?.kind === "mouse" ? ev.button : ev?.kind, `${program}: the rest decodes as \`button: "none"\``).toBe("none");
 
@@ -331,8 +392,7 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808
       const wheel = async (xdo: (...a: readonly string[]) => void, w: string): Promise<void> => {
         xdo("mousemove", "--window", w, "100", "100"); await sleep(250);
         for (const b of ["4", "5", "6", "7"]) { xdo("click", b); await sleep(250); }
-        xdo("type", "k"); await sleep(250);
-      };
+          };
       /** Every SGR report in the capture as `<Cb><final>`, wheel bit set only. */
       const wheelReports = (s: string): string[] =>
         [...s.matchAll(/\x1b\[<(\d+);\d+;\d+([Mm])/gu)]
@@ -343,9 +403,10 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808
       for (const program of MEASURED) {
         const cap = await captureFromEmulator({
           program, enter: MOUSE_ANY.enter, leave: MOUSE_ANY.leave, drive: wheel,
+          sentinel: "k",
         });
-        expect(cap.a, `${program}: the control byte in phase a`).toContain("k");
-        expect(cap.b, `${program}: the control byte in phase b`).toContain("k");
+        phase(cap, "a", program);
+        phase(cap, "b", program);
         const a = wheelReports(cap.a);
         expect(wheelReports(cap.b), `${program}: the second run is byte-identical to the first`).toEqual(a);
         seen.set(program, a);
@@ -380,7 +441,7 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808
 
       // **And the decoder on those bytes** — the four names in the array's
       // order, from the emulator's own report rather than a hand-built string.
-      const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true }, now: () => 0 });
+      const d = createDecoder({ capabilities: { bracketedPaste: true, mouse: true, keyboardProtocol: "none" }, now: () => 0 });
       const names = ["64", "65", "66", "67"].map((cb) => {
         const [ev] = d.push(new TextEncoder().encode(`\u001b[<${cb};1;1M`));
         return ev?.kind === "mouse" ? ev.button : ev?.kind;

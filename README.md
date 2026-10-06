@@ -9,10 +9,10 @@ with a scrollable transcript, history and live views.
 
 You do not write a terminal.
 
-![docker-tui, the reference application: a landing dashboard refreshing in place with CPU and memory bars per container, then a table of containers, then a single container's live view where a CPU plot fills one sample at a time, then a comparison, a unified diff and a streaming log tail](examples/docker/demo.gif)
+![docker-tui, the reference application, against an invented host: a landing dashboard refreshing in place with CPU and memory bars per container, then a table of containers, then a single container's stats where a CPU plot fills one sample at a time, then a comparison of a container against its image, a unified config diff and two short verbs](examples/docker/demo.gif)
 
-*[`docker-tui`](examples/docker/README.md) — the reference application, driven
-against real containers. Everything in it is blocks; none of its adapters draws.*
+*[`docker-tui`](examples/docker/README.md) — the reference application, recorded
+against an invented host so no real machine is shown. Everything in it is blocks; none of its adapters draws.*
 
 ---
 
@@ -45,6 +45,29 @@ in the framework knows what your domain is.
 
 The adapter is a pure function: data in, blocks out. That is the whole extension
 model, and it is where an app spends nearly all of its effort.
+
+---
+
+## Installing
+
+The package is **`calcium-tui`**, and it is **not on a registry yet** (A04 §9). Build a
+clone and depend on the folder:
+
+```sh
+git clone https://github.com/Ma1achy/Calcium.git calcium
+cd calcium && npm install && npm run build
+```
+
+```json
+{ "dependencies": { "calcium-tui": "file:../calcium" } }
+```
+
+Node 22.22.1 or a later 22 (`engines`). The entry points are `calcium-tui`,
+`calcium-tui/testing`, `calcium-tui/fixtures`, `calcium-tui/profiling` and
+`calcium-tui/mermaid`. Coming from the previous scoped name, [`MIGRATION.md`](MIGRATION.md)
+has the rewrite, and [`CHANGELOG.md`](CHANGELOG.md) names every breaking change.
+
+Not a git dependency: building one needs an install script, and A04 §3 allows none.
 
 ---
 
@@ -312,7 +335,7 @@ no adapter knows which terminal it is on.
 
 Truecolour:
 
-![The live container view in truecolour: a braille CPU curve in olive green, a shaded memory bar, and panels bordered with box-drawing characters](docs/media/depth-24.gif)
+![/container stats worker in truecolour: a braille CPU curve in green between two dotted threshold lines, a shaded memory bar, and panels bordered with box-drawing characters](docs/media/depth-24.gif)
 
 256 colours:
 
@@ -337,27 +360,39 @@ carried meaning in colour at all, which is why it is the one element that barely
 changes. `examples/docker/DEGRADATION.md` has the byte counts and the three
 places something *was* lost.
 
-**An adapter writes `tone: "ok"` and `glyph: "running"` once.** What those become
+**An adapter writes `tone: "ok"` and `glyph: "work-unit"` once.** What those become
 on each of these terminals is not its problem, and that is the entire argument for
 naming palette slots rather than colours.
 
 The same is true of the variant. `/theme light` is one command, and no adapter
 knows it happened:
 
-![The same dashboard in the light variant on a light terminal: dark text on a pale background, container names and bars in green, the busy container's CPU bar in red, blue accents in the panel title](docs/media/theme-light.gif)
+![The same dashboard in the light variant on a light terminal: dark text on a pale background, container names in green, the busy container's CPU bar in amber with a warning mark, and the CPU history heatmap below](docs/media/theme-light.gif)
 
-**Calcium paints no background, and that is a decision rather than an omission.**
-The surface tones stop at 1-bit because *background colours are the emulator's and
-a user may override them* — so a variant is a set of foregrounds chosen to pair
-with a terminal, not a skin that repaints one. The image above is rendered on a
-light terminal for that reason.
+**A theme decides whether it paints the page, and the two shipped ones decide
+differently.** `dark` takes `background: "terminal"` and emits nothing behind the
+text, because *background colours are the emulator's and a user may override
+them* — so on a dark terminal it is a set of foregrounds chosen to pair with
+what is already there. `light` takes `background: "surface"` and **paints**,
+because it cannot work otherwise: dark foregrounds emitting nothing behind them
+are dark-on-dark, and the name is the lie.
+
+Grounds are separate from that choice and every theme has them — focus,
+selection, wells, meter fills, diff lines — resolved through `resolveBackground`
+and painted per cell. What a theme chooses is whether it also paints the page
+underneath.
+
+*This paragraph read "Calcium paints no background" until it was measured
+against `tokens-light.ts:24`, a file since retired — `light` is generated from the registry now. The claim was true of `dark` alone, and its own
+next sentence — that the image above needs a light terminal for that reason —
+was a consequence of the false half.*
 
 ### Spinners and bars, every one
 
 The two glyph catalogues the framework ships, drawn rather than listed — and generated from the
 same tables the renderer reads, so neither picture can go stale against the code.
 
-![Twenty-six spinner sets in three columns, each turning beside its name](docs/media/spinner-sets.gif)
+![Twenty-seven spinner sets in three columns, each turning beside its name at its own interval](docs/media/spinner-sets.gif)
 
 ![Nine bar styles at four fills on three capability arms: full, ASCII, and ambiguous-wide](docs/media/bar-styles.png)
 
@@ -373,14 +408,14 @@ and the plots demo's `/spinners` and `/bars` are the first two.
 proved against. Twelve surfaces, every block type, and sixty-nine findings logged
 while building it.
 
-![docker-tui: a six-beat screencast — the landing dashboard refreshing in place, the /ps table, drilling into a container where a CPU plot fills one sample at a time, a comparison of container against image, a unified config diff, and a streaming log tail](examples/docker/demo.gif)
+![docker-tui against an invented host: an eleven-beat screencast — the landing dashboard refreshing in place, the /ps table walked with the arrow keys, a completion menu, /container stats worker where a CPU plot fills one sample at a time, a comparison of web against its image, a unified config diff of proxy's nginx config, /port and /top, and the session scrolled back to the banner](examples/docker/demo.gif)
 
 The same table at 120 columns and at 80. `PORTS` is dropped by declared priority
 and `USAGE` leaves the dashboard above it, neither of which the adapter asked for:
 
-![docker-tui at 120 columns: the tail of the live dashboard showing CPU, MEM and USAGE columns per container, and below it a /ps table of five containers with NAME, IMAGE, STATUS and PORTS](docs/media/ps-120.gif)
+![docker-tui at 120 columns: the tail of the live dashboard — the busy container's CPU, MEM and USAGE — and its CPU history heatmap, and below it a /ps table of six containers with NAME, IMAGE, STATUS and PORTS](docs/media/ps-120.gif)
 
-![docker-tui at 80 columns: the same dashboard with the USAGE column gone, and the same /ps table reduced to NAME, IMAGE and STATUS](docs/media/ps-80.gif)
+![docker-tui at 80 columns: the same dashboard with the USAGE column gone, and the same /ps table of six reduced to NAME, IMAGE and STATUS](docs/media/ps-80.gif)
 
 [`examples/docker/`](examples/docker/README.md) has the recording, how to run it,
 and the ledger. [`docs/ROADMAP.md`](docs/ROADMAP.md) is what the ledger turned
@@ -491,8 +526,8 @@ Calcium's.
 <!-- verified against examples/minimal/main.ts by examples/minimal/test/minimal.test.ts -->
 
 ```ts
-import { b, createTui, defaultTheme } from "@fmx/calcium";
-import type { Adapter } from "@fmx/calcium";
+import { b, createTui, defaultTheme } from "calcium-tui";
+import type { Adapter } from "calcium-tui";
 
 const manifest = {
   schema: "tui.manifest/1",
@@ -526,7 +561,7 @@ const list: Adapter = {
               state: {
                 text: String(r["state"]),
                 tone: r["state"] === "running" ? "ok" : "muted",
-                glyph: r["state"] === "running" ? "running" : "queued",
+                glyph: r["state"] === "running" ? "work-unit" : "queued",
               },
               replicas: { text: String(r["replicas"]) },
             },
@@ -565,7 +600,7 @@ cron                                                                    ○ stop
 ```
 
 The glyphs, the tones, the column widths, the header and the prompt are all the
-framework's. The adapter said `tone: "ok"` and `glyph: "running"`; what those
+framework's. The adapter said `tone: "ok"` and `glyph: "work-unit"`; what those
 become on a 256-colour terminal, a 16-colour one, or an ASCII one is not its
 problem.
 

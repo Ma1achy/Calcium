@@ -31,11 +31,11 @@ Identical for every kind.
 ▌   kind        candidate · TrainingJob
 ▌   family      digit-classifier
 ▌   status      ● running · epoch 17 / 40
-▌   owner       malachy@fmx.io
+▌   owner       someone@example.com
 ▌   submitted   14:00:14 UTC   (23m ago)
 ▌   mr          !1248  auto-merged (CODEOWNERS)
-▌   image       registry.fmx.io/fraud-detection/prism-executor:a3f9b21
-▌   resources   2×GPU · 16Gi · gpu-04.fmx.internal
+▌   image       registry.example.com/sample-team/prism-executor:a3f9b21
+▌   resources   2×GPU · 16Gi · gpu-04.example.internal
 ```
 
 The full UUID, not the seven-cell form — this is where you copy it from. `mr` carries an `open` action; nothing else here is actionable.

@@ -1,0 +1,80 @@
+ONE HIERARCHY, with independent owners and target classes beside it
+
+  owner route: frame / tab  →  scope  →  substate  →  focused element
+  independent target: a selection range or set may overlap the focused element
+
+  a FRAME     a tab. Its own prompt, context and scopes. ⌃⇥ sideways
+  a SCOPE     prompt · transcript · block. Three, and they nest
+  a SUBSTATE  find, completion, history search. It handles first, then passes
+              to the prompt scope below it
+  an ELEMENT  what has focus inside the scope
+  a SELECTION what would be copied
+
+  and a blocking QUESTION sits BESIDE the hierarchy and owns input while
+  it is open. It is not a rung, which is why esc RESOLVES its declared
+  safe path rather than leaking into the held scope.
+  A captured CHILD also sits beside it: an attached PTY transfers ownership
+  without becoming a substate; only host.detach returns ownership.
+
+★ A QUESTION IS ONE IDENTITY WITH INDEPENDENT PROPERTIES
+
+  answerForm · placement · blocking · owner · dismissal · safeResolution
+  inspectionPath · editorState · residue
+
+  CHOICE             normally REPLACES; ←→ and ⏎ choose an answer
+  TEXT               normally FLOATS above the held prompt and uses
+                     a question-scoped editor
+
+  PANEL, PEEK and OVERLAY describe layer behaviour, not question type.
+
+★ TWO TARGET CLASSES, which settles the click argument
+
+  DIRECT-ACTION    a link, a button, a chip, a toggle, a legend entry,
+                   a choice. ONE CLICK acts. There is nothing to be
+                   inside, so focus-then-activate would be ceremony
+  FOCUS-FIRST      a row, a plot, an expandable block, a slider. The
+                   first click FOCUSES, the second ACTIVATES — because
+                   entering one changes what the arrows drive
+
+  the earlier text said both, in different sections, without naming
+  the axis. The axis is whether the target HAS AN INSIDE.
+
+★ FOCUS IS VISIBLY INTENSIFIED, by a SHAPE-SPECIFIC treatment
+
+  an unpainted RUN or BOX inverts — its own tone becomes its ground
+  a FRAME          its border or axes take the tone and go heavy
+  a CONTROL        a wash over label, track and value
+  a PAINTED IDENTITY chip bolds and takes a mark; the hue is its
+                   identity and must not move
+
+  the old “active means invert, everywhere” claim was true of two of the four, and
+  the document drew the other two correctly while claiming otherwise.
+
+★ HOVER MAY PREVIEW. It never moves focus, activates or commits domain state.
+
+  a link, a button, a chip   previews its focus treatment
+  a cursorable plot          moves the readout
+  everything else            nothing
+
+  “nothing, everywhere else” was already false in three sections. The
+  rule that survives is the CONSEQUENCE, not the coverage.
+
+★ IN THE ENTRY GUTTER, ● IS A WORK UNIT. The COLUMN says whose.
+
+● I'll check the parser first.                  col 0 — the agent
+● read_file(parse.ts) · 184 lines       col 0 — its call
+  ├─ ●  count   verify the count       indented — a child's
+    ● 7c2d4e1  decoder-zoom      succeeded      a table row
+
+  “● is always the agent” was never true — it marks a unit of work,
+  and the gutter column plus the indentation say who owns it.
+
+★ PASSIVE against REJECTED, which is the honest form of the last rule
+
+  PASSIVE — unconsumed, silent   an unarmed release, a right-click, a click
+                                 on blank space, hover on nothing
+  REJECTED — explains itself     a key with no action HERE, a
+                                 disabled control, a refused paste
+
+  “nothing silently does nothing” meant REJECTED. A pointer event with
+  no target was never a command, and explaining it would be noise.

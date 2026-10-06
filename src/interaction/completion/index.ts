@@ -31,12 +31,13 @@ export {
   type DirEntry,
   type ReadDir,
 } from "./sources.js";
-export { MENU_ID, menuBlocks, menuLayer, menuRowsShown, menuWindow, remainderOf } from "./menu.js";
+export { MENU_ID, menuBlocks, menuLayer, menuRowsShown, menuWindow, menuWindowOf, remainderOf } from "./menu.js";
 export {
   CompletionError,
   SLOT_KINDS,
   type Acceptance,
   type Candidate,
+  type CandidateChip,
   type CompletionContext,
   type CompletionResult,
   type CompletionSource,

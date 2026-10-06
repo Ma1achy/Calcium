@@ -1,7 +1,8 @@
 // A03 §4 — the implemented subset of SS1..SS37. Forbidden patterns, scoped by
 // directory. A row here is a rule that can fire; A03 inventories the rest, each
 // waiting on the component that creates its scope.
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { readdirSync, readFileSync } from "node:fs";
 
 /**
  * The encoding vocabularies SS51 forbids reading directly — see that rule.
@@ -63,7 +64,7 @@ export const SCANS = [
   // that L2 has no such exception and never acquires one.
   // C14 T2.4's other half. The clock is SS4's; this is `fs` and the clipboard
   // shell-out, which are the two side effects a viewport plausibly reaches for —
-  // copy mode has to put text somewhere, and `pbcopy` is one line away. C14 §6
+  // native selection has to put text somewhere, and `pbcopy` is one line away. C14 §6
   // injects the writer for exactly that reason: a component that shells out
   // cannot be unit-tested.
   { id: "SS13", spec: "C14 I11 · C14 T2.4",
@@ -890,7 +891,7 @@ export const SCANS = [
   // a glyph position, so it needs no exemption — and an exemption nobody needs
   // is a door left open.
   { id: "SS39", spec: "C04 I6 · C09 §4",
-    pattern: /\bglyph\s*:\s*["'`](?!(?:ok|warn|error|info|pending|working|running|queued|cancelled|expand|collapse|live|bullet|quote|nested|continuation|step)["'`])/,
+    pattern: /\bglyph\s*:\s*["'`](?!(?:question|current|ok|warn|error|info|pending|working|work-unit|queued|cancelled|expand|collapse|focus|bullet|quote|nested|continuation)["'`])/,
     scope: "src/", allow: [],
     why: "a block names a glyph slot; C09 §4 owns both renderings and the 1:1 width rule" },
 
@@ -1164,7 +1165,6 @@ export const SCANS = [
   //     src/data/adapters/registry.ts      an unmapped verb's notice
   //     src/data/viewmodel/markdown.ts     a blockquote parses to a notice
   //     src/viewport/transcript/cap.ts     the cap marker (C13 §5)
-  //     src/interaction/history/layers.ts  the reverse-search layer's status
   //     src/presentation/art.ts            a figure's text fallback
   //   **the owed group is gone** (F777, 2026-09-05). Four L4 files carried
   //   fourteen sites — `confirm.ts` (1), `execution.ts` (5), `refresh.ts` (2),
@@ -1215,7 +1215,6 @@ export const SCANS = [
       "src/data/adapters/registry.ts",
       "src/data/viewmodel/markdown.ts",
       "src/viewport/transcript/cap.ts",
-      "src/interaction/history/layers.ts",
       "src/presentation/art.ts",
     ],
     why: "one grammar for a notice — composed in `documents.ts`, never a hand-composed `kind: \"notice\"` or a `b.notice.warn`/`.error` call outside it (C23 I61, F827); a site that rolls its own chooses its own glyph and the ones that forgot produced no entry at all" },
@@ -1262,9 +1261,26 @@ export const SCANS = [
  * is not this rule's, which is about marks. Recorded so it is re-checkable rather
  * than rediscovered.
  *
- * A second limit: this reads literals lexically, so a mark built by
- * `String.fromCodePoint` or held in a variable passes. Every current site is a
- * literal, and a computed one would be a change worth noticing on its own.
+ * A second limit: this reads literals, so a mark built by `String.fromCodePoint`
+ * or held in a variable passes — `definition.ts` computes its braille cells as
+ * `BRAILLE_BASE + ink` and the rule never sees them. A computed mark would be a
+ * change worth noticing on its own.
+ *
+ * **It judges a literal's value, not its spelling** (F1326). It read the source
+ * characters, so `"\u2502"` was six ASCII characters and the rule had nothing
+ * to be wrong about: the split separator shipped at the ASCII rung that way,
+ * behind an exemption whose reason described a different line. Decoding before
+ * judging fired on **25 literals in eight files** the list did not name, and a
+ * classification — drawn or not, and whether the ASCII rung needs it to degrade
+ * — found no defect among them: `scatter3`, `field` and `annotate` draw only
+ * behind a capability test, `svg` draws in a document no terminal reads, and
+ * the other four are data. Each is an entry below with its premise. Three files
+ * already listed — `text`, `ramp`, `linedraw` — carried escaped marks their
+ * reasons did not describe, and the reasons now name them.
+ * `decodeLiteral` is SS57's decoder as well, so the two
+ * rules cannot read one literal two ways. What it does not decode is stated:
+ * `String.raw` is read as if cooked (a false report, never a silent pass), and a
+ * `${…}` inside a template is read as the template's text.
  *
  * **A third, and it is about the exemption rather than the scan** (F665).
  * `PROSE_MARKS` is let through *because it is prose*, so it is the one class of
@@ -1293,21 +1309,55 @@ export const MARK_EXEMPTIONS = Object.freeze({
   "src/presentation/blocks/glyphs.ts":
     "the vocabulary itself — every entry is a pair and C09 I5's test asserts each is 1:1 by cell count",
   "src/presentation/text.ts":
-    "the truncation marker resolves against the capability on the line it is written (`ascii ? \"~\" : \"…\"`)",
+    "the truncation marker resolves against the capability on the line it is written (`ascii ? \"~\" : \"…\"`). "
+    + "The other two are selectors and draw nothing: U+FE0F is searched for in a cluster `cells()` is measuring, and "
+    + "`TEXT_PRESENTATION` U+FE0E is the zero-width suffix SS57 requires after an emoji base (F1326)",
   "src/presentation/patch/collapse.ts":
     "carries its own `[unicode, ascii]` pair; the marker is a whole row, so the ASCII form's three cells cost nothing",
-  "src/presentation/patch/definition.ts":
-    "picks its rule character from the capability in the expression that draws it",
+  "src/interaction/router/keymap.ts":
+    "`chordText` resolves against the capability on the line it is written (`if (!unicode) return chordName(key)`), which is `text.ts`'s form and `chrome.ts`'s subject — key names, which no `Glyph` slot holds because a chord is text and not a mark. The eleven glyphs are the design's own (§019, the binding registry) and the registry declares no ASCII rung for any of them, so the fallback is `keySlot`'s shorthand rather than eleven spellings chosen here (C16 §6a clause 6, parked). T1.98 asserts the ASCII arm is ASCII-renderable for every binding and that the chords equal the registry's by equality, so the premise is re-checked rather than inherited",
   "src/presentation/plot/ramp.ts":
-    "`RAMP_UNICODE` beside `RAMP_ASCII` — the ramp is the vocabulary for a plot cell",
+    "`RAMP_UNICODE` beside `RAMP_ASCII` — the ramp is the vocabulary for a plot cell. The escaped ladders "
+    + "(`RAMP_BRAILLE`, `RAMP_DENSITY`, the extent and fill ladders' blocks and braille) are the same premise: each "
+    + "ladder function returns its ASCII arm first under `unicode: \"ascii\"` and its braille arm under "
+    + "`ambiguousWidth: \"wide\"`, so every block element here is reached only at narrow unicode (F1326)",
   "src/presentation/plot/marks.ts":
     "the category ladders, one per capability arm, side by side in the file that *is* the vocabulary — `ramp.ts`'s premise exactly, and `markOf` is the only door. The premise to re-check: all three arms are eight long and `enforce-rules.test.ts` asserts it, so a ninth mark on one arm is a test failure rather than a silent ladder that runs out at a different index than its palette",
   "src/presentation/plot/curve.ts":
     "the braille blank, folded per mode by `definition.ts`; braille is chosen only where the capability allows it",
   "src/presentation/plot/linedraw.ts":
-    "the box-drawing glyph tables — the vocabulary for line-style curves, gated by ambiguousWidth in `definition.ts`",
+    "the box-drawing glyph tables — the vocabulary for line-style curves, gated by ambiguousWidth in `definition.ts`. "
+    + "`QUADRANTS`, escaped, is the same premise with two readers: the radar's quadrant figure, reached only when "
+    + "`flatAlphabet` is false (`definition.ts`), and `scatter3.ts`'s `mixedRows`, reached only on the `half` arm, "
+    + "which `armOf` takes only where `halfBlockEligible` holds (F1326)",
   "src/presentation/plot/sankey.ts":
     "`sankeyAlphabet` is the pair resolved where the capability is in hand — `▀ ▄ █ ▒` at narrow unicode and `# - =` at ASCII or wide, one function, both arms in the same expression (C12 I111). The premise to re-check: every mark in the file is read from that table, so a glyph written beside it rather than into it is what this reason does not cover",
+  "src/presentation/plot/scatter3.ts":
+    "`LOWER` and `LEFT`, the eighths, are drawn by `areaGlyph` from `mixedRows` alone, which runs only on the `half` "
+    + "arm — and `armOf` takes that arm only where `halfBlockEligible` holds: not `ascii`, not `ambiguousWidth: \"wide\"`, "
+    + "at least 8 colours. Below it the `glyph` arm draws from C09's table. The premise to re-check: a caller of "
+    + "`areaGlyph` outside `mixedRows` is a second decision this reason does not cover (F1326)",
+  "src/presentation/plot/annotate.ts":
+    "`shadeFor`'s `░` is resolved on the two lines above it — `null` under `unicode: \"ascii\"` and under "
+    + "`ambiguousWidth: \"wide\"`, where the band falls back to its two dashed edges (C12 I25's bottom rung). "
+    + "`text.ts`'s form: the capability is in hand where the mark is written (F1326)",
+  "src/presentation/plot/field.ts":
+    "`ARROWS_UNICODE` beside `ARROWS_ASCII`, one expression choosing between them on `unicode` and "
+    + "`ambiguousWidth` — the pair resolved where the capability is in hand. And `isBlank`'s U+2800 is compared "
+    + "against, never drawn: the braille blank a raster emits (F1326)",
+  "src/presentation/plot/definition.ts":
+    "U+2800 is compared against and never drawn — `cell === \"\\u2800\"` asks whether a braille raster left the "
+    + "cell empty, so a gridline may land there. The braille cells this file does draw are computed "
+    + "(`BRAILLE_BASE + ink`), which is SS47's stated blind spot rather than an exemption (F1326)",
+  "src/presentation/plot/svg.ts":
+    "the SVG arm's truncation marker, in a `<text>` element a browser shapes with its own font — no terminal "
+    + "reads it, no capability exists on this path, and `cells()` has no counterpart here (C12 §3aj) (F1326)",
+  "src/presentation/rows.ts":
+    "U+009C is C1 ST, a byte the tokeniser matches as one of an OSC's three terminators — data being parsed, "
+    + "never a mark being drawn (F1326)",
+  "src/interaction/editor/graphemes.ts":
+    "U+FFFD replaces an unpaired surrogate in the buffer's text (C17 T3.16). It is data: the buffer is the command "
+    + "that will be sent, and a substitute that varied with the terminal would change what runs (F1326)",
   "src/presentation/image/halfblock.ts":
     "`HALF_BLOCK` is `linedraw.ts`'s premise one module over — a rendering primitive rather than framework text, and gated by ambiguousWidth in `halfBlockEligible` in the same file rather than one away. The premise to re-check: it is the *only* mark here, so a second one is a second decision and this reason would not cover it",
   "src/shell/config.ts":
@@ -1320,6 +1370,9 @@ export const MARK_EXEMPTIONS = Object.freeze({
     "the conformance report, same premise: a tool's output, not a rendered document",
   "src/testing/navigation-conformance.ts":
     "the element-conformance report, and the same premise as its sibling above: a tool's output read by a developer, never composed into a frame",
+  "src/testing/expect-document.ts":
+    "a premise table's `why` strings, naming the marks a rendering substitutes — read by a developer in a failing "
+    + "assertion and never composed into a frame, the premise of the two conformance reports above (F1326)",
 });
 
 /**
@@ -1362,7 +1415,8 @@ export function checkMarks(files, readFile = (f) => readFileSync(f, "utf8"), exe
     const code = codeOnly(readFile(file));
     for (const m of code.matchAll(LITERALS)) {
       const body = m[0].slice(1, -1);
-      const marks = [...body].filter((c) => c.codePointAt(0) > 127);
+      // **The value, not the spelling** (F1326): `"\u2502"` is `│`.
+      const marks = [...decodeLiteral(body)].filter((c) => c.codePointAt(0) > 127);
       if (marks.length === 0) continue;
       // **A letter is prose, whatever its diacritics.** `rôle` in a reason string
       // fired this on the first new file written after the rule landed, and the
@@ -1460,6 +1514,536 @@ export function checkMarks(files, readFile = (f) => readFileSync(f, "utf8"), exe
  * and a mark built by `String.fromCodePoint` or held in a variable passes, as
  * it does SS47.
  */
+/**
+ * A `readonly number[]` range table, read out of `text.ts` rather than restated.
+ *
+ * **One reader for both tables, because `cells()` consults both** (C09 I48).
+ * `isAmbiguous` is `inRanges(cp, AMBIGUOUS_RANGES) || inRanges(cp, DRAWN_AS_GEOMETRY)`,
+ * so a check that read only the first would call every geometric shape Narrow
+ * and pass a registry that says so.
+ */
+/**
+ * A `Record<string, readonly string[]>` of domains, read out of `glyphs.ts`.
+ *
+ * Shape: `token: ["row-lead"],` — one line per token, beside the table it
+ * classifies, so a new glyph that forgets its domain is a parse gap the scan
+ * reports rather than a mark it silently exempts.
+ *
+ * **A quoted key as well as a bare one** (question 57). `work-unit` is the first
+ * hyphenated token and is written `"work-unit": […]`, which a `(\w+)` key never
+ * matched — so it dropped out of the corpus with nothing reporting it: the
+ * empty-parse control sees a whole table vanish, not one key. The suite holds
+ * the parsed keys equal to `GLYPH_TOKENS`, which is what sees one.
+ */
+export function parseDomainTable(source, name) {
+  const start = source.indexOf(`export const ${name}`);
+  if (start < 0) return {};
+  const end = source.indexOf("\n};", start);
+  const out = {};
+  for (const m of source.slice(start, end).matchAll(/^ {2}(?:"(?<quoted>[\w-]+)"|(?<bare>\w+)): \[([^\]]*)\],/gmu)) {
+    out[m.groups.quoted ?? m.groups.bare] = [...m[3].matchAll(/"([^"]+)"/gu)].map((d) => d[1]);
+  }
+  return out;
+}
+
+/**
+ * One `Record<string, string>` of halves, read out of a frozen object literal —
+ * the value is the pattern's last group, and the key its `quoted` or `bare`
+ * group where it names them, else its first.
+ */
+function parseAsciiPairs(source, opener, pattern) {
+  const start = source.indexOf(opener);
+  if (start < 0) return {};
+  const body = source.slice(start, source.indexOf("\n});", start));
+  const out = {};
+  for (const m of body.matchAll(pattern)) {
+    out[m.groups?.quoted ?? m.groups?.bare ?? m[1]] = JSON.parse(`"${m[m.length - 1]}"`);
+  }
+  return out;
+}
+
+/**
+ * `GLYPH_TABLE`'s two halves, keyed by token, as SS64 reads them (question 57).
+ *
+ * Exported so the suite can hold the keys equal to `GLYPH_TOKENS`: a key this
+ * parse cannot read is a mark SS64 never compares, and no count it prints moves.
+ */
+export function parseGlyphTable(glyphSource) {
+  return {
+    ascii: parseAsciiPairs(glyphSource, "const GLYPH_TABLE",
+      /^ {4}(?:"(?<quoted>[\w-]+)"|(?<bare>\w+)): \["(?:[^"\\]|\\.)*", "((?:[^"\\]|\\.)*)"\],/gmu),
+    unicode: parseAsciiPairs(glyphSource, "const GLYPH_TABLE",
+      /^ {4}(?:"(?<quoted>[\w-]+)"|(?<bare>\w+)): \["((?:[^"\\]|\\.)*)", "(?:[^"\\]|\\.)*"\],/gmu),
+  };
+}
+
+/**
+ * **SS64 — a mark is unique inside the domains it appears in, across every
+ * structure that paints one.**
+ *
+ * Three structures paint ASCII marks and the registry's own check sees one of
+ * them. That is how `:` was chosen for collapsed disclosure and passed: it is
+ * `GlyphSet.separator` (F834), so a lead mark and a field separator would be the
+ * same character on one row, and the gate that said *green* had never been shown
+ * the set it was ruling on (F1246).
+ *
+ * **Domains rather than a global alphabet, because the alphabet ran out.** With
+ * every mark compared against every other, twelve printable characters remained
+ * for four unregistered roles — so uniqueness was costing more than it bought in
+ * places no reader can confuse. A domain is a screen region: `row-lead` and
+ * `inline` are both inside `content-row`, because a row shows its lead and its
+ * separators together; `table-header` is a different row, which is what lets the
+ * sort pair take `v` and `^` while disclosure keeps `v` in the lead.
+ *
+ * **Two records of one mark are not a clash.** The registry and `GLYPH_TABLE`
+ * mirror each other on purpose — `disclosure ▿ v` is in both — so the rule fires
+ * on a shared ASCII half with a **different** Unicode half, which is the case a
+ * reader cannot tell apart at the ASCII rung and can at every other.
+ */
+export function checkMarkDomains(
+  registrySource = readFileSync("docs/design/language/calcium-registry.json", "utf8"),
+  glyphSource = readFileSync("src/presentation/blocks/glyphs.ts", "utf8"),
+) {
+  const violations = [];
+  const registry = JSON.parse(registrySource);
+  const contains = registry.collisionDomains ?? {};
+  const closure = (domains) => {
+    const out = new Set(domains ?? []);
+    for (const [name, record] of Object.entries(contains)) {
+      for (const inner of record.contains ?? []) if (out.has(inner)) out.add(name);
+    }
+    return out;
+  };
+  const marks = [];
+  let deferred = 0;
+  for (const g of [...registry.glyphs, ...registry.delimiters]) {
+    // **A state-resolved ASCII half holds no character** (the monochrome rung),
+    // so there is nothing to compare — counted, never silently dropped.
+    if (g.asciiResolution !== undefined) { deferred += 1; continue; }
+    marks.push({ who: `registry:${g.id}`, ascii: g.ascii, unicode: g.unicode, domains: g.collisionDomains ?? [] });
+  }
+  const tableDomains = parseDomainTable(glyphSource, "GLYPH_DOMAINS");
+  const setDomains = parseDomainTable(glyphSource, "GLYPH_SET_DOMAINS");
+  const { ascii: table, unicode: tableUnicode } = parseGlyphTable(glyphSource);
+  const set = parseAsciiPairs(glyphSource, "const ASCII: GlyphSet", /^ {2}(\w+): "((?:[^"\\]|\\.)*)",/gmu);
+  // **The Unicode half, read rather than stubbed.** A placeholder here made every
+  // `GlyphSet` member differ from every other and from `GLYPH_TABLE`, so `ok ✓`
+  // and `tick ✓` — one character under two names — read as a clash on `+`. The
+  // rule fires on *different* marks sharing a character; two records of one mark
+  // are not two marks.
+  const setUnicode = parseAsciiPairs(glyphSource, "const UNICODE: GlyphSet", /^ {2}(\w+): "((?:[^"\\]|\\.)*)",/gmu);
+  const unclassified = [];
+  for (const [token, ascii] of Object.entries(table)) {
+    if (tableDomains[token] === undefined) { unclassified.push(`GLYPH_TABLE:${token}`); continue; }
+    marks.push({ who: `GLYPH_TABLE:${token}`, ascii, unicode: tableUnicode[token], domains: tableDomains[token] });
+  }
+  for (const [token, ascii] of Object.entries(set)) {
+    if (setDomains[token] === undefined) { unclassified.push(`GlyphSet:${token}`); continue; }
+    marks.push({ who: `GlyphSet:${token}`, ascii, unicode: setUnicode[token] ?? `\u0000${token}`, domains: setDomains[token] });
+  }
+  if (marks.length <= registry.glyphs.length + registry.delimiters.length - deferred) {
+    violations.push({
+      rule: "SS64", file: "src/presentation/blocks/glyphs.ts", line: 1,
+      message: "no mark was read out of `glyphs.ts` — an empty parse compares the registry with itself and passes, which is the vacuity this rule exists to refuse (F1246)",
+      spec: "R-GLY-003",
+    });
+    return violations;
+  }
+  for (const who of unclassified) {
+    violations.push({
+      rule: "SS64", file: "src/presentation/blocks/glyphs.ts", line: 1,
+      message: `${who} paints an ASCII mark and declares no domain — a mark with no region is one this rule cannot rule on, which is an exemption rather than an answer`,
+      spec: "R-GLY-003",
+    });
+  }
+  for (let i = 0; i < marks.length; i += 1) {
+    for (let j = i + 1; j < marks.length; j += 1) {
+      const a = marks[i], b = marks[j];
+      if (a.ascii !== b.ascii || a.unicode === b.unicode) continue;
+      const shared = [...closure(a.domains)].filter((d) => closure(b.domains).has(d));
+      if (shared.length === 0) continue;
+      // **A figure domain is not a mark domain.** Inside a frame or a plot the
+      // character is not the signal — its place in the figure is. ASCII has no
+      // box drawing, so every corner, tee and crossing *is* `+` and every edge
+      // `-`; demanding uniqueness there refuses the fallback rather than a
+      // defect, and the rule's first run said so 45 times out of 59.
+      if (shared.every((d) => contains[d]?.figure === true)) continue;
+      violations.push({
+        rule: "SS64",
+        file: "src/presentation/blocks/glyphs.ts",
+        line: 1,
+        message: `${a.who} and ${b.who} both paint ${JSON.stringify(a.ascii)} in ${shared.join(", ")} — one character, two marks, on a row a reader reads at once (R-GLY-003)`,
+        spec: "R-GLY-003",
+      });
+    }
+  }
+  return violations;
+}
+
+export function parseRangeTable(textSource, name) {
+  const start = textSource.indexOf(`const ${name}: readonly number[] = [`);
+  if (start < 0) return [];
+  const end = textSource.indexOf("\n];", start);
+  return [...textSource.slice(start, end).matchAll(/0x([0-9a-f]+)/gu)].map((m) => Number.parseInt(m[1], 16));
+}
+
+/**
+ * **SS63 — a glyph's recorded width class is the one `cells()` measures.**
+ *
+ * `widthClass` is a record of a measurement and **nothing reads it** — not the
+ * builder, not `src/`, not the suite — which is exactly why it could disagree
+ * with the tree for as long as it did. `focus` and `disclosure` were recorded
+ * `narrow` and are Ambiguous; `meter-fill` and `rule` carried no class at all
+ * while measuring 1 cell narrow and 2 wide. Those values came from a design
+ * block that stated the measurement it said had never been taken (F1246), and a
+ * scalar snapshot with no reader is *a snapshot records, it does not check* with
+ * nothing in the frame to notice.
+ *
+ * **The field is kept rather than derived**, and the reason is that it is not a
+ * restatement of `widthByCapability`. That field is the width in the composed
+ * browser grid and the builder gates `reservedCells` on it; this one is whether
+ * the character is Ambiguous, which is what sends a **set** to its ASCII rung
+ * (R-GLY-003). Deriving it away would delete the fact rather than un-drift it.
+ *
+ * The ranges come from `text.ts`'s own tables, so there is one authority and not
+ * a second copy to fall behind (C09 I48, F1246).
+ */
+/**
+ * SS65 — every `current` registry glyph resolves to a mark this tree can draw
+ * (C09 I88, `R-GLY-003`, `R-TAB-001`).
+ *
+ * **The absence `SS64` cannot see, and the reason is structural.** `SS64` is a
+ * *collision* rule: it reads the registry and `glyphs.ts`, pairs the marks that
+ * appear on **both** sides, and refuses a shared ASCII half. A glyph with no
+ * character in the tree never enters a pair, so it passes every run. Measured on
+ * this rule's first: `question` `⟩` was in no file in `src/` at all while both
+ * question components name it as their first carrier, `current` `›` existed only
+ * in `overlay/place.ts` under another meaning, and `reader` `❯` lives in the
+ * shell's config. F161's shape with the consumers actually present.
+ *
+ * The vocabulary is the whole of `glyphs.ts` rather than the three parsed
+ * tables, and that is deliberate: `▰` is `BAR_STYLES`', `⋯` and `─` are drawn
+ * from other structures in the same file, and a rule that demanded a
+ * `GLYPH_TABLE` row for each would refuse nine marks the tree draws perfectly
+ * well. The question is *can this tree draw it*, not *is it in one table*.
+ *
+ * **Comments are stripped before the vocabulary is read**, and the rule's own
+ * first row is why: `question`'s `\u27e9` appears in `glyphs.ts` exactly once, in a
+ * comment distinguishing it from `\u203a`. A whole-file `includes` reads that as the
+ * mark being drawable, so the scan passed on the very absence it was written
+ * about — prose inflating a textual signal, with the prose *about* the defect.
+ * A mark in a comment is a mark nothing can draw.
+ *
+ * `GLYPH_HOMES` is the allow-list and it carries the premise, as
+ * `MARK_EXEMPTIONS` does: where the mark lives, and why it lives there. The
+ * bidirectional arm is the same as MG24's — an entry whose glyph has arrived in
+ * `glyphs.ts` is a violation, because an exemption that outlives its reason is
+ * how the list stops being read.
+ */
+export const GLYPH_HOMES = Object.freeze({
+  reader:
+    "`❯` is the prompt's mark and lives in `src/shell/config.ts` beside `PROMPT_GUTTER`, "
+    + "whose `[unicode, ascii]` pair `frame.ts` already asserts is `PROMPT_GUTTER.first` cells "
+    + "wide (C22 I52). It is chrome the shell draws, not a block's vocabulary, and moving it "
+    + "into `glyphs.ts` would put a prompt token in the block library.",
+});
+
+export function checkGlyphPresence(
+  registrySource = readFileSync("docs/design/language/calcium-registry.json", "utf8"),
+  glyphSource = readFileSync("src/presentation/blocks/glyphs.ts", "utf8"),
+  homes = GLYPH_HOMES,
+) {
+  const violations = [];
+  const registry = JSON.parse(registrySource);
+  const at = (file, needle) => {
+    const i = file.indexOf(needle);
+    return i < 0 ? 1 : file.slice(0, i).split("\n").length;
+  };
+  // **Whole comment lines are dropped, and nothing is parsed out of a code
+  // line.** The first draft ran two regexes over the source and ate three live
+  // slots — `question`, `current` and `ellipsis` — because a `/*` or a `//`
+  // inside a string literal opens nothing and the pattern cannot tell. Dropping
+  // lines whose first non-space character begins a comment is the part that is
+  // certain, and it is the whole of the hazard: the mark this rule was written
+  // about sits on a `// **...` line of its own.
+  // **And `\\uXXXX` is decoded before the search, because a slot may be written
+  // either way and the scan must not care.** `question: ["\\u27e9", "?"]` is the
+  // mark, present and drawable, and a raw-text match calls it absent — a matcher
+  // that sees one encoding. The two defects cancelled on the first run: the
+  // escape hid the slot while the comment supplied the character, so the rule
+  // was green about a file it had read wrongly in both directions.
+  const code = glyphSource
+    .split("\n")
+    .filter((line) => !/^\s*(?:\/\/|\/\*|\*)/u.test(line))
+    .join("\n")
+    .replace(/\\u\{([0-9a-fA-F]+)\}/gu, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/\\u([0-9a-fA-F]{4})/gu, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+
+  // **The control, and it is SS64's** (F1246): a vocabulary that read as empty
+  // would report every glyph missing, which is loud, and one that read as
+  // everything would report none, which is silent. The second is the danger, so
+  // the file is checked for the marks it certainly holds before it is trusted.
+  for (const certain of ["\u2713", "\u25b8"]) {
+    if (code.includes(certain)) continue;
+    violations.push({
+      rule: "SS65", file: "src/presentation/blocks/glyphs.ts", line: 1,
+      message:
+        `the vocabulary does not contain ${JSON.stringify(certain)}, which `
+        + "`GLYPH_TABLE` declares — the source did not parse as expected, and a vocabulary "
+        + "read wrongly wide passes every glyph in silence",
+      spec: "C09 I88",
+    });
+    return violations;
+  }
+
+  const excused = new Set(Object.keys(homes));
+  const present = new Set();
+  for (const g of [...registry.glyphs, ...registry.delimiters]) {
+    if (g.status !== "current") continue;
+    const has = typeof g.unicode === "string" && code.includes(g.unicode);
+    if (has) {
+      present.add(g.id);
+      continue;
+    }
+    if (excused.has(g.id)) continue;
+    violations.push({
+      rule: "SS65",
+      file: "docs/design/language/calcium-registry.json",
+      line: at(registrySource, `"${g.id}"`),
+      message:
+        `${g.id} is a current glyph and ${JSON.stringify(g.unicode)} appears nowhere in `
+        + "`glyphs.ts` — a carrier is made of marks, and a mark with no character is one "
+        + "`SS64` can never see, because a collision rule pairs the marks on both sides "
+        + "(C09 I88). Give it a slot, or name it in GLYPH_HOMES with its home and its reason",
+      spec: "C09 I88",
+    });
+  }
+
+  for (const id of excused) {
+    if (!present.has(id)) continue;
+    violations.push({
+      rule: "SS65",
+      file: "tools/enforce/source-scans.mjs",
+      line: 1,
+      message:
+        `GLYPH_HOMES names ${id}, whose mark is now in \`glyphs.ts\` — remove the entry: an `
+        + "exemption that outlives its reason is how the list stops being read",
+      spec: "C09 I88",
+    });
+  }
+  return violations;
+}
+
+/**
+ * **SS67 — every ground a renderer names is a ground the floor measures, or it
+ * says why not** (C10 I60, R-THM-004).
+ *
+ * The floor's scope was a list, and it was wrong three times: `bgElev` then
+ * `focusGround` joined `textSurfaces` only when a frame showed text on them,
+ * and `bgDeep` was excluded "because no text lands on it" while the prompt chip
+ * painted `tone.meta` there at 6.38 : 1 under a declared 7. Each time the
+ * renderer moved and the list did not. So the list is now checked against the
+ * renderers: every `"surface.X"` literal outside `theme/` must have a
+ * disposition here.
+ *
+ * - **`text`** — a ground in `textGrounds` (`contrast.ts`), measured at every
+ *   theme's floor. C10 T2.61 holds this set **equal** to the function's names,
+ *   since this file cannot import TypeScript and a copy nobody compares drifts.
+ * - **`gated`** — a ground with its own pairs and its own check, named.
+ * - **`ink`** — a surface token drawn as a foreground or a mark, not a ground.
+ * - **`excluded`** — a ground that carries no ink, and the reason.
+ *
+ * **Driven in both directions**: a literal with no entry fails, and so does an
+ * entry no literal names — an exemption outliving its subject is how the list
+ * stops being read (MG24's arm).
+ *
+ * **Stated blind spot.** It dispositions a *surface*, not a *(site, use)* pair:
+ * the plot draws `surface.bgDeep` as a box **ink** and `tone.default` on it as
+ * a median mark, and both pass because `bgDeep` is `text` — the mark is not in
+ * `bgDeep`'s refs, and nothing measures it. A ground reached by
+ * `tokens.surfaces[name]` rather than a `"surface.X"` literal is not seen at
+ * all; the corpus has none outside `theme/` today.
+ */
+export const SURFACE_ROLES = Object.freeze({
+  bg: { role: "text" },
+  bgElev: { role: "text" },
+  focusGround: { role: "text" },
+  diffAdd: { role: "text" },
+  diffRemove: { role: "text" },
+  bgDeep: { role: "text" },
+  selection: { role: "gated", gate: "validateBands", why: "a band's ink answers for every ref on it (`bandInk`, R-THM-005), and `validateBands` measures it; a theme without a band paints no ink change on it" },
+  pick: { role: "gated", gate: "pickPairs", why: "the focused chip's ink is `surface.pickInk`, one pair, measured by `pickPairs`" },
+  errorGround: { role: "gated", gate: "errorTagPairs", why: "the error tag's ink is `surface.errorInk`, one pair, measured by `errorTagPairs`" },
+  errorInk: { role: "ink", why: "the error tag's foreground, on `errorGround`" },
+  pickInk: { role: "ink", why: "the focused chip's foreground, on `pick`" },
+  border: { role: "ink", why: "a rule and a plot axis are drawn in it; it is never behind anything" },
+  meterFill: { role: "excluded", why: "the painted meter fills with spaces (`simple.ts`, C09 I97) — its ground is the whole of what it shows, and no ink lands on it" },
+});
+
+export function checkTextGrounds(files, readFile = (f) => readFileSync(f, "utf8"), roles = SURFACE_ROLES) {
+  const violations = [];
+  const named = new Set();
+  const corpus = files.filter(
+    (f) => (f.startsWith("src/presentation/") || f.startsWith("src/shell/"))
+      && !f.startsWith("src/presentation/theme/") && f.endsWith(".ts"),
+  );
+  for (const file of corpus) {
+    const lines = readFile(file).split("\n");
+    lines.forEach((line, i) => {
+      // Whole comment lines only, for SS65's reason: a `//` inside a string opens nothing.
+      if (/^\s*(?:\/\/|\/\*|\*)/u.test(line)) return;
+      for (const m of line.matchAll(/"surface\.([A-Za-z]+)"/gu)) {
+        const name = m[1];
+        named.add(name);
+        if (Object.hasOwn(roles, name)) continue;
+        violations.push({
+          rule: "SS67", file, line: i + 1,
+          message:
+            `\`surface.${name}\` is named by a renderer and has no disposition in SURFACE_ROLES — `
+            + "if text lands on it, add it to `textGrounds` (C10 I60) and mark it `text`; if it has "
+            + "its own pairs, `gated` with the gate; if it is drawn as a foreground, `ink`; otherwise "
+            + "`excluded` with the reason no ink lands on it",
+          spec: "C10 I60",
+        });
+      }
+    });
+  }
+  // **The control** (F1246's): a corpus read as empty would pass every entry
+  // as dead, loudly; one that names the diff grounds is being read.
+  if (!named.has("diffAdd")) {
+    violations.push({
+      rule: "SS67", file: "src/presentation/patch/lines.ts", line: 1,
+      message: "the corpus names no `surface.diffAdd`, which `lines.ts` paints — the renderers did not read as expected",
+      spec: "C10 I60",
+    });
+    return violations;
+  }
+  for (const name of Object.keys(roles)) {
+    if (named.has(name)) continue;
+    violations.push({
+      rule: "SS67", file: "tools/enforce/source-scans.mjs", line: 1,
+      message: `SURFACE_ROLES names ${name}, which no renderer names — remove the entry: an exemption that outlives its subject is how the list stops being read`,
+      spec: "C10 I60",
+    });
+  }
+  return violations;
+}
+
+/**
+ * **SS68 — every design rule a spec cites is a rule the registry holds** (A03
+ * commitment 14).
+ *
+ * The specs cite the design registry by id — `R-BLK-191`, `R-MOT-012` — 1 042
+ * times when this rule landed, and nothing resolved a single one. SP3 resolves
+ * every `I`/`T`/`F` number and SP8 every `§`, and an `R-` id was the one citation
+ * form with no reader: C26 I24 cited `R-NAV-004` for a keyboard ruling, the
+ * registry has no `R-NAV` family at all, and it was found by a person following
+ * the link. A citation that resolves to nothing reads exactly like one that
+ * resolves, which is how it survived review.
+ *
+ * **Current, example or superseded all resolve.** The specs cite history on
+ * purpose — an amendment names the rule it narrowed — and a superseded rule is
+ * still in the registry with its successor linked, so the id still says where
+ * to look. Only an id the registry has never held fires.
+ *
+ * **The control** (F1246's): a corpus read as empty, or a registry parsed as
+ * no rules, passes every citation vacuously — so a corpus citing nothing, or a
+ * registry holding nothing, is reported and nothing else is.
+ *
+ * **Stated blind spot.** It checks that a cited rule **exists**, never that it
+ * says what the sentence citing it claims — a citation resolving against the
+ * wrong rule is the class `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass
+ * argues no mechanism should be built for, and this one does not try. It reads
+ * the text shape `R-XXX-NNN` alone: a range written `R-BLK-182–190` checks only
+ * its first end (none in the corpus today); a mention and a citation are one
+ * thing to it; and it reads `docs/components/` and `docs/architecture/` only —
+ * code comments, tests and the other documents cite ids too, and measured when
+ * this rule landed none of theirs dangled outside the enforce suite's own
+ * fabrications.
+ */
+export const RULE_CITATION_DIRS = Object.freeze(["docs/components", "docs/architecture"]);
+
+export function ruleCitationCorpus(dirs = RULE_CITATION_DIRS) {
+  return dirs
+    .flatMap((dir) => readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => `${dir}/${f}`))
+    .sort();
+}
+
+export function checkRuleCitations(
+  docs = ruleCitationCorpus(),
+  readFile = (f) => readFileSync(f, "utf8"),
+  registrySource = readFileSync("docs/design/language/calcium-registry.json", "utf8"),
+) {
+  const violations = [];
+  const known = new Set((JSON.parse(registrySource).rules ?? []).map((r) => r.id));
+  let cited = 0;
+  for (const file of docs) {
+    readFile(file).split("\n").forEach((line, i) => {
+      for (const m of line.matchAll(/\bR-[A-Z]{3}-\d{3}\b/gu)) {
+        cited += 1;
+        if (known.has(m[0])) continue;
+        violations.push({
+          rule: "SS68", file, line: i + 1,
+          message:
+            `cites \`${m[0]}\`, which the design registry has never held — current, example and `
+            + "superseded ids all resolve, so this one names nothing. Cite the rule the sentence means; "
+            + "if the id is history the registry never recorded, strike the citation the way the specs "
+            + "strike history rather than leaving a live one",
+          spec: "A03 SS68",
+        });
+      }
+    });
+  }
+  if (known.size === 0 || cited === 0) {
+    return [{
+      rule: "SS68", file: "docs/design/language/calcium-registry.json", line: 1,
+      message: `the registry parsed as ${String(known.size)} rules and the corpus cited ${String(cited)} ids — `
+        + "one of the two did not read, and every citation would pass against it",
+      spec: "A03 SS68",
+    }];
+  }
+  return violations;
+}
+
+export function checkGlyphWidthClass(
+  registrySource = readFileSync("docs/design/language/calcium-registry.json", "utf8"),
+  textSource = readFileSync("src/presentation/text.ts", "utf8"),
+) {
+  const violations = [];
+  const ambiguous = parseRangeTable(textSource, "AMBIGUOUS_RANGES");
+  const geometry = parseRangeTable(textSource, "DRAWN_AS_GEOMETRY");
+  const at = (file, needle) => {
+    const i = file.indexOf(needle);
+    return i < 0 ? 1 : file.slice(0, i).split("\n").length;
+  };
+  if (ambiguous.length === 0 || geometry.length === 0) {
+    violations.push({
+      rule: "SS63", file: "src/presentation/text.ts", line: 1,
+      message: "the width tables parsed to nothing — an empty table calls every character Narrow and passes every registry record, which is the vacuity this rule exists to refuse (C09 I48)",
+      spec: "C09 I48",
+    });
+    return violations;
+  }
+  const inRanges = (cp, table) => {
+    for (let i = 0; i < table.length; i += 2) if (cp >= table[i] && cp <= table[i + 1]) return true;
+    return false;
+  };
+  const registry = JSON.parse(registrySource);
+  for (const glyph of [...registry.glyphs, ...registry.delimiters]) {
+    const cp = glyph.unicode.codePointAt(0);
+    const measured = inRanges(cp, ambiguous) || inRanges(cp, geometry) ? "ambiguous" : "narrow";
+    if (glyph.widthClass === measured) continue;
+    violations.push({
+      rule: "SS63",
+      file: "docs/design/language/calcium-registry.json",
+      line: at(registrySource, `"${glyph.id}"`),
+      message: `${glyph.id} records widthClass ${JSON.stringify(glyph.widthClass ?? null)} and ${glyph.unicode} (U+${cp.toString(16).toUpperCase().padStart(4, "0")}) measures ${measured} — a recorded measurement nothing reads is one that drifts (F1246)`,
+      spec: "C09 I48",
+    });
+  }
+  return violations;
+}
+
 export function parseEmojiBases(textSource) {
   const start = textSource.indexOf("const EMOJI_VARIATION_BASES: readonly number[] = [");
   if (start < 0) return [];
@@ -1471,10 +2055,22 @@ export function parseEmojiBases(textSource) {
 /** U+FE0E — *draw the preceding character as text, not as an emoji*. */
 const TEXT_PRESENTATION = "\ufe0e";
 
-/** `\uXXXX` and `\u{X…}` in a literal's body, as the characters they spell. */
-function decodeEscapes(body) {
-  return body.replaceAll(/\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})/gu, (_, braced, plain) =>
-    String.fromCodePoint(Number.parseInt(braced ?? plain, 16)),
+/**
+ * A literal's body as the characters it spells — `\uXXXX`, `\u{X…}` and `\xNN`
+ * decoded, **one escape at a time from the left**, so `\\u2502` is a backslash
+ * and six ASCII characters rather than `│` (F1326). Any other escape is left as
+ * written, which keeps an ASCII escape ASCII and a non-ASCII one its character.
+ *
+ * **One decoder for SS47 and SS57.** SS57's own decoded `\u` alone and matched
+ * `\\u` as an escape; two copies of the grammar in one file are two readings of
+ * one literal, and the rules would disagree about it silently.
+ */
+function decodeLiteral(body) {
+  return body.replaceAll(/\\(?:u\{([0-9a-fA-F]+)\}|u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2})|[\s\S])/gu, (all, braced, plain, byte) =>
+    braced !== undefined ? String.fromCodePoint(Number.parseInt(braced, 16))
+    : plain !== undefined ? String.fromCharCode(Number.parseInt(plain, 16))
+    : byte !== undefined ? String.fromCharCode(Number.parseInt(byte, 16))
+    : all,
   );
 }
 
@@ -1504,7 +2100,7 @@ export function checkEmojiBases(
     if (!f.startsWith("src/")) continue;
     const code = codeOnly(readFile(file));
     for (const m of code.matchAll(LITERALS)) {
-      const body = decodeEscapes(m[0].slice(1, -1));
+      const body = decodeLiteral(m[0].slice(1, -1));
       for (const c of body) {
         const cp = c.codePointAt(0) ?? 0;
         if (cp < 0x80 || !inEmojiRanges(cp, ranges)) continue;
@@ -1755,6 +2351,138 @@ export function checkControlBytes(files, readFile = (f) => readFileSync(f, "utf8
         spec: "C16 T2.10 · F236",
       });
     }
+  }
+  return violations;
+}
+
+/**
+ * **SS69 — a literal bidi format character in a tracked text file** (F1402,
+ * ruling 71, A03 commitment 14).
+ *
+ * An override is invisible and reorders every character after it on the line,
+ * so a file holding U+202E reads one way to a reviewer and another to the
+ * compiler — the class published as *Trojan Source*. Ruling 71 escapes the
+ * twelve everywhere a block is drawn and C01 I26 in the two OSC sinks; nothing
+ * looked at the repository's own files. `trust-boundary.test.ts` landed with
+ * its twelve as literal code points, a file write having turned the escapes
+ * into characters, and enforce was green. **The first run found a second**:
+ * `test/contract/image-path.test.ts` wrote its poisoned filename with a literal
+ * U+202E where every sibling wrote an escape.
+ *
+ * **The set is `text.ts`'s, parsed out of `isBidiFormat`** rather than restated
+ * here — the function ruling 71's mechanism reads, so a character added there
+ * joins this scan. The control is that the parse found U+202E: a rewrite of the
+ * function into another shape parses as nothing, and a scan over an empty set
+ * passes every file.
+ *
+ * **Every tracked text file, not a directory list**: `git ls-files` is the
+ * corpus and `git grep -I -F` finds the candidates, because reading 6 500 files
+ * through the bind mount takes seconds and the grep under one. The control is
+ * that the tracked set is not empty and that `git` answered at all — exit 1 is
+ * *no match*, anything else is a scan that did not run.
+ *
+ * **Exemptions by equality, both directions** (`BIDI_LITERAL_EXEMPTIONS`): a
+ * file that must hold a literal is named with its reason, and an entry whose
+ * file holds none is itself a violation. Empty at landing — the one file that
+ * fired had no reason to hold the character literally.
+ *
+ * **Stated blind spot.** An untracked file is not read: a commit cannot carry
+ * one past the pre-commit hook, which runs after staging, but `make enforce` on
+ * a tree with new unstaged files says nothing about them. The working copy is
+ * read, not the index, so a partially staged file is judged by what is on disk.
+ * `git grep -I` skips a file it classes as binary. An escape — `\u202E` — is the
+ * remedy and is not read, so a file that *builds* the character at run time is
+ * outside the rule by construction. Every other invisible or confusable
+ * character — U+2028, a zero-width joiner, a homoglyph — is outside the set.
+ */
+export const BIDI_LITERAL_EXEMPTIONS = Object.freeze({});
+
+/** The bidi format code points `text.ts`'s `isBidiFormat` answers true for, parsed from its source. */
+export function bidiFormatCodePoints(textSource = readFileSync("src/data/text.ts", "utf8")) {
+  const start = textSource.indexOf("export function isBidiFormat(");
+  if (start < 0) return [];
+  const body = textSource.slice(start, textSource.indexOf("\n}", start));
+  const out = [];
+  for (const m of body.matchAll(/cp\s*===\s*0x([0-9a-f]+)|cp\s*>=\s*0x([0-9a-f]+)\s*&&\s*cp\s*<=\s*0x([0-9a-f]+)/giu)) {
+    if (m[1] !== undefined) out.push(Number.parseInt(m[1], 16));
+    else for (let cp = Number.parseInt(m[2], 16); cp <= Number.parseInt(m[3], 16); cp += 1) out.push(cp);
+  }
+  return out.sort((x, y) => x - y);
+}
+
+/**
+ * The tracked text files holding any of `codePoints` literally, and the count of
+ * tracked files — `git grep` narrows, so the count is the only evidence the
+ * corpus was there to narrow.
+ */
+export function trackedBidiCandidates(codePoints, cwd = process.cwd()) {
+  const git = (args) => execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 28 });
+  const tracked = git(["ls-files", "-z"]).split("\0").filter((f) => f !== "").length;
+  const patterns = codePoints.flatMap((cp) => ["-e", String.fromCodePoint(cp)]);
+  let listed = "";
+  try {
+    listed = git(["grep", "-I", "-l", "-z", "-F", ...patterns]);
+  } catch (e) {
+    // Exit 1 is *nothing matched*; anything else is a scan that did not run.
+    if (e.status !== 1) throw e;
+  }
+  return { tracked, files: listed.split("\0").filter((f) => f !== "").sort() };
+}
+
+export function checkBidiLiterals({
+  codePoints = bidiFormatCodePoints(),
+  candidates = undefined,
+  readFile = (f) => readFileSync(f, "utf8"),
+  exemptions = BIDI_LITERAL_EXEMPTIONS,
+} = {}) {
+  if (!codePoints.includes(0x202e)) {
+    return [{
+      rule: "SS69", file: "src/data/text.ts", line: 1,
+      message: `\`isBidiFormat\` parsed as ${String(codePoints.length)} code points without U+202E — the set did not `
+        + "read, and a scan over it passes every file. Keep the function's `cp === 0x…` / range shape or teach "
+        + "`bidiFormatCodePoints` the new one",
+      spec: "A03 SS69 · F1402",
+    }];
+  }
+  const { tracked, files } = candidates ?? trackedBidiCandidates(codePoints);
+  if (tracked === 0) {
+    return [{
+      rule: "SS69", file: ".", line: 1,
+      message: "`git ls-files` listed no file — the corpus did not read, and every file would pass",
+      spec: "A03 SS69 · F1402",
+    }];
+  }
+  const set = new Set(codePoints);
+  const violations = [];
+  const holding = new Set();
+  for (const file of files) {
+    readFile(file).split("\n").forEach((line, i) => {
+      let col = 0;
+      for (const ch of line) {
+        col += 1;
+        const cp = ch.codePointAt(0) ?? 0;
+        if (!set.has(cp)) continue;
+        holding.add(file);
+        if (Object.hasOwn(exemptions, file)) continue;
+        violations.push({
+          rule: "SS69", file: `${file}:${String(i + 1)}`, line: i + 1,
+          message:
+            `a literal U+${cp.toString(16).toUpperCase().padStart(4, "0")} at column ${String(col)} — a bidi format `
+            + "character reorders what a reviewer reads against what the compiler reads. Write it as an escape "
+            + "(`\\u202E`), or name the file in `BIDI_LITERAL_EXEMPTIONS` with the reason it must hold one",
+          spec: "A03 SS69 · F1402 · ruling 71",
+        });
+      }
+    });
+  }
+  for (const file of Object.keys(exemptions)) {
+    if (holding.has(file)) continue;
+    violations.push({
+      rule: "SS69", file: "tools/enforce/source-scans.mjs", line: 1,
+      message: `\`BIDI_LITERAL_EXEMPTIONS\` names \`${file}\`, which holds no literal bidi character — remove the `
+        + "entry; the list is compared by equality on purpose",
+      spec: "A03 SS69 · F1402",
+    });
   }
   return violations;
 }

@@ -27,15 +27,15 @@ import { parse } from "../interaction/parser/index.js";
 import type { Builtin, ParseResult } from "../interaction/parser/index.js";
 import type { RawPatch } from "../data/transport/index.js";
 import type { Exit } from "../data/process/types.js";
-import type { Block, ViewDocument } from "../data/viewmodel/index.js";
-import { approvalPrompt, blockId, callHead, callStatus, cardOver, completeLocal, compose, DENY_KEY, errorDoc, noticeDoc, refusalNotice, toolCallDoc, usageDoc } from "./documents.js";
+import type { Block, EchoChip, ViewDocument } from "../data/viewmodel/index.js";
+import { approvalPrompt, blockId, callHead, callStatus, cancelledCard, cancelledDoc, cardOver, completeLocal, compose, DENY_KEY, errorDoc, noticeDoc, refusalNotice, toolCallDoc, usageDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
-import { createRefreshDriver } from "./refresh.js";
-import { DOCUMENT_VIEW_ID } from "./document-view.js";
+import { createRefreshDriver, STALL_BLOCK } from "./refresh.js";
 import type { ProducerContext } from "../data/adapters/types.js";
 import { overflowNotice, withOverflowNotice } from "../data/adapters/overflow.js";
+import { cancelledNotice, exitCodeOf } from "../data/adapters/mapping.js";
 import { BODY_INDENT } from "./entry-layout.js";
-import { isViewInvocation, jsonFlagFor } from "../data/manifest/index.js";
+import { jsonFlagFor } from "../data/manifest/index.js";
 import type { ValidationResult } from "../data/manifest/index.js";
 import { b } from "./builders/index.js";
 import { liveDeclarations } from "./builders/live.js";
@@ -72,6 +72,14 @@ export type InFlight = "app" | "local" | "shell" | null;
  * on the answer.
  */
 const headOf = (command: string): string => command.split(/\s+/u)[0] ?? "shell";
+
+/**
+ * The signals a handed-off child ends on when it was stopped rather than when
+ * it failed (C23 I95, ruling 91): an interrupt, a termination request and a
+ * closed terminal. Any other signal is a failure, `SIGQUIT` included — a
+ * terminal sends it too, and the ruling's set is these three (§8a A6.6 row 6).
+ */
+const CANCEL_SIGNALS: ReadonlySet<string> = new Set(["SIGINT", "SIGTERM", "SIGHUP"]);
 
 /** What a handler is told when validation failed and there is nothing parsed. */
 const EMPTY_ARGS: Readonly<Record<string, unknown>> = Object.freeze({});
@@ -127,6 +135,18 @@ class Guard {
 /** C06's default for a non-streaming verb. Streams pass 0, which is unbounded. */
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+/**
+ * **The arguments: the argv after the verb's own words** (C23 I54, F1430).
+ *
+ * C18 builds `ParseResult.argv` as the verb split on spaces followed by what
+ * is transmitted, so a namespaced verb's second word is the verb's and not an
+ * argument. Three sites took the arguments and one sliced a single word, which
+ * is how the running card read `container stats(stats worker)` in every stats
+ * still while the local route, slicing the verb's length, was right.
+ */
+const argsOf = (result: Readonly<{ tool: Readonly<{ name: string }>; argv: readonly string[] }>): readonly string[] =>
+  result.argv.slice(result.tool.name.split(" ").length);
+
 export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   /**
    * The producer context, **built at the call and never captured** (C07 §3a).
@@ -165,6 +185,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     line: string;
     result: Exclude<ParseResult, { kind: "empty" }>;
     id: EntryId;
+    /** The line's chips, carried as the line is (I104, §6t.3 row 4). */
+    echo?: readonly EchoChip[];
   }>;
   const queue: Queued[] = [];
 
@@ -185,22 +207,27 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       setSuppressBackground: deps.setSuppressBackground,
       history: () => deps.history.entries,
       bindings: () => deps.bindings(),
+      currentScope: () => deps.currentScope(),
       stop: deps.stop,
-      // C28 §3c's view, for `/profile` (C23 I68) — the row is in
-      // `FRAMEWORK_TOOLS`, so a handler missing here is what `seal()` refuses.
-      profileView: deps.profileView,
-      // C23 I69's amended pair — `/profile snapshot` and `/profile live` read
-      // the same reader `LocalContext.profile` carries, and `null` where that
-      // is absent. **The reader, never the recorder**: the two verbs put a card
-      // in the transcript and a transcript part has no close, so a tier raise
-      // from here would pin the tier for the session and reset the ring doing
-      // it (C28 I50, I18). There is nothing to reach it with.
+      // `/profile`'s reader (C23 I68) — the row is in `FRAMEWORK_TOOLS`, so a
+      // handler missing here is what `seal()` refuses. Every arm reads the same
+      // reader `LocalContext.profile` carries, and `null` where that is absent.
+      // **The reader, never the recorder**: every arm puts cards in the
+      // transcript and a transcript entry has no close, so a tier raise from
+      // here would pin the tier for the session and reset the ring doing it
+      // (C28 I18). There is nothing to reach it with.
       profileReport: () => deps.profile?.() ?? null,
+      // C22 I125 — the record and its sources, as C02 resolved them.
+      capabilities: () => ({ values: deps.capabilities, sources: deps.capabilitySources }),
+      // C22 I115 — the record `/config` draws (C23 I80, ruling 43).
+      settings: () => deps.settings,
       // **The one operation, `null` where there is no profiler** (C28 I64).
       // Required rather than optional for the same reason `profileReport` is:
       // a wiring site that may omit a member is a wiring site that will, and
       // the verb would then answer *no profiler* in a session that has one.
       profileCapture: deps.profileCapture ?? null,
+      // C22 I135 and C22 I136 — the session's watches, whose producers the two verbs are.
+      watches: deps.watches,
     }),
   )) {
     local.register(verb, handler);
@@ -342,7 +369,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * A green suite shows neither. Left alone on purpose — the duplication is
    * apparent rather than real.
    */
-  type Settle = Readonly<{ line: string; into: EntryId | null }>;
+  type Settle = Readonly<{
+    line: string;
+    into: EntryId | null;
+    /**
+     * The line's chips, as ranges into `line` (I104, C04 I152). **Spread with
+     * `into`, never rebuilt** — a route settling into its own pending entry
+     * writes `{ ...settle, into }`, so the chips reach the settle (C22 §6t.3 row 2).
+     */
+    echo?: readonly EchoChip[];
+  }>;
 
   /**
    * A slot reserved before its document existed (C22 I99).
@@ -352,10 +388,21 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * terminal path. A lineless arm inside `Settle` would be a second way for a
    * submission to enter no history, which is the defect I29 exists to forbid.
    */
-  type IntoSlot = Readonly<{ line?: undefined; into: EntryId }>;
+  type IntoSlot = Readonly<{ line?: undefined; into: EntryId; echo?: undefined }>;
 
   /** A submission routed as it was typed — the ordinary case. */
-  const now = (line: string): Settle => ({ line, into: null });
+  const now = (line: string, echo?: readonly EchoChip[]): Settle =>
+    echo === undefined ? { line, into: null } : { line, into: null, echo };
+
+  /**
+   * **I104 — a document written for a submission carries its chips where its
+   * `command` is the line.** A document stating another command — an adapter's
+   * own (C07 I16), an app line's argv form — is written without, because the
+   * ranges index the line and nothing else. One function, so every route asks
+   * the same question.
+   */
+  const withEcho = (doc: ViewDocument, settle: Settle | IntoSlot | undefined): ViewDocument =>
+    settle?.echo === undefined || doc.command !== settle.line ? doc : { ...doc, meta: { ...doc.meta, echo: settle.echo } };
 
   /**
    * The one place a document reaches the transcript, and the one place the
@@ -390,6 +437,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     opts?: Parameters<typeof deps.transcript.append>[1],
   ): string | null => {
     const line = settle?.line;
+    doc = withEcho(doc, settle);
     let id: string | null = null;
     try {
       // **The two cases of one destination.** A submission that waited already
@@ -466,7 +514,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   // reason was always about *no part takes effect now* and never about
   // discarding the line.
 
-  const submit = (line: string): void => {
+  const submit = (line: string, chips?: readonly EchoChip[]): void => {
+    // I104 — only a line that held a chip carries a record of one.
+    const echo = chips === undefined || chips.length === 0 ? undefined : chips; // cells-ok — an array count
     // **C23 I12 first, before anything else is read.** A submission after shutdown
     // begins must not append, and the check has to precede the guard so a
     // refusal during teardown does not take one it will never release.
@@ -501,11 +551,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // Everything queues, strictly. The rule that would let a `local` handler
       // jump is the **who is writing** axis, and it is inferred from two cases:
       // the roadmap entry carries it as the open question it is.
-      enqueue(line, result);
+      enqueue(line, result, echo);
       return;
     }
 
-    route(now(line), result);
+    route(now(line, echo), result);
   };
 
   /**
@@ -520,7 +570,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * append would record a line that has not run. History is written by the route
    * that drains it, through the funnel, exactly as an unqueued submission's is.
    */
-  const enqueue = (line: string, result: Exclude<ParseResult, { kind: "empty" }>): void => {
+  const enqueue = (line: string, result: Exclude<ParseResult, { kind: "empty" }>, echo?: readonly EchoChip[]): void => {
     // **Contained, because C23 I2 admits no escaping failure and this append is
     // outside the funnel's catch** (§5). Found by T1.46 rather than by reading:
     // `/help` takes the guard, so with a throwing transcript the second and
@@ -534,14 +584,14 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     let id: EntryId;
     try {
       id = deps.transcript.append(
-        noticeDoc(line, `queued behind ${guard.verb ?? "a command"}`, "muted", { origin: "user" }),
+        withEcho(noticeDoc(line, `queued behind ${guard.verb ?? "a command"}`, "muted", { origin: "user" }), now(line, echo)),
         { streaming: true },
       );
     } catch (cause) {
       contain("enqueue", cause);
       return;
     }
-    queue.push({ line, result, id });
+    queue.push(echo === undefined ? { line, result, id } : { line, result, id, echo });
     deps.scheduler.commit("input");
   };
 
@@ -567,7 +617,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       while (guard.route === null) {
         const next = queue.shift();
         if (next === undefined) return;
-        route({ line: next.line, into: next.id }, next.result);
+        route({ ...now(next.line, next.echo), into: next.id }, next.result);
       }
     } finally {
       draining = false;
@@ -585,14 +635,24 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    *
    * **The work is not discarded silently**, and the entry appended at submission
    * is what pays for that: it already exists and settles in place saying what
-   * happened to it.
+   * happened to it — as a cancel, on `partial` (I96, ruling 92). It was a `warn`
+   * ▲ on an `ok` document, which drew a cancel as a warning.
    */
   const clearQueue = (): void => {
     for (const item of queue.splice(0)) {
-      deps.transcript.settle(
-        item.id,
-        noticeDoc(item.line, "cancelled before it ran", "warn", { origin: "user" }),
+      // **A cleared line is a submission, and it settles here** (I29, F1492):
+      // recorded with the code it settled with, which is -1, C07 I14's *never
+      // started*. C07 §3 names an invocation aborted before anything was
+      // spawned as one of -1's two producers, and this is that invocation one
+      // step earlier. 0 would record a success, 130 an interrupt of something
+      // that was never running. It was recorded nowhere, so `↑` could not
+      // recall a line the reader typed.
+      const doc = withEcho(
+        cancelledDoc(item.line, "cancelled before it ran", { origin: "user", exitCode: -1 }),
+        now(item.line, item.echo),
       );
+      deps.transcript.settle(item.id, doc);
+      recordHistory(item.line, doc);
     }
   };
 
@@ -710,12 +770,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     const pendingId =
       settle.into === null
         ? deps.transcript.append(
-            compose({
-              command: line,
-              status: "ok",
-              blocks: [snapshot()],
-              meta: { origin: "user", transport: "subprocess", argv: [command] },
-            }),
+            withEcho(
+              compose({
+                command: line,
+                status: "ok",
+                blocks: [snapshot()],
+                meta: { origin: "user", transport: "subprocess", argv: [command] },
+              }),
+              settle,
+            ),
             { streaming: true },
           )
         : settle.into;
@@ -896,12 +959,22 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         pipeOverflowed = child.overflowed;
       }
 
-      const failed = cancelled || exit.code !== 0 || exit.signal !== null;
-      const message = cancelled
-        ? "Cancelled."
-        : exit.signal !== null
+      // **A cancel is not a failure** (I66, I96, ruling 92): it settles `partial`
+      // under the `cancelled` state's notice, where it was an `error` box on an
+      // `error` document with `error.code` `CANCELLED` — failure's status, tone
+      // and mark. The code has nowhere to go on `partial` (C04 I3) and nothing
+      // read it; 130 in `meta.exitCode` and C20 is what a consumer keeps.
+      const failed = !cancelled && (exit.code !== 0 || exit.signal !== null);
+      // **C07's sentences and C07's table** (I100, ruling 98, F1491). A child
+      // with neither a code nor a signal never started — C21 I13 settles a
+      // spawn failure that way — and `exited with code 1` named a code it never
+      // returned; the text is C07's for the same `Exit`.
+      const message =
+        exit.signal !== null
           ? `Killed by ${exit.signal}.`
-          : `The command exited with code ${String(exit.code ?? 1)}.`;
+          : exit.code === null
+            ? "The command did not start."
+            : `The command exited with code ${String(exit.code)}.`;
 
       /**
        * **The final snapshot, then the disposal** (C23 I67, C27 §6): the cursor
@@ -930,28 +1003,24 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       appendAndCommit(
         compose({
           command: line,
-          status: failed ? "error" : "ok",
+          status: cancelled ? "partial" : failed ? "error" : "ok",
           blocks: withOverflowNotice(
-            failed
-              ? [callStatus("error", message, { id: blockId("shell-failed") }), settled]
-              : [settled],
+            cancelled
+              ? [cancelledNotice("Cancelled.", blockId("shell-cancelled")), settled]
+              : failed
+                ? [callStatus("error", message, { id: blockId("shell-failed") }), settled]
+                : [settled],
             pipeOverflowed,
           ),
           ...(failed
-            ? {
-                error: {
-                  message,
-                  code: cancelled
-                    ? "CANCELLED"
-                    : exit.signal !== null
-                      ? "KILLED_BY_SIGNAL"
-                      : "UNEXPECTED_EXIT",
-                },
-              }
+            ? { error: { message, code: exit.signal !== null ? "KILLED_BY_SIGNAL" : "UNEXPECTED_EXIT" } }
             : {}),
           meta: {
             origin: "user",
-            exitCode: cancelled ? 130 : (exit.code ?? 1),
+            // 128 + n for a signal, -1 for a child that never started (C07
+            // I14). `code ?? 1` gave 1 for both, and 0 for a signal on the PTY
+            // arm until C21 I19 nulled the code there.
+            exitCode: cancelled ? 130 : exitCodeOf({ exitCode: exit.code, signal: exit.signal }),
             transport: "subprocess",
             argv: [command],
           },
@@ -960,7 +1029,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // forwards). This route appends before it spawns, so `into` is never
         // null by the time it settles — passing the caller's `settle` would
         // append a second entry beside the one the reader has been watching.
-        { line, into: pendingId },
+        // Spread rather than rebuilt, so the line's chips reach it (I104).
+        { ...settle, into: pendingId },
       );
     } catch (cause) {
       accepting = false;
@@ -969,7 +1039,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       emulator.dispose();
       appendAndCommit(
         errorDoc(line, { message: String(cause), stage: "spawn" }, { origin: "user" }),
-        { line, into: pendingId },
+        { ...settle, into: pendingId },
       );
     } finally {
       cancelInFlight = null;
@@ -1034,13 +1104,41 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // A notice rather than a `raw` block: the child wrote to the terminal
       // directly, so there is no output to carry. What the transcript can say
       // is that it ran and how it ended.
-      const code = exit.code ?? 1;
-      appendAndCommit(
+      //
+      // **Its tone and mark agree with its status** (C23 I95, ruling 91). This
+      // was `warn` and ▲ on an `error` document for every non-zero exit and
+      // every signal, so the document said failed and everything a reader sees
+      // said warning. Three endings, each the call state of the same name:
+      // `failed` is `error` and ✗ on `error`; `cancelled` is `muted` and ⊘ on
+      // `partial`, the status C07 gives a cancelled call (C23 T3.4) — never
+      // the error document I66 then drew, which read the cancel as the failure
+      // the ruling separates it from. The signal is read first (§8a A6.6 row 7).
+      //
+      // **No code and no signal is not `exited 1`** (ruling 94, F1482): C21 I13
+      // settles a child that never started that way, and `code ?? 1` named an
+      // exit it never returned. It is still a failure, and it says what
+      // happened (ruling 100 c, F1511): a spawn failure is the only producer of
+      // `{null, null}` on every C21 arm, so *ended without an exit status*
+      // described an ending none of them reaches.
+      const text =
         exit.signal !== null
-          ? noticeDoc(line, `${label} ended on ${exit.signal}`, "warn", { origin: "user" }, "error")
-          : code === 0
-            ? noticeDoc(line, `${label} finished`, "muted", { origin: "user" })
-            : noticeDoc(line, `${label} exited ${String(code)}`, "warn", { origin: "user" }, "error"),
+          ? `${label} ended on ${exit.signal}`
+          : exit.code === null
+            ? `${label} did not start`
+            : exit.code === 0
+              ? `${label} finished`
+              : `${label} exited ${String(exit.code)}`;
+      // **The child's code, for the record beneath the notice** (I97, F1480).
+      // `meta()` defaulted it to 0, so a `vim` that exited 1 said failed and was
+      // kept in history as a success. C07 I14's table, not a second copy: 128 + n
+      // for a signal, -1 for neither.
+      const metaSpec = { origin: "user", exitCode: exitCodeOf({ exitCode: exit.code, signal: exit.signal }) } as const;
+      appendAndCommit(
+        exit.signal !== null && CANCEL_SIGNALS.has(exit.signal)
+          ? cancelledDoc(line, text, metaSpec)
+          : exit.signal === null && exit.code === 0
+            ? noticeDoc(line, text, "muted", metaSpec)
+            : noticeDoc(line, text, "error", metaSpec, "error"),
         settle,
       );
     } catch (cause) {
@@ -1097,11 +1195,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // the wrapper is an allocation and a promise hop on the path that is
       // meant to cost nothing at `off`.
       const invoke = async () => handler(argv, {
-        // **`null`, and C07 §3a cell B records that it is right by accident.**
-        // The local route cannot open a view — C18 classifies on `tool.local`
-        // first and `isViewInvocation` is read only on the `app` route — so a
-        // local verb has no bound to state. F129 is that gap; when it closes,
-        // this argument changes with it.
+        // **`null`, on every route** (C23 I41, C22 §13a). No route defines a region
+        // for a producer: a verb's result is a transcript entry, and an entry is as
+        // tall as its blocks. C07 §3a cell B recorded this cell as right by accident
+        // of the local route being unable to open a view; it is now right on purpose,
+        // and it is the only answer this file gives.
         ...producerContext(null),
         command: line,
         // **The host's own `ask`, not a per-call wrapper** (C23 I36). One layer
@@ -1165,163 +1263,6 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   };
 
   /**
-   * Step 4 onward, for a verb whose result is a view (C22 §13a).
-   *
-   * The transcript is untouched throughout — that is the ruling, and it is why
-   * `Esc` has nothing to do to a source entry and why C16 I2 preserves focus:
-   * focus resets only on append, and nothing appends.
-   *
-   * A failure renders **into the view**, because the view is where the reader is
-   * looking and the transcript has nothing to show them. History still records
-   * the line: history is C20's store and not the transcript, and a view the
-   * reader cannot reopen from `↑` would be a surface reachable exactly once.
-   */
-  const runIntoView = async (
-    displayed: string,
-    settle: Settle,
-    verb: string,
-    result: Extract<ParseResult, { kind: "app" }>,
-  ): Promise<void> => {
-    // `line` is read throughout; `settle` carries where its document goes.
-    const { line } = settle;
-    const controller = new AbortController();
-
-    /**
-     * **`Ctrl-C` reaches this route too** — the obligation the table found
-     * missing (C22 §13a). It was set on the entry route and not here, which is
-     * `declareLive` and `release` a third time: an obligation the author of a
-     * new route did not notice, in a route written rather than derived.
-     *
-     * It pops rather than settling, because there is no entry to settle. The
-     * reader is left with no record, which §13a rules is the cost B03 §2 already
-     * names for an excursion that appended nothing on the way in.
-     */
-    const cancelThis = (): void => {
-      controller.abort();
-      refresh.release({ kind: "view", id: DOCUMENT_VIEW_ID });
-      deps.documentView.pop();
-      deps.history.append(line, 130);
-      deps.scheduler.commit("completion");
-    };
-    cancelInFlight = cancelThis;
-
-    try {
-      const transport = deps.transport.for(verb);
-      const streams = result.tool.streams ?? false;
-      // **The caller resolves it, so C06 never reads C05** (C05 I26, C06 I25,
-      // F1). `streams`' seam exactly, one field up.
-      const loaded = deps.manifest.manifest;
-      const jsonFlag =
-        loaded === null ? result.tool.jsonFlag : jsonFlagFor(loaded, result.tool);
-      const invocation = {
-        verb,
-        argv: result.argv,
-        streams,
-        ...(jsonFlag === undefined ? {} : { jsonFlag }),
-        // 0 is unbounded, which is what a follow needs (C06 commitment 7).
-        timeoutMs: streams ? 0 : DEFAULT_TIMEOUT_MS,
-        signal: controller.signal,
-      };
-
-      /**
-       * **The fourth route** (C22 I48, §13a), and the three obligations it does
-       * not share with the entry one are ruled in the spec rather than here.
-       *
-       * The order of these four lines is the whole of what was refused before:
-       * the guard is released *before* the loop or one follow holds the session
-       * (C23 I6), and the canceller is registered *before* the loop is awaited
-       * or Ctrl-C falls past C16 §5's rung — which on this route quits the
-       * shell, because the view's loop is the only thing on screen.
-       */
-      if (streams) {
-        guard.release();
-        liveStreams.push({ id: DOCUMENT_VIEW_ID, cancel: cancelThis });
-        // **An empty document before the loop.** `open()` pushed a spinner and
-        // `ViewPatch` has no delete, so appending beside it would leave it
-        // spinning under the notice that says the stream stopped.
-        deps.documentView.fill({
-          schema: "tui.view/1",
-          command: displayed,
-          status: "ok",
-          blocks: [],
-          meta: {
-            verb,
-            adapter: "stream",
-            exitCode: 0,
-            durationMs: 0,
-            truncated: false,
-            argv: result.argv,
-            stderr: "",
-            transport: "subprocess",
-            origin: "user",
-          },
-        });
-        try {
-          await streamIntoView(displayed, verb, transport.stream(invocation), result.validation.ok ? result.validation.args : {});
-        } finally {
-          forgetStream(DOCUMENT_VIEW_ID);
-        }
-        return;
-      }
-
-      const raw = await transport.invoke(invocation);
-      const doc = deps.adapters.adapt(raw, {
-        command: displayed,
-        verb,
-// **The region's height, because a view's producer is defined by it**
-// (C07 I18, C15 §4). The same source `documentView` reads — a second
-// computation is a producer splitting against an axis the frame does
-// not use, and nothing in the arithmetic would look wrong.
-...producerContext(deps.region().height),
-        userRequestedJson: result.argv.includes("--json"),
-        // C05 I21 — the validated values, so a `shellOnly` flag is readable by
-        // the thing that has to act on it. Empty on the failure arm, which
-        // cannot be reached here: a malformed invocation never spawns.
-        flags: result.validation.ok ? result.validation.args : {},
-        transport: "subprocess",
-        origin: "user",
-        tool: result.tool,
-      });
-      // **A queued view invocation still owns an entry, and this route has no
-      // settlement of its own** (roadmap 33; C22 §13a). §13a ruled *it pops
-      // rather than settling, because there is no entry to settle*, and that was
-      // true of a view submitted directly — it appends nothing on the way in.
-      // A **deferred** one appended its entry when it was typed, so the sentence
-      // no longer covers it and the entry would stream for ever, marked *queued
-      // behind* something that finished long ago.
-      //
-      // Settled before the fill, so the ordering holds if the fill refuses.
-      if (settle.into !== null) {
-        deps.transcript.settle(
-          settle.into,
-          noticeDoc(line, `${verb} opened a view`, "muted", { origin: "user" }),
-        );
-      }
-      if (!deps.documentView.fill(doc)) return;
-      // **Declare-on-push, which had no call site until now** (C23 I33a, F20).
-      // `declareLive` hard-coded an entry host because an entry was the only
-      // host anything produced; this is the other arm of `RefreshHost`, reached
-      // for the first time.
-      declareLiveInView(doc.blocks);
-      recordHistory(line, doc);
-      if (doc.meta.resultId !== undefined) deps.writes.setLastUuid(doc.meta.resultId);
-    } catch (cause) {
-      // C23 I2 — a transport that fails, times out or throws ends in a document
-      // like everything else. It just lands somewhere else.
-      const failed = errorDoc(line, { message: String(cause), stage: "transport" }, {
-        origin: "user",
-        verb,
-      });
-      deps.documentView.fill(failed);
-      recordHistory(line, failed);
-    } finally {
-      cancelInFlight = null;
-      guard.release();
-      deps.scheduler.commit("completion");
-    }
-  };
-
-  /**
    * C23 §3 — the eight steps, and the ordering that fails silently.
    *
    * **Step 3 before step 4** (C23 I3). The pending entry reaches the transcript
@@ -1367,17 +1308,6 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // orphan (C23 §3, T3.17).
     guard.take("app", verb);
 
-    /**
-     * **The tier, read here because after step 3 it is too late** (C22 I45,
-     * C05 I20).
-     *
-     * C23 I3 appends the pending entry before the transport is invoked and C13
-     * has no delete, so a decision taken on seeing the result could only produce
-     * a view *and* the entry B03 §2 says a push does not leave. The declaration
-     * is the only thing known this early, which is the whole of §13a's argument
-     * for putting it on the manifest.
-     */
-    const asView = isViewInvocation(result.tool, result.validation.args);
 
     /**
      * **The displayed command: the user's line, with `$_` resolved** (I15,
@@ -1390,30 +1320,18 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
      * `argv`, so the displayed line is that argv wearing the prefix the user
      * typed, which is exactly D24's one-token mapping.
      */
-    const displayed = `/${result.argv.join(" ")}`;
+    //
+    // **A line holding a chip and no `$_` displays as typed** (I15 amended,
+    // I104): the chips' ranges index the line, and the joined argv is another
+    // string. With `$_` as well, the argv form and no chips (C22 §6t.5).
+    const displayed = settle.echo !== undefined && !line.includes("$_") ? line : `/${result.argv.join(" ")}`;
 
-    /**
-     * **Step 3, for a view: the layer takes the pending entry's place** (C22 I45).
-     *
-     * One for one and in the same slot — pushed before the transport, filled
-     * after it — because step 3 exists so that something is on screen before the
-     * work starts, and ruling the entry away without a replacement would make a
-     * slow verb look like a hung terminal.
-     *
-     * A refusal here is the one case that falls back to appending: C15 I1
-     * permits one view at a time, and a second `/ps --watch` while the first is
-     * open has to say so somewhere the reader is looking. The transcript is that
-     * somewhere, and this is the only path on which a view verb touches it.
-     */
-    if (asView) {
-      const refusal = deps.documentView.open(displayed);
-      if (refusal === null) {
-        await runIntoView(displayed, settle, verb, result);
-        return;
-      }
-      appendAndCommit(errorDoc(line, { message: refusal }, { origin: "user", verb }), settle);
-      return;
-    }
+    // **Step 3 is the pending entry, for every verb** (C22 §13a, R-EXA-082). A branch
+    // stood here that pushed a layer in the entry's slot for a verb declaring `view`, one
+    // for one and in the same moment, because ruling the entry away without a replacement
+    // would have made a slow verb look like a hung terminal. The design removes the push
+    // rather than the answer: a verb's result has no prompt and no context of its own, so
+    // it is an entry, and the slot it would have taken is the slot it gets.
 
     // Step 3 — the pending entry. Before step 4. This is the ordering.
     //
@@ -1425,7 +1343,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // was the command row and silence. The figure is I53's readout, registered
     // below with this header's id; below one second `elapsed()` draws nothing,
     // so the card is bare at dispatch and gains `· 1s` on the first wake.
-    const call = { name: verb, args: result.argv.slice(1).join(" "), id: blockId("step") };
+    const call = { name: verb, args: argsOf(result).join(" "), id: blockId("call") };
     // **Composed by `documents.ts`, with the capabilities** (C23 I61, F828): the
     // separator is a slot and the duration slot is the spinner's while the call
     // runs (I58) — `tick` is the readout's, so the frame moves at I53's cadence.
@@ -1466,7 +1384,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     let pendingId: EntryId;
     if (settle.into === null) {
       pendingId = deps.transcript.append(
-        toolCallDoc(displayed, call, { origin: "user", verb, transport: "subprocess", argv: [...result.argv] }, deps.capabilities),
+        withEcho(toolCallDoc(displayed, call, { origin: "user", verb, transport: "subprocess", argv: [...result.argv] }, deps.capabilities), settle),
         { streaming: true },
       );
     } else {
@@ -1478,8 +1396,6 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     }
     deps.resetFocus();
     deps.scheduler.commit("input");
-    // §3b — from here the entry can go quiet, so it is watched for silence.
-    refresh.watch(pendingId);
     /**
      * The verdict, into the header, **before** `settle` (I54, §8g row 6).
      *
@@ -1499,6 +1415,65 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       );
     };
 
+    /**
+     * **A cancel settles `partial`, through a document the shell writes** (I98,
+     * ruling 97). The card as it stands — the head `finishCard` has just written,
+     * and whatever the entry streamed under it — with the cancelled notice after
+     * it, on `partial` with 130. It was `settle(id)` with no document, which can
+     * change no status: the entry stayed `ok` with 0 while C20 recorded 130.
+     *
+     * **The shell may write it**: C13's `settle` takes a document on an entry
+     * that still streams whoever composed it, and a cancel is the first
+     * settlement the entry sees. `settle` and not `settleWithDocument`, because
+     * nothing a cancel keeps should begin to refresh.
+     */
+    const settleCancelled = (): void => {
+      const held = deps.transcript.entries.find((e) => e.id === pendingId)?.doc;
+      if (held === undefined) {
+        deps.transcript.settle(pendingId);
+        deps.history.append(line, 130);
+        return;
+      }
+      // **The stall row is left out** (ruling 100 d): a stall is a condition of a
+      // live entry, and this document is the shell's to compose, so the settle
+      // replaces the view and nothing is deleted. `refresh.settled` is not
+      // called — its *resumed after* would be false for a cancel — and the
+      // watch ends on the settle change regardless (I102).
+      const doc = cancelledCard({ ...held, blocks: held.blocks.filter((blk) => blk.id !== STALL_BLOCK) });
+      deps.transcript.settle(pendingId, doc);
+      recordHistory(line, doc); // I29, I101 — the code the document carries.
+    };
+
+    /**
+     * **Every settlement that keeps the card carries its code** (I101, ruling
+     * 100). The card as it stands, with `code` in its `meta`, and C20 records
+     * from that document, so the entry and the record cannot say two things.
+     * They did on four routes: a stream's own ending recorded nothing (F1508),
+     * and a denial settled at 0 while C20 was told 126 (F1510).
+     *
+     * `settle(id)` when the card already carries the code: C13 I13 moves `rev`
+     * only when the document changed, and a stream ending at 0 over a card
+     * that says 0 did not.
+     */
+    const settleKept = (code: number, withoutStall = false): void => {
+      const found = deps.transcript.entries.find((e) => e.id === pendingId)?.doc;
+      if (found === undefined) {
+        // Cleared underneath: nothing to settle into, and the line was still typed.
+        deps.transcript.settle(pendingId);
+        deps.history.append(line, code);
+        return;
+      }
+      // **A stall the shell's own settlement ends is left out** (I103, ruling
+      // 103 c, F1519): the malformed patch and the throw compose the card as it
+      // stood, and a stall is a condition of a live entry. The natural `end`
+      // passes `false`: `refresh.settled` has already made its row a record.
+      const stalled = withoutStall && found.blocks.some((blk) => blk.id === STALL_BLOCK);
+      const held = stalled ? { ...found, blocks: found.blocks.filter((blk) => blk.id !== STALL_BLOCK) } : found;
+      const doc = held === found && held.meta.exitCode === code ? held : { ...held, meta: { ...held.meta, exitCode: code } };
+      deps.transcript.settle(pendingId, doc === held ? undefined : doc);
+      recordHistory(line, doc);
+    };
+
     // **A call that needs a decision waits for it** (I60, §8f P10, P12, §8g rows
     // 15–17). The head reads `· ⠋ waiting`, the confirm layer carries the
     // invocation, the consequence and the choices, and **no readout is
@@ -1511,12 +1486,42 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     if (approval !== null) {
       deps.transcript.patch(pendingId, { op: "replace", blockId: call.id, block: header(0, undefined, true) }, "shell");
       deps.scheduler.commit("input");
-      const answer = await deps.confirm.ask(approvalPrompt(call, approval.consequence, approval.choices));
-      if (answer === DENY_KEY) {
-        finishCard("denied");
+      let answer: Awaited<ReturnType<typeof deps.confirm.ask>>;
+      try {
+        answer = await deps.confirm.ask({
+          ...approvalPrompt(call, approval.consequence, approval.choices),
+          // The asker's withdrawal and expiry reach the question (C23 I92, I94).
+          ...(approval.signal === undefined ? {} : { signal: approval.signal }),
+          ...(approval.expiresAfterMs === undefined ? {} : { expiresAfterMs: approval.expiresAfterMs }),
+        });
+      } catch (cause) {
+        // **A refused question settles this card, and nothing runs** (I94,
+        // F1495). `approvalPrompt` and `ask` throw on a set whose `esc` would
+        // not deny, before anything is pushed. Unwound from here the throw
+        // reached `start`, which appended the error as a second entry and left
+        // this card streaming at `⠋ waiting` for good (§8a A6.11 row 5). The
+        // card is the entry, so the failure is settled into it, as the invoke
+        // arm's throw is.
+        const refused = errorDoc(line, { message: String(cause), stage: "pipeline" }, { origin: "user", verb });
+        settleWithDocument(pendingId, withEcho(cardOver(refused, call, deps.elapsed() - startedAt, deps.capabilities), settle));
+        recordHistory(line, refused); // I29 — a refusal is a settlement.
+        deps.scheduler.commit("completion");
+        guard.release();
+        return;
+      }
+      // **Only an answer runs the tool** (I94, §7g ruling 4). A question that
+      // was withdrawn or timed out resolves with its default's key, and the
+      // approval's default is `deny` — but the card says what happened: *expired,
+      // not denied* (`R-BLK-881`), and nothing is run on either.
+      if (answer.outcome !== "answered" || answer.key === DENY_KEY) {
+        finishCard(answer.outcome === "answered" ? "denied" : answer.outcome);
         refresh.settled(pendingId);
-        deps.transcript.settle(pendingId);
-        deps.history.append(line, 126);
+        // A withdrawal is a cancel (I98); a denial and an expiry are not, and
+        // keep the card alone.
+        // 130 for a withdrawal, as `cancelThis` records one; 126 otherwise, in
+        // the document as in C20 (I101, ruling 100 a) — the status stays `ok`.
+        if (answer.outcome === "cancelled") settleCancelled();
+        else settleKept(126);
         deps.scheduler.commit("completion");
         guard.release();
         return;
@@ -1533,19 +1538,35 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // stops it. `readout` writes with `origin: "shell"`, as the shell speaking
     // about an entry it holds. Its tick is the spinner's frame (I58).
     refresh.readout(pendingId, call.id, (ms, tick) => header(ms, undefined, false, tick));
+    // §3b — from here the entry can go quiet, so it is watched for silence.
+    // **With the readout, not at dispatch** (I103, ruling 103 d, F1520): an
+    // approval's wait is the reader's, and a question open for two minutes read
+    // `no output for 2m` — then carried it into the run once allowed.
+    refresh.watch(pendingId);
 
     const controller = new AbortController();
+    /**
+     * **Whether this run still holds the guard** (I99). A cancel releases it —
+     * `cancel()` does, after this — and a stream releases it before its loop
+     * (I6), and in both cases the run goes on unwinding afterwards: a late
+     * answer, or the stream's own end. `Guard.release()` names no holder, so a
+     * `finally` that released unconditionally released whatever the *next*
+     * submission had taken, and the queue started a third beside it (§8a A6.8
+     * rows 6 and 7).
+     */
+    let holdsGuard = true;
     const cancelThis = (): void => {
       forgetStream(pendingId);
       controller.abort();
-      // I54 — the card survives a cancel (this settle carries no document), so
+      holdsGuard = false;
+      // I54 — the card survives a cancel (I98 keeps it inside the document), so
       // the header says what happened to it. §8f P5.
       finishCard("cancelled");
-      deps.transcript.settle(pendingId);
       // I29 — the streaming route settles here rather than through
       // `appendAndCommit`, so these are the settlements the funnel does not
-      // reach. A cancellation is a settlement and carries its own code.
-      deps.history.append(line, 130);
+      // reach. A cancellation is a settlement and carries its own code, which
+      // `settleCancelled` records from the document it settles.
+      settleCancelled();
       deps.scheduler.commit("completion");
     };
     cancelInFlight = cancelThis;
@@ -1573,13 +1594,14 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       if (streams) {
         // C23 I6 — a subscription does not hold the guard. Released before the
         // loop rather than after it, or one `--watch` blocks the session.
+        holdsGuard = false;
         guard.release();
         // **Registered before the loop is awaited**, because the loop does not
         // return until the stream ends: a registration after it would only ever
         // run for a subscription that had already finished.
         liveStreams.push({ id: pendingId, cancel: cancelThis });
         try {
-          await streamInto(pendingId, displayed, verb, transport.stream(invocation), result.validation.ok ? result.validation.args : {}, finishCard);
+          await streamInto(pendingId, displayed, verb, transport.stream(invocation), result.validation.ok ? result.validation.args : {}, finishCard, settleKept, controller.signal);
         } finally {
           forgetStream(pendingId);
         }
@@ -1588,6 +1610,12 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
 
       // Steps 4 and 5 — invoke, then adapt.
       const raw = await transport.invoke(invocation);
+      // **I99 — the cancel settled this entry and recorded it; the answer
+      // arrives to nobody.** A real transport answers an aborted invocation with
+      // C06's `cancelled` result once the child has stopped, which is always
+      // after `cancelThis`. Run on, it was refused by C13 as `settled` and
+      // recorded in C20 a second time (§8a A6.8 row 4).
+      if (controller.signal.aborted) return;
       const doc = deps.adapters.adapt(raw, {
         command: displayed,
         verb,
@@ -1615,7 +1643,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // this the settle replaced the card wholesale and `❯ /ps` over a table
       // was what a finished listing read — §9c's settled state on this route
       // was reached by no path.
-      settleWithDocument(pendingId, cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities));
+      settleWithDocument(pendingId, withEcho(cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities), settle));
       recordHistory(line, doc); // I29 — the app route's settlement.
 
       // C23 I7 — declared, never inferred. A verb declaring none leaves `$_`
@@ -1625,6 +1653,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // Step 8.
       deps.scheduler.commit("completion");
     } catch (cause) {
+      // I99 — a transport that throws once aborted is the late answer too.
+      if (controller.signal.aborted) return;
       // C23 I2 — a transport that fails, times out or throws ends in a document
       // like everything else.
       const failed = errorDoc(
@@ -1634,12 +1664,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       );
       // I55, §8g row 11 — the status box is the body and the verdict is the
       // header's: two statements of one fact, and the header is the one 1-bit keeps.
-      settleWithDocument(pendingId, cardOver(failed, call, deps.elapsed() - startedAt, deps.capabilities));
+      settleWithDocument(pendingId, withEcho(cardOver(failed, call, deps.elapsed() - startedAt, deps.capabilities), settle));
       recordHistory(line, failed); // I29 — a failure is a settlement.
       deps.scheduler.commit("completion");
     } finally {
-      cancelInFlight = null;
-      guard.release();
+      // I99 — only what this run still holds. By the time a cancelled or
+      // streaming run unwinds here, the slot and the guard may be the next
+      // submission's.
+      if (cancelInFlight === cancelThis) cancelInFlight = null;
+      if (holdsGuard) guard.release();
     }
   };
 
@@ -1652,129 +1685,6 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * and the two want opposite endings: settle with what was kept, or map the
    * failure through C07. C23 is the first consumer of that shape.
    */
-  /**
-   * `streamInto`'s sibling — the same loop against a view (C22 I48).
-   *
-   * **Not a parameterisation of `streamInto`, and that is a decision.** The two
-   * differ at every branch: the target, the settlement, and what a failed patch
-   * means. A shared function with a `target` flag would carry six conditionals
-   * and read as one route with exceptions, when it is two routes with a common
-   * shape — and the shape is what the route-obligation table already records.
-   *
-   * **What is genuinely shared is `seq`'s discipline** (C07 I15, I30): a
-   * per-stream counter, incremented per patch *adapted* rather than applied,
-   * because a patch C07 mapped to `null` still occupied a position. Counting
-   * only the applied ones reuses a position after every dropped line, and the
-   * collision that produces is the one no test that builds its own context can
-   * see.
-   */
-  const streamIntoView = async (
-    displayed: string,
-    verb: string,
-    patches: AsyncIterable<RawPatch>,
-    /** The invocation's validated flags, for `adaptPatch` (C05 I21, F39). */
-    flags: Readonly<Record<string, unknown>>,
-  ): Promise<void> => {
-    let seq = 0;
-
-    /**
-     * **A view has no settlement** (C22 I48). `end`, a malformed patch and a
-     * failure all append a notice and leave the view open, because the stream
-     * ending is not the reader having finished with it — `docker logs` without
-     * `-f` ends immediately, and a view that popped would flash and vanish.
-     * Only the wording differs, so only the wording is a parameter.
-     */
-    const finish = (text: string, tone: "ok" | "warn" | "error", id: string): void => {
-      // **The glyph is passed, not defaulted** (C04 I6). `b.notice` supplies one
-      // for `warn` and `error` and none for `ok`, and this site has always drawn
-      // `✓` on the `ok` arm — the one of the fourteen where the family's default
-      // and the literal disagreed, found by the walk and not by the frame.
-      deps.documentView.patch({
-        op: "append",
-        block: b.notice(tone, text, tone, { id: blockId(id) }),
-      });
-      // The stall machinery is per host and this one has stopped producing, so
-      // `settled` still fires — it is only `transcript.settle` that has no
-      // counterpart here, and only because there is no transcript on this route.
-      refresh.settled(DOCUMENT_VIEW_ID);
-      deps.scheduler.commit("completion");
-    };
-
-    try {
-      for await (const patch of patches) {
-        if (patch.kind === "end") {
-          // **The walk said this route has no exit code and it was wrong.**
-          // `RawPatch` `end` carries a whole `RawResult`
-          // (`transport/types.ts:63`), so the code is right there — the ruling
-          // was written from *what a patch is for* rather than from the type,
-          // and the type is the thing that can falsify it.
-          //
-          // It matters to the reader rather than being a detail: a follow that
-          // ends because the container stopped is a different event from one
-          // that ends because the log ran out, and the code is what separates
-          // them. Still not phrased as *the container stopped* — a non-zero
-          // code is the `docker logs` process's, and inferring the container's
-          // fate from it is a second claim this route cannot make.
-          const code = patch.result.exitCode;
-          // **And the reason, when there is one.** The first version said only
-          // *exited 1*, which a frame-read against a container that does not
-          // exist showed to be the wrong half: the reader is told the follow
-          // failed and not why, while `stderr` sat on the same `RawResult`
-          // carrying `No such container`. The entry route has the transcript's
-          // error rendering behind it; this route has only what it appends.
-          const why = patch.result.stderr.trim().split("\n")[0] ?? "";
-          finish(
-            code === 0
-              ? "the log stream ended"
-              : `the log stream ended — ${why === "" ? `docker exited ${String(code)}` : why}`,
-            code === 0 ? "ok" : "warn",
-            "stream-end",
-          );
-          return;
-        }
-
-        const view = deps.adapters.adaptPatch(patch, {
-          command: displayed,
-          verb,
-  // **The region's height, because a view's producer is defined by it**
-  // (C07 I18, C15 §4). The same source `documentView` reads — a second
-  // computation is a producer splitting against an axis the frame does
-  // not use, and nothing in the arithmetic would look wrong.
-  ...producerContext(deps.region().height),
-          userRequestedJson: false,
-          flags,
-          transport: "subprocess",
-          origin: "user",
-          tool: null,
-          seq,
-        });
-        seq += 1;
-        if (view === null) continue;
-
-        const outcome = deps.documentView.patch(view);
-        if (outcome.ok) {
-          refresh.sawPatch(DOCUMENT_VIEW_ID);
-          deps.scheduler.commit("stream");
-          continue;
-        }
-
-        if (outcome.reason === "patch") {
-          finish(`output truncated: ${outcome.error.message}`, "warn", "truncated");
-          return;
-        }
-
-        // `"closed"`, `"layer"`, `"project"` — the view is gone or could not be
-        // reprojected, so there is nothing to append a notice *to*. Stop
-        // consuming: a subprocess still streaming into a layer that has been
-        // popped spends a process on output nothing can receive. This is the
-        // arm A4 rules, and it is why the owner returns rather than throwing.
-        return;
-      }
-    } catch (cause) {
-      finish(`stream failed: ${String(cause)}`, "error", "stream-error");
-    }
-  };
-
   const streamInto = async (
     id: string,
     /**
@@ -1792,10 +1702,24 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     /**
      * Writes the card's verdict into its header (C23 I54). Called on every
      * ending of this route **before** the settle that ends it, because each of
-     * them is a `settle(id)` that keeps the card, and the settle change is what
+     * them keeps the card (`settleKept`, below), and the settle change is what
      * persistence writes (§8f P3, P8).
      */
     finishCard: (outcome: string) => void,
+    /**
+     * Settles the card with the code the entry ended with, and records it
+     * (I101, F1508). Every ending of this route but the cancel came through a
+     * bare `settle(id)` and none of them reached C20.
+     */
+    settleKept: (code: number, withoutStall?: boolean) => void,
+    /**
+     * The invocation's own, so a cancel is visible here (I99). `cancelThis` has
+     * settled the entry by the time the far side's `end` arrives — a subprocess
+     * stream yields it once the child has exited — and `finishCard` is a
+     * `"shell"` patch, which C13 admits on a settled entry: the head read
+     * `succeeded · exit null` over the cancel (§8a A6.8 row 5).
+     */
+    cancelled: AbortSignal,
   ): Promise<void> => {
     // **The stream's own counter** (I30, C07 I15). Not decoration: C07 spends it
     // as the namespace for generated block ids *and* as the per-stream reset,
@@ -1809,6 +1733,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
 
     try {
       for await (const patch of patches) {
+        if (cancelled.aborted) return;
         if (patch.kind === "end") {
           // **An overflowed stream is a notice here too** (C07 §4, I22). The
           // registry appends it in `finish` and the `shell` route appends it
@@ -1828,11 +1753,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           // such — `exit 1` — not as a claim about what it was following. **A
           // zero is no outcome** (I59): the head reads `verb · 4s` and the tone
           // carries the verdict; `exit 0` was `ok` with a number on it.
-          finishCard(patch.result.exitCode === 0 ? "" : `exit ${String(patch.result.exitCode)}`);
+          //
+          // **One number for the head and the record** (I101): C07 I14's table,
+          // so a stream a signal ended reads `exit 137` where it read
+          // `exit null` over `succeeded`.
+          const code = exitCodeOf(patch.result);
+          finishCard(code === 0 ? "" : `exit ${String(code)}`);
           // C23 I8 — settlement flushes at `"completion"`. §8a A4: settling
           // clears the stall state, so a notice does not outlive its condition.
           refresh.settled(id);
-          deps.transcript.settle(id);
+          settleKept(code);
           deps.scheduler.commit("completion");
           return;
         }
@@ -1881,7 +1811,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
             block: callStatus("error", `output truncated: ${outcome.error.message}`, { id: blockId("truncated") }),
           });
           finishCard("truncated"); // I54, §8f P8 — the box carries the why
-          deps.transcript.settle(id);
+          // I101 — 1, I100's code for a failure whose own is unknown: the
+          // stream stops here, before any `end` could say how the child ended.
+          // I103 — and a stall it had is left out: the shell composed this.
+          settleKept(1, true);
           deps.scheduler.commit("completion");
           return;
         }
@@ -1892,13 +1825,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         return;
       }
     } catch (cause) {
+      // I99 — a stream that dies of its own cancel says nothing more.
+      if (cancelled.aborted) return;
       // §8g row 13 — the throw settles over a `status` box (I61); the head is kept.
       deps.transcript.patch(id, {
         op: "append",
         block: callStatus("error", `stream failed: ${String(cause)}`, { id: blockId("stream-error") }),
       });
       finishCard("failed"); // I54, §8f P8
-      deps.transcript.settle(id);
+      settleKept(1, true); // I101, I103 — 1 as the invoke arm's throw carries, and no stall row
       deps.scheduler.commit("completion");
     }
   };
@@ -2032,7 +1967,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
           runLocal(
             settle,
             result.tool.name,
-            result.argv.slice(result.tool.name.split(" ").length),
+            argsOf(result),
             result.validation.ok ? result.validation.args : EMPTY_ARGS,
           ),
         );
@@ -2081,6 +2016,28 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     }
   };
 
+  const refuse = (from: EntryId | null, text: string): void => {
+    if (from === null) {
+      appendAndCommit(noticeDoc("", text, "warn", { origin: "action" }));
+      return;
+    }
+    const outcome = deps.transcript.patch(
+      from,
+      {
+        op: "append",
+        block: refusalNotice(text, blockId("refused")),
+      },
+      // **The whole of why this works now.** A refusal notice *is* data, so a
+      // gate reading the operation refused it on every settled entry — which
+      // is most of the ones a reader acts on. The gate reads who is writing
+      // (C13 §6), and this is the shell.
+      "shell",
+    );
+    // The entry was evicted or cleared under the action. Nothing to patch and
+    // nothing worth appending about it.
+    if (outcome.ok) deps.scheduler.commit("input");
+  };
+
   /**
    * C23 I16 — C23 supplies `onAction` and nothing else may.
    *
@@ -2094,35 +2051,18 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     scheduler: deps.scheduler,
     openUrl: deps.openUrl,
     submit: (l) => void submit(l),
-    pushView: (from, target) => deps.patchView.open(from, target),
 
     // **Patched into the source entry, never appended** (C23 I18, §3a). An
     // append freezes the block the action came from, so the next action is
     // refused as frozen rather than for its own reason and the selection A01 D7
     // preserves is cleared — C23 §4's pop row, one section over.
-    refuse: (from, text) => {
-      if (from === null) {
-        appendAndCommit(noticeDoc("", text, "warn", { origin: "action" }));
-        return;
-      }
-      const outcome = deps.transcript.patch(
-        from,
-        {
-          op: "append",
-          block: refusalNotice(text, blockId("refused")),
-        },
-        // **The whole of why this works now.** A refusal notice *is* data, so a
-        // gate reading the operation refused it on every settled entry — which
-        // is most of the ones a reader acts on. The gate reads who is writing
-        // (C13 §6), and this is the shell.
-        "shell",
-      );
-      // The entry was evicted or cleared under the action. Nothing to patch and
-      // nothing worth appending about it.
-      if (outcome.ok) deps.scheduler.commit("input");
-    },
+    refuse,
 
     notify: (text) => void appendAndCommit(noticeDoc("", text, "warn", { origin: "action" })),
+
+    // The registry's fold hook and nothing wider (C23 I84, C09 I124): the
+    // dispatcher asks a block whether it folds, and never what kind it is.
+    fold: (block) => deps.blocks.fold(block),
   });
 
   /**
@@ -2223,19 +2163,6 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * `--watch` scrolled out of view is still running. C24 §5's *teardown on
    * freeze* row was deleted against exactly that.
    */
-  /**
-   * The view arm of I33a's declaration, and the call site that did not exist.
-   *
-   * `declareLive` hard-codes `{ kind: "entry" }` because an entry was the only
-   * host anything in the tree produced — the finding gap 7 was filed against
-   * (F20). This is the other arm, reached now that a verb's result can be a
-   * view, and it is the same `declare` with the same parts.
-   */
-  const declareLiveInView = (blocks: readonly Block[]): void => {
-    const parts = liveDeclarations(blocks).map((d) => partOf(d.spec));
-    if (parts.length > 0) refresh.declare({ kind: "view", id: DOCUMENT_VIEW_ID }, parts);
-  };
-
   const declareLive = (id: string, blocks: readonly Block[]): void => {
     const parts = liveDeclarations(blocks).map((d) => partOf(d.spec));
     if (parts.length > 0) refresh.declare({ kind: "entry", id }, parts);
@@ -2284,44 +2211,61 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     // refusing on every tick says it once.
     fault: contain,
     stopping: () => deps.session().stopping,
-    // **A second seam, because the two hosts are different components.** §3b
-    // commits that an entry and a pushed view are driven by *the same code*,
-    // not that they are the same store: C13 patches, C15 updates, and the
-    // driver holds one loop over both.
-    // **The document view is asked, not the layer** (C22 §13a, C22 I46). Its layer
-    // holds a *window* of the document, so a part scrolled out of view is absent
-    // from `layer.content` while being perfectly alive — patching the layer
-    // directly would report that as a vanished host and release the parts, and
-    // the reader would come back from a scroll to a dead panel.
-    //
-    // The owner holds the whole document, so it answers for blocks the window
-    // does not currently show. `putBlock` is total (§13a): the reprojection
-    // happens into a local and nothing is assigned unless it succeeds.
-    updateView: (id, blockId, next) => {
-      if (id === DOCUMENT_VIEW_ID) return deps.documentView.putBlock(blockId, next);
-      const layer = deps.overlays.stack.find((l) => l.id === id);
-      if (layer === undefined) return false;
-      const content = layer.content.map((b) => (b.id === blockId ? next : b));
-      return deps.overlays.update(id, { content });
-    },
-    // Returns the panel itself, not its child (F22). The caller wants the block
-    // as the view holds it, and handing back a child forced a reconstruction
-    // that silently dropped every field it did not know to set.
-    viewPanel: (id, blockId) => {
-      const found =
-        id === DOCUMENT_VIEW_ID
-          ? deps.documentView.blockAt(blockId)
-          : deps.overlays.stack.find((l) => l.id === id)?.content.find((b) => b.id === blockId);
-      return found !== undefined && found !== null && found.kind === "panel" ? found : null;
-    },
+    // **The second seam is gone with the second host** (C22 §13a, C28 §3c,
+    // R-EXA-082, F1254). §3b committed that an entry and a pushed view are driven
+    // by *the same code*, not that they are the same store: C13 patched one and
+    // C15 updated the other, and the driver held one loop over both. There is one
+    // store now, and the commitment reads as a description of what is left.
     // C23 I46 — C22 answers, because the answer is C14's for an entry and C15's
     // for a layer (A02 Seam 4).
     visible: deps.visible,
   });
 
+  /**
+   * **A key's emission is not a submission** (C23 I79, C16 I57, R-KEY-005).
+   *
+   * `?` and `F1` went through `submit("/help keys")`, which is three things
+   * besides an append: the prompt cleared (I28), the line recorded (I29), and
+   * the line queued behind a running verb (I5). So `F1` mid-sentence lost the
+   * draft, left a line in history nobody typed, and during a run drew nothing.
+   * This runs the **same handler** — one renderer, so the key and the typed verb
+   * cannot disagree — and appends with no settle, which is the path that
+   * records nothing. No guard is taken, so nothing queues it.
+   */
+  const emitLocal = async (line: string): Promise<void> => {
+    if (deps.session().stopping) return;
+    const result = classify(line);
+    if (result.kind !== "local") return;
+    const verb = result.tool.name;
+    const argv = argsOf(result);
+    const handler = local.get(verb);
+    if (handler === undefined) return;
+    const startedAt = deps.elapsed();
+    const call = { name: verb, args: argv.join(" ") };
+    const carded = (doc: ViewDocument): ViewDocument => cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities);
+    // The context `runLocal` hands a handler, so the listing is the typed verb's.
+    const context = {
+      ...producerContext(null),
+      command: line,
+      ask: deps.confirm.ask,
+      ...(deps.profile === undefined ? {} : { profile: deps.profile }),
+      args: result.validation.ok ? result.validation.args : EMPTY_ARGS,
+    };
+    try {
+      const produced = await handler(argv, context);
+      appendAndCommit(carded(completeLocal(produced, { command: line, verb, argv, durationMs: deps.elapsed() - startedAt })));
+    } catch (cause) {
+      appendAndCommit(
+        carded(errorDoc(line, { message: `\`${verb}\` failed: ${String(cause)}`, stage: "local" }, { origin: "user" })),
+      );
+    }
+  };
+
   return {
     submit,
+    emitLocal,
     onAction,
+    refuse,
     /**
      * C23 I48 — read by C22 §8 step 3, on the restored primary screen.
      *
@@ -2332,10 +2276,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       return Object.freeze([...faults]);
     },
     identityNotice: (text) => void refresh.identityNotice(text),
-    releaseView: () => void refresh.release({ kind: "view", id: DOCUMENT_VIEW_ID }),
     visibilityChanged: () => void refresh.visibilityChanged(),
-    // C23 I65 — the listeners resize the child first and the emulator second;
-    // this is only the delivery.
+    // C23 I65 — each listener tells the emulator and then the child one width,
+    // computed once; the order between them is not the invariant (F1336). This
+    // is only the delivery.
     resized: () => {
       for (const listener of [...resizeListeners]) listener();
     },
@@ -2407,6 +2351,33 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
 
     get inFlight() {
       return guard.route;
+    },
+
+    /**
+     * `runHandoff`'s five calls with no entry behind them (C22 I144, C23 §4).
+     *
+     * **The same `finally` shape, for A6.5's reason**: a rejection from C21
+     * after the suspend still resumes, resets the decoder and repaints. The
+     * guard is taken for the duration and released on every path — its
+     * `release` drains the queue, so a line typed before the editor opened runs
+     * after it closes, as one typed during a `/tty` line would.
+     */
+    borrowTerminal: async (argv: readonly string[], label: string) => {
+      if (guard.route !== null) return { kind: "busy" as const, verb: guard.verb };
+      guard.take("shell", label);
+      try {
+        deps.lifecycle.suspend();
+        try {
+          const exit = await deps.runner.handoff(argv, { cwd: () => deps.session().cwd });
+          return { kind: "ran" as const, exit };
+        } finally {
+          deps.lifecycle.resume();
+          deps.resetInput();
+          deps.scheduler.invalidate();
+        }
+      } finally {
+        guard.release();
+      }
     },
 
     cancel: () => {

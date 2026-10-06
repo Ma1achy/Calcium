@@ -16,16 +16,19 @@ import {
   type MergeRow,
   type Table,
   type TableRow,
+  type Tape,
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 import { CORPUS, doc, ONE_PER_KIND, tableOf } from "../support/blocks.js";
 import { axesOf } from "../../src/data/viewmodel/index.js";
-import { ASCII_CAPS, FULL_CAPS, measurable } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { measureSequence } from "../support/viewport.js";
-import { SUBSTITUTIONS } from "../../src/presentation/blocks/index.js";
-import { cells } from "../../src/presentation/text.js";
+import { FREE_WIDTH_SLOTS, SUBSTITUTIONS, glyphs } from "../../src/presentation/blocks/index.js";
+import { cells, sliceCells } from "../../src/presentation/text.js";
+import { tapeMemberCols } from "../../src/presentation/blocks/index.js";
+import { rampStyle } from "../../src/presentation/theme/index.js";
 import { checkAsciiParity, formatReport } from "../../src/testing/measurement-conformance.js";
 
 function unwrap(r: ReturnType<typeof applyPatch>): ViewDocument {
@@ -338,12 +341,24 @@ describe("C04 fail-on-revert", () => {
   });
 
   it("T6.3: an ASCII fallback glyph of a different width → T2.6 fails", () => {
-    // The 1:1 rule made checkable: every substitution is one cell on both
-    // sides, so a fixture's measured height is identical in both unicode
-    // modes. A two-cell fallback would pass every test run in a UTF-8 locale.
+    // The slot rule made checkable: every substitution fits the slot it
+    // declares on both sides, so a fixture's measured height is identical in
+    // both unicode modes. A fallback wider than its slot would pass every test
+    // run in a UTF-8 locale.
+    //
+    // **`residue` is the one rôle whose two renderings differ in width** — it
+    // is a free-width slot, because a residue lead is followed only by its own
+    // count and no column aligns to it (T2.5, `FREE_WIDTH_SLOTS`). Parity for
+    // every other rôle still holds through the character.
     for (const [unicode, ascii] of SUBSTITUTIONS) {
+      if (unicode === "\u22ef") continue;
       expect(cells(ascii), `${unicode} → ${ascii}`).toBe(cells(unicode));
     }
+    expect(FREE_WIDTH_SLOTS.has("residue"), "and the exception is declared, not assumed").toBe(true);
+    expect(
+      [cells(glyphs(FULL_CAPS).residue), cells(glyphs(ASCII_CAPS).residue)],
+      "the two renderings genuinely differ, which is what makes the exemption live",
+    ).toEqual([1, 3]);
 
     const report = checkAsciiParity(
       measurable(),
@@ -488,5 +503,96 @@ describe("C04 §3 both axes — fail-on-revert", () => {
     const element = kit.registry.elementsIn([group], 40).find((e) => e.blockId === "chips");
     expect(element?.element.rows.from, "the walk agrees with the frame").toBe(drawn);
     expect(drawn, "and the frame is F816's").toBe(3);
+  });
+});
+
+describe("C04 I6 fail-on-revert — the vocabulary is closed", () => {
+  it("T6.105 (C04 I6, ruling 44): dropping the membership check → T2.139 fails on envx", () => {
+    // Without it the column's declaration exempts every cell under it, and a
+    // cell whose text is no word of the set carries `warn` with no glyph —
+    // free text opting itself out, the case the ruling says must not happen.
+    const outside = {
+      kind: "table",
+      id: "settings",
+      columns: [{ key: "source", label: "source", priority: 1, minWidth: 7, sortable: false, vocabulary: ["env", "flag"] }],
+      rows: [{ id: "r", cells: { source: { text: "envx", tone: "warn" } } }],
+    };
+    expect(() => block(outside as never)).toThrow(/C04 I6, ruling 44/u);
+  });
+  it("T6.106 (C04 I6, ruling 77): dropping the wire's glyph check → T2.139 fails at the wire", () => {
+    // Without it the wire accepts what `block()` throws on — one document, two
+    // verdicts, and the far side is the producer D29 exists for (F1284).
+    const colourOnly = { kind: "notice", id: "n", tone: "error", text: "failed" };
+    expect(() => block(colourOnly as never), "the builder").toThrow(/C04 I6/u);
+    const wire = validateBlock(colourOnly);
+    expect(wire.ok ? "" : wire.error.join("\n"), "the wire").toMatch(/requires a glyph \(C04 I6, D29\)/u);
+  });
+});
+
+describe("C04 I124, I144–I148 — tier 6 (review batch 4)", () => {
+  it("T6.108 (C04 I144): the tape arm reverted to requireArray → T2.150 fails", () => {
+    // **The document the old arm let through**: its members are an array, which
+    // is all `requireArray` asked, and two of them answer to one name — so a
+    // click, a focus and an `expand` each had two targets. Reverting the arm
+    // makes this valid and T2.150's duplicate row goes red.
+    const twins = { kind: "tape", id: "t", members: [{ id: "a", label: "x" }, { id: "a", label: "y" }] };
+    expect(Array.isArray(twins.members), "requireArray alone is satisfied").toBe(true);
+    expect(validateBlock(twins).ok, "the arm refuses it").toBe(false);
+  });
+  it("T6.109 (C04 I145): progress measuring 1 at every fraction → T1.80 fails at 100/100", () => {
+    // **The old answer beside the new one**: at 99/100 both say 1, which is why
+    // a row sampling below the total could not tell them apart; at 100/100 only
+    // the finished-bar arm says 0.
+    const kit = measurable({ capabilities: FULL_CAPS });
+    const at = (current: number) => kit.registry.measure(block({ kind: "progress", id: "m", label: "x", quantity: "progress", current, total: 100 } as never), 40);
+    expect(at(99), "below the total, the two answers agree").toBe(1);
+    expect(at(100), "at it, the reverted 1 is what T1.80 refuses").toBe(0);
+  });
+
+  it("T6.110 (C04 I146): the progress arm without its field checks → T2.151 fails", () => {
+    // **What the arm let through before**: `"progres"` is a string, the one
+    // thing a field nobody checked could be, and it never finishes (C04 I145).
+    const misspelt = { kind: "progress", id: "g", label: "x", current: 10, total: 10, quantity: "progres" };
+    expect(validateBlock(misspelt).ok, "the arm refuses it").toBe(false);
+    const kit = measurable({ capabilities: FULL_CAPS });
+    expect(kit.registry.measure(block({ ...misspelt, quantity: "progress" } as never), 40), "spelt right, it has finished").toBe(0);
+  });
+  it("T6.111 (C04 I147): width counting labels and gaps only → T1.81 fails on the measured case", () => {
+    // **The old sum, computed here, and the row it drew.** Labels at narrow and
+    // two gaps: 5 + 3 + 5 + 4 = 17, and a tape laid out at 17 slides.
+    const members = [
+      { id: "seams", label: "seams", detail: "2:53", state: "succeeded" },
+      { id: "arm", label: "arm", detail: "4:02", state: "running" },
+      { id: "count", label: "count" },
+    ];
+    const tape = block({ kind: "tape", id: "t", members, current: "arm" } as never);
+    const old = members.reduce((n, m, i) => n + cells(m.label) + (i > 0 ? 2 : 0), 0); // narrow-ok — the reverted arithmetic
+    expect(old).toBe(17);
+    const kit = measurable({ capabilities: FULL_CAPS });
+    expect(kit.renderToLines(tape, old).join(""), "at the old width the row slides").toContain("«");
+    expect(kit.registry.width(tape, 200), "and the width counts what it draws").toBeGreaterThan(old);
+  });
+  it("T6.112 (C04 I148): the sampler ignoring overshoot → T1.82 fails at t = 1", () => {
+    // **What ignoring it draws**: the plain gradient, whose `t = 1` is the
+    // accent exactly — the head the band drew before, and not T1.82's lift.
+    const plain = { fill: "gradient", from: "default", to: "accent" } as const;
+    const sample = (ramp: Parameters<typeof rampStyle>[0]) => rampStyle(ramp, 1, 0, DARK_THEME, { colourDepth: 24 });
+    expect(sample({ ...plain, overshoot: { lift: 1.35, share: 0.35 } }), "the stop moves the head").not.toEqual(sample(plain));
+    expect(sample({ ...plain, overshoot: { lift: 1.35, share: 0.35 } })).toEqual({ colour: { kind: "rgb", hex: "#ffe3a7" } });
+  });
+  it("T6.113 (C04 I124): tapeMemberCols leaving out the current's lead → T1.83 fails", () => {
+    // **The lead is the member's**: the current's range opens on `›`, two cells
+    // before its label. A range taken from the text alone starts at the label,
+    // and a press on the mark lands on nobody — T1.83's lead row fails.
+    const tape = block({
+      kind: "tape",
+      id: "t",
+      members: [{ id: "a", label: "alpha" }, { id: "b", label: "beta" }],
+      current: "b",
+    } as never) as Tape;
+    const cols = tapeMemberCols(tape, 40, FULL_CAPS, 0);
+    const line = measurable({ capabilities: FULL_CAPS }).renderToLines(tape, 40)[0]!.replace(/\u001b\[[0-9;]*m/gu, "");
+    expect(sliceCells(line, cols[1]!.from, cols[1]!.from + 2), "the range opens on the lead").toBe("› ");
+    expect(sliceCells(line, cols[1]!.from + 2, cols[1]!.to), "and the label follows it").toBe("beta");
   });
 });

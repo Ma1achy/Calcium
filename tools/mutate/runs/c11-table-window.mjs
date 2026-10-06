@@ -59,8 +59,8 @@ const results = runPass({
       // than the range C14 addressed — and the counts agree, so C09 I26 passes.
       name: "DECLARATION-ORDER: units are built from `block.rows`, not the display order",
       file: DEF,
-      from: "  for (const row of sortedRows(block)) {\n    out.push({ rows: 1 + detailHeight(block, row, width, measureChild), row, bar: false });",
-      to: "  for (const row of block.rows) {\n    out.push({ rows: 1 + detailHeight(block, row, width, measureChild), row, bar: false });",
+      from: "  for (const row of sortedRows(block)) {\n    out.push({ rows: 1 + detailHeight(block, row, width, measureChild, planOf), row, bar: false });",
+      to: "  for (const row of block.rows) {\n    out.push({ rows: 1 + detailHeight(block, row, width, measureChild, planOf), row, bar: false });",
       expect: "T2.14",
     },
     {
@@ -128,7 +128,7 @@ const results = runPass({
       // the seam and wrong for the one that does.
       name: "CHILD-IGNORED: a row's unit is one row, whatever its detail measures",
       file: DEF,
-      from: "    out.push({ rows: 1 + detailHeight(block, row, width, measureChild), row, bar: false });",
+      from: "    out.push({ rows: 1 + detailHeight(block, row, width, measureChild, planOf), row, bar: false });",
       to: "    out.push({ rows: 1, row, bar: false });",
       expect: "T2.21",
     },

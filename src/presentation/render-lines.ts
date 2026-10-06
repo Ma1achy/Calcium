@@ -5,7 +5,7 @@
  * was its first caller, so it was written where the caller was — and then
  * `shell/paint.ts`, `shell/composite.ts` and `shell/session.ts` came to depend
  * on `renderSequenceToLines` for real frame composition. The package declares
- * `@fmx/calcium/testing` dev-only and C24 I8 says it is absent from a production
+ * `calcium-tui/testing` dev-only and C24 I8 says it is absent from a production
  * bundle; tracing the built runtime entry found three edges into
  * `dist/testing/index.js`, dragging both conformance suites in behind them.
  *
@@ -25,6 +25,7 @@ import type { BlockRegistry, RenderContext, RenderContextInput, Rendered } from 
 import { normaliseRow } from "./rows.js";
 import type { ResolvedTheme } from "./theme/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
+import type { Motion } from "./blocks/index.js";
 
 /**
  * Everything a render needs that is not the registry or the block. Defaulted
@@ -33,8 +34,12 @@ import type { TerminalCapabilities } from "../terminal/capabilities.js";
 export type RenderOptions = Readonly<{
   theme: ResolvedTheme;
   capabilities: TerminalCapabilities;
+  /** The reader's motion preference (C09 I99); absent is `"full"`. */
+  motion?: Motion;
   tick?: number;
   focus?: RenderContext["focus"];
+  /** Blocks under a banded selection (C14 I54). Absent is none, and is the only value off a band. */
+  washed?: RenderContext["washed"];
   /** Per-container scroll offsets, in rows (C04 I48). Absent is none. */
   scrollOffsets?: RenderContext["scrollOffsets"];
   /** Per-plot cursor positions, in sample indices. Absent is no cursor. */
@@ -79,7 +84,9 @@ export function renderToLines(
     width,
     theme: options.theme,
     capabilities: options.capabilities,
+    ...(options.motion === undefined ? {} : { motion: options.motion }),
     focus: options.focus ?? null,
+    ...(options.washed === undefined ? {} : { washed: options.washed }),
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),
@@ -133,7 +140,9 @@ export function renderSequenceToLines(
     width,
     theme: options.theme,
     capabilities: options.capabilities,
+    ...(options.motion === undefined ? {} : { motion: options.motion }),
     focus: options.focus ?? null,
+    ...(options.washed === undefined ? {} : { washed: options.washed }),
     ...(options.scrollOffsets === undefined ? {} : { scrollOffsets: options.scrollOffsets }),
     ...(options.cursorPositions === undefined ? {} : { cursorPositions: options.cursorPositions }),
     ...(options.cameras === undefined ? {} : { cameras: options.cameras }),

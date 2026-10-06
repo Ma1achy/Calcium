@@ -1,0 +1,50 @@
+THREE TIERS, not two — and each degrades its own way
+
+  CONTENT       shrinks to its FLOOR; representation substitution happens before
+                any final container clip or scroll
+                a plot, a table, a mosaic cell, a chip
+                visible and recoverable
+
+  REPRESENTATIONsubstitutes a smaller FORM saying the same thing
+                a sidebar → a rail, a footer → its primary action
+
+  DECORATION    truncates with NO MARK, then drops with no trace
+                a rule, a spacer, a trailing dash, a box corner
+
+★ TRUNCATION MARKS LOSS. A shorter rule has lost nothing.
+
+  which is why decoration gets no ellipsis — and why its minimum is a
+  THRESHOLD rather than a floor:
+
+  content's min      a FLOOR — it WIDENS its container to keep it
+  decoration's min   a THRESHOLD — it NEVER widens anything, and
+                     below it the decoration simply goes
+
+   7/10 ────────────────────────────── 39k/50k █████████░░░   56
+   7/10 ────────── 39k/50k █████████░░░   40
+   7/10       39k/50k █████████░░░      30
+   7/10    39                                  22
+
+  the rule fills, then silently goes — and the CONTENT keeps every cell
+  it had. A cell that vanishes silently is a bug; a divider that vanishes
+  silently is the design.
+
+★ SHED, DON’T SHRED — and four kinds get this wrong today (C09 I81)
+
+  truncation is for ONE RUN too long for its box. Shedding is for a ROW
+  OF PEERS too many for the width. Four kinds apply truncation to a
+  shedding problem, which is why every column gives at the same moment.
+
+  today   basel… a      b      Δ     ✓   every part, together
+  should  a b Δ ✓ +1               one at a time, in a declared order
+          a b ✓ +2
+          a b +3                     RANK 0 NEVER SHEDS
+
+  comparison  the two VALUES never shed — without them it is not a
+              comparison
+  keyValue    the KEY never sheds — a value with no key is not a fact
+  events      the TIME and the mark never shed
+  steps       the CURRENT step never sheds
+
+  and the last is the agent switcher’s own rule arriving at a fourth
+  kind: a row that cannot show you where you are is worse than no row.

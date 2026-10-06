@@ -12,32 +12,35 @@
 
 import type { CaptureResult, ProfileOptions, ProfileReport, TraceFn } from "./profiling/types.js";
 import type { ConfirmHost } from "./confirm.js";
+import type { Setting } from "./config.js";
 import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters/index.js";
 import type { ManifestDocument, ManifestStore } from "../data/manifest/index.js";
-import type { ProcessRunner, PtyFactory } from "../data/process/types.js";
+import type { Exit, ProcessRunner, PtyFactory } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
-import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
+import type { Action, Block, EchoChip, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
-import type { DocumentView } from "./document-view.js";
-import type { PatchView } from "./patch-view.js";
-import type { ProfileView } from "./profile-view.js";
+import type { OwnerRung } from "../interaction/router/types.js";
+
+/** What C16 I70 names: the refused chord, and whether the way out is its release or a pause. */
+export type GuardRefusal = Readonly<{ key: Binding["key"]; untilRelease: boolean }>;
 import type { RefreshHost } from "./refresh.js";
 import type { CompletionSource } from "../interaction/completion/index.js";
-import type { FocusTarget } from "../interaction/router/types.js";
+import type { Binding, FocusTarget, KeyAction, ReservedKeyAction } from "../interaction/router/types.js";
 import type { CursorStyle } from "../terminal/escapes.js";
+import type { WatchItem, WatchStore } from "./watches.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore } from "../interaction/history/types.js";
 import type { CommandPolicy } from "../interaction/parser/index.js";
-import type { AnyBlockDefinition, BlockRegistry } from "../presentation/blocks/index.js";
+import type { AnyBlockDefinition, BlockRegistry, Motion } from "../presentation/blocks/index.js";
 import type { ThemeSet, ThemeStore } from "../presentation/theme/index.js";
 import type { FrameScheduler } from "../terminal/frame-scheduler.js";
-import type { TerminalCapabilities } from "../terminal/capabilities.js";
+import type { CapabilitySource, TerminalCapabilities } from "../terminal/capabilities.js";
 import type { TerminalLifecycle } from "../terminal/lifecycle.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { TranscriptStore } from "../viewport/transcript/index.js";
 import type { LocalContext, LocalHandler } from "./local/registry.js";
 import type { ExecutionWrites } from "./state.js";
-import type { PushedSurface, PushedSurfaceHandle } from "./surface.js";
+import type { ChildSurface, ChildSurfaceHandle } from "./surface.js";
 
 /** The five triggers of §8. Three reach `stop`; two are C01's (I4). */
 export type StopReason = "exit" | "eof" | "interrupt" | "signal" | "fault";
@@ -82,22 +85,146 @@ export type SessionSnapshot = Readonly<{
  * field changes on an event, and I11 would then be satisfied by a writer firing
  * sixty times a second. `columns` is C01's to hand down (C01 I13).
  */
+/**
+ * Which copy mode holds the copy rung, and in semantic mode how much a copy
+ * would take right now (C14 I55, questions 4 and 35).
+ *
+ * **Both modes raise one rung**, so `owner` cannot say which — and they want
+ * different footers: the semantic mode's keys extend a selection, and the
+ * handoff's reach nothing, because the terminal owns the mouse. `size` is
+ * `null` with nothing selected, which is no count rather than a count of zero.
+ */
+export type CopyState =
+  | Readonly<{ mode: "native" }>
+  | Readonly<{
+      mode: "semantic";
+      size: Readonly<{ chars: number; rows: number; entries: number }> | null;
+      /**
+       * *A selection exists* — `hasSelection`, the predicate `esc` branches on
+       * (C14 I59). **Not `size !== null`**: a selection of a `rule` alone copies
+       * nothing and is still what the next `esc` clears.
+       */
+      clears: boolean;
+      /** Every span of the held view is selected — `A`'s *says what it did*, derived (C14 I55). */
+      all: boolean;
+      /**
+       * The rectangle's size in cells, or `null` at block granularity (C14 I60).
+       * Zero by zero where it resolves to no block.
+       */
+      rect: Readonly<{ columns: number; rows: number }> | null;
+      /**
+       * Why the file is offered for this selection's text — `no clipboard`,
+       * `too large for the terminal`, `pbcopy failed`, `pbcopy did not answer` —
+       * so `⏎` reads `to file` and the reason is the last of the facts (C14 I61,
+       * §6e K3, K7, K8, K13; `R-SEL-011`'s *states it and offers a file*).
+       * Absent where a route takes the text, and in a chrome composed without a
+       * session, which cannot know and draws `⏎ copy`.
+       */
+      fileOffer?: string;
+    }>;
+
 export type ChromeContext = Readonly<{
   session: SessionSnapshot;
   now: number;
   columns: number;
   /**
-   * Copy mode is up (C16 §5b).
+   * Native selection is up (C16 §5b).
    *
    * **Handed down rather than left to the default header**, because an app that
-   * supplies its own chrome supplies all of it — and copy mode is the one mode
+   * supplies its own chrome supplies all of it — and native selection is the one mode
    * whose entire effect is that things stop responding. A reader whose mouse
    * has gone dead with nothing on screen saying why has been given a bug.
    *
    * Not on `SessionSnapshot`: that is what a *command* runs against, and this is
    * a property of the frame, like `columns`.
    */
-  copyMode: boolean;
+  owner: OwnerRung | null;
+  /**
+   * Is that owner newly raised and still refusing its first activation
+   * (C16 I44, C22 §6, R-OWN-002, R-INT-008)?
+   *
+   * **The refusal's explanation, and the reason it is a field rather than a
+   * notice.** A rung that has just been raised refuses one activation, so a key
+   * already in flight cannot answer a question that arrived under it — and
+   * R-INT-008 says a rejected command explains. The owner line already answers
+   * *who has your keys*; *and not yet* is the same question one moment earlier.
+   * The mark is drawn while the arm is live and gone after the refusal, so the
+   * refused key **changes the frame**, which is the difference between a key
+   * refused and a key swallowed and the only part a frame-read can see.
+   *
+   * Optional on the same terms as `owner`: `compose` runs before the session
+   * graph exists, and absent is *no arm*.
+   *
+   * *(C16 I70: the mark no longer goes at the refusal — under ruling 52 a
+   * refusal extends the guard — so the change is `ownerRefused` below.)*
+   */
+  ownerArmed?: boolean;
+  /**
+   * The key the guard refused first, and the way out on this terminal (C16 I70,
+   * C22 §6). Absent until the first refusal, and absent again when the guard
+   * ends.
+   *
+   * **The refused key's change to the frame.** `ownerArmed` alone could not be
+   * it: the mark is there before the refusal and after it, so a refusal that
+   * only extended the guard left the frame as it was. The owner line names this
+   * chord, once, and the linear cue says the same words.
+   */
+  ownerRefused?: GuardRefusal;
+  /**
+   * Entries the record holds and the frame is not showing (C14 I34, `R-SEL-010`).
+   *
+   * **The hold's only observable**, and the one subject that reads both the
+   * record and the view: without it a held view and a render that has stopped
+   * working are the same picture. Zero whenever nothing is held, which is every
+   * frame outside semantic copy mode.
+   *
+   * Optional on the same terms as `owner` — `compose` runs before the session
+   * graph exists, and absent is *nothing held*.
+   */
+  bufferedEntries?: number;
+  /**
+   * The copy rung's mode and, in semantic mode, the selection's size
+   * (C14 I55). Absent when no copy mode is up, and absent on the same terms as
+   * `owner` before the session graph exists — a `copy` rung with no `copy`
+   * reads as semantic mode with nothing selected.
+   */
+  copy?: CopyState;
+  /**
+   * A form field holds the editor (C22 I118): the inside rung's owner is a
+   * field, and its keys are `⏎` and `esc`, not a plot's. Absent is *no field*.
+   */
+  editingField?: boolean;
+  /**
+   * The live toast's text, if one is live (C22 I116, §6l.13, §105, §012).
+   *
+   * **For a fact that changed nothing** — a copy, a toggle with no record —
+   * and drawn by the default footer in place of its tail for `TOAST_MS`. Handed
+   * to an application's own footer as `copy` and `owner` are; one that ignores
+   * it draws none, which §012's table allows because nothing here is the only
+   * record of anything. Absent when no toast is live.
+   */
+  toast?: string;
+  /**
+   * What the live toast's mark says, when it is not `ok` (C22 I116, C23 I92).
+   *
+   * `expired` is a question that resolved itself because nobody answered it
+   * (`R-BLK-881`): *the question expired*, drawn hollow and muted — `✓` would
+   * say it went well. Absent is `ok`, which is every other toast.
+   */
+  toastMark?: "expired";
+  /**
+   * C02's resolved record, because **the chrome draws marks and a mark needs a
+   * rung** (A03 SS47, C09 I22). The owner line's chords are `⏎ ⇧ ⇥ ⌃] ←→ ↑↓`,
+   * none of which an ASCII terminal can render, and a framework string carrying
+   * one unresolved is the defect SS47 exists to catch.
+   *
+   * **Optional on the same terms as `lastFrame`, and absent in the same frames
+   * `owner` is null**: `compose` runs before the session graph exists, and a
+   * fabricated record for that case would be a fake supplying the one answer
+   * this field is for. There is no owner before there is a terminal, so the
+   * owner line is never the thing that misses it.
+   */
+  capabilities?: TerminalCapabilities;
   /**
    * C24 I32 — the **previous** frame's cost in milliseconds, and the member's
    * name says which frame it describes.
@@ -113,6 +240,69 @@ export type ChromeContext = Readonly<{
    * longer being maintained.
    */
   lastFrame?: number;
+  /**
+   * What the owner line names its keys from (C22 I133, ruling 63).
+   *
+   * **The session's keymap, not a table of its own.** The line spelled its
+   * chords itself — `⏎ send`, `⇧⏎ newline` — so an application that rebound one
+   * kept a footer naming the old chord, which is C16 I19's second keymap in the
+   * row §103 legislates. Absent is *the default keymap*, which is the same answer
+   * for a session that rebinds nothing and the only one before the graph exists.
+   */
+  hints?: OwnerHints;
+  /**
+   * The session's watches and the row's selection (C22 I139, §6p, ruling 50).
+   *
+   * **Handed to an application's own footer as `copy` and `toast` are**: the row
+   * is the default footer's drawing of a session fact, and a footer the
+   * application supplies draws it or does not. Present while a watch stands or
+   * the row has focus; `items` oldest first; `selected` is the row's index while
+   * the watch row is the active target and `null` otherwise — a question over
+   * the row takes the keys, and the mark goes with them (§6p.3 row 8).
+   */
+  watches?: WatchRowState;
+}>;
+
+/** One watch as a footer draws it (C22 I137, I139). */
+export type { WatchItem } from "./watches.js";
+
+/** `ChromeContext.watches` (C22 I139). */
+export type WatchRowState = Readonly<{
+  items: readonly WatchItem[];
+  selected: number | null;
+}>;
+
+/**
+ * The owner line's source of keys and words (C22 I133).
+ *
+ * `chord` is the session keymap's first row for an action at a target, as
+ * dispatch would resolve it on this terminal's profile; `undefined` is unbound,
+ * and an unbound action draws no chip. The rest are what an owner says of
+ * itself — the substate's declared name (C15 I29), an open question's state and
+ * where its safe path resolves (C23 I36), and semantic copy mode's refused
+ * interrupt (C16 I62), which is drawn once, on the frame after the refusal.
+ */
+export type OwnerHints = Readonly<{
+  chord(target: FocusTarget, action: KeyAction): Binding["key"] | undefined;
+  substate?: "find" | "complete" | "preview";
+  /** Whether the chip preview's box overflows — the owner line's scroll chip (C22 I143). */
+  previewScrolls?: boolean;
+  /**
+   * A completion menu at rest: the prompt's keys resolve before the panel's
+   * (C22 I150, C19 I20, ruling 96). **The router's own answer** — `promptUnderMenu()`,
+   * the top layer's `promptLive` (I145) — so the line cannot name a key that
+   * dispatch sends somewhere else. Absent is *the menu owns its keys*.
+   */
+  promptUnderMenu?: boolean;
+  question?: Readonly<{ state: "choice" | "reply" | "inspection"; resolvesTo: string }>;
+  refused?: boolean;
+  /**
+   * Where the watch row stands for the scope line (C22 I139): `present` while a
+   * watch stands and focus is elsewhere — `⇧⇥` then goes to the row, and the
+   * chip says `watches` — and `focused` while the row has the keys, where the
+   * line names the row's own. Absent is *no row*.
+   */
+  watchRow?: "present" | "focused";
 }>;
 
 export type ChromeFn = (ctx: ChromeContext) => readonly Block[];
@@ -123,7 +313,43 @@ export type ChromeFn = (ctx: ChromeContext) => readonly Block[];
  * no footer at all (I82). Nothing here is a height — the one thing an app
  * decides is what its footer returns (§6l.4 F).
  */
-export type Chrome = Readonly<{ header: ChromeFn; footer: ChromeFn }>;
+/**
+ * The application's identity, for the prompt's upper rule (C22 I111, §6l.10,
+ * §069, `R-COL-003`).
+ *
+ * **A function of the frame rather than a string, and the design's own ladder
+ * is why**: *the app*, *the app and the branch*, *and the dirty count*. A
+ * branch and a dirty count are facts the application recomputes, and it is
+ * identity rather than status — it does not change during a turn, which is what
+ * earns it a permanent slot instead of a region.
+ *
+ * `null` is no label, and so is a string that strips to nothing. **Whether it
+ * is drawn is never the caller's**: the frame sheds it first, below 60 columns
+ * and whenever it would leave no rule glyph, which is what *the least
+ * load-bearing thing on the screen* means once it is a mechanism.
+ */
+/**
+ * The label, with the hue the application chose to paint it (C22 I114, §070).
+ *
+ * **A NAME and never a colour**, which is §070's own first line — `/colour`
+ * *takes a COLOUR NAME — not a tone*. C10 resolves it per theme, so the label follows
+ * a theme change; a hex could not, and everywhere else in this system a hex is
+ * refused for exactly that reason.
+ *
+ * An unknown name paints `bgElev`, the untinted ground — the name arrives from
+ * a config file where a person typed it, so the reachable wrong input is a
+ * misspelling, and a label that vanishes is a worse answer to a typo than one
+ * that is simply not tinted.
+ */
+export type Label = Readonly<{ text: string; hue?: string }>;
+
+export type LabelFn = (ctx: ChromeContext) => string | Label | null;
+
+/**
+ * §6l — the chrome's three members. `label` is optional and absent is the frame
+ * that shipped, glyph for glyph (C22 I81, as amended in §6l.10).
+ */
+export type Chrome = Readonly<{ header: ChromeFn; footer: ChromeFn; label?: LabelFn }>;
 
 /**
  * Superset of C20's `HistoryFs` (C22 §2), so the injected value passes straight
@@ -156,6 +382,15 @@ export interface FileSystem {
    * `node:fs` (I10) — a second filesystem route would put two in the graph.
    */
   readDir(path: string): Promise<readonly Readonly<{ name: string; directory: boolean }>[]>;
+  /**
+   * A fresh directory only this user can read, under the system's temporary
+   * one, named from `prefix` (C22 I144) — where `⌥o` writes a chip for the
+   * reader's editor. Optional, so a filesystem an application supplies need not
+   * have one; `⌥o` then refuses and says so.
+   */
+  makeTempDir?(prefix: string): Promise<string>;
+  /** Remove a directory and everything in it (C22 I144). Optional with `makeTempDir`. */
+  removeDir?(path: string): Promise<void>;
 }
 
 /**
@@ -168,7 +403,17 @@ export interface FileSystem {
  * design. Four built, four sealed, and they are not the same four.)
  */
 export interface Pipeline {
-  submit(line: string): void;
+  /**
+   * `chips` is the line's, as ranges into it (C23 I104, C04 I152): the prompt's
+   * submission passes the editor's and a re-run the entry's own. No other
+   * caller passes any.
+   */
+  submit(line: string, chips?: readonly EchoChip[]): void;
+  /**
+   * A `local` verb's entry appended **without submitting** (C23 I79, C16 I57):
+   * no clear, no history, no queue. The help action's route.
+   */
+  emitLocal(line: string): Promise<void>;
   /**
    * What the pipeline's bare catches swallowed (C23 I48, F15).
    *
@@ -196,6 +441,21 @@ export interface Pipeline {
   /** Cancel what is in flight, settling the entry `partial` (C23 I10). */
   cancel(): void;
   /**
+   * The terminal, lent to a program that is not a verb — C22 I144's editor —
+   * through the handoff's own sequence (C23 §4: suspend, C21 `handoff`,
+   * resume, reset the decoder, invalidate), **appending nothing**: what comes
+   * back is the caller's to say. `busy` names the verb holding the guard, and
+   * nothing is run then — a suspended terminal would take that verb's frames.
+   * The guard is held for the handoff, so a submission in the meantime queues.
+   *
+   * Optional, so a pipeline a harness supplies need not lend the terminal; C22
+   * refuses the editor with none.
+   */
+  borrowTerminal?(
+    argv: readonly string[],
+    label: string,
+  ): Promise<Readonly<{ kind: "ran"; exit: Exit }> | Readonly<{ kind: "busy"; verb: string | null }>>;
+  /**
    * Where Calcium's own local handlers and the app's arrive (C23 §2).
    *
    * Before `seal()`, which reconciles them against the manifest (C23 I27) — and
@@ -215,15 +475,6 @@ export interface Pipeline {
    */
   onAction(action: Action, from?: EntryId | null): void;
   /**
-   * The document view was popped — stop its parts now (C22 I46).
-   *
-   * **At the pop, not a tick later.** Without this the driver only discovers a
-   * gone host when a fetch resolves into it and `putBlock` returns false, so one
-   * more request runs against a view nobody is looking at. That lazy path stays
-   * as the backstop it was; this is the trigger C23 I33's set was missing.
-   */
-  releaseView(): void;
-  /**
    * Something moved on screen, so which hosts are visible may have changed
    * (C23 I46).
    *
@@ -241,9 +492,12 @@ export interface Pipeline {
    * **Heard rather than polled, for the same reason `visibilityChanged` is.** A
    * live child holds a grid whose width came from the body, and a child that has
    * gone quiet has nothing left to notice the change on — polling on the next
-   * chunk resizes only the children that were about to redraw anyway. The order
-   * inside is the invariant: the child first, so its SIGWINCH names a size the
-   * emulator has already taken by the time the repaint arrives.
+   * chunk resizes only the children that were about to redraw anyway. **The
+   * figure is the invariant, not the order** (C23 I65): the child's repaint
+   * reaches the emulator through the write queue, so it cannot land between the
+   * two calls however they are sequenced — and the listener resizes the emulator
+   * first. *As it stood:* ~~the child first, so its SIGWINCH names a size the
+   * emulator has already taken~~ — an ordering I65 rules vacuous (F1336).
    */
   resized(): void;
   /**
@@ -265,6 +519,12 @@ export interface Pipeline {
    * `meta`.
    */
   identityNotice(text: string): void;
+  /**
+   * A refusal stated on the entry it came from (C23 I18's shape) — the
+   * dispatcher's own, exposed so a form field's refused paste says why by the
+   * same path a refused action does (C22 I118, C04 §3ar F9).
+   */
+  refuse(from: EntryId | null, text: string): void;
   /**
    * §4 step 7's greeting, appended (I44).
    *
@@ -355,26 +615,15 @@ export type PipelineDeps = Readonly<{
    */
   capabilities: TerminalCapabilities;
   /**
-   * The region a view fills (C15 §4) — for `ProducerContext.height` on the one
-   * route where a bound exists (C07 I18).
+   * The region, for the width a body wraps at (C07 I18).
    *
-   * The same source `documentView` reads, rather than a second computation of
-   * it: two answers to *how big is the region* is how a producer splits against
-   * an axis the frame does not use.
+   * **No route reads its height any more** (C23 I41, C22 §13a): a verb's result
+   * is a transcript entry and an entry is as tall as its blocks, so
+   * `ProducerContext.height` is `null` everywhere and there is no bound to state.
    */
   region: () => Readonly<{ width: number; height: number }>;
   editor: LineEditor;
   overlays: OverlayManager;
-  /**
-   * The fullscreen patch view (C25 §3b), for the `view` action's arm.
-   *
-   * On the pipeline's deps rather than reached through `overlays`, because the
-   * refusal it returns is C23's to patch into the source entry and the stack
-   * check that produces it is the view owner's (C23 I31).
-   */
-  patchView: PatchView;
-  /** C22 §13a — raised when a verb's declaration says its result is a view. */
-  documentView: DocumentView;
   /**
    * Whether anyone is looking at a live part's host (C23 I46).
    *
@@ -394,6 +643,20 @@ export type PipelineDeps = Readonly<{
   confirm: ConfirmHost;
   /** C28's report, when a profiler exists (C22 I93). Absent otherwise. */
   profile?: () => ProfileReport;
+  /** How each field of `capabilities` was answered (C02 I13), for `/capabilities` (C22 I125). */
+  capabilitySources: Readonly<Record<keyof TerminalCapabilities, CapabilitySource>>;
+  /**
+   * `ResolvedConfig.settings` (C22 I115), for `/config` (C23 I80, ruling 43) —
+   * handed down as `capabilitySources` is, so the verb draws the record the
+   * session was built from rather than resolving it a second time.
+   */
+  settings: readonly Setting[];
+  /**
+   * The session's watches (C22 I135), for `/watch` and `/unwatch` (I136) —
+   * handed down as `settings` is: the composition root owns the set, because
+   * the notifier and the footer read it too.
+   */
+  watches: WatchStore;
   /**
    * One operation from C28's recorder, for `/profile capture` (C28 I64).
    *
@@ -405,15 +668,6 @@ export type PipelineDeps = Readonly<{
    * lets it happen.
    */
   profileCapture?: (ms: number) => Promise<CaptureResult>;
-  /**
-   * C28 §3c's view, for `/profile`'s handler (C23 I68).
-   *
-   * **Supplied by the root, always** — a session built without `TuiConfig.profile`
-   * still gets a view, whose `open` refuses naming that option (C28 T1.97). The
-   * row is in `FRAMEWORK_TOOLS`, `execution.ts` hands this to `shippedHandlers`,
-   * and C23 I27 refuses the pair in either half's absence (T4.66, T4.67).
-   */
-  profileView: ProfileView;
   /**
    * One async bracket for C23's local verb route (C28 I36).
    *
@@ -434,7 +688,17 @@ export type PipelineDeps = Readonly<{
    * lands with its test consumer rather than a producer nothing calls.
    */
   approval?: (call: Readonly<{ name: string; args: string }>) =>
-    Readonly<{ consequence?: string; choices?: readonly Readonly<{ key: string; label: string; default?: true }>[] }> | null;
+    Readonly<{
+      consequence?: string;
+      choices?: readonly Readonly<{ key: string; label: string; default?: true }>[];
+      /**
+       * The asker withdrawing its question (C23 I92, I94, `R-BLK-881`): the
+       * approval resolves `cancelled` and the call runs nothing.
+       */
+      signal?: AbortSignal;
+      /** How long the approval stays open before it resolves `expired` (C23 I92). */
+      expiresAfterMs?: number;
+    }> | null;
   theme: ThemeStore;
   /** Persist the chosen variant (C22 I40). Absent in harnesses with no state directory. */
   persistTheme?: (name: string) => void;
@@ -480,7 +744,9 @@ export type PipelineDeps = Readonly<{
    * Read rather than restated: a hand-written help text guarantees drift, and
    * a binding shown that C16 does not dispatch is the drift arriving.
    */
-  bindings: () => readonly Readonly<{ keys: string; does: string }>[];
+  bindings: () => readonly Readonly<{ keys: string; does: string; target: string }>[];
+  /** The reader’s rung, so `/help keys` leads with it (R-KEY-005). */
+  currentScope: () => string;
   /** For rewriting `/verb` inside a delegated command (C18 I5). */
   binary: string;
   commandPolicy: CommandPolicy;
@@ -505,10 +771,12 @@ export type TuiConfig = Readonly<{
    * The cursor's shape, per focus target (C22 I63, §6f, roadmap entry 45).
    *
    * **Keyed on the focus target and not on the layer**, and that is a check
-   * rather than a preference: `FOCUS_ORDER` has seven members and exactly two —
-   * `overlay` and `pushedView` — are layers, so a style on `Layer` would cover
-   * two-sevenths of its subject while reading as total, and the prompt, which is
-   * the case that motivates the feature, is not a layer at all.
+   * rather than a preference: `FOCUS_ORDER` has eight members and exactly two —
+   * `overlay` and `panel` — are layers, so a style on `Layer` would cover a
+   * quarter of its subject while reading as total, and the prompt, which is the
+   * case that motivates the feature, is not a layer at all. (The pair was
+   * `overlay` and `pushedView`; the second retired with its layer kind and the
+   * `panel` target took the rung — R-EXA-082.)
    *
    * A target with no entry takes `fallback`; a `fallback` of `null`, or absent,
    * means **the terminal's own** — Calcium writes nothing and the user's own
@@ -643,6 +911,24 @@ export type TuiConfig = Readonly<{
    * focused plot set too — C02's rule that the mouse is never the only way.
    */
   hover?: boolean;
+  /**
+   * How much motion this reader wants (C09 I99, `R-MOT-001`, §038). Defaults to
+   * `"full"`; handed to every block through `RenderContext.motion`.
+   *
+   * **Config and not a capability, on `hover`'s own argument above and on the
+   * design's**: `R-BLK-702` names the precedent itself — *mouse: off already
+   * exists; motion joins it as an independent preference*. Nothing in the
+   * environment predicts it, so a C02 detection rule would be a constant; what
+   * differs is what the reader asked for. It is a **third axis**, independent
+   * of colour depth and of the glyph set, which is `R-BLK-702`'s two cases: *a
+   * 1-bit display may animate and a 24-bit display may be still*.
+   *
+   * `"off"` stops every animation — the ramps and the spinners both — and the
+   * state survives on the three carriers that never moved (`R-MOT-002`): the
+   * mark, the label and the elapsed text. `"reduced"` stops the ambient ramps
+   * alone (`glint drift tide`), leaving every group a reader is meant to act on.
+   */
+  motion?: Motion;
   /** The session's starting directory. Defaults to the process's. */
   cwd?: string;
   clock?: () => number;
@@ -733,6 +1019,18 @@ export type TuiConfig = Readonly<{
    * wants launch cheap omits `every` and gets a one-shot.
    */
   greeting?: (ctx: ProducerContext) => ViewDocument | Promise<ViewDocument>;
+  /**
+   * Handlers for the chords the design reserves (C24 I39, C16 §6c, ruling 64).
+   *
+   * Keyed by the registry's id — `"queue.drop"`, `"agent.1"` — because that
+   * is the name `/help` and `docs/KEYS.md` print. A handler returning `false`
+   * has not handled the key: the row's displaced meaning runs if it has one
+   * (`⌥⌫` kills a word) and otherwise the key passes. With no handler the row
+   * resolves as though it were absent. An id outside the set is refused at
+   * construction, naming the set; a handler that throws is contained and
+   * noticed rather than ending the session (C22 I134).
+   */
+  keyActions?: Readonly<Partial<Record<ReservedKeyAction, () => boolean | void>>>;
 }>;
 
 /**
@@ -816,7 +1114,7 @@ export type TuiConfigInput<C extends TuiConfig> = C & {
 export interface TuiInstance {
   start(): Promise<void>;
   /** Opens the application-owned full-region surface. The session must be running. */
-  openSurface(surface: PushedSurface): PushedSurfaceHandle;
+  openSurface(surface: ChildSurface): ChildSurfaceHandle;
   /** Resolves with the exit code. */
   stop(reason: StopReason): Promise<number>;
   readonly session: SessionSnapshot;

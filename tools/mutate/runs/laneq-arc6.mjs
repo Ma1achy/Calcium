@@ -46,8 +46,8 @@ const results = runPass({
     {
       name: "SCROLL-DETAIL: a scroll's element carries a detail, the state SCROLL_PEEK was closed as uninhabited",
       file: "src/presentation/blocks/kinds/containers.ts",
-      from: "          copy: copyTextOf(r.child),\n        }),\n      ),\n    );\n  },\n\n  /**\n   * **No `window`, and the sweep is what said so**",
-      to: "          copy: copyTextOf(r.child),\n          detail: r.child,\n        }),\n      ),\n    );\n  },\n\n  /**\n   * **No `window`, and the sweep is what said so**",
+      from: "          ...copyOrNothing(copyChild(r.child)),\n        }),\n      ),\n    );\n  },\n\n  /**\n   * **No `window`, and the sweep is what said so**",
+      to: "          ...copyOrNothing(copyChild(r.child)),\n          detail: r.child,\n        }),\n      ),\n    );\n  },\n\n  /**\n   * **No `window`, and the sweep is what said so**",
       expect: "T4.13",
     },
     {
@@ -76,10 +76,16 @@ const results = runPass({
       expect: "T4.17",
     },
     {
-      name: "NOTICE-NO-GROUND: the focused notice is `accent` alone — the pills collision, one kind over",
+      // **Re-anchored** (C09 I83, C10 I47): the focused notice takes its **own**
+      // tone over `focusGround`, where it took `accent` over the *selection*
+      // ground. The mutation is the same one — the focused notice loses its
+      // ground and is a tone alone — and it is anchored on the ground, which is
+      // what it removes.
+      name: "NOTICE-NO-GROUND: the focused notice is a tone alone — the pills collision, one kind over",
       file: "src/presentation/blocks/kinds/simple.ts",
-      from: "      ? { ...tone(\"accent\", ctx.theme, ctx.capabilities), ...selectionStyle(ctx.theme, ctx.capabilities) }\n      : tone(block.tone, ctx.theme, ctx.capabilities);\n",
-      to: "      ? tone(\"accent\", ctx.theme, ctx.capabilities)\n      : tone(block.tone, ctx.theme, ctx.capabilities);\n",
+      // Re-anchored 2026-09-27 (C09 I121): the focus shapes read focusShapeStyle.
+      from: "      ? { ...tone(block.tone, ctx.theme, ctx.capabilities, \"focusGround\"), ...focusShapeStyle(ctx.theme, ctx.capabilities) }\n",
+      to: "      ? tone(block.tone, ctx.theme, ctx.capabilities)\n",
       expect: "IC8",
     },
     {

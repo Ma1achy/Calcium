@@ -9,14 +9,17 @@
  * renderer must agree to the cell, and `fitAt` is where truncation and padding
  * meet in one place so they cannot disagree.
  */
-import { glyphFor, glyphs } from "../blocks/glyphs.js";
+import { glyphFor, glyphs, type GlyphCaps } from "../blocks/glyphs.js";
 import { pad, padStart, paintRuns, tone, type Span } from "../blocks/paint.js";
 import { runsOf, runsText, sliceRuns } from "../runs.js";
-import { sparkline, valueBar } from "../plot/index.js";
+import { pairFor, sparkline, valueBar } from "../plot/index.js";
 import { cells, stripControl, truncate, truncateParts } from "../text.js";
-import type { Cell, ColumnDef, Table, TableRow } from "../../data/viewmodel/index.js";
+import type { AmbiguousWidth } from "../text.js";
+import type { Cell, ColumnDef, Table, TableRow, Tone } from "../../data/viewmodel/index.js";
 import type { RenderContext } from "../blocks/types.js";
-import type { PlannedColumns } from "./plan.js";
+import type { PlannedColumn, PlannedColumns } from "./plan.js";
+import type { Alignment } from "./kind.js";
+import { displayText, isMissing } from "./kind.js";
 
 /** The gap between columns, as a span. */
 function gapSpan(gap: number): Span {
@@ -82,6 +85,49 @@ function seriesLead(
 }
 
 /**
+ * Where a table declaring `current` puts its lead, and whether this row is the
+ * one it marks (I33, §5d). Absent on a table without the field, which is every
+ * table that drew before it and draws the same now.
+ */
+export type CurrentLead = Readonly<{ key: string; on: boolean }>;
+
+/**
+ * The current row's lead (I33, §5d, §097): `current`'s mark and its separator
+ * on the current row, and the same cells blank on every other.
+ *
+ * **Taken off the column's planned width before the cell is fitted**, as
+ * `seriesLead` takes a series' mark (I23). A lead spliced into the text would
+ * be what a cut removes first from a column truncating at its start, and the
+ * mark is the one thing on the row that must survive; outside the cut, the
+ * text shortens instead. A column narrower than the lead draws the cell with
+ * no lead, on every row alike, so the rows still agree.
+ *
+ * **The blank is measured from the mark**, not written as a literal two: C09
+ * I48 resolves an Ambiguous slot to its ASCII half at `"wide"`, and a blank
+ * counted separately is a second answer to how wide the lead is.
+ *
+ * The mark is `accent`, the registry's tone for `current`, and bold with the
+ * cell it leads (§097's `bold` is on ` › /colour `). On a row that takes the
+ * `pick` ground both are re-inked by the ground's `pickInk` in `definition.ts`;
+ * at one bit, and on a theme with no `pick`, the accent and the weight are
+ * what is left, and the weight survives both.
+ */
+function currentLead(
+  planned: PlannedColumn,
+  lead: CurrentLead | undefined,
+  ctx: RenderContext,
+  on: string | undefined,
+): Readonly<{ span: Span | null; planned: PlannedColumn }> {
+  if (lead === undefined || lead.key !== planned.key) return { span: null, planned };
+  const mark = `${glyphFor("current", ctx.capabilities)} `;
+  const used = cells(mark, ctx.capabilities.ambiguousWidth);
+  if (used > planned.width) return { span: null, planned };
+  const rest = { ...planned, width: planned.width - used };
+  if (!lead.on) return { span: { text: " ".repeat(used) }, planned: rest }; // cells-ok — the mark's own cells, measured above
+  return { span: { text: mark, style: { ...tone("accent", ctx.theme, ctx.capabilities, on), bold: true } }, planned: rest };
+}
+
+/**
  * The columns whose glyph slot is reserved: those where **any** row draws a
  * series beside a mark (I23).
  *
@@ -89,6 +135,133 @@ function seriesLead(
  * per-row scan over `block.rows` would be quadratic, and a memo would be state
  * C11 is not allowed to hold (I11).
  */
+/**
+ * Where each `align: "decimal"` column's point sits, in cells (C11 I26, §099).
+ *
+ * **Derived rather than authored**, which is I26's ruling: a declared point is a
+ * number the planner can contradict when a column yields width under
+ * `R-TBL-005`, with nothing able to report the disagreement. The column's point
+ * is the widest **integer part** among its own cells, so it is a property the
+ * column has rather than one it is told.
+ *
+ * **Computed once per block, beside `markedSeriesColumns`.** `rowSpans` holds
+ * the whole table and could take this every time it draws a row, which is the
+ * same walk once per row — the reason the marked set is already hoisted.
+ */
+export function decimalPoints(
+  block: Table,
+  plan: PlannedColumns,
+  ambiguous: AmbiguousWidth,
+  /** Each column's resolved alignment (I27), from `columnAlignments`. */
+  aligns: ReadonlyMap<string, Alignment>,
+  /** The columns that group their thousands (I28), from `groupingColumns`. */
+  grouping: ReadonlySet<string>,
+): ReadonlyMap<string, number> {
+  return new Map([...decimalColumns(block, plan, ambiguous, aligns, grouping)].map(([k, c]) => [k, c.point]));
+}
+
+/**
+ * Where each aligned decimal column's values **end** — its point plus its widest
+ * fraction (C11 I29). A missing number's dash sits there, under the last digit,
+ * which is where §078 draws it; the column's edge is further right whenever the
+ * column is wider than its values.
+ */
+export function decimalEnds(
+  block: Table,
+  plan: PlannedColumns,
+  ambiguous: AmbiguousWidth,
+  aligns: ReadonlyMap<string, Alignment>,
+  grouping: ReadonlySet<string>,
+): ReadonlyMap<string, number> {
+  return new Map([...decimalColumns(block, plan, ambiguous, aligns, grouping)].map(([k, c]) => [k, c.end]));
+}
+
+/** The one walk `decimalPoints` and `decimalEnds` read: each aligned column's point and end. */
+function decimalColumns(
+  block: Table,
+  plan: PlannedColumns,
+  ambiguous: AmbiguousWidth,
+  aligns: ReadonlyMap<string, Alignment>,
+  grouping: ReadonlySet<string>,
+): ReadonlyMap<string, Readonly<{ point: number; end: number }>> {
+  const points = new Map<string, Readonly<{ point: number; end: number }>>();
+  const widthOf = new Map(plan.visible.map((c) => [c.key, c.width]));
+  for (const column of block.columns) {
+    // **The resolved alignment, not the declared one** (I27). A numeric column
+    // that declared nothing resolves to `decimal`, so it takes a point here
+    // exactly as a declared one does — which is the whole of what makes the
+    // default a refinement of `right` rather than a second behaviour.
+    if (aligns.get(column.key) !== "decimal") continue;
+    const room = widthOf.get(column.key);
+    if (room === undefined) continue;
+    let int = 0;
+    let frac = 0;
+    for (const row of block.rows) {
+      const cell = row.cells[column.key];
+      if (cell === undefined) continue;
+      // **Measured over the text that will be DRAWN, not the bare value**
+      // (I28). A separator is part of an integer part, so taking the point
+      // first would put the column's point one cell left of where its own
+      // values sit, once per separator — and every width assertion would still
+      // be correct, which is what makes it worth a row of its own (T1.37).
+      const text = displayText(cell.text, grouping.has(column.key));
+      const whole = integerPart(text);
+      int = Math.max(int, cells(whole, ambiguous));
+      frac = Math.max(frac, cells(text.slice(whole.length), ambiguous)); // cells-ok — a code-unit offset
+    }
+    // **A column too narrow to hold the alignment falls back as a COLUMN**
+    // (I26). Clamping each cell's lead to its own slack instead produced a
+    // column whose points drift by one — `0.0372` and `0.941` a cell apart,
+    // which reads as a defect rather than as a degradation, and is worse than
+    // either alignment. Found by reading the frame; the counts were all correct.
+    if (int + frac > room) continue;
+    points.set(column.key, { point: int, end: int + frac });
+  }
+  return points;
+}
+
+/**
+ * The part of a value before its point — the whole of it when there is none.
+ *
+ * **No point is all integer part**, and that is what makes §099's figure come
+ * out without a case for each shape: `1284` ends where the point sits because
+ * its integer part is four cells, and `3e-4` does the same for the same reason
+ * rather than for a rule of its own.
+ */
+function integerPart(text: string): string {
+  const at = text.indexOf(".");
+  return at < 0 ? text : text.slice(0, at); // cells-ok — a code-unit offset
+}
+
+/**
+ * A trend cell's arrow and the tone its column's polarity gives it (C11 I30,
+ * C04 I128, C09 I111), or `undefined` for a cell with no trend.
+ *
+ * **Derived, never read off the cell** — construction refuses a trend cell that
+ * carries a glyph or a tone, so this is the only answer there is. The arrow is
+ * the sign of `to − from`; its tone is `ok` when that runs with the column's
+ * polarity, `error` against it, and none in a neutral column. **A reading that
+ * did not move draws `trendFlat`** in no tone (question 37): a flat reading has
+ * no direction to be good or bad about, and it is still a comparison — drawn
+ * bare, it was the same picture as a cell with no trend at all.
+ */
+export function trendMark(
+  cell: Cell | undefined,
+  column: ColumnDef | undefined,
+  capabilities: GlyphCaps,
+): Readonly<{ mark: string; tone: Tone | undefined }> | undefined {
+  if (cell?.trend === undefined) return undefined;
+  const { from, to } = cell.trend;
+  const g = glyphs(capabilities);
+  if (to === from) return { mark: g.trendFlat, tone: undefined };
+  const up = to > from;
+  const wants = column?.polarity ?? "neutral";
+  return {
+    mark: up ? g.trendUp : g.trendDown,
+    tone: wants === "neutral" ? undefined : (wants === "higher") === up ? "ok" : "error",
+  };
+}
+
 export function markedSeriesColumns(block: Table): ReadonlySet<string> {
   const marked = new Set<string>();
   for (const row of block.rows) {
@@ -145,14 +318,33 @@ export function headerSpans(
   block: Table,
   plan: PlannedColumns,
   ctx: RenderContext,
+  /** Each column's resolved alignment (I27), from `columnAlignments`. */
+  aligns: ReadonlyMap<string, Alignment>,
+  /**
+   * The ground the row is painted on — a surface name (I24, C10 I48).
+   *
+   * **Passed rather than assumed**, on `rowSpans`' own argument: *which ground
+   * did this row take* is one question, and two answers to it is how the ink
+   * and the ground stopped agreeing (F1240). The caller that paints the row is
+   * the caller that names it here.
+   */
+  on?: string,
+  /**
+   * The current row's lead column (I33, §5d), always blank here: the header is
+   * a row, and a label over a column whose cells start two cells in would sit
+   * two cells left of every value it names.
+   */
+  current?: CurrentLead,
 ): readonly Span[] {
   const g = glyphs(ctx.capabilities);
-  const dim = tone("muted", ctx.theme, ctx.capabilities);
+  const dim = tone("muted", ctx.theme, ctx.capabilities, on);
   const byKey = new Map<string, ColumnDef>(block.columns.map((c) => [c.key, c]));
 
   const spans: Span[] = [];
-  plan.visible.forEach((planned, index) => {
+  plan.visible.forEach((whole, index) => {
     if (index > 0) spans.push(gapSpan(plan.gap));
+    const { span: leadSpan, planned } = currentLead(whole, current, ctx, on);
+    if (leadSpan !== null) spans.push(leadSpan);
 
     const column = byKey.get(planned.key);
     const label = stripControl(column === undefined ? planned.key : column.label);
@@ -161,8 +353,23 @@ export function headerSpans(
         ? ` ${block.sort.direction === "desc" ? g.sortDesc : g.sortAsc}`
         : "";
 
+    // **The header takes the column's *resolved* alignment, and the rule is the
+    // one that already shipped** (I27, I21). A header that kept `left` over a
+    // column its values right-align would put the label at one end and every
+    // value beneath it at the other — I21's *every drawn row begins each column
+    // at the same cell* holding while the frame reads as two tables. What I27
+    // changes is only which value is read: a column that declared nothing now
+    // has an answer here.
+    //
+    // **`decimal` is deliberately not included**, which is where this differs
+    // from `rowSpans` below. A decimal column's right edge is **ragged on
+    // purpose** — the fraction side is left-aligned after the point (I26, and
+    // §099's own figure) — so the column's inline end is not where its data is,
+    // and a header pushed there would sit past every value it names. Left is
+    // the answer it has always had and the one §099's golden recorded.
+    const align = aligns.get(planned.key);
     const text =
-      column?.align === "right"
+      align === "right"
         ? padStart(
             truncate(label + indicator, planned.width, ctx.capabilities),
             planned.width,
@@ -190,17 +397,43 @@ export function rowSpans(
   ctx: RenderContext,
   options: Readonly<{
     expandable: boolean;
-    focused: boolean;
-    selected?: boolean;
+    /**
+     * What expanding this row reveals (C11 I32, ruling 69) — drawn `+N` beside a
+     * collapsed row's mark, and not at all at zero.
+     */
+    hidden: number;
+    /**
+     * **The ground this row is painted on** (C10 I48, I14) — a surface name,
+     * absent being the page. One value, chosen by the caller that also picks
+     * the wash, because *which ground did this row take* is one question and
+     * two answers to it is how the ink and the ground stopped agreeing (F1240).
+     */
+    on?: string | undefined;
     /** The columns reserving a glyph slot (I23), from `markedSeriesColumns`. */
     marked: ReadonlySet<string>;
+    /** Where each decimal column's point sits (I26), from `decimalPoints`. */
+    points?: ReadonlyMap<string, number> | undefined;
+    /** Each column's resolved alignment (I27), from `columnAlignments`. */
+    aligns: ReadonlyMap<string, Alignment>;
+    /** The columns that group their thousands (I28), from `groupingColumns`. */
+    grouping: ReadonlySet<string>;
+    /** The columns whose missing cells draw the absent mark (I29), from `unknownColumns`. */
+    unknown?: ReadonlySet<string>;
+    /** Where each aligned decimal column's values end (I29), from `decimalEnds`. */
+    ends?: ReadonlyMap<string, number> | undefined;
+    /** The current row's lead column, and whether this row is current (I33). */
+    current?: CurrentLead | undefined;
   }>,
 ): readonly Span[] {
   const byKey = new Map<string, ColumnDef>(block.columns.map((c) => [c.key, c]));
   const spans: Span[] = [];
 
-  plan.visible.forEach((planned, index) => {
+  plan.visible.forEach((whole, index) => {
     if (index > 0) spans.push(gapSpan(plan.gap));
+    // **The current row's lead, before any arm reads the column's width** (I33,
+    // §5d): every arm below fits its cell to what the lead leaves.
+    const { span: leadSpan, planned } = currentLead(whole, options.current, ctx, options.on);
+    if (leadSpan !== null) spans.push(leadSpan);
 
     const column = byKey.get(planned.key);
     const cell: Cell | undefined = row.cells[planned.key];
@@ -209,19 +442,31 @@ export function rowSpans(
     // that cannot be opened leaves the column blank rather than drawing a marker
     // that does nothing when pressed.
     if (column?.role === "expand") {
-      const marker = options.expandable
-        ? glyphFor(row.expanded === true ? "collapse" : "expand", ctx.capabilities)
-        : "";
+      // **Two carriers for a collapsed row** (C10 §4k.5, ruling 69): the mark and
+      // the count it hides, so collapsed and leaf differ by more than a glyph.
+      // An expanded row's second carrier is its content's position below it.
+      const mark = glyphFor(row.expanded === true ? "collapse" : "expand", ctx.capabilities);
+      const counted = row.expanded !== true && options.hidden > 0 ? `${mark}+${String(options.hidden)}` : mark;
+      // **A count is never cut** (C11 I32, §3a row 9): below the reservation —
+      // the column itself truncated — `▹+12` cut from the end reads `▹+1`, a
+      // different number, so the mark stands alone.
+      const marker = !options.expandable
+        ? ""
+        : cells(counted, ctx.capabilities.ambiguousWidth) <= planned.width
+          ? counted
+          : mark;
       // `fitAt` and not `fit` for the reason above, even though the internal
       // glyph table cannot reach it today: `glyphFor` collapses `expand` and
       // `collapse` to `>` and `v` at `ambiguousWidth: "wide"` (C09 I48), so the
       // marker is one cell under both conventions and the two padders agree.
-      // Stated rather than relied on — the day a token leaves `AMBIGUOUS_TOKENS`
-      // this is a two-cell glyph in a one-cell column, and the site that decides
-      // that is in a different component (I21).
+      // Stated rather than relied on — the day a token's ASCII half stops being
+      // one cell this is a two-cell glyph in a one-cell column, and the site
+      // that decides that is in a different component (C09 I21). **`AMBIGUOUS_TOKENS`
+      // is gone**: the vocabulary takes its ASCII rung whole at `wide` now, so
+      // the condition is about the half rather than about the member (C09 I48).
       spans.push({
         text: fitAt(marker, planned.width, ctx),
-        style: tone("dim", ctx.theme, ctx.capabilities),
+        style: tone("dim", ctx.theme, ctx.capabilities, options.on),
       });
       return;
     }
@@ -240,7 +485,7 @@ export function rowSpans(
     // recent samples — the ones it was shown for.
     if (cell?.spark !== undefined) {
       const { lead, room } = seriesLead(cell, options.marked.has(planned.key), planned.width, ctx);
-      const style = tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities);
+      const style = tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities, options.on);
       // The mark is its own run for the reason the text path gives: a span's
       // offsets stay offsets into the series rather than into a spliced string.
       if (lead !== "") spans.push({ text: lead, style });
@@ -257,30 +502,54 @@ export function rowSpans(
     // decides nothing.
     if (cell?.bar !== undefined) {
       const { lead, room } = seriesLead(cell, options.marked.has(planned.key), planned.width, ctx);
-      const style = tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities);
+      const style = tone(cell.tone ?? "accent", ctx.theme, ctx.capabilities, options.on);
       if (lead !== "") spans.push({ text: lead, style });
       spans.push({ text: valueBar(cell.bar, room, ctx.capabilities), style });
       return;
     }
 
-    const spanned = cell === undefined ? [] : runsOf(cell.text, cell.spans);
-    // **A focused row drops a span's tone as it drops the cell's** (I14, C09
-    // §5): focus replaces `cell.tone` with `accent` below, and a span's `tone`
-    // is the same claim at a finer grain — a row that kept it would read as two
-    // things on the one occasion it must read as one. Attributes and a value
-    // are not claims about the foreground and survive.
-    // A selected row drops them the same way (I14): its ink is `default`, the
-    // one slot C10 §4b measured over the wash, and a span's own tone would be
-    // a second claim on the one occasion the row must read as one thing.
-    const textRuns = options.focused || options.selected === true
-      ? spanned.map((run) => {
-          if (run.tone === undefined) return run;
-          const { tone: _focusTakesIt, ...rest } = run;
-          return rest;
-        })
-      : spanned;
+    // **A missing number is the absent mark** (I29, §078 `R-TBL-003`): *0 is a
+    // measurement; blank is a rendering failure*. Muted, at the inline end,
+    // which is where §078 draws it in both its decimal and its duration column —
+    // and the mark `pairFor` gives a bar's missing value, so one fact keeps one
+    // character. A cell with a glyph is not missing: the glyph is its content.
+    if (
+      options.unknown?.has(planned.key) === true &&
+      (cell === undefined || (isMissing(cell.text) && cell.glyph === undefined && cell.trend === undefined))
+    ) {
+      // In an aligned decimal column the values end short of the column's edge,
+      // and the dash ends where they do; everywhere else, at the edge.
+      const end = Math.min(planned.width, options.ends?.get(planned.key) ?? planned.width);
+      spans.push({
+        text: pad(padStart(pairFor(ctx.capabilities).absent, end), planned.width),
+        style: tone("muted", ctx.theme, ctx.capabilities, options.on),
+      });
+      return;
+    }
+
+    // **A run keeps its own tone, and the ground decides what that tone inks
+    // as** (I14 as amended, C10 I48). The first form of this dropped a span's
+    // tone on a focused or selected row, arguing that a row which kept it would
+    // read as two things on the one occasion it must read as one. That was true
+    // of a resolver with one ink per slot: there was the page's value or a
+    // legible one and not both. The resolver takes the ground now, so a span's
+    // tone resolves *against* the wash — the band's single ink where the theme
+    // declares a band, which is the one-ink reading kept exactly where it was
+    // ever true, and the theme's composed value where it does not (F1240).
+    // **Grouped where the column groups** (I28). `spans` are code-unit offsets
+    // into `text` and grouping splices into it, so a column with any span does
+    // not group at all — clause 2 — and `runsOf` is therefore never handed a
+    // string the offsets no longer address.
+    const textRuns =
+      cell === undefined
+        ? []
+        : runsOf(displayText(cell.text, options.grouping.has(planned.key)), cell.spans);
     const text = runsText(textRuns);
-    const glyph = cell?.glyph === undefined ? "" : glyphFor(cell.glyph, ctx.capabilities);
+    // A trend's arrow stands where a glyph would (I30 — I23's lead), so it is
+    // inside the planned width like any other mark.
+    const trend = trendMark(cell, column, ctx.capabilities);
+    const glyph =
+      trend !== undefined ? trend.mark : cell?.glyph === undefined ? "" : glyphFor(cell.glyph, ctx.capabilities);
 
     // The glyph is part of the cell's width, not an addition to it: a status
     // column declaring `minWidth` for "succeeded" plus its glyph is the surface
@@ -297,21 +566,25 @@ export function rowSpans(
     // spliced into the string the offsets address.
     const lead = glyph !== "" && text !== "" ? `${glyph} ` : glyph;
     const body = lead + text;
-    const bodyRuns = lead === "" ? textRuns : [{ text: lead }, ...textRuns];
+    // The arrow's tone is the lead's own, resolved against the row's ground like
+    // any run; the text keeps the cell's default.
+    const bodyRuns =
+      lead === "" ? textRuns : [{ text: lead, ...(trend?.tone === undefined ? {} : { tone: trend.tone }) }, ...textRuns];
 
-    // **Focus is rendered, never owned** (I14). It changes the tone and nothing
-    // else — no marker, no extra row, no width. `measure` receives no focus at
-    // all (C04 §5), so a focused row that occupied a different number of cells
-    // or rows would be I9 broken by whichever row the user happened to be on.
+    // **Focus is rendered, never owned** (I14). It changes the ground and the
+    // mark and no geometry — no extra row, no width. `measure` receives no
+    // focus at all (C04 §5), so a focused row that occupied a different number
+    // of cells or rows would be I9 broken by whichever row the user happened to
+    // be on.
     //
-    // **Selected is the same rule, one more state** (I14): `default` ink, and
-    // the caller lays the wash over the whole row. `focused` wins where both
-    // hold — the head is painted as the head.
-    const style = options.focused
-      ? tone("accent", ctx.theme, ctx.capabilities)
-      : options.selected === true
-        ? tone("default", ctx.theme, ctx.capabilities)
-        : tone(cell?.tone ?? "default", ctx.theme, ctx.capabilities);
+    // **The cell keeps its own tone whatever the row's state**, and `on` is
+    // what makes that legible: the ink is resolved against the ground the
+    // caller laid, so §4k.2 row 1's third clause holds — failure keeps its
+    // glyph, its word and its tone, on the ground selection took.
+    const inked = tone(cell?.tone ?? "default", ctx.theme, ctx.capabilities, options.on);
+    // **The current row's first cell is bold** (I33, §097): the weight is the
+    // carrier that survives one bit, where the ground and the accent do not.
+    const style = options.current?.on === true && options.current.key === whole.key ? { ...inked, bold: true } : inked;
 
     // The end a cell truncates from is the surface's (C04 I30) — a path keeps its
     // filename, a config key its leaf, an image its tag. C11 reads the field and
@@ -324,15 +597,32 @@ export function rowSpans(
     const parts = truncateParts(body, planned.width, ctx.capabilities, from);
     const cut = parts.prefix + parts.kept + parts.suffix;
     const short = Math.max(0, planned.width - cells(cut, ctx.capabilities.ambiguousWidth));
+    // **The decimal arm splits the padding rather than putting it at one end**
+    // (I26, §099). The integer part is right-aligned to the column's point and
+    // everything from the point on is left-aligned after it; a value with no
+    // point is all integer part and so **ends** at the point, which is what puts
+    // `1284` under `0.941`'s point with no case of its own. The lead is clamped
+    // to what the cell actually has, so a cut cell cannot push itself past its
+    // own width.
+    const align = options.aligns.get(planned.key);
+    const point = align === "decimal" ? options.points?.get(planned.key) : undefined;
+    // **A decimal column that could not align falls back to `right`, not left**
+    // — the convention for numbers, and §099's complaint about `right` is that
+    // it misaligns *points*, which a column with no room for them has anyway.
+    const rightish = align === "right" || align === "decimal";
+    const pointLead =
+      point === undefined
+        ? undefined
+        : Math.max(0, Math.min(short, point - cells(integerPart(cut), ctx.capabilities.ambiguousWidth))); // cells-ok — a cell budget
     const pieces = [
-      { text: column?.align === "right" ? " ".repeat(short) : "" },
+      { text: pointLead !== undefined ? " ".repeat(pointLead) : rightish ? " ".repeat(short) : "" },
       { text: parts.prefix },
       ...sliceRuns(bodyRuns, parts.start, parts.kept.length), // cells-ok — a code-unit length
       { text: parts.suffix },
-      { text: column?.align === "right" ? "" : " ".repeat(short) },
+      { text: pointLead !== undefined ? " ".repeat(short - pointLead) : rightish ? "" : " ".repeat(short) },
     ];
 
-    spans.push(...paintRuns(pieces, style, ctx));
+    spans.push(...paintRuns(pieces, style, { ...ctx, on: options.on }));
   });
 
   return spans;

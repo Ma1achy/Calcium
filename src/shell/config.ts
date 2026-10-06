@@ -15,12 +15,20 @@
 import { createFallbackAdapter } from "../data/adapters/index.js";
 import { DEFAULT_MAX_BLOCK_ROWS } from "../presentation/blocks/index.js";
 import { slashPolicy } from "../interaction/parser/index.js";
+import { RESERVED_ACTIONS } from "../interaction/router/keymap.js";
 import { createExecutionPipeline } from "./execution.js";
 import { makeDefaultChrome } from "./chrome.js";
 import { createRecording, recordStdin } from "./profiling/record.js";
 import { DEFAULT_TIER } from "./profiling/recorder.js";
 import { ConfigError, type FileSystem, type TuiConfig } from "./types.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
+import type { Motion } from "../presentation/blocks/index.js";
+
+/**
+ * The three `TuiConfig.motion` admits (C09 I99, `R-MOT-001`). A set rather
+ * than an array because the only reader is a membership test.
+ */
+const MOTIONS: ReadonlySet<string> = new Set<Motion>(["full", "reduced", "off"]);
 
 /**
  * Below this the layout engine cannot produce a sane answer, so the size gate
@@ -78,7 +86,9 @@ export const MAX_FOOTER_ROWS =
  * row the reader types into. `promptFor` is the only reader; nothing resolves it
  * at module scope, which would read a capability before C02 has detected one.
  */
-const PROMPT_FORMS: readonly [unicode: string, ascii: string] = Object.freeze(["❯ ", "> "]);
+// `$` at ASCII is the registry's `reader` record (C09 I123). It was `>`, which
+// is `focus`'s ASCII mark — the collision the design moved the reader off.
+const PROMPT_FORMS: readonly [unicode: string, ascii: string] = Object.freeze(["❯ ", "$ "]);
 
 export function promptFor(caps: Pick<TerminalCapabilities, "unicode">): string {
   return caps.unicode === "ascii" ? PROMPT_FORMS[1] : PROMPT_FORMS[0];
@@ -122,6 +132,26 @@ export function regionWidth(columns: number): number {
   return Math.max(1, columns - CONTENT_MARGIN_R); // cells-ok — a column count
 }
 
+/**
+ * Column 0 of the transcript region, which the frame reserves on every row for
+ * the selection rail (C14 I57, ruling 68). Never configurable, for
+ * `CONTENT_MARGIN_R`'s reason.
+ */
+export const RAIL_COLUMNS = 1;
+
+/**
+ * The transcript's width — the region's less the rail's column (C14 I57).
+ *
+ * **One implementation, for `regionWidth`'s reason, and the two are not
+ * interchangeable.** The prompt and the layer region keep the region's width;
+ * the transcript is measured, windowed, rendered and hit at this. A site that
+ * reached for `regionWidth` where it meant the transcript laid its blocks out a
+ * column wider than the frame draws them — the drift the helper exists to name.
+ */
+export function transcriptWidth(columns: number): number {
+  return Math.max(1, regionWidth(columns) - RAIL_COLUMNS); // cells-ok — a column count
+}
+
 /** C13 §5a — a number rather than "all"; doubling memory is how a debug mode
  * becomes one nobody turns on. */
 export const DEFAULT_RETAIN_PAYLOADS = 50;
@@ -151,6 +181,20 @@ export const DEFAULT_RETAIN_PAYLOADS = 50;
  * append to a developer's real history, because there is no single one.
  */
 export const DEFAULT_STATE_DIR = ".calcium";
+
+/**
+ * Where a configuration value came from (C22 I115, §075, `R-HON-008`).
+ *
+ * Ordered as §075's ladder is, by when the layer is applied — and **only
+ * `default` has a producer today**. A `TuiConfig` value is the reader's
+ * default whether the framework supplied it or the application did, because the
+ * reader chose neither. The other three are the reader's own choices; a config
+ * file, the environment and flags declare them the day they are read.
+ */
+export type Provenance = "default" | "config" | "env" | "flag";
+
+/** One reader-facing value, as text, with where it came from (C22 I115). */
+export type Setting = Readonly<{ key: string; value: string; source: Provenance }>;
 
 const REQUIRED = ["name", "binary", "manifest", "theme"] as const;
 
@@ -193,6 +237,14 @@ export function validateConfig(config: TuiConfig): void {
   if (config.hover !== undefined && typeof config.hover !== "boolean") {
     throw new ConfigError("hover", `must be a boolean, got ${String(config.hover)}`);
   }
+  // C09 I99 — one of three, or absent. **Checked and not narrowed by the type
+  // alone**, on `hover`'s own argument one line up: a value the union does not
+  // admit arrives from JSON and from a settings file, and an unrecognised
+  // string falling through to the `?? "full"` default below would silently
+  // ignore a reader who asked for `off` and misspelled it.
+  if (config.motion !== undefined && !MOTIONS.has(config.motion)) {
+    throw new ConfigError("motion", `must be one of full, reduced, off — got ${String(config.motion)}`);
+  }
   // C22 I94 — **the same path, not both fields.** The rule was written as *set
   // together*, and building the apparatus falsified it: a replay is compared to
   // its recording by **recording the replay**, because the two byte streams
@@ -203,6 +255,26 @@ export function validateConfig(config: TuiConfig): void {
   //
   // **The message names both fields**, because a refusal naming one reads as
   // that field being invalid and neither is.
+  // C24 I39 — a handler under an id the design did not reserve would be a key
+  // nothing resolves to it, silently. **The message names the whole set**, so
+  // a reader who misspelled one learns the spelling from the refusal, and the
+  // type refuses the same ids at compile time for a consumer who names them.
+  const keyActions = config.keyActions;
+  if (keyActions !== undefined) {
+    const reserved = Object.keys(RESERVED_ACTIONS);
+    const unknown = Object.keys(keyActions).filter((id) => !reserved.includes(id));
+    if (unknown.length > 0) {
+      throw new ConfigError(
+        "keyActions",
+        `names ${unknown.join(", ")}, which the design does not reserve — the reserved ids are ` +
+          `${reserved.join(", ")} (C24 I39)`,
+      );
+    }
+    const notCallable = Object.entries(keyActions).filter(([, h]) => typeof h !== "function");
+    if (notCallable.length > 0) {
+      throw new ConfigError("keyActions", `${notCallable.map(([id]) => id).join(", ")} must be a function`);
+    }
+  }
   const profile = config.profile;
   if (profile?.record !== undefined && profile.record === profile.replay) {
     throw new ConfigError(
@@ -342,6 +414,8 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     // I3a — registered at step 10 before `seal()`. Defaulted like every other
     // optional field, so an app with no local verbs supplies nothing.
     localHandlers: config.localHandlers ?? {},
+    // C22 I134 — empty, not absent, so `bound` asks one record and never a `?.`.
+    keyActions: config.keyActions ?? {},
     fallbackAdapter: createFallbackAdapter(),
     commandPolicy: config.commandPolicy ?? slashPolicy,
     completionSources: config.completionSources ?? [],
@@ -388,12 +462,25 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     // C01 I21 — off unless asked for; resolved here so C22 hands C01 a boolean
     // and the default lives with the other defaults.
     hover: config.hover ?? false,
+    // C09 I99 — the reader's motion preference, defaulted here beside `hover`
+    // for the reason `hover` is: it is a preference, not a capability.
+    motion: config.motion ?? "full",
     cwd: config.cwd ?? ambient.cwd,
     clock: ((c) => (recording === null ? c : recording.wall(c)))(config.clock ?? ambient.clock),
     schedule: ambient.schedule,
     platform: ambient.platform,
     fs: config.fs ?? ambient.fs,
     stateDir: config.stateDir ?? DEFAULT_STATE_DIR,
+    // **Taken here, at the one site that knows which side of each `??` won**
+    // (C22 I115). Every source is `default`: a caller's value is still one the
+    // reader did not choose, so it is not `config` — that layer is a file the
+    // reader wrote, and nothing reads one yet.
+    settings: Object.freeze<Setting[]>([
+      { key: "motion", value: config.motion ?? "full", source: "default" },
+      { key: "hover", value: String(config.hover ?? false), source: "default" },
+      { key: "maxBlockRows", value: String(config.maxBlockRows ?? DEFAULT_MAX_BLOCK_ROWS), source: "default" },
+      { key: "stateDir", value: config.stateDir ?? DEFAULT_STATE_DIR, source: "default" },
+    ]),
     ...(config.persist === undefined ? {} : { persist: config.persist }),
     openUrl: config.openUrl,
     // C28 I46 — the input tap, applied at the one place that resolves the

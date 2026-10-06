@@ -1,33 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
 <rect width="100%" height="100%" fill="#1a1a1a"/>
-<text x="149.6" y="316.8" text-anchor="end" font-size="12" font-family="monospace" fill="#626262">12</text>
+<text x="149.6" y="316.8" text-anchor="end" font-size="12" font-family="monospace" fill="#8c8c8c">12</text>
 <defs><linearGradient id="rsvgb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#440154"/><stop offset="0.125" stop-color="#472d7b"/><stop offset="0.25" stop-color="#3b528b"/><stop offset="0.375" stop-color="#2c728e"/><stop offset="0.5" stop-color="#21918d"/><stop offset="0.625" stop-color="#27ad81"/><stop offset="0.75" stop-color="#5dc863"/><stop offset="0.875" stop-color="#aadc32"/><stop offset="1" stop-color="#fde725"/></linearGradient></defs>
 <rect x="153.6" y="307.2" width="268.8" height="9.6" fill="url(#rsvgb)"/>
-<text x="426.4" y="316.8" text-anchor="start" font-size="12" font-family="monospace" fill="#626262">38</text>
+<text x="426.4" y="316.8" text-anchor="start" font-size="12" font-family="monospace" fill="#8c8c8c">38</text>
 <clipPath id="isvgb-0"><rect x="0" y="12.267" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="28.267" text-anchor="end" clip-path="url(#isvgb-0)" font-size="12" font-family="monospace" fill="#626262">Jan</text>
+<text x="83.6" y="28.267" text-anchor="end" clip-path="url(#isvgb-0)" font-size="12" font-family="monospace" fill="#8c8c8c">Jan</text>
 <clipPath id="isvgb-1"><rect x="0" y="35.2" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="51.2" text-anchor="end" clip-path="url(#isvgb-1)" font-size="12" font-family="monospace" fill="#626262">Feb</text>
+<text x="83.6" y="51.2" text-anchor="end" clip-path="url(#isvgb-1)" font-size="12" font-family="monospace" fill="#8c8c8c">Feb</text>
 <clipPath id="isvgb-2"><rect x="0" y="58.133" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="74.133" text-anchor="end" clip-path="url(#isvgb-2)" font-size="12" font-family="monospace" fill="#626262">Mar</text>
+<text x="83.6" y="74.133" text-anchor="end" clip-path="url(#isvgb-2)" font-size="12" font-family="monospace" fill="#8c8c8c">Mar</text>
 <clipPath id="isvgb-3"><rect x="0" y="81.067" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="97.067" text-anchor="end" clip-path="url(#isvgb-3)" font-size="12" font-family="monospace" fill="#626262">Apr</text>
+<text x="83.6" y="97.067" text-anchor="end" clip-path="url(#isvgb-3)" font-size="12" font-family="monospace" fill="#8c8c8c">Apr</text>
 <clipPath id="isvgb-4"><rect x="0" y="104" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="120" text-anchor="end" clip-path="url(#isvgb-4)" font-size="12" font-family="monospace" fill="#626262">May</text>
+<text x="83.6" y="120" text-anchor="end" clip-path="url(#isvgb-4)" font-size="12" font-family="monospace" fill="#8c8c8c">May</text>
 <clipPath id="isvgb-5"><rect x="0" y="126.933" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="142.933" text-anchor="end" clip-path="url(#isvgb-5)" font-size="12" font-family="monospace" fill="#626262">Jun</text>
+<text x="83.6" y="142.933" text-anchor="end" clip-path="url(#isvgb-5)" font-size="12" font-family="monospace" fill="#8c8c8c">Jun</text>
 <clipPath id="isvgb-6"><rect x="0" y="149.867" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="165.867" text-anchor="end" clip-path="url(#isvgb-6)" font-size="12" font-family="monospace" fill="#626262">Jul</text>
+<text x="83.6" y="165.867" text-anchor="end" clip-path="url(#isvgb-6)" font-size="12" font-family="monospace" fill="#8c8c8c">Jul</text>
 <clipPath id="isvgb-7"><rect x="0" y="172.8" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="188.8" text-anchor="end" clip-path="url(#isvgb-7)" font-size="12" font-family="monospace" fill="#626262">Aug</text>
+<text x="83.6" y="188.8" text-anchor="end" clip-path="url(#isvgb-7)" font-size="12" font-family="monospace" fill="#8c8c8c">Aug</text>
 <clipPath id="isvgb-8"><rect x="0" y="195.733" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="211.733" text-anchor="end" clip-path="url(#isvgb-8)" font-size="12" font-family="monospace" fill="#626262">Sep</text>
+<text x="83.6" y="211.733" text-anchor="end" clip-path="url(#isvgb-8)" font-size="12" font-family="monospace" fill="#8c8c8c">Sep</text>
 <clipPath id="isvgb-9"><rect x="0" y="218.667" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="234.667" text-anchor="end" clip-path="url(#isvgb-9)" font-size="12" font-family="monospace" fill="#626262">Oct</text>
+<text x="83.6" y="234.667" text-anchor="end" clip-path="url(#isvgb-9)" font-size="12" font-family="monospace" fill="#8c8c8c">Oct</text>
 <clipPath id="isvgb-10"><rect x="0" y="241.6" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="257.6" text-anchor="end" clip-path="url(#isvgb-10)" font-size="12" font-family="monospace" fill="#626262">Nov</text>
+<text x="83.6" y="257.6" text-anchor="end" clip-path="url(#isvgb-10)" font-size="12" font-family="monospace" fill="#8c8c8c">Nov</text>
 <clipPath id="isvgb-11"><rect x="0" y="264.533" width="83.6" height="24"/></clipPath>
-<text x="83.6" y="280.533" text-anchor="end" clip-path="url(#isvgb-11)" font-size="12" font-family="monospace" fill="#626262">Dec</text>
+<text x="83.6" y="280.533" text-anchor="end" clip-path="url(#isvgb-11)" font-size="12" font-family="monospace" fill="#8c8c8c">Dec</text>
 <rect x="89.6" y="12.8" width="33.067" height="22.933" fill="#355f8d"/>
 <rect x="122.667" y="12.8" width="33.067" height="22.933" fill="#38598c"/>
 <rect x="155.733" y="12.8" width="33.067" height="22.933" fill="#3b528b"/>

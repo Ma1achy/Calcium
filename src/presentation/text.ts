@@ -731,7 +731,7 @@ export function truncate(
   text: string,
   width: number,
   caps: Readonly<{ unicode: "full" | "bmp" | "ascii"; ambiguousWidth?: AmbiguousWidth }>,
-  from: "start" | "end" = "end",
+  from: "start" | "end" | "middle" = "end",
 ): string {
   const limit = Math.max(0, Math.floor(width));
   if (limit === 0) return "";
@@ -759,6 +759,26 @@ export function truncate(
   // than two implementations: a second pass over the same grapheme stream would
   // round differently at the boundary in exactly the CJK and ZWJ cases this
   // module exists for (C09 I9).
+  // **The middle cut keeps both ends** (C09 I103, §099): *the head says where
+  // and the tail says what, and either end alone is the wrong half*. The head
+  // takes a third of the budget and the tail the rest, which is the bias §099's
+  // three specimens share — they are specimens rather than a ratio, because
+  // `R-SEC-099` rules the section's sample content to be examples.
+  //
+  // **Two walks of the same cursor, not a second implementation.** Each end
+  // calls `keptWithin`, so the boundary rounds the way it rounds everywhere
+  // else and a cluster is never split (C04 I84, C09 I79). The head is taken
+  // first and the tail is given whatever the head did not spend, so a
+  // double-width glyph refused at the head is a cell the tail can use rather
+  // than a cell that goes blank.
+  if (from === "middle") {
+    const headBudget = Math.floor(budget / 3); // cells-ok — a cell budget
+    const head = keptWithin(clean, headBudget, caps.ambiguousWidth, "end");
+    const tail = keptWithin(clean, budget - head.used, caps.ambiguousWidth, "start");
+    const spent = head.used + tail.used;
+    return `${head.kept}${marker}${" ".repeat(budget - spent)}${tail.kept}`;
+  }
+
   const { kept, used } = keptWithin(clean, budget, caps.ambiguousWidth, from);
 
   // A double-width glyph refused at the boundary leaves a cell to fill, so the
@@ -872,6 +892,11 @@ export function truncateParts(
   text: string,
   width: number,
   caps: Readonly<{ unicode: "full" | "bmp" | "ascii"; ambiguousWidth?: AmbiguousWidth }>,
+  // **No `"middle"` arm here, and the contract is why** (C09 I103). A middle cut
+  // keeps **two** pieces, and this function's whole promise is that `kept` is one
+  // exact substring of the input at offset `start` — which is what lets `code`
+  // slice its token stream against it. Two pieces cannot be reported through one
+  // offset, so the arm lives on `truncate`, whose answer is a string.
   from: "start" | "end" = "end",
 ): Readonly<{ kept: string; prefix: string; suffix: string; start: number }> {
   const whole = stripControl(text);

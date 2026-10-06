@@ -1,5 +1,5 @@
 /**
- * `@fmx/calcium/testing` — C24 §7. Dev-only, and never in a production bundle (I8).
+ * `calcium-tui/testing` — C24 §7. Dev-only, and never in a production bundle (I8).
  *
  * **The two suites arrived by moving, not by rewriting.** Both were written in
  * `test/support/` under an explicit `DESTINATION: src/testing/` header,
@@ -41,6 +41,12 @@ export { expectDocument, type DocumentAssertions, type RenderOpts } from "./expe
  * the document.
  */
 export { liveParts, type LivePart } from "./live-parts.js";
+
+/**
+ * The regional tone budget (C10 I58, `R-COL-002`, §090) — a conformance suite
+ * because *five is a smell* is a judgement about a design rather than an error.
+ */
+export { toneBudgetSuite, TONE_BUDGET, TONE_SMELL } from "./tone-conformance.js";
 
 /**
  * A `ProducerContext` a consumer can build (C24 §7).

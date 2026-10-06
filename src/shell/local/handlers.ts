@@ -23,14 +23,19 @@ import type { GlyphCaps } from "../../presentation/blocks/index.js";
 import type { ThemeStore } from "../../presentation/theme/index.js";
 import { b } from "../builders/index.js";
 import { blockId, compose, warnNotice } from "../documents.js";
-import { CARDS, SECTIONS, profileCard } from "../profiling/panes/index.js";
+import { CARDS, SECTIONS, deckOf, profileCard } from "../profiling/panes/index.js";
 import { ms } from "../profiling/panes/kit.js";
 import type { ProfileSection } from "../profiling/panes/index.js";
 import { TIER_RANK } from "../profiling/types.js";
 import type { CaptureResult, ProfileReport } from "../profiling/types.js";
-import type { ProfileView } from "../profile-view.js";
 import type { LocalHandler } from "./registry.js";
 import type { StopReason } from "../types.js";
+import type { CapabilitySource, TerminalCapabilities } from "../../terminal/capabilities.js";
+import { scopesInReadingOrder } from "../../interaction/router/keymap.js";
+import { configBlock } from "../config-table.js";
+import { watchName } from "../watches.js";
+import type { WatchStore } from "../watches.js";
+import type { Setting } from "../config.js";
 
 export type HandlerDeps = Readonly<{
   manifest: () => Manifest | null;
@@ -51,34 +56,43 @@ export type HandlerDeps = Readonly<{
    */
   setSuppressBackground: (suppressed: boolean) => void;
   history: () => readonly HistoryEntry[];
-  /** Every binding C16 will dispatch, for `/help` (C23 I26). */
-  bindings: () => readonly Readonly<{ keys: string; does: string }>[];
+  /**
+   * Every binding C16 will dispatch, for `/help` (C23 I26) — **with its target,
+   * so the listing can be grouped by scope** (R-KEY-005, C16 §6a).
+   *
+   * The target used to be folded into `does` as `"prompt: complete"`, which is
+   * a string a renderer would have to take apart again to group by — the
+   * re-parsing SS40 is about, one seam over.
+   */
+  bindings: () => readonly Readonly<{ keys: string; does: string; target: string }>[];
+  /** Which rung the reader is on, so their own scope is listed first (R-KEY-005). */
+  currentScope: () => string;
   stop: (reason: StopReason) => Promise<number>;
   /**
-   * C28 §3c's view, for `/profile` (C23 I68) — the way `stop` is for `/exit`.
+   * The report, for every arm of `/profile` (C23 I68, I69, amended).
    *
-   * **Required, because the row is.** `FRAMEWORK_TOOLS` declares seven verbs
-   * and C23 I27 refuses a row without a handler at every startup, so the view
-   * has to arrive whether or not a profiler does: the root always builds one,
-   * and a view with no recorder behind it refuses through the route rather than
-   * vanishing (T4.67). This was optional, with the handler included only when a
-   * view was handed in, while the row and `execution.ts`'s call site were
-   * outside the round that wrote it (T1.64's second arm watched that).
-   */
-  profileView: ProfileView;
-  /**
-   * The report, for `/profile snapshot` and `/profile live` (C23 I69, amended).
+   * **A reader and not a profiler.** Every arm puts blocks in the transcript
+   * and none may raise the tier — an entry has no close, so a raise would pin
+   * the tier for the session and reset the ring doing it (C28 I18). Handing
+   * over `() => ProfileReport | null` rather than the recorder is what makes
+   * `setTier` unreachable from here rather than merely unused.
    *
-   * **A reader and not a profiler.** The two verbs put a card in the transcript
-   * and neither may raise the tier — a transcript part has no close, so a raise
-   * would pin the tier for the session and reset the ring doing it (C28 I50,
-   * I18). Handing over `() => ProfileReport | null` rather than the recorder is
-   * what makes `setTier` unreachable from here rather than merely unused.
+   * **This used to be true of two verbs and is now true of the whole route**
+   * (R-EXA-082, F1254): the section arm raised a layer that held the tier for
+   * its lifetime and restored it at the pop, and there is no layer.
    *
    * `null` when the session was built without `TuiConfig.profile`, which is the
-   * same state `profileView.open` refuses on.
+   * state every arm answers with a `warn` notice naming that option.
    */
   profileReport: () => ProfileReport | null;
+  /**
+   * The resolved capability record and how each field was answered (C02 I13),
+   * for `/capabilities` (C22 I125).
+   */
+  capabilities: () => Readonly<{
+    values: TerminalCapabilities;
+    sources: Readonly<Record<keyof TerminalCapabilities, CapabilitySource>>;
+  }>;
   /**
    * `/profile capture`'s one operation, `null` where no profiler exists
    * (C28 I64).
@@ -89,20 +103,49 @@ export type HandlerDeps = Readonly<{
    * off the report's own `regime.tier` and nothing here can change it.
    */
   profileCapture: ((ms: number) => Promise<CaptureResult>) | null;
+  /**
+   * `ResolvedConfig.settings` — every reader-facing value and where it came
+   * from (C22 I115), for `/config` (C23 I80, ruling 43). The resolved record,
+   * never a second derivation of it.
+   */
+  settings: () => readonly Setting[];
+  /**
+   * The session's watches, for `/watch` and `/unwatch` (C22 I135, I136). The
+   * set itself rather than a view of it: the two verbs are its producers.
+   */
+  watches: WatchStore;
 }>;
+
+/**
+ * The entry a watch verb names (C22 I136, §6p.2): `back` counted from the
+ * transcript's end as `/debug` counts, or — with none — the verb's own default.
+ * An answer or the notice that says why there is none.
+ */
+type Named = Readonly<{ entry: TranscriptStore["entries"][number] }> | Readonly<{ refusal: string }>;
+
+const nthBack = (transcript: TranscriptStore, raw: string | undefined): Named | null => {
+  if (raw === undefined) return null;
+  // C05 has validated `int` already; a value below one is `/debug`'s one.
+  const back = Math.max(1, Number.parseInt(raw, 10) || 1);
+  const entries = transcript.entries;
+  const entry = entries[entries.length - back];
+  return entry === undefined
+    ? { refusal: `no entry ${String(back)} back — the transcript holds ${String(entries.length)}` }
+    : { entry };
+};
 
 const isSection = (x: unknown): x is ProfileSection =>
   typeof x === "string" && (SECTIONS as readonly string[]).includes(x);
 
 /**
- * `/profile [section]` — open C28's view (C23 I68, I69).
+ * `/profile [section]` — compose C28's deck into an entry (C23 I68, I69).
  *
- * **It appends a notice and never the cards.** The deck is drawn in the layer
- * the view refreshes; a document holding a report would freeze one reading into
- * the transcript's record and read as current on every later frame, which is
- * I18's stale-data shape with the framework's own figures inside it. The two
- * verbs that *do* put a card in the transcript — `snapshot` and `live` — carry a
- * stamp or a cadence for exactly that reason (C23 I69, amended).
+ * **Every card that reaches the transcript is stamped or live.** A document
+ * holding a report would freeze one reading into the transcript's record and
+ * read as current on every later frame, which is I18's stale-data shape with
+ * the framework's own figures inside it — so a section's cards and
+ * `snapshot`'s one card carry a stamp, and `live`'s carries a cadence
+ * (C23 I69, amended).
  *
  * **The section comes from `ctx.args`, never from `argv[0]`** (C22 I66), for
  * `/theme`'s reason: C05 parsed and enum-checked it, and a second reader of one
@@ -110,9 +153,10 @@ const isSection = (x: unknown): x is ProfileSection =>
  * is empty there, because a local verb is not gated on validation — to quote
  * the token that was typed, and to tell *no argument* from *a bad one*.
  *
- * Every refusal is a document on this route rather than a throw (C23 I2): the
- * view's own strings for *no profiler* and *something is open*, and a usage
- * line for a section that is not one of C28's three.
+ * Every refusal is a document on this route rather than a throw (C23 I2): a
+ * `warn` notice naming `TuiConfig.profile` on every arm when there is no
+ * profiler, and a usage line for a token that is none of C28's three sections
+ * and none of the three verbs.
  */
 /**
  * The stamp (C23 I69, amended).
@@ -149,17 +193,17 @@ const stampOf = (r: ProfileReport, card: string, caps: GlyphCaps): string => {
   ].join(sep);
 };
 
-/** How often a live card refetches — the view's cadence, for the view's reasons. */
+/** How often a live card refetches — the sampler's cadence (C23 §2). */
 const LIVE_EVERY_MS = 1000;
 
 /**
  * The rows a snapshot card is drawn at.
  *
- * **A figure and not the region**, which is the whole of why the verb exists:
- * the overlay is one screen and does not scroll, so an icicle of a 47 ms frame
- * is cramped there and right in scrollback, where it can be scrolled past and
- * compared with the next one. `ctx.height` is the *viewport's* height and would
- * reproduce the cramping in the one place that is not bound by it.
+ * **A figure and not the region.** An entry is as tall as its blocks and the
+ * transcript scrolls it, so an icicle of a 47 ms frame is drawn at a height it
+ * reads at, where it can be scrolled past and compared with the next one.
+ * `ctx.height` is the *viewport's* height and would reproduce a one-screen
+ * cramping in the one place that is not bound by it.
  *
  * The width is `ctx.width` — that one is a real constraint, and a card drawn
  * wider than the transcript wraps (C01's width rule, the direction that
@@ -170,11 +214,9 @@ const SNAPSHOT_ROWS = 32;
 /**
  * The card a document verb draws, named or defaulted.
  *
- * **The verdict rather than whatever the view is showing**, and the difference
- * matters: the prompt takes no keys while a view is top (C16 §3), so a reader
- * who has walked to `frame on a clock` has to close the view before they can
- * type `/profile snapshot` — and by then there is no open card to mean. The
- * card is named on the line or it is the verdict.
+ * **Named on the line or the verdict**, and never *the card on screen*: there
+ * is no open card to mean — the deck is entries in the transcript, several of
+ * which may be visible at once (C23 §2).
  */
 const cardFor = (wanted: unknown): string =>
   typeof wanted === "string" && CARDS.some((c) => c.id === wanted) ? wanted : "verdict";
@@ -194,7 +236,7 @@ const CAPTURE_MIN = 50;
 const CAPTURE_MAX = 10_000;
 
 const profileHandler =
-  (view: ProfileView, report: () => ProfileReport | null,
+  (report: () => ProfileReport | null,
    take: ((ms: number) => Promise<CaptureResult>) | null): LocalHandler =>
   async (argv, ctx) => {
   const wanted = ctx.args["section"];
@@ -302,9 +344,9 @@ const profileHandler =
           if (TIER_RANK[now.regime.tier] < TIER_RANK.spans) {
             return b.notice(
               "warn",
-              `the tier is \`${now.regime.tier}\` and a live card never raises it — ` +
-                "open `/profile` to watch the deck, which raises to `spans` while it is open " +
-                "and restores the tier on close (C28 I50)",
+              `the tier is \`${now.regime.tier}\` and nothing in a running session raises it — ` +
+                "set `profile: { tier: \"spans\" }` and restart; raising it from here would reset " +
+                "the ring every figure is drawn from (C28 I18)",
               undefined,
               { id: `${blockId("profile-live")}-tier` },
             );
@@ -330,13 +372,39 @@ const profileHandler =
       ),
     ]);
   }
-  const refused = view.open(section);
-  if (refused !== null) {
-    return doc("/profile", [warnNotice(refused, blockId("profile-refused"))]);
+  // **The section is an entry, and it always was three quarters of one**
+  // (C28 §3c, R-EXA-082, F1254). This arm raised a `kind: "view"` layer over the
+  // transcript, walked its deck with `n`/`p` and restored the profiler's tier at
+  // the pop; the design's test for anything wanting a frame of its own is *does
+  // it have its own prompt and its own context*, and a reading of the profiler
+  // has neither. So the section's cards go where `/profile snapshot`'s one card
+  // already went: `profileCard` is the seam §3c already published *for a
+  // consumer with its own navigation*, and the transcript is that consumer.
+  //
+  // **Stamped, for `snapshot`'s reason** — the document is a reading taken at a
+  // moment and says which moment on its own title. Currency is `/profile live`'s
+  // question and it is answered there, by a part that refetches; a stamp beside
+  // a refetch would be two claims about one fact.
+  //
+  // **The no-profiler arm is the deck's own**, not the snapshot branch's: this
+  // path never reached `report()` before, because `view.open` answered the state
+  // with a refusal string. Same sentence, one branch over.
+  const deck = report();
+  if (deck === null) {
+    return doc(`/profile ${section}`, [
+      warnNotice(
+        "no profiler to show — this session was built without `TuiConfig.profile`",
+        blockId("profile-refused"),
+      ),
+    ]);
   }
-  return doc("/profile", [
-    b.notice("muted", `profiler: ${section}`, undefined, { id: blockId("profile") }),
-  ]);
+  return doc(`/profile ${section}`, deckOf(deck, section).map((entry) =>
+    b.panel(
+      stampOf(deck, entry.spec.id, ctx.capabilities),
+      [...profileCard(deck, entry.spec.id, { w: ctx.width, rows: SNAPSHOT_ROWS }, ctx.capabilities, entry.seq)],
+      { id: blockId(`profile-${entry.spec.id}${entry.seq === undefined ? "" : `-${String(entry.seq)}`}`) },
+    ),
+  ));
 };
 
 /**
@@ -397,13 +465,37 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
       const visible = manifest === null ? [] : visibleTools(manifest);
 
       if (argv[0] === "keys") {
-        return doc("/help keys", [
-          block({
-            kind: "keyValue",
-            id: blockId("help-keys"),
-            rows: deps.bindings().map((bnd) => ({ label: bnd.keys, value: bnd.does })),
-          }),
-        ]);
+        // **R-KEY-005: the current scope first, the rest grouped by scope.** A
+        // flat list in registration order was 85 rows and is 119 since M6, and
+        // registration order is the order the *table* was written in — which is
+        // a fact about this repository's history and about nothing the reader is
+        // doing. Grouping makes the entry answer *what do my keys do here*
+        // before it answers anything else.
+        const all = deps.bindings();
+        const here = deps.currentScope();
+        // The order is `R-KEY-005` and lives with the keymap (C16 §6a clause
+        // 4); the blocks below are this verb's.
+        const scopes = scopesInReadingOrder(all, here);
+        return doc(
+          "/help keys",
+          scopes.flatMap((scope) => [
+            // A labelled rule for the heading, because `keyValue` has no title
+            // and inventing one would widen a public type for a section break.
+            block({
+              kind: "rule",
+              id: blockId(`help-keys-rule-${scope}`),
+              label: scope === here ? `${scope} — where you are` : scope,
+              level: 3 as const,
+            }),
+            block({
+              kind: "keyValue",
+              id: blockId(`help-keys-${scope}`),
+              rows: all
+                .filter((b) => b.target === scope)
+                .map((bnd) => ({ label: bnd.keys, value: bnd.does })),
+            }),
+          ]),
+        );
       }
 
       // **Grouped by C05 §3's partition**, and this is its second consumer.
@@ -486,7 +578,11 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
           warnNotice(`usage: /theme ${deps.theme.names.join("|")} — got \`${argv[0] ?? ""}\``, blockId("theme-usage")),
         ]);
       }
-      deps.theme.setTheme(wanted);
+      // **The name the set answers, not the word typed** (C10 I63): an alias is
+      // read on the way in and never written on the way out, so the preference
+      // file only ever holds a name the set declares.
+      const chosen = deps.theme.resolveName(wanted) ?? wanted;
+      deps.theme.setTheme(chosen);
       // **Written on the change, not at exit** (C22 I40). A session killed by
       // `SIGKILL` runs no shutdown path (C01 §5), and a preference that
       // survives a clean exit and not a crash is one people stop trusting.
@@ -496,7 +592,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
       // handler that awaited a disk would block the frame on it. A failed write
       // means the choice does not survive the session, which is what the state
       // directory being unwritable already means for history (C20).
-      deps.persistTheme?.(wanted);
+      deps.persistTheme?.(chosen);
 
       // **Warn and comply, and only where the flag suppresses an actual paint**
       // (C22 I66, C10 §4c row 5). `/theme light --no-bg` on a dark terminal
@@ -509,7 +605,7 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
         ctx.args["no-bg"] === true && deps.theme.current.tokens.background === "surface";
 
       return doc("/theme", [
-        b.notice("muted", `theme: ${wanted}`, undefined, { id: blockId("theme") }),
+        b.notice("muted", `theme: ${chosen}`, undefined, { id: blockId("theme") }),
         ...(suppressed
           ? [
               warnNotice(
@@ -588,6 +684,92 @@ export function shippedHandlers(deps: HandlerDeps): Readonly<Record<string, Loca
     },
 
     // The seventh (C23 §2, I68).
-    profile: profileHandler(deps.profileView, deps.profileReport, deps.profileCapture),
+    profile: profileHandler(deps.profileReport, deps.profileCapture),
+
+    /**
+     * **Where the route appears** (C22 I125, §107: *the chosen route appears in
+     * `/capabilities`*). The route first, then every field C02 resolved, each
+     * with the source that would falsify it — the column §075 argues for:
+     * *the commonest question is not what is it, it is WHY is it that*.
+     */
+    capabilities: () => {
+      const { values, sources } = deps.capabilities();
+      // `notify` is a list (C02 I17), and `String([])` is a blank cell — which
+      // reads as a value that is missing rather than one that is empty.
+      const shown = (v: unknown): string =>
+        Array.isArray(v) ? (v.length === 0 ? "none" : v.join(", ")) : String(v);
+      const fields = [
+        "renderMode" as const,
+        ...(Object.keys(values) as (keyof TerminalCapabilities)[]).filter((f) => f !== "renderMode"),
+      ];
+      return doc("/capabilities", [
+        b.table({
+          id: blockId("capabilities"),
+          columns: [b.col("field"), b.col("value"), b.col("source")],
+          rows: fields.map((f) => ({
+            id: f,
+            cells: { field: { text: f }, value: { text: shown(values[f]) }, source: { text: sources[f] } },
+          })),
+        }),
+      ]);
+    },
+
+    /**
+     * **The ninth** (C23 I80, §075, ruling 43) — *the commonest question is not
+     * what is it, it is WHY is it that*. One table, one row per setting, the
+     * source column toned by §075's ladder.
+     */
+    config: () => doc("/config", [configBlock(deps.settings(), blockId("config"))]),
+
+    /**
+     * **The tenth** (C22 I136, §085, ruling 50) — *pin one that is not yours*.
+     *
+     * **Whose it is decides nothing** (§6p.2): the sentence names the use the
+     * verb was drawn for, and a reader's own run is as watchable. The default is
+     * the newest running entry **that is not the shell's own** — a queued line is
+     * `streaming` and `transport: "local"` until it runs, and when `/watch`
+     * itself was queued the newest such line is this one (§6p.1).
+     */
+    watch: (argv) => {
+      const named =
+        nthBack(deps.transcript, argv[0]) ??
+        (() => {
+          const running = [...deps.transcript.entries]
+            .reverse()
+            .find((e) => e.streaming && e.doc.meta.transport !== "local");
+          return running === undefined ? { refusal: "nothing is running to watch" } : { entry: running };
+        })();
+      if ("refusal" in named) return doc("/watch", [warnNotice(named.refusal, blockId("watch-none"))]);
+      const name = watchName(named.entry);
+      if (deps.watches.has(named.entry.id)) {
+        return doc("/watch", [b.notice("muted", `already watching ${name}`, undefined, { id: blockId("watch") })]);
+      }
+      // I130's `false` — a run that has ended has no future to watch — with words.
+      if (!deps.watches.watch(named.entry.id)) {
+        return doc("/watch", [warnNotice(`${name} has settled — nothing left to watch`, blockId("watch-settled"))]);
+      }
+      return doc("/watch", [b.notice("muted", `watching ${name}`, undefined, { id: blockId("watch") })]);
+    },
+
+    /**
+     * **The eleventh** (C22 I136, §085) — *or it drops itself when the run
+     * ends*. With no argument, the newest watch: a verb with nothing named acts
+     * on what it would most recently have affected.
+     */
+    unwatch: (argv) => {
+      const named: Named =
+        nthBack(deps.transcript, argv[0]) ??
+        (() => {
+          const newest = deps.watches.ids().at(-1);
+          const entry = newest === undefined ? undefined : deps.transcript.entries.find((e) => e.id === newest);
+          return entry === undefined ? { refusal: "nothing is watched" } : { entry };
+        })();
+      if ("refusal" in named) return doc("/unwatch", [warnNotice(named.refusal, blockId("unwatch-none"))]);
+      const name = watchName(named.entry);
+      if (!deps.watches.unwatch(named.entry.id)) {
+        return doc("/unwatch", [warnNotice(`${name} is not watched`, blockId("unwatch-not"))]);
+      }
+      return doc("/unwatch", [b.notice("muted", `stopped watching ${name}`, undefined, { id: blockId("unwatch") })]);
+    },
   };
 }

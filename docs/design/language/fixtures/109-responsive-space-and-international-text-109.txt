@@ -1,0 +1,28 @@
+WIDTH AND HEIGHT ARE BOTH CAPABILITIES. LANGUAGE IS NOT A WIDTH ASSUMPTION.
+
+  WIDTH  comfortable   80+ columns
+         compact       40–79 columns; lower-priority chrome sheds
+         narrow        20–39 columns; tables linearize; choices stack
+         postage-stamp under 20 columns; one safe action at a time
+
+  HEIGHT comfortable   16+ rows
+         compact       8–15 rows; body keeps owner and safe action
+         postage-stamp under 8 rows; one safe action at a time
+
+width and height each propose a rung; the MORE CONSTRAINED rung wins. Prompt growth is
+capped against the live viewport, never a fixed ten rows. No rung may clip a
+permission choice, failure reason, current owner or focused identity.
+
+text operations name their coordinate system and locale contract
+
+  caret / delete      extended grapheme clusters
+  word movement       locale-aware boundaries, including languages without spaces
+  wrapping            locale-aware line breaking, not whitespace alone
+  bidi                logical inline-start/end; isolate code, paths, URLs and ids
+  IME                 composition is one edit; commands do not fire while composing
+  search / sort       declared case folding, collation and normalization
+  numbers / dates     locale grouping, decimal separator, plural and duration
+
+emoji ZWJ sequences, variation selectors, flags, skin tones and combining marks
+remain one grapheme for ordinary editing. Labels measure intrinsically; mandatory
+choices wrap or stack rather than truncate. Direction of reading is never assumed.

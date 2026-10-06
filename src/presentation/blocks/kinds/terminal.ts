@@ -134,6 +134,13 @@ function spansOf(
 export const terminalDefinition: BlockDefinition<Terminal> = {
   kind: "terminal",
 
+  // §7a — *a live terminal as its scrollback at the moment of the copy*
+  // (I86, `R-SEL-004`). The lines this block holds **are** that moment: the
+  // block is a value, so there is no later state for the copy to drift to, and
+  // `dropped` is a count of what the cap already discarded rather than
+  // something to reconstruct.
+  copy: (block) => block.lines.map((l) => l.text).join("\n"),
+
   /**
    * C09 I55 — one row per line, plus the marker row when the cap has bitten.
    *

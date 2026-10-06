@@ -56,8 +56,14 @@ describe("C22 §6b — the write is a difference", () => {
     expect(settled[0]?.trim(), "the header is on the screen").not.toBe("");
     expect(
       settled.findIndex((r) => r.trimStart().startsWith("❯")),
-      "the prompt sits between the two rules, above the footer (C22 I81)",
-    ).toBe(21);
+      // **20, not 21** (M5), and the direction is worth stating because the
+      // obvious prediction is the other one. The footer is two rows now — facts
+      // and directory, then §103's owner line — and the frame is full height, so
+      // the extra row is paid out of the transcript above and everything below
+      // the rule moves **up**. Read off the frame rather than predicted: rows
+      // 19–23 are rule, prompt, rule, `/help … /work`, `⏎ send …`.
+      "the prompt sits between the two rules, above the two-row footer (C22 I81, R-KEY-004)",
+    ).toBe(20);
     const whole = settled.join("\r\n").length;
 
     const before = stdout.chunks.length;
@@ -111,7 +117,7 @@ describe("C22 §6b — the write is a difference", () => {
     expect(screen().rows, "showing the same thing it showed before").toEqual(rowsBefore);
   });
 
-  it("T4.33 (C19 I23, C15 I14): a resize moves the open menu with the region", async () => {
+  it("C22 T4.33 (C19 I23, C15 I14): a resize moves the open menu with the region", async () => {
     // **Read from the screen, because the anchor number agrees with the wrong
     // place.** An anchored layer stores the row it was placed against, and
     // every writer of that row was a keystroke path: the resize handler
@@ -124,6 +130,17 @@ describe("C22 §6b — the write is a difference", () => {
     // The assertion is where the menu sits **relative to the prompt**: it is
     // chrome for the prompt and belongs immediately above it, which is the one
     // relation a stale anchor breaks and the only one a reader would name.
+    //
+    // **Never the row adjacent to the prompt**, which is what this row first
+    // asserted and what let it pass with the refresh deleted: C22 I81 put a
+    // rule directly above `❯` after this row was written, so "the last
+    // non-blank row above the prompt is the one above it" was satisfied by the
+    // frame's own rule while the menu sat stranded at rows 11–18 over sixteen
+    // blank rows. So the row reads two things the rule cannot supply: a
+    // candidate's distance from the prompt, which must survive the resize, and
+    // the row above I81's rule, which must be the menu's last row — a
+    // candidate or its indicator, since the menu closes on I81's rule (C19
+    // I23, ruling 90).
     const stdin = fakeStdin();
     const { screen, resize } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 24 });
     await settle();
@@ -134,17 +151,33 @@ describe("C22 §6b — the write is a difference", () => {
     const rowOf = (needle: string, rows: readonly string[]): number =>
       rows.findIndex((r) => r.includes(needle));
 
-    /** The last row with anything on it above `at` — the menu's bottom edge. */
+    /** The last row with anything on it above `at`. */
     const bottomAbove = (rows: readonly string[], at: number): number => {
       for (let i = at - 1; i >= 0; i -= 1) if ((rows[i] ?? "").trim() !== "") return i;
       return -1;
     };
 
-    const before = screen().rows;
-    const promptBefore = rowOf("❯", before);
-    expect(bottomAbove(before, promptBefore), "the menu sits directly above the prompt").toBe(
-      promptBefore - 1,
-    );
+    /**
+     * The menu against the prompt: I81's rule is the row directly above `❯`,
+     * so the menu's last row is the last non-blank row above **that**, and
+     * a candidate's row is the menu's position. `/capabilities` and not
+     * `/help`, which the footer also names.
+     */
+    const read = (rows: readonly string[]) => {
+      const prompt = rowOf("❯", rows);
+      const rule = prompt - 1;
+      return {
+        prompt,
+        rule: rows[rule] ?? "",
+        edge: bottomAbove(rows, rule),
+        candidate: rowOf("/capabilities", rows.slice(0, prompt)),
+      };
+    };
+
+    const before = read(screen().rows);
+    expect(before.candidate, "the menu is open").toBeGreaterThanOrEqual(0);
+    expect(before.rule.trim(), "the row above the prompt is I81's rule").toMatch(/^─+$/u);
+    expect(before.edge, "the menu sits directly above the prompt's rule").toBe(before.prompt - 2);
 
     // **Taller, not shorter, and the direction is the whole row.** On a shrink
     // the clamp pushes a stale anchor to the bottom of the region — which is
@@ -159,13 +192,16 @@ describe("C22 §6b — the write is a difference", () => {
     // read as a fresh one, exactly the confusion this row exists to catch.
     await new Promise((done) => setTimeout(done, 40));
 
-    const after = screen().rows;
-    const promptAfter = rowOf("❯", after);
-    expect(promptAfter, "the prompt moved with the region").toBeGreaterThan(promptBefore);
-    expect(bottomAbove(after, promptAfter), "and the menu came with it").toBe(promptAfter - 1);
+    const after = read(screen().rows);
+    expect(after.prompt, "the prompt moved with the region").toBeGreaterThan(before.prompt);
+    expect(after.rule.trim(), "the row above the prompt is I81's rule").toMatch(/^─+$/u);
+    expect(after.edge, "and the menu came with it, with no gap beneath").toBe(after.prompt - 2);
+    expect(after.candidate - after.prompt, "at the distance from the prompt it had before").toBe(
+      before.candidate - before.prompt,
+    );
   });
 
-  it("T4.34 (C19 I23, entry 16): the truncated menu's indicator is on the screen", async () => {
+  it("C19 T4.12 (I23, entry 16, ruling 90): the truncated menu's indicator is on the screen, and the menu closes on the prompt's rule", async () => {
     // **Through the real wiring, because that is where it was missing.** The
     // window and the remainder are both unit-tested and both were right; what
     // shipped was a call site that handed C15 every candidate and let the frame
@@ -187,15 +223,19 @@ describe("C22 §6b — the write is a difference", () => {
     const menu = rows.slice(0, prompt - 1);
     expect(menu.some((r) => /\+ \d+ more/u.test(r)), "the indicator is drawn").toBe(true);
     // **And the box closes**, which is the half a row about the indicator alone
-    // does not cover: the bottom edge sits between the menu and the prompt, and
-    // C19 §6 argues it is what stops the list reading as continuous with the
-    // line below it. A window one row too generous keeps the indicator and
-    // loses this — the original defect, one row's worth — and the mutation pass
-    // is what asked for the assertion.
-    expect(menu[menu.length - 1] ?? "", "the rule closes the menu").toMatch(/^[─-]{20,}/u);
-    expect(menu[menu.length - 2] ?? "", "with the indicator directly above it").toMatch(
-      /\+ \d+ more/u,
-    );
+    // does not cover: an edge sits between the menu and the prompt, and C19 §6
+    // argues it is what stops the list reading as continuous with the line
+    // below it. A window one row too generous keeps the indicator and loses
+    // this — the original defect, one row's worth — and the mutation pass is
+    // what asked for the assertion.
+    //
+    // **The edge is the prompt's own rule, and there is one** (ruling 90,
+    // F1475). The menu drew a rule of its own above I81's, two stacked rows
+    // where §097's panel floats between two rules and the lower one is the
+    // prompt's. So the indicator sits directly on I81's rule.
+    expect(rows[prompt - 1] ?? "", "the prompt's rule closes the menu").toMatch(/^[─-]{20,}/u);
+    expect(menu[menu.length - 1] ?? "", "with the indicator directly on it").toMatch(/\+ \d+ more/u);
+    expect(menu[menu.length - 2] ?? "", "and no second rule above it").not.toMatch(/^[─-]{20,}/u);
   });
 
   it("T4.15 (I56): a write that throws leaves the next frame whole", async () => {
@@ -208,8 +248,8 @@ describe("C22 §6b — the write is a difference", () => {
     expect(screen().drawn, "a frame is on the screen").toBe(true);
     expect(
       screen().rows.findIndex((r) => r.trimStart().startsWith("❯")),
-      "the frame reaches the foot of the terminal — rule, prompt, rule, footer",
-    ).toBe(21);
+      "the frame reaches the foot of the terminal — rule, prompt, rule, footer, owner line",
+    ).toBe(20);
 
     // The next write throws part-way — the screen keeps a prefix of a frame no
     // record describes. `throwOn` is what makes this constructible at all.
@@ -227,6 +267,78 @@ describe("C22 §6b — the write is a difference", () => {
     // than cleared before it, this is a diff against the frame *preceding* the
     // failed one, and the rows the partial write got wrong are the rows it skips.
     expect(written, "and it is a full repaint").toContain(HOME_SEQ);
+  });
+});
+
+describe("C22 I150 — the completion footer at rest and after Tab", () => {
+  /** A session at 80 columns with `/c` typed a byte at a time: the menu at rest. */
+  async function atRest() {
+    const stdin = fakeStdin();
+    const session = await buildSession({ stdin: stdin as never }, { columns: 80, rows: 24 });
+    await settle();
+    const press = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      // `⇥` runs §5 in a promise continuation (C19 I21), so a macrotask too.
+      await settle();
+      await new Promise((r) => setTimeout(r, 0));
+    };
+    for (const ch of "/c") await press(ch);
+    const rows = (): readonly string[] => session.screen().rows.map((r) => r.trimEnd());
+    const footer = (): string => rows().at(-1) ?? "";
+    /** The menu's rows: everything above the prompt's upper rule that is not blank. */
+    const menu = (): readonly string[] => {
+      const r = rows();
+      const prompt = r.findIndex((l) => l.startsWith("❯"));
+      return r.slice(0, prompt - 1).filter((l) => l.trim() !== "");
+    };
+    const prompt = (): string => rows().find((l) => l.startsWith("❯")) ?? "";
+    return { press, rows, footer, menu, prompt };
+  }
+  const TAB = "\t";
+  const DOWN = "\u001b[B";
+  const ENTER = "\r";
+
+  it("T4.120 (C22 I150, C19 I20, C19 I29, ruling 96, ruling 99, F1486): the footer at rest and after ⇥ differ, and each names only keys that do what it says", async () => {
+    const s = await atRest();
+    // **The subject before the claim**: the menu is up and marks its current.
+    expect(s.menu().some((l) => l.includes("› /capabilities")), "the menu is up at rest, marked").toBe(true);
+    const restMenu = s.menu();
+    const rest = s.footer();
+    expect(rest).toBe("complete  ⏎ run  ⇥ complete  esc close");
+
+    await s.press(TAB);
+    const selected = s.footer();
+    expect(selected).toBe("complete  ↑↓ move  ⏎ accept  esc close");
+    // **The difference is the claim** (ruling 96). The menu's rows are the same
+    // text in both states — ruling 89 marks the current at rest and after `⇥`
+    // alike — so the footer is the one thing on screen that tells them apart.
+    expect(s.menu(), "the menu reads the same after ⇥").toEqual(restMenu);
+    expect(selected, "and the footer does not").not.toBe(rest);
+
+    await s.press(DOWN);
+    expect(s.footer(), "↓ moves within a selection and the line holds").toBe(selected);
+    expect(s.menu().some((l) => l.includes("› /clear")), "the mark moved").toBe(true);
+    // `⏎ accept` does what it says once there is a selection.
+    await s.press(ENTER);
+    expect(s.prompt()).toBe("❯ /clear");
+  });
+
+  it("T4.120 (C22 I150, C19 I20, ruling 96, ruling 99): the controls — ⏎ at rest runs the line, and ↓ at rest selects nothing", async () => {
+    // **What the rest line names, pressed.** `⏎ run` at rest runs the partial
+    // line; measured before the footer moved, this is the frame that sat
+    // beneath `⏎ accept`.
+    const enter = await atRest();
+    await enter.press(ENTER);
+    expect(enter.rows().some((l) => l.includes("unknown verb: /c")), "⏎ at rest ran the line").toBe(true);
+
+    // **`↓` is the prompt's at rest** (C19 §6a): ruling 96 read *`⇥` or `↓`*
+    // as the keys that select, and the second does not. The footer and the
+    // mark stay where they were.
+    const down = await atRest();
+    const before = { footer: down.footer(), menu: down.menu() };
+    await down.press(DOWN);
+    expect({ footer: down.footer(), menu: down.menu() }).toEqual(before);
+    expect(down.footer()).toBe("complete  ⏎ run  ⇥ complete  esc close");
   });
 });
 
@@ -405,7 +517,15 @@ describe("C22 integration — the frame's viewport", () => {
     // because the thunk agreeing with the keymap is not the claim: the claim is
     // that the help a user reads contains them.
     const stdin = fakeStdin();
-    const { screen } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 40 });
+    // **160 rows, and the number is the listing's** (M6): the keymap is 119
+    // bindings in eight scope groups since §6a, so a 40-row frame shows one
+    // group's worth of tail and this row would be asserting *where in the
+    // listing a key sits* rather than *that it is rendered from the table* —
+    // the positional control the comment below retired, arriving again through
+    // the terminal's height instead of through the regex. A tall terminal is a
+    // real session; the entry is durable and a short one scrolls to the same
+    // place.
+    const { screen } = await buildSession({ stdin: stdin as never }, { columns: 100, rows: 160 });
 
     // **`/help keys`, not `/help`.** The keymap moved behind an argument when
     // `/help` was measured at thirty verbs: it emitted every binding last, and
@@ -418,7 +538,7 @@ describe("C22 integration — the frame's viewport", () => {
     await Promise.resolve();
 
     const frame = screen().rows;
-    expect(frame, "a frame was written").toHaveLength(40);
+    expect(frame, "a frame was written").toHaveLength(160);
     const text = frame.join("\n");
 
     // The control: help arrived at all. Without it every assertion below is
@@ -437,10 +557,17 @@ describe("C22 integration — the frame's viewport", () => {
     // for whoever added it rather than for whoever wrote this.
     // The keymap is a card's body since C22 I88, so each row arrives under the
     // hook or the bar; the gutter is stripped before the binding shape is read.
-    const bindingRows = frame.filter((r) => /^\S+\s+\w+: \w+/u.test(r.replace(/^\s*[⎿│]\s/u, "").trim())).length;
+    // The row shape lost its `target: ` prefix in M6: the listing is grouped by
+    // scope now, so naming the scope on every row repeated the heading above it.
+    const bindingRows = frame.filter((r) => /^\S+\s+\w+$/u.test(r.replace(/^\s*[⎿│]\s/u, "").trim())).length;
     expect(bindingRows, "the keymap document is on the frame").toBeGreaterThan(10);
 
-    for (const shown of ["pageup", "pagedown", "c+home", "c+end"]) {
+    // **The chords, because that is what a reader sees** (C16 §6a clause 6).
+    // `c+home` and `c+end` were the slot spelling; the listing renders
+    // `chordText` now, and the slot is the identity `slot` compares and nothing
+    // shows. The two scroll keys with no modifier are unchanged, which is what
+    // keeps this row about arrival rather than about notation.
+    for (const shown of ["pageup", "pagedown", "⌃home", "⌃end"]) {
       expect(text, `/help shows ${shown}`).toContain(shown);
     }
   });
@@ -456,7 +583,7 @@ describe("C22 §7 — identity, from the app through C23", () => {
   const NOW = 1_000_000;
   const nearlyExpired = () => ({
     user: "m",
-    email: "m@fmx.io",
+    email: "s@example.com",
     groups: [] as readonly string[],
     // Inside the one-day warning window, and comfortably not expired.
     expiresAt: NOW + 14 * 60 * 60 * 1000,
@@ -917,17 +1044,19 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
 
     const rows = screen().rows.map((r) => r.trimEnd());
     // No `ok` beside a dropped count (C23 I59): the settled head is the verb, and its tone.
-    const ps = rows.findIndex((r) => r.includes("⏺︎ ps"));
-    const note = rows.findIndex((r) => r.includes("⏺︎ note"));
+    const ps = rows.findIndex((r) => r.includes("● ps"));
+    const note = rows.findIndex((r) => r.includes("● note"));
     expect(ps, "the first card").toBeGreaterThan(0);
     expect(note, "the second card").toBeGreaterThan(ps);
     // Row 17: the hook marks content, not the leading gap the block carried.
-    expect(rows[ps + 1]?.indexOf("⎿"), "the first hook at column 2").toBe(2);
+    // Column 2 of the transcript, which starts at the terminal's column 1: the
+    // rail reserves column 0 on every row (C14 I57), so the terminal reads 3.
+    expect(rows[ps + 1]?.indexOf("⎿"), "the first hook at column 2").toBe(3);
     expect(rows[ps + 1], "and it carries the body's content").toContain("web running");
-    expect(rows[note + 1]?.indexOf("⎿"), "the second hook at column 2").toBe(2);
+    expect(rows[note + 1]?.indexOf("⎿"), "the second hook at column 2").toBe(3);
     // Rows 18–19: one blank closes entry 1 (before entry 2's `❯ /note` echo),
     // one closes entry 2 above the upper rule.
-    expect(rows[note - 1]?.startsWith("❯ /note"), "entry 2's command echo").toBe(true);
+    expect(rows[note - 1]?.startsWith(" ❯ /note"), "entry 2's command echo, past the rail's column").toBe(true);
     expect(rows[note - 2], "one blank row closing entry 1").toBe("");
     expect(rows[note + 2], "the blank closing entry 2").toBe("");
     expect(/^[─-]{20,}/u.test(rows[note + 3] ?? ""), "then the upper rule").toBe(true);
@@ -942,14 +1071,14 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
       schema: "tui.manifest/1",
       binary: "prism",
       version: "1.0.0",
-      tools: [{ name: "wide", local: true, summary: "one notice, 99 cells", args: [], flags: [] }],
+      tools: [{ name: "wide", local: true, summary: "one notice, 98 cells", args: [], flags: [] }],
     };
     const localHandlers: NonNullable<TuiConfig["localHandlers"]> = {
       wide: () => ({
         schema: "tui.view/1",
         command: "wide",
         status: "ok",
-        blocks: [{ kind: "notice", id: "n", tone: "muted", text: "a".repeat(99) }],
+        blocks: [{ kind: "notice", id: "n", tone: "muted", text: "a".repeat(98) }],
       }),
     };
     const stdin = fakeStdin();
@@ -959,15 +1088,19 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     await settle();
 
     const rows = screen().rows;
-    const at = rows.findIndex((r) => r.includes("⏺︎ wide"));
+    const at = rows.findIndex((r) => r.includes("● wide"));
     expect(at, "the card's header is on the screen").toBeGreaterThan(0);
-    // **95 and 4, where this read 96 and 3** (C22 I109): the body renders at
-    // the region's width less the hook's four cells, and the region is a column
+    // **94 and 5, where this read 95 and 4 and before that 96 and 3** (C22
+    // I109, C09 I5): the body renders at the region's width less BODY_INDENT —
+    // five since the hook reserved two cells — and the region is a column
     // narrower than the terminal. The premise the row was written for is
     // unchanged — a notice that fits the region and not the indented body, so
     // it wraps once more under the hook — and only the split moved.
-    expect(rows[at + 1]?.startsWith(`  ⎿ ${"a".repeat(95)}`), "the body's first row: the hook at 2 and 95 cells").toBe(true);
-    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under the bar (C22 I88)").toBe("  │ aaaa");
+    // **98 cells and 93 + 5 since the rail** (C14 I57): the transcript is a
+    // further column in, so the notice that fits it is 98 and the rows start at
+    // the terminal's column 1.
+    expect(rows[at + 1]?.startsWith(`   ⎿  ${"a".repeat(93)}`), "the body's first row: the hook at 2 and 93 cells").toBe(true);
+    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under the bar (C22 I88)").toBe("   │  aaaaa");
     expect(rows[at + 3]?.trim(), "the entry's blank row (I85)").toBe("");
     expect(/^[─-]{20,}/u.test(rows[at + 4] ?? ""), "then the upper rule — nothing dropped between").toBe(true);
     expect(rows[at + 5]?.trimStart().startsWith("❯"), "and the prompt").toBe(true);
@@ -1035,8 +1168,8 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     // The box is a card's body (C23 I55), so its first row carries the hook (C22
     // I83) — required, not optional: a `visibleRows` that skipped the layout
     // survived this row while the hook was `(⎿ )?`.
-    expect(/^\s*⎿ ┌/u.test(rows[at - 1] ?? ""), "the box opens above it, under the hook").toBe(true);
-    expect(/^\s*│ └/u.test(rows[at + 1] ?? ""), "and closes below it, under the bar (C22 I88)").toBe(true);
+    expect(/^\s*⎿  ┌/u.test(rows[at - 1] ?? ""), "the box opens above it, under the hook").toBe(true);
+    expect(/^\s*│  └/u.test(rows[at + 1] ?? ""), "and closes below it, under the bar (C22 I88)").toBe(true);
     // **The prompt directly below the closing border is the height assertion.**
     // Three rows measured, three drawn, and nothing between the box and what
     // follows it — a stronger claim than a blank row, which a box one row short
@@ -1060,11 +1193,16 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
   });
 });
 
-describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
-  it("T4.30 (C16 §5b B1): ⌥v enters, the header says COPY, mouse tracking goes off", async () => {
-    // **B1 is the row this file owes.** `copyMode` and `exitCopyMode` were both
+describe("C22 — native selection, entered and left (C16 §5b, C03 §4a)", () => {
+  it("C22 T4.30 (C16 §5b B1): ⌥⇧C enters, the header says NATIVE, mouse tracking goes off", async () => {
+    // **`⌥⇧C`, not `⌥v`, since M6** (C16 §6a): the registry gives `⌥v` to
+    // `values.toggle` and native selection its own two chords — `⌥⇧C` native handoff,
+    // `⌥⇧V` semantic. Nothing was invented for this; the design supplied both.
+    // The wire form is `ESC C`, which names the capital and sets no shift bit.
+    //
+    // **B1 is the row this file owes.** `nativeSelection` and `exitNativeSelection` were both
     // stubs for the length of C26 — routed, ordered, unreachable — and the
-    // producer landing alone would have given a mode the ⌃c rung consumes and
+    // producer landing alone would have given a mode the exit row consumes and
     // does not end. The pair is asserted as a pair for that reason.
     const stdin = fakeStdin();
     const { stdout, screen } = await buildSession({ stdin: stdin as never });
@@ -1076,13 +1214,13 @@ describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
     };
 
     // The control: the indicator is not there before the key, so the assertion
-    // below is about the key rather than about the header always saying COPY.
-    expect(screen().rows[0], "no indicator before entry").not.toContain("COPY");
+    // below is about the key rather than about the header always saying NATIVE.
+    expect(screen().rows[0], "no indicator before entry").not.toContain("NATIVE");
 
     const before = stdout.output;
-    await type("\u001bv");
+    await type("\u001bC");
 
-    expect(screen().rows[0], "the mode is on screen, in the row always drawn").toContain("COPY");
+    expect(screen().rows[0], "the mode is on screen, in the row always drawn").toContain("NATIVE");
     expect(
       stdout.output.slice(before.length),
       "tracking off, so the terminal's own selection works",
@@ -1090,12 +1228,12 @@ describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
 
     // **The indicator's frame is up before the hold takes effect** — otherwise
     // the reader is told nothing and simply finds the mouse dead.
-    expect(screen().rows[0]).toContain("COPY");
+    expect(screen().rows[0]).toContain("NATIVE");
   });
 
-  it("T4.31 (C16 §5b B1): ⌃c leaves it, and the screen comes back", async () => {
+  it("C22 T4.31 (C16 §5b B1, I62): esc leaves it, and the screen comes back", async () => {
     const stdin = fakeStdin();
-    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+    const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
 
     const type = async (bytes: string): Promise<void> => {
       stdin.emit(bytes);
@@ -1103,21 +1241,28 @@ describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
       await Promise.resolve();
     };
 
-    await type("\u001bv");
-    expect(screen().rows[0]).toContain("COPY");
+    await type("\u001bC");
+    expect(screen().rows[0]).toContain("NATIVE");
 
     const before = stdout.output;
-    await type("\u0003");
+    // **`esc`, where this pressed `⌃c`** (C16 I62, ruling 59): copy mode
+    // rejects the interrupt, so `esc` is the one way out. A lone `Esc` waits
+    // C16 §2's 50 ms to be told apart from a sequence prefix; the wake is a real
+    // timer against the injected clock.
+    stdin.emit("\u001b");
+    clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+    for (let i = 0; i < 4; i += 1) await Promise.resolve();
 
-    expect(screen().rows[0], "the indicator goes with the mode").not.toContain("COPY");
+    expect(screen().rows[0], "the indicator goes with the mode").not.toContain("NATIVE");
     expect(stdout.output.slice(before.length), "tracking back on").toContain("[?1002h");
   });
 
-  it("T4.32 (C03 I13): while copy mode is up, output does not move the screen", async () => {
+  it("C22 T4.32 (C03 I13): while native selection is up, output does not move the screen", async () => {
     // The whole point of the suspension, at the level where it is visible:
     // a selection the reader is taking must not come to mean other text.
     const stdin = fakeStdin();
-    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+    const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
 
     const type = async (bytes: string): Promise<void> => {
       stdin.emit(bytes);
@@ -1125,32 +1270,39 @@ describe("C22 — copy mode, entered and left (C16 §5b, C03 §4a)", () => {
       await Promise.resolve();
     };
 
-    // A control first: typing moves the screen when copy mode is NOT up, so the
+    // A control first: typing moves the screen when native selection is NOT up, so the
     // assertion after it is about the mode and not about typing being invisible.
     const base = screen().rows.join("\n");
     await type("abc");
     expect(screen().rows.join("\n"), "typing normally repaints").not.toBe(base);
 
-    await type("\u001bv");
+    await type("\u001bC");
     const held = stdout.output;
 
     await type("def");
     expect(stdout.output, "nothing reaches the terminal while suspended").toBe(held);
 
-    await type("\u0003");
+    // **`esc`, where this pressed `⌃c`** (C16 I62, ruling 59): copy mode
+    // rejects the interrupt, so `esc` is the one way out. A lone `Esc` waits
+    // C16 §2's 50 ms to be told apart from a sequence prefix; the wake is a real
+    // timer against the injected clock.
+    stdin.emit("\u001b");
+    clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+    for (let i = 0; i < 4; i += 1) await Promise.resolve();
     expect(stdout.output.length, "and resume writes the catching-up frame").toBeGreaterThan(
       held.length,
     );
     // **The length is a proxy and the tracking pair satisfies it.** Measured
     // 2026-09-05 with `resume()` deleted from the exit: `1002h 1006h` still
     // arrives, the length grows, and the assertion above passed while the
-    // screen stayed frozen with `COPY` in the header. The frame is the subject,
+    // screen stayed frozen with `NATIVE` in the header. The frame is the subject,
     // so the frame is what is read.
-    expect(screen().rows[0], "the catching-up frame took the indicator down").not.toContain("COPY");
+    expect(screen().rows[0], "the catching-up frame took the indicator down").not.toContain("NATIVE");
   });
 });
 
-describe("C22 — copy mode: the order inside the exit, and the far side under the hold (C16 §5b, §5c)", () => {
+describe("C22 — native selection: the order inside the exit, and the far side under the hold (C16 §5b, §5c)", () => {
   // Four microtasks rather than two: a settle runs through C23's continuation
   // before the store moves, and a row reading `stdout` one tick early would
   // report "nothing written" for a frame that had not been composed yet.
@@ -1163,37 +1315,51 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
 
   const count = (haystack: string, needle: string): number => haystack.split(needle).length - 1;
 
-  it("T4.31b (C16 §5b B1, C01 I10): after ⌃c the tracking pair is the first thing written, before any byte of the frame", async () => {
+  // **`esc`, where these rows pressed `⌃c`** (C16 I62, ruling 59): copy mode
+  // rejects the interrupt, so `esc` is the one way out. A lone `Esc` waits C16
+  // §2's 50 ms to be told apart from a sequence prefix; the wake is a real timer
+  // against the injected clock.
+  const leave = async (
+    stdin: ReturnType<typeof fakeStdin>,
+    clock: Readonly<{ advance: (ms: number) => void }>,
+  ): Promise<void> => {
+    stdin.emit("\u001b");
+    clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+    for (let i = 0; i < 4; i += 1) await Promise.resolve();
+  };
+
+  it("C22 T4.31b (C16 §5b B1, C01 I10): after esc the tracking pair is the first thing written, before any byte of the frame", async () => {
     const stdin = fakeStdin();
-    const { stdout, screen } = await buildSession({ stdin: stdin as never });
+    const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
     const type = typer(stdin);
 
-    await type("\u001bv");
-    expect(screen().rows[0], "in copy mode").toContain("COPY");
+    await type("\u001bC");
+    expect(screen().rows[0], "in native selection").toContain("NATIVE");
 
     const before = stdout.output.length;
-    await type("\u0003");
+    await leave(stdin, clock);
     const after = stdout.output.slice(before);
 
     // **The control comes first**: a frame did follow the pair. Without it,
     // "starts with the pair" is satisfied by a session that wrote the pair and
     // then nothing — which is exactly what dropping `resume()` produces.
     expect(after.length, "a catching-up frame followed").toBeGreaterThan(MOUSE.enter.length);
-    expect(screen().rows[0], "and it removed the indicator").not.toContain("COPY");
+    expect(screen().rows[0], "and it removed the indicator").not.toContain("NATIVE");
 
     // The reader has finished selecting; the app takes the mouse back before it
     // takes the screen. T4.31 asserts both bytes arrived and cannot see which
     // came first — the swap passes it.
     expect(
       after.startsWith(MOUSE.enter),
-      `the first bytes after ⌃c are 1002h 1006h, got ${JSON.stringify(after.slice(0, 48))}`,
+      `the first bytes after esc are 1002h 1006h, got ${JSON.stringify(after.slice(0, 48))}`,
     ).toBe(true);
   });
 
-  it("T4.32b (C03 I13, C16 §5b B4): a verb settling during copy mode writes nothing; the exit's one frame carries it", async () => {
+  it("C22 T4.32b (C03 I13, C16 §5b B4): a verb settling during native selection writes nothing; the exit's one frame carries it", async () => {
     const stdin = fakeStdin();
     let settle: ((doc: unknown) => void) | null = null;
-    const { stdout, screen } = await buildSession({
+    const { stdout, screen, clock } = await buildSession({
       stdin: stdin as never,
       manifest: {
         schema: "tui.manifest/1",
@@ -1215,8 +1381,8 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
     expect(settle, "the verb is in flight").not.toBeNull();
     expect(screen().text.join("\n"), "and has not settled").not.toContain(TEXT);
 
-    await type("\u001bv");
-    expect(screen().rows[0]).toContain("COPY");
+    await type("\u001bC");
+    expect(screen().rows[0]).toContain("NATIVE");
     const held = stdout.output;
 
     // **The far side is not frozen.** The store moves; the screen does not.
@@ -1228,40 +1394,40 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
       "the screen still holds the frame the reader is selecting from",
     ).not.toContain(TEXT);
 
-    await type("\u0003");
+    await leave(stdin, clock);
     expect(stdout.output.length, "one catching-up frame").toBeGreaterThan(held.length);
     expect(screen().text.join("\n"), "and it carries what settled under the hold").toContain(TEXT);
   });
 
-  it("T4.32c (C16 §5c C5): ⌥v a second time in copy mode writes nothing — one 1002l, not two", async () => {
+  it("C22 T4.32c (C16 §5c C5): ⌥⇧C a second time in native selection writes nothing — one 1002l, not two", async () => {
     const stdin = fakeStdin();
     const { stdout, screen } = await buildSession({ stdin: stdin as never });
     const type = typer(stdin);
 
-    await type("\u001bv");
-    expect(screen().rows[0]).toContain("COPY");
+    await type("\u001bC");
+    expect(screen().rows[0]).toContain("NATIVE");
     const once = stdout.output;
     expect(count(once, MOUSE.leave), "the leave pair, once").toBe(1);
 
-    await type("\u001bv");
+    await type("\u001bC");
     expect(stdout.output, "the second press writes nothing at all").toBe(once);
   });
 
   // **RED UNTIL LANE S LANDS THE ROW — and `it.fails` is how it says so.** The
-  // ruling is C16 §5c: `Esc` leaves copy mode. It needs a `copyMode`/`escape`
-  // row in `keymap.ts`, `"exitCopyMode"` in `KeyAction`, and one effect line in
+  // ruling is C16 §5c: `Esc` leaves native selection. It needs a `nativeSelection`/`escape`
+  // row in `keymap.ts`, `"exitNativeSelection"` in `KeyAction`, and one effect line in
   // `keys.ts`, none of which this lane owns. The body asserts the *ruling*; the
   // wrapper asserts that the tree does not yet satisfy it. The day the three
   // lines land this row goes red, which is the signal to flip it to `it` — a
   // deferral that expires on the change it waits for, where an `it.todo` would
   // not (`todo-expiry` is indexed by component, and every component here exists).
-  it("T4.68 (C16 §5c C1): Esc leaves copy mode — the tracking pair is the first bytes written, then the frame", async () => {
+  it("T4.68 (C16 §5c C1): Esc leaves native selection — the tracking pair is the first bytes written, then the frame", async () => {
     const stdin = fakeStdin();
     const { stdout, screen, clock } = await buildSession({ stdin: stdin as never });
     const type = typer(stdin);
 
-    await type("\u001bv");
-    expect(screen().rows[0]).toContain("COPY");
+    await type("\u001bC");
+    expect(screen().rows[0]).toContain("NATIVE");
     const before = stdout.output.length;
 
     // A lone `Esc` waits C16 §2's 50 ms to be told apart from a sequence
@@ -1272,7 +1438,7 @@ describe("C22 — copy mode: the order inside the exit, and the far side under t
     for (let i = 0; i < 4; i += 1) await Promise.resolve();
 
     expect(stdout.output.slice(before), "tracking back on Esc").toContain(MOUSE.enter);
-    expect(screen().rows[0], "the indicator goes with the mode").not.toContain("COPY");
+    expect(screen().rows[0], "the indicator goes with the mode").not.toContain("NATIVE");
   });
 });
 
@@ -1347,5 +1513,40 @@ describe("C22 §4 — the greeting's context, and where `stopped` leads", () => 
     // And it stays terminal: a second attempt is refused the same way, so the
     // state did not move on the way through.
     await expect(tui.start()).rejects.toThrow(SessionStateError);
+  });
+});
+
+describe("C16 I51, I49 — refusals through a built session (review batch 2, M5)", () => {
+  it("T4.83 (C16 I51, I62, C22 I133, ruling 59, ruling 60): ⌃c in semantic copy mode keeps the mode and draws the one-shot chip", async () => {
+    // **Refused, not swallowed** (R-HON-004): the mode's frame is otherwise
+    // still, so a `⌃c` that changed nothing on screen would read as a dead key.
+    // The chip is the difference, and it is one-shot — the next key takes it
+    // down whatever that key does.
+    const stdin = fakeStdin();
+    const { screen } = await buildSession({ stdin: stdin as never });
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+    const footer = (): string => screen().rows.find((r) => r.includes("the screen is frozen")) ?? "<no owner line>";
+    const header = (): string => screen().rows[0] ?? "";
+
+    // `⌥⇧V` — ESC V, the base route for `selection.semantic`.
+    await type("\u001bV");
+    // **The control**: the mode is up and the chip is not, so the chip below is
+    // the refusal's doing rather than the mode's.
+    expect(header(), "the mode is up").toContain("COPY");
+    expect(footer()).toContain("esc out");
+    expect(footer()).not.toContain("interrupt refused");
+
+    await type("\u0003");
+    expect(header(), "⌃c does not leave the mode (ruling 59)").toContain("COPY");
+    expect(footer(), "and the owner line says it was refused (ruling 60)").toContain("▲ interrupt refused");
+
+    // One-shot: `↓` moves the caret, and the chip goes with the key after it.
+    await type("\u001b[B");
+    expect(header(), "still in the mode").toContain("COPY");
+    expect(footer(), "the chip described one key, and it was not this one").not.toContain("interrupt refused");
   });
 });

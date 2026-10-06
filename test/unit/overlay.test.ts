@@ -4,20 +4,28 @@
 // here is the shape after each call; the rejections are tier 3's.
 import { describe, expect, it } from "vitest";
 
-import { createOverlayManager } from "../../src/viewport/overlay/index.js";
-import type { OverlayChange } from "../../src/viewport/overlay/index.js";
-import { REGION, anchored, centred, peek, placeIn, registry, rows, view } from "../support/overlay.js";
+import { createOverlayManager, takesInput, takesPointer } from "../../src/viewport/overlay/index.js";
+import type { Layer, OverlayChange } from "../../src/viewport/overlay/index.js";
+import { REGION, anchored, centred, covering, panel, peek, placeIn, registry, rows } from "../support/overlay.js";
 import { OverlayError } from "../../src/viewport/overlay/index.js";
+
+/**
+ * A layer built past the type, for the rows about what `push` refuses (C15 I30).
+ *
+ * `Layer` is a union that rejects each refused combination at a literal, so a
+ * refusal row has to reach the stack the way a cast, a widened value or
+ * JavaScript does — which is the caller the run-time check exists for.
+ */
+const unchecked = (fields: object): Layer => fields as Layer;
 
 const manager = () => createOverlayManager({ registry });
 
 describe("C15 unit — the stack", () => {
-  it("T1.1: push(overlay) on empty → one layer, it is top, no view", () => {
+  it("T1.1: push(overlay) on empty → one layer, and it is top", () => {
     const m = manager();
     m.push(centred("a", 3));
     expect(m.stack.map((l) => l.id)).toEqual(["a"]);
     expect(m.top?.id).toBe("a");
-    expect(m.hasView).toBe(false);
   });
 
   it("T1.23 (I21): a peek on empty → one layer and top is null; two peeks, still null", () => {
@@ -28,13 +36,16 @@ describe("C15 unit — the stack", () => {
     m.push(peek("p2", 2, { row: 8, prefer: "below" }));
     expect(m.stack.map((l) => l.id)).toEqual(["p1", "p2"]);
     expect(m.top).toBeNull();
-    expect(m.hasView).toBe(false);
   });
 
-  it("T1.24 (I21, I23): a peek pushed after an overlay sits beneath it; after a view, above it; between the two, between them", () => {
+  it("T1.24 (I21, I23): a peek pushed after an overlay sits beneath it; after a panel, beneath that; between the two, beneath both", () => {
     // Through `push`, in the order a real session produces: the confirm is up,
-    // then focus moves and the peek opens. I2's sort was unreachable through
-    // `push` (T2.8's reason); I23's is not, and that is why this row exists.
+    // then focus moves and the peek opens.
+    //
+    // **The view arms are gone and the peek keeps its floor** (R-EXA-082,
+    // F1254). A peek used to sit *above* the view and below everything else,
+    // which made it the middle band of four; with the view band deleted the
+    // peek is the bottom of three and every arm here reads the same way.
     const m = manager();
     m.push(anchored("confirm", 2, { row: 10, prefer: "above" }));
     m.push(peek("p", 2, { row: 5, prefer: "below" }));
@@ -43,14 +54,14 @@ describe("C15 unit — the stack", () => {
     expect(m.layout(REGION).map((p) => p.layer.id), "placed bottom-first, peek beneath").toEqual(["p", "confirm"]);
 
     const v = manager();
-    v.push(view("dash"));
+    v.push(panel("menu", 3, { row: 20, prefer: "above" }));
     v.push(peek("p", 2, { row: 5, prefer: "below" }));
-    expect(v.top?.id, "the view is still top").toBe("dash");
-    expect(v.layout(REGION).map((p) => p.layer.id)).toEqual(["dash", "p"]);
+    expect(v.top?.id, "the panel takes keys, so it is still top").toBe("menu");
+    expect(v.layout(REGION).map((p) => p.layer.id), "peek beneath the panel").toEqual(["p", "menu"]);
 
-    v.push(anchored("menu", 2, { row: 10, prefer: "above" }));
-    expect(v.layout(REGION).map((p) => p.layer.id), "view, peek, overlay").toEqual(["dash", "p", "menu"]);
-    expect(v.top?.id).toBe("menu");
+    v.push(anchored("advisory", 2, { row: 10, prefer: "above" }));
+    expect(v.layout(REGION).map((p) => p.layer.id), "peek, panel, overlay").toEqual(["p", "menu", "advisory"]);
+    expect(v.top?.id).toBe("advisory");
   });
 
   it("T1.25 (I21, I3): pop never removes a peek; dismiss does, and emits dismiss rather than pop", () => {
@@ -69,31 +80,32 @@ describe("C15 unit — the stack", () => {
     expect(changes.at(-1)).toEqual({ kind: "dismiss", id: "p", reason: "explicit" });
   });
 
-  it("T1.26 (I22): a centred or fill peek is refused at push, and at update the layer is left as it was", () => {
+  it("T1.26 (I22): a centred peek is refused at push, and at update the layer is left as it was", () => {
     const m = manager();
     expect(() =>
-      m.push({ id: "c", kind: "peek", placement: { kind: "centred" }, content: rows(1, "c"), dismissable: true, width: 20 }),
+      m.push({ id: "c", kind: "peek", placement: { kind: "centred" }, content: rows(1, "c"), blocking: false, dismissal: "focus", width: 20 }),
     ).toThrow(OverlayError);
-    expect(() =>
-      m.push({ id: "f", kind: "peek", placement: { kind: "fill" }, content: rows(1, "f"), dismissable: true }),
-    ).toThrow(OverlayError);
-    expect(m.stack, "neither landed").toEqual([]);
+    expect(m.stack, "it did not land").toEqual([]);
 
     const ok = peek("p", 1, { row: 5, prefer: "below" });
     m.push(ok);
-    expect(() => m.update("p", { placement: { kind: "fill" } })).toThrow(OverlayError);
+    // With a width, so the refusal is I22's and not I20's.
+    expect(() => m.update("p", { placement: { kind: "centred" }, width: 20 })).toThrow(OverlayError);
     expect(m.stack[0], "the survivor is exactly the pushed layer").toEqual(ok);
     // The control: the same update on an overlay is legal, so the refusal is the peek's.
     const o = manager();
     o.push(anchored("a", 1, { row: 5, prefer: "below" }));
-    expect(o.update("a", { placement: { kind: "fill" } })).toBe(true);
+    expect(o.update("a", { placement: { kind: "centred" }, width: 20 })).toBe(true);
   });
 
-  it("T1.2: push(view) on empty → hasView", () => {
+  it("T1.2: an overlay on empty → one layer, it is top, and layout places it", () => {
+    // **Re-aimed off `hasView`** (R-EXA-082, F1254), **then off `fill`**
+    // (parked 3): what is left is the stack holding and exposing one layer.
     const m = manager();
-    m.push(view("dash"));
-    expect(m.hasView).toBe(true);
+    m.push(anchored("dash", 3, { row: 5, prefer: "below" }));
+    expect(m.stack.map((l) => l.id)).toEqual(["dash"]);
     expect(m.top?.id).toBe("dash");
+    expect(m.layout(REGION)[0]).toMatchObject({ top: 6, left: 0, height: 3, width: REGION.width });
   });
 
   it("T1.3: two overlays → LIFO, the second is top", () => {
@@ -104,11 +116,12 @@ describe("C15 unit — the stack", () => {
     expect(m.top?.id).toBe("b");
   });
 
-  it("T1.4 (I2): an overlay over a view is top", () => {
+  it("T1.4 (I23): an overlay over a panel is top, and the panel stays beneath it", () => {
     const m = manager();
-    m.push(view("dash"));
+    m.push(panel("menu", 3, { row: 20, prefer: "above" }));
     m.push(centred("confirm", 3));
     expect(m.top?.id).toBe("confirm");
+    expect(m.layout(REGION).map((p) => p.layer.id), "bottom-first").toEqual(["menu", "confirm"]);
   });
 
   it("T1.5: pop with two overlays removes the top one only", () => {
@@ -119,12 +132,11 @@ describe("C15 unit — the stack", () => {
     expect(m.stack.map((l) => l.id)).toEqual(["a"]);
   });
 
-  it("T1.6: pop with only a view → empty", () => {
+  it("T1.6: pop with only one overlay → empty", () => {
     const m = manager();
-    m.push(view("dash"));
+    m.push(covering("dash"));
     expect(m.pop()?.id).toBe("dash");
     expect(m.stack).toEqual([]);
-    expect(m.hasView).toBe(false);
   });
 
   it("T1.7 (I13): dismiss removes a layer at any depth, and so does the disposable", () => {
@@ -140,18 +152,18 @@ describe("C15 unit — the stack", () => {
     expect(m.stack.map((l) => l.id)).toEqual(["c"]);
   });
 
-  it("T1.8 (I2): pop with a view plus an overlay takes the overlay first", () => {
+  it("T1.8 (I23): pop with a panel plus an overlay takes the overlay first", () => {
     const m = manager();
-    m.push(view("dash"));
+    m.push(panel("menu", 3, { row: 20, prefer: "above" }));
     m.push(centred("confirm", 3));
     expect(m.pop()?.id).toBe("confirm");
-    expect(m.pop()?.id).toBe("dash");
+    expect(m.pop()?.id).toBe("menu");
   });
 
   it("T1.9 (I3): pop on a non-dismissable top → null, stack unchanged", () => {
     const m = manager();
     m.push(centred("menu", 3));
-    m.push(centred("confirm", 3, { dismissable: false }));
+    m.push(centred("confirm", 3, { blocking: true, dismissal: "answer" }));
 
     expect(m.pop()).toBeNull();
     expect(m.stack.map((l) => l.id)).toEqual(["menu", "confirm"]);
@@ -163,7 +175,7 @@ describe("C15 unit — the stack", () => {
     // and the whole of T6.11.
     const m = manager();
     m.push(centred("menu", 3));
-    m.push(centred("confirm", 3, { dismissable: false }));
+    m.push(centred("confirm", 3, { blocking: true, dismissal: "answer" }));
 
     m.pop();
     expect(m.stack.map((l) => l.id)).toContain("menu");
@@ -171,21 +183,16 @@ describe("C15 unit — the stack", () => {
 
   it("T1.10: dismiss removes a non-dismissable layer — explicit resolution always works", () => {
     const m = manager();
-    m.push(centred("confirm", 3, { dismissable: false }));
+    m.push(centred("confirm", 3, { blocking: true, dismissal: "answer" }));
     m.dismiss("confirm");
     expect(m.stack).toEqual([]);
   });
 });
 
 describe("C15 unit — one layer's geometry", () => {
-  it("T1.11: a view fills the region", () => {
-    const [p] = placeIn([view("dash")]);
-    expect(p).toMatchObject({ top: 0, left: 0, height: REGION.height, width: REGION.width });
-  });
-
   it("T1.12 (I14): update changes a layer and nothing about the stack", () => {
     const m = manager();
-    m.push(view("dash"));
+    m.push(panel("menu", 3, { row: 20, prefer: "above" }));
     m.push(centred("a", 3));
     m.push(centred("b", 3));
 
@@ -197,19 +204,18 @@ describe("C15 unit — one layer's geometry", () => {
 
     expect(m.stack.map((l) => l.id)).toEqual(before);
     expect(m.top?.id).toBe("b");
-    expect(m.hasView).toBe(true);
     expect(changes).toEqual([{ kind: "content", id: "a" }]);
   });
 
   it("T1.13 (I14): LayerUpdate cannot carry dismissable", () => {
     const m = manager();
-    m.push(centred("confirm", 3, { dismissable: false }));
+    m.push(centred("confirm", 3, { blocking: true, dismissal: "answer" }));
 
     // @ts-expect-error — I14: escapability does not change mid-life, and the
     // only form that restriction can take is the type rejecting the field.
-    m.update("confirm", { dismissable: true });
+    m.update("confirm", { dismissal: "escape" });
 
-    expect(m.stack[0]?.dismissable).toBe(false);
+    expect(m.stack[0]?.dismissal).toBe("answer");
   });
 
   it("T1.14 (I16): content is measured at the resolved width, not the region's", () => {
@@ -249,9 +255,10 @@ describe("C15 unit — one layer's geometry", () => {
     // **The throw and the state it prevents, in one row.** A row asserting only
     // the throw says nothing about why the state is wrong, and the reason is
     // not arithmetic — an absent width resolves to the region's (I16), so the
-    // layer is placed at `left` 0 across the whole region and is `fill` wearing
-    // `centred`'s name. The control is the same layer with a width, read for a
-    // `left` that differs from a filling layer's.
+    // layer is placed at `left` 0 across the whole region and is an anchored
+    // layer's column span wearing `centred`'s name. The control is the same
+    // layer with a width, read for a `left` that differs from a region-width
+    // anchored layer's.
     const m = manager();
     expect(() =>
       m.push({
@@ -259,17 +266,16 @@ describe("C15 unit — one layer's geometry", () => {
         kind: "overlay",
         placement: { kind: "centred" },
         content: rows(3, "wide"),
-        dismissable: true,
+        blocking: false,
+        dismissal: "escape",
       }),
     ).toThrow(/declares no width/);
     expect(m.stack, "and nothing reached the stack").toEqual([]);
 
     const [declared] = placeIn([centred("c", 3, { width: 40 })]);
-    const [filling] = placeIn([
-      { id: "f", kind: "overlay", placement: { kind: "fill" }, content: rows(3, "f"), dismissable: true },
-    ]);
-    expect(declared?.left, "the state I20 forbids is this one").not.toBe(filling?.left);
-    expect(filling?.left).toBe(0);
+    const [spanning] = placeIn([anchored("f", 3, { row: 5, prefer: "below" })]);
+    expect(declared?.left, "the state I20 forbids is this one").not.toBe(spanning?.left);
+    expect(spanning?.left).toBe(0);
   });
 
   it("T1.22 (I20): an update to centred without a width is refused, and the layer survives", () => {
@@ -295,4 +301,378 @@ describe("C15 §2b — approval is a layer, owed at the spec commit", () => {
   it.todo(
     "T1.27 (C15 I24, §2b): approvalPrompt's options through the confirm host produce an overlay whose blocks are the invocation notice, the warn consequence when supplied and none when not, and the host's 3-column choice table with always allow as an ordinary row; activeTarget answers overlay; deny pops it and the entry reads denied — not deferred on a component: approvalPrompt lands with C4 of the call grammar",
   );
+});
+
+describe("C15 §2c — blocking and dismissal are two fields (M8)", () => {
+  it("T1.29 (I26, R-QST-001, R-BLK-822): the two fields are the layer's, and neither is the other", () => {
+    // **The pair `dismissable` could not hold.** One flag answered *owns
+    // input*, *is closed by esc* and *takes the keys first* at once, and it was
+    // right only while those three agreed. These two layers are the case where
+    // they do not: a full-region layer that owns nothing, and a one-row typed
+    // reply that owns everything.
+    const m = manager();
+
+    const wide: Layer = covering("wide", REGION.height);
+    m.push(wide);
+    expect(m.top?.blocking, "large and owning nothing").toBe(false);
+
+    // §101's typed reply: it blocks, it floats above a live prompt, and it is
+    // still not escapable — the combination that proves the fields are two.
+    const reply: Layer = {
+      id: "reply",
+      kind: "overlay",
+      placement: { kind: "anchored", row: 20, rows: 1, prefer: "above" },
+      content: rows(1, "reply"),
+      blocking: true,
+      dismissal: "answer",
+    };
+    m.push(reply);
+    expect(m.top?.id).toBe("reply");
+    expect(m.top?.blocking, "one row and owning input").toBe(true);
+    expect(m.top?.dismissal).toBe("answer");
+    // Anchored, so it is above the prompt rather than over it — floating and
+    // blocking at once, which no single flag can say.
+    expect(m.top?.placement.kind).toBe("anchored");
+
+    // **Neither is derivable from the other, in both directions.** The routing
+    // half — that C16's step 3 reads `blocking` and measures no box — is
+    // T1.31 in `router-dispatch.test.ts`; this is the half about the record.
+    expect(
+      m.stack.map((l) => `${l.id}:${String(l.blocking)}:${l.dismissal}`),
+      "four combinations would be expressible and two are used here",
+    ).toEqual(["wide:false:escape", "reply:true:answer"]);
+  });
+
+  it("T1.30 (I3, I26): pop answers three ways, because dismissal has three values", () => {
+    // The old row asserted two of the three because only two existed.
+    const m = manager();
+    m.push(peek("beside", 2, { row: 5, prefer: "below" }));
+    m.push(centred("menu", 3));
+    expect(m.pop()?.id, "escape: removed").toBe("menu");
+
+    m.push(centred("question", 3, { blocking: true, dismissal: "answer" }));
+    expect(m.pop(), "answer: left where it is").toBeNull();
+    expect(m.stack.map((l) => l.id)).toEqual(["beside", "question"]);
+
+    // And `focus`, which `pop` never reaches at all — a peek is not `top`
+    // (I21), so the question above it is what `pop` inspected both times.
+    m.dismiss("question");
+    expect(m.top, "a peek is never top").toBeNull();
+    expect(m.pop(), "focus: nothing for esc to take").toBeNull();
+    expect(m.stack.map((l) => l.id)).toEqual(["beside"]);
+  });
+
+  it("T1.31 (I27, R-BLK-779): a panel is one triple, refused at both entry points", () => {
+    const base = panel("p", 2, { row: 10, prefer: "above" });
+    const m = manager();
+
+    // The control first, so the three refusals below are not satisfied by a
+    // guard that refuses every panel.
+    m.push(base);
+    expect(m.top?.id, "the anchored non-blocking escape one is accepted").toBe("p");
+    m.dismiss("p");
+
+    const refused: readonly Layer[] = [
+      unchecked({ ...base, placement: { kind: "centred" }, width: 30 }),
+      unchecked({ ...base, blocking: true }),
+      unchecked({ ...base, dismissal: "answer" }),
+    ];
+    for (const layer of refused) {
+      expect(
+        () => m.push(layer),
+        `${layer.placement.kind}/${String(layer.blocking)}/${layer.dismissal} is not a panel`,
+      ).toThrow(OverlayError);
+      expect(m.stack, "and nothing is left behind").toEqual([]);
+    }
+
+    // **`update` too, because `LayerUpdate` admits `placement`** (I20's own
+    // argument, applied to the kind's triple). A panel pushed anchored and
+    // updated to centred reaches the refused state by a route the push-time
+    // check cannot see.
+    m.push(base);
+    expect(() => m.update("p", { placement: { kind: "centred" }, width: 30 })).toThrow(
+      OverlayError,
+    );
+    expect(m.top?.placement.kind, "unchanged, not half-updated").toBe("anchored");
+  });
+
+  it("T1.32 (I28, I32, R-BLK-873): a blocking arrival closes the panels first, each on its own change", () => {
+    const m = manager();
+    const seen: OverlayChange[] = [];
+
+    m.push(peek("beside", 2, { row: 5, prefer: "below" }));
+    m.push(panel("menu", 3, { row: 20, prefer: "above" }));
+    using _sub = m.subscribe((c) => void seen.push(c));
+
+    m.push(centred("question", 3, { blocking: true, dismissal: "answer" }));
+    expect(m.stack.map((l) => l.id), "the peek stays; the panel is gone").toEqual([
+      "beside",
+      "question",
+    ]);
+    // **Before the push returned**, and each with its own id — an owner runs
+    // its own teardown, and one collective change would name none of them.
+    // **`displaced`, not `explicit`** (I32): the reader did not close it, and
+    // an owner that read `explicit` dropped a menu the question closed.
+    expect(seen).toEqual([
+      { kind: "dismiss", id: "menu", reason: "displaced" },
+      { kind: "push", id: "question", layerKind: "overlay" },
+    ]);
+
+    // **The control, and it is what scopes the rule.** A non-blocking arrival
+    // leaves the panel alone — so the subject is the arriving layer's
+    // `blocking`, not the presence of a panel.
+    m.dismiss("question");
+    seen.length = 0;
+    m.push(panel("menu2", 3, { row: 20, prefer: "above" }));
+    m.push(centred("advisory", 3));
+    expect(m.stack.map((l) => l.id)).toEqual(["beside", "menu2", "advisory"]);
+  });
+
+  it("T1.28 (I25): every removal emits one change with the layer's id before the call returns, and a removal of nothing emits nothing", () => {
+    // **Moved off C28's pushed view** (R-EXA-082, F1254). It was written there
+    // because that owner's state was a raised profiler tier and a running
+    // timer — the two things a stale owner costs the most — and there is no
+    // such owner. What the row is about survives the move: the change arrives
+    // **before the call returns**, so an owner that tears down from the stream
+    // is already torn down when the non-owner who popped it reads the stack.
+    //
+    // The owner here keeps a flag and nothing else. A richer one would be a
+    // better story and a worse row: the claim is about the ordering of an
+    // emission against a return, and state that takes work to build invites
+    // asserting the work instead.
+    const m = manager();
+    const changes: OverlayChange[] = [];
+    let open = false;
+    m.subscribe((c) => {
+      changes.push(c);
+      if ((c.kind === "pop" || c.kind === "dismiss") && c.id === "owned") open = false;
+    });
+
+    // A non-owner's `pop()`.
+    m.push(centred("owned", 3));
+    open = true;
+    const n = changes.length;
+    expect(m.pop()?.id).toBe("owned");
+    expect(changes.slice(n)).toEqual([{ kind: "pop", id: "owned", layerKind: "overlay" }]);
+    expect(open, "the owner had already torn down when `pop()` returned").toBe(false);
+
+    // `dismiss(id)` on the same layer: one `dismiss`, with its reason.
+    m.push(centred("owned", 3));
+    open = true;
+    const k = changes.length;
+    m.dismiss("owned");
+    expect(changes.slice(k)).toEqual([{ kind: "dismiss", id: "owned", reason: "explicit" }]);
+    expect(open).toBe(false);
+
+    // An id not on the stack: nothing at all.
+    const j = changes.length;
+    m.dismiss("never-pushed");
+    expect(changes.slice(j)).toEqual([]);
+  });
+
+  it("T1.33 (I23, R-BLK-779): peek · panel · overlay, bottom-first, from every push order", () => {
+    // *overlay › panel › peek › base*, read from the other end. Asserted as the
+    // whole sequence rather than as a pair, because a partition that puts one
+    // band in the right place and another in the wrong one satisfies every
+    // pairwise check written about the band that moved.
+    const build = (): readonly Layer[] => [
+      peek("beside", 2, { row: 5, prefer: "below" }),
+      panel("menu", 3, { row: 20, prefer: "above" }),
+      // **Non-blocking, because I28 makes the other pair unconstructible.** A
+      // blocking arrival closes the panels first, so *a panel beneath a
+      // question* is a stack this component will not hold — and a row that
+      // used one would be asserting the sort over three bands while claiming
+      // four. The overlay band is exercised by an escapable advisory instead.
+      centred("advisory", 3),
+    ];
+    // **Every permutation, because nothing is pinned to first any more.** The
+    // view was, because `push` refused one onto a non-empty stack — so the old
+    // sequences all began `0` and the sort was exercised over three free
+    // members of four. With the kind gone (R-EXA-082, F1254) the three bands
+    // arrive in any order a session produces, so the row walks all six.
+    const order: readonly (readonly number[])[] = [
+      [0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0],
+    ];
+    for (const seq of order) {
+      const m = manager();
+      const layers = build();
+      for (const i of seq) m.push(layers[i] as Layer);
+      expect(m.stack.map((l) => l.id), `pushed ${seq.join("")}`).toEqual([
+        "beside",
+        "menu",
+        "advisory",
+      ]);
+    }
+  });
+});
+
+describe("C15 I29 — a keyed layer declares its owner (review batch 2, M5 item 3)", () => {
+  it("T1.34 (C15 I29): push refuses an owner its fields contradict, and LayerUpdate does not admit one", () => {
+    const question = unchecked({ ...centred("q", 2, { blocking: true, dismissal: "answer" }), owner: { rung: "question" } });
+    const complete = unchecked({ ...panel("menu", 2, { row: 10, prefer: "above" }), owner: { rung: "substate", name: "complete" } });
+    const m = manager();
+
+    // **The controls first**, so the refusals below are not satisfied by a
+    // guard that refuses every owner — and the undeclared overlay is accepted,
+    // which is the narrow form this invariant is (the strict one refused 52
+    // rows of stand-ins).
+    for (const layer of [question, complete, centred("plain", 2)]) {
+      m.push(layer);
+      expect(m.top?.id, `${layer.id} is accepted`).toBe(layer.id);
+      m.dismiss(layer.id);
+    }
+
+    const refused: readonly Layer[] = [
+      unchecked({ ...complete, owner: { rung: "question" } }),
+      unchecked({ ...question, blocking: false, dismissal: "escape" }),
+      unchecked({ ...question, dismissal: "escape" }),
+      unchecked({ ...question, owner: { rung: "substate", name: "find" } }),
+      unchecked({ ...peek("beside", 2, { row: 5, prefer: "below" }), owner: { rung: "substate", name: "preview" } }),
+    ];
+    for (const layer of refused) {
+      expect(() => m.push(layer), `${layer.kind} ${layer.id} owning ${String(layer.owner?.rung)}`).toThrow(
+        OverlayError,
+      );
+      expect(m.stack, "and nothing is left behind").toEqual([]);
+    }
+
+    m.push(question);
+    // @ts-expect-error — I29, for I14's reason: an owner that moved mid-life
+    // makes the ladder depend on when it looked, so `LayerUpdate` has no field.
+    m.update("q", { owner: { rung: "substate", name: "find" } });
+  });
+});
+
+describe("C15 I30, I31, I33 — the layer's shape, its pointer and its generation (review batch 3, M7 item 5, M8 items 2 and 6)", () => {
+  it("T1.35 (C15 I30): the §2d table both ways, at push and at update, and each refused literal a compile error", () => {
+    const at = { kind: "anchored", row: 5, prefer: "below" } as const;
+    const content = rows(1, "x");
+    const m = manager();
+
+    // **The valid rows first**, so the refusals below are not satisfied by a
+    // guard that refuses every combination of a kind.
+    const valid: readonly Layer[] = [
+      { id: "peek", kind: "peek", placement: at, content, blocking: false, dismissal: "focus" },
+      { id: "panel", kind: "panel", placement: at, content, blocking: false, dismissal: "escape" },
+      { id: "question", kind: "overlay", placement: at, content, blocking: true, dismissal: "answer" },
+      { id: "modal-escape", kind: "overlay", placement: at, content, blocking: true, dismissal: "escape" },
+      { id: "advisory", kind: "overlay", placement: at, content, blocking: false, dismissal: "escape" },
+    ];
+    for (const layer of valid) {
+      m.push(layer);
+      expect(m.stack.some((l) => l.id === layer.id), `${layer.id} is accepted`).toBe(true);
+      m.dismiss(layer.id);
+    }
+
+    // **Each refused row, as the type refuses it and as `push` does.** The
+    // `@ts-expect-error` lines go red the day the union widens to admit one;
+    // the `push` assertions go red the day the run-time check stops seeing it.
+    const refused: readonly Layer[] = [
+      // @ts-expect-error — a blocking peek closes the panels and blocks nothing
+      { id: "blocking-peek", kind: "peek", placement: at, content, blocking: true, dismissal: "focus" },
+      // @ts-expect-error — a peek is never popped, so `escape` is a promise nothing keeps
+      { id: "escape-peek", kind: "peek", placement: at, content, blocking: false, dismissal: "escape" },
+      // @ts-expect-error — a peek takes no keys, so nothing can answer it
+      { id: "answer-peek", kind: "peek", placement: at, content, blocking: false, dismissal: "answer" },
+      // @ts-expect-error — an overlay takes keys, so focus never leaves it to close it
+      { id: "focus-overlay", kind: "overlay", placement: at, content, blocking: true, dismissal: "focus" },
+      // @ts-expect-error — the same, non-blocking
+      { id: "focus-advisory", kind: "overlay", placement: at, content, blocking: false, dismissal: "focus" },
+      // @ts-expect-error — an owner waits while keys and clicks pass beneath it
+      { id: "open-question", kind: "overlay", placement: at, content, blocking: false, dismissal: "answer" },
+    ];
+    for (const layer of refused) {
+      expect(() => m.push(layer), `${layer.id} is refused`).toThrow(/\(I30\)/u);
+      expect(m.stack, "and nothing is left behind").toEqual([]);
+    }
+
+    // **`update` reaches the table through `placement` alone** — `LayerUpdate`
+    // admits no `blocking`, `dismissal` or `kind` (I14) — so the rows it can
+    // reach are I22's and I27's, and a refused update leaves the layer as it
+    // was rather than half-written.
+    m.push({ id: "p", kind: "peek", placement: at, content, blocking: false, dismissal: "focus" });
+    m.push({ id: "menu", kind: "panel", placement: at, content, blocking: false, dismissal: "escape" });
+    expect(() => m.update("p", { placement: { kind: "centred" }, width: 20 })).toThrow(OverlayError);
+    expect(() => m.update("menu", { placement: { kind: "centred" }, width: 20 })).toThrow(OverlayError);
+    expect(m.stack.map((l) => `${l.id}:${l.placement.kind}`)).toEqual(["p:anchored", "menu:anchored"]);
+    // @ts-expect-error — I14: the fields the table is over are not updatable
+    m.update("p", { blocking: true });
+  });
+
+  it("T1.36 (C15 I31): takesPointer admits a peek for the wheel and not for a press, and takesInput never", () => {
+    const placed = placeIn([
+      peek("beside", 2, { row: 5, prefer: "below" }),
+      panel("menu", 2, { row: 20, prefer: "above" }),
+      centred("question", 2, { blocking: true, dismissal: "answer" }),
+    ]);
+    const table = placed.map((p) => ({
+      id: p.layer.id,
+      keys: takesInput(p),
+      wheel: takesPointer(p, "wheel"),
+      press: takesPointer(p, "press"),
+    }));
+    expect(table).toEqual([
+      { id: "beside", keys: false, wheel: true, press: false },
+      { id: "menu", keys: true, wheel: true, press: true },
+      { id: "question", keys: true, wheel: true, press: true },
+    ]);
+  });
+
+  it("T1.37 (C15 I33): generation moves on keyed pushes and removals and on nothing else, asserted after every step", () => {
+    const m = manager();
+    const steps: [string, () => void][] = [
+      ["push a panel", () => void m.push(panel("menu", 2, { row: 20, prefer: "above" }))],
+      ["pop it", () => void m.pop()],
+      ["push a peek", () => void m.push(peek("beside", 2, { row: 5, prefer: "below" }))],
+      ["update the peek", () => void m.update("beside", { content: rows(3, "beside") })],
+      ["push a panel again", () => void m.push(panel("menu", 2, { row: 20, prefer: "above" }))],
+      // I28: the menu's removal and the question's push are two.
+      ["a question over it", () => void m.push(centred("q", 2, { blocking: true, dismissal: "answer" }))],
+      ["update the question", () => void m.update("q", { content: rows(1, "q") })],
+      ["pop() on an answer top removes nothing", () => void m.pop()],
+      ["dismiss the peek", () => m.dismiss("beside")],
+      ["dismiss the question", () => m.dismiss("q")],
+      ["dismiss what is gone", () => m.dismiss("q")],
+    ];
+    const seen = steps.map(([name, step]) => {
+      step();
+      return `${name}: ${String(m.generation)}`;
+    });
+    expect(seen).toEqual([
+      "push a panel: 1",
+      "pop it: 2",
+      "push a peek: 2",
+      "update the peek: 2",
+      "push a panel again: 3",
+      "a question over it: 5",
+      "update the question: 5",
+      "pop() on an answer top removes nothing: 5",
+      "dismiss the peek: 5",
+      "dismiss the question: 6",
+      "dismiss what is gone: 6",
+    ]);
+  });
+});
+
+describe("C15 I34 — promptLive", () => {
+  it("T1.38 (C15 I34): promptLive on push reads on top; an update changes it alone; absent reads false", () => {
+    const m = manager();
+    m.push(panel("bare", 2, { row: 20, prefer: "above" }));
+    expect(m.top?.promptLive ?? false, "absent reads false").toBe(false);
+    m.dismiss("bare");
+
+    m.push({ ...panel("menu", 2, { row: 20, prefer: "above" }), promptLive: true });
+    expect(m.top?.promptLive).toBe(true);
+    const before = m.top;
+    expect(m.update("menu", { promptLive: false })).toBe(true);
+    expect(m.top?.promptLive, "update carries it").toBe(false);
+    expect(m.top?.content, "and touches nothing else").toBe(before?.content);
+    expect(m.top?.placement).toBe(before?.placement);
+    // An update that does not name it leaves it where it was.
+    m.update("menu", { content: rows(3, "menu") });
+    expect(m.top?.promptLive).toBe(false);
+    m.update("menu", { promptLive: true });
+    m.update("menu", { content: rows(2, "menu") });
+    expect(m.top?.promptLive).toBe(true);
+  });
 });

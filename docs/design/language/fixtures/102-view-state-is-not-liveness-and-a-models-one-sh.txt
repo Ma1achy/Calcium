@@ -1,0 +1,62 @@
+“LIVE” WAS CONFLATING TWO ORTHOGONAL THINGS
+
+does the CONTENT change? and does it have VIEW STATE? are different
+questions — and live named a container for the first while gating the
+second. The view changing is a RENDER; the data changing is a PATCH.
+
+   kind            view state     content
+   a 3D plot       a camera       settled or patched — orbits either way
+   a 2D plot       a cursor       settled or patched
+   a table         sort + scroll  settled or patched
+   a terminal      a scroll offset patched while attached
+   an image        a zoom         settled
+   a paragraph     none           streamed, then settled
+   a patch         none           settled
+
+  which leaves two ORDINARY mechanisms and no category: every block can
+  be PATCHED, and a block declares whether it has VIEW STATE. Neither
+  needs a wrapper, and live as a kind can go.
+
+★ A 3D PLOT IS INTERACTIVE BECAUSE IT HAS A CAMERA, not because it is
+live. Settled an hour ago, from a call that finished — it STILL ORBITS.
+
+  ● plot(attractor) · 0.6s
+      1.0┨        ⡇⡇⣿⣿⣿⡇⡇
+         ┨   ⣿⣿⡇⡇⡇⡇⡇⡇⡇⡇⣿⣿
+    −0.5╂━━━━━━━━━━━━━━━━━
+      ←→ orbit   ↑↓ tilt   o auto   r reset   esc out
+      az 60°   tilt 10°
+
+★ KEYBOARD CONTROLS APPEAR ONLY INSIDE; POINTER READOUT MAY PREVIEW OUTSIDE
+
+  at rest   no controls; no readout until the plot has a declared cursor
+  hover     pointer preview moves the readout without entering; leaving keeps it
+  focused   the way IN — ⏎ enter; a persisted readout may remain
+  inside    the full keyboard controls, and the readout follows the cursor
+
+  and all of it sits DIRECTLY UNDER THE PLOT — not in chrome elsewhere,
+  which is why the controls used to read as belonging to the container
+  rather than the figure.
+
+  the control row is a REPRESENTATION, so it sheds descriptions and then
+  becomes ? keys rather than disappearing at narrow widths.
+
+★ HOW A MODEL’S ANSWER IS FORMATTED — and it is ONE SHAPE
+
+  ● The parser handles quotes with a single boolean, so a nested
+    quote flips it back instead of counting a level.
+
+  ● I won’t add a bypass for the approval gate — that is the one
+    path the posture exists to hold.
+
+  ● I’m not sure this is the right fix. I haven’t checked whether
+    the tokeniser re-enters this path after an escape.
+
+  an explanation, a refusal and a hedge are the SAME SHAPE, because THE
+  SYSTEM CANNOT TELL THEM APART AND MUST NOT PRETEND IT CAN — there is
+  no classifier, and colouring an answer by what it seems to mean would
+  be a guess wearing the authority of chrome.
+
+  the one thing that DOES change the shape is the content’s own
+  STRUCTURE: prose wraps, a fenced block does not. The renderer acts on
+  structure it can PARSE, never on meaning it would have to INFER.

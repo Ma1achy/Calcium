@@ -259,22 +259,34 @@ export function shadeColour(colour: ColourValue, intensity: number): ColourValue
 }
 
 /**
- * The sixteen ANSI colours, as the xterm defaults (C10 §4i, I38).
+ * The sixteen ANSI colours, as the legacy Windows console paints them (C10 §4i,
+ * I38, I61) — the same values as HTML 4's sixteen named colours.
+ *
+ * **Named for what it is, because it was labelled as something else** (C10
+ * I61). This comment said *the xterm defaults*, and xterm's differ at indices
+ * 1–8 and 12: `#cd0000` where this has `#800000`, `#e5e5e5` where it has
+ * `#c0c0c0`, `#5c5cff` where it has `#0000ff`. Nor is it VGA, whose text
+ * defaults are the `0xaa` / `0x55` levels. The values did not change with the
+ * name, and nothing measured on them moved.
  *
  * **A table rather than a computation**, because there is nothing to compute: a
  * terminal's low sixteen are whatever the user's palette says, and these are the
  * reference values the mapping measures distance against. A child asking for
  * *the terminal's red* keeps its index and never reaches this table (I38); it is
  * consulted only when an `rgb` or an `ansi256` has to come down to four bits.
+ *
+ * **Exported for C10 I61**: the curated 4-bit band pairs are held to C10 I45's
+ * constraints against these values, because the user's own sixteen cannot be
+ * known and the reference is the one statement a gate can check.
  */
-const ANSI16_HEX: readonly string[] = Object.freeze([
+export const ANSI16_WINDOWS_HEX: readonly string[] = Object.freeze([
   "#000000", "#800000", "#008000", "#808000", "#000080", "#800080", "#008080", "#c0c0c0",
   "#808080", "#ff0000", "#00ff00", "#ffff00", "#0000ff", "#ff00ff", "#00ffff", "#ffffff",
 ]);
 
 /** The 256-colour cube and greys as hexes, for the `ansi256` → 4-bit step. */
 function hexOfAnsi256(index: number): string {
-  if (index < 16) return ANSI16_HEX[index] ?? "#000000";
+  if (index < 16) return ANSI16_WINDOWS_HEX[index] ?? "#000000";
   if (index >= 232) {
     const level = 8 + (index - 232) * 10; // cells-ok — a grey ramp step
     const part = level.toString(16).padStart(2, "0");
@@ -300,8 +312,8 @@ export function nearestAnsi16(hex: string): number {
   const channel = (h: string, i: number): number => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
   let best = 0;
   let bestDistance = Number.POSITIVE_INFINITY;
-  for (let i = 0; i < ANSI16_HEX.length; i += 1) { // cells-ok — a palette index
-    const candidate = ANSI16_HEX[i] ?? "#000000";
+  for (let i = 0; i < ANSI16_WINDOWS_HEX.length; i += 1) { // cells-ok — a palette index
+    const candidate = ANSI16_WINDOWS_HEX[i] ?? "#000000";
     let distance = 0;
     for (let c = 0; c < 3; c += 1) { // cells-ok — a colour channel
       const d = channel(hex, c) - channel(candidate, c);

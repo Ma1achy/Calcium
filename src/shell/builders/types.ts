@@ -14,7 +14,7 @@
  * oversight.
  */
 
-import type { Action, Block, Cell, ColormapName, ErrorLike, Glyph, HeadingLevel, KeyValue, Tone, TextSpan } from "../../data/viewmodel/index.js";
+import type { Action, Block, CallState, Cell, ColormapName, ErrorLike, Glyph, HeadingLevel, KeyValue, Tone, TextSpan, TrailForm } from "../../data/viewmodel/index.js";
 import type { ProducerContext } from "../../data/adapters/types.js";
 
 /**
@@ -92,6 +92,32 @@ export type NoticeOpts = ValuedTextOpts &
   Readonly<{
     /** The notice's one button — `fill` for a retry, `open` for a log (C04 §3). */
     action?: Action;
+    /**
+     * The lifecycle state of the call this notice heads (C04 I59, C09 I45).
+     *
+     * **Present is what makes a notice a call head** — one committed row, an
+     * element in the focus ring, and a mark that resolves at render rather than
+     * here. An author composing their own call grammar states it for the same
+     * reason `callHead` does: the character is a question about the terminal and
+     * a producer has never seen one.
+     */
+    state?: CallState;
+    /**
+     * Whether the notice's text is still arriving (C04 I122, C09 §7e).
+     *
+     * **The band is a property of the stream, not of the block's shape**, so
+     * an author composing their own streaming line declares it here rather
+     * than styling a run: the trail's arithmetic is the renderer's and the
+     * cells it covers are a question about the terminal.
+     */
+    streaming?: boolean;
+    /**
+     * Which of the five trails the band draws (C04 I123, §026).
+     *
+     * Omitted, `hotEdge` — the design's default. It is read only while
+     * `streaming` is true, so a settled notice carrying one draws nothing.
+     */
+    trail?: TrailForm;
   }>;
 
 /**
@@ -180,6 +206,19 @@ export type ChipInput = Readonly<{
   tone?: Tone;
   action?: Action;
   active?: boolean;
+}>;
+
+/**
+ * A member for `b.tape` (§4, C04 §3ao, §095).
+ *
+ * `detail` is the all-or-nothing group — every member's goes together or none
+ * does, and it goes before one member goes offscreen (C04 I126).
+ */
+export type TapeMember = Readonly<{
+  id: string;
+  label: string;
+  detail?: string;
+  state?: CallState;
 }>;
 
 /** A row for `b.comparison` (§4). Two axes, never one (C04 I36). */

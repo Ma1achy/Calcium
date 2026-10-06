@@ -36,7 +36,6 @@ import type { RawPatch, RawResult, TransportRouter } from "../../src/data/transp
 import { block } from "../../src/data/viewmodel/index.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { createOverlayManager } from "../../src/viewport/overlay/index.js";
-import { createDocumentView } from "../../src/shell/document-view.js";
 import type { Block, ViewDocument, ViewPatch } from "../../src/data/viewmodel/index.js";
 
 import { FULL_CAPABILITIES } from "../support/producer-context.js";
@@ -89,12 +88,6 @@ const GREETING = { schema: "tui.view/1" as const, command: "", status: "ok" as c
 function harness(script: Scripted = {}) {
   const transcript = createTranscriptStore();
   const overlays = createOverlayManager({ registry: blocks });
-  const documentView = createDocumentView({
-    overlays,
-    measureSequence: (blks, width) => blocks.measureSequence(blks, width),
-    region: () => ({ width: 80, height: 24 }),
-    redraw: () => undefined,
-  });
   const session = createSessionStore({ cwd: "/work", env: {}, cluster: "c", version: "1" });
   const commits: string[] = [];
   const resets: number[] = [];
@@ -153,8 +146,7 @@ function harness(script: Scripted = {}) {
     transcript,
     // C07 I18/I19 — what the producer context is built from (C23 I40). `blocks`
     // is already the real registry below, so `measure` is the frame's rather
-    // than a stub's; this adds the two the context also needs, with the same
-    // region `documentView` is given.
+    // than a stub's; this adds the two the context also needs.
     capabilities: FULL_CAPABILITIES,
     region: () => ({ width: 80, height: 24 }),
     scheduler: {
@@ -222,12 +214,11 @@ function harness(script: Scripted = {}) {
     // **Real, and no longer `{} as never`.** The deps object below ends in
     // `as unknown as PipelineDeps`, which satisfies the type by *erasure* — every
     // absent field is invisible, not merely this one. That cast is why a route
-    // could be untested while its seam was green: `documentView` was simply not
-    // there, and nothing said so until a mutation was aimed at the wiring.
-    // These two are built for real so the view route has something to run
-    // against; the rest of the cast is noted in test/support/README.md.
+    // could be untested while its seam was green: the view owner was simply not
+    // there, and nothing said so until a mutation was aimed at the wiring. The
+    // owner has since gone with the pushed view (C22 §13a); the manager stays
+    // real, and the rest of the cast is noted in test/support/README.md.
     overlays,
-    documentView,
     theme: { current: {} as never, setTheme: () => undefined, applyOverrides: () => [] },
     // `append` is real: C23 I29 records every settled submission through it,
     // and a fake without it throws inside the funnel — where the failure reads
@@ -278,7 +269,7 @@ function harness(script: Scripted = {}) {
     // `/theme` alike. This is the second harness in the tree with its own
     // `as unknown as PipelineDeps`, and the cast is why the compiler saw
     // neither.
-    confirm: createConfirmHost({ overlays, anchor: () => ({ row: 0, rows: 1 }), overlayRegion: () => ({ width: 80, height: 24 }), invalidate: () => undefined }),
+    confirm: createConfirmHost({ overlays, anchor: () => ({ row: 0, rows: 1 }), draft: () => "", holdDraft: () => undefined, restoreDraft: () => undefined, overlayRegion: () => ({ width: 80, height: 24 }), invalidate: () => undefined }),
     // C23 I46 — everything visible. This harness has no viewport, so answering
     // from one would pause every part in the file: a fake supplying the
     // behaviour under test rather than standing in for it. The pause has its own
@@ -288,15 +279,11 @@ function harness(script: Scripted = {}) {
     // what `as unknown as PipelineDeps` buys and costs — `overlays` and `confirm`
     // are the two the comment above already records.
     visible: () => true,
-    // The seventh shipped verb's seam (C23 I68); `seal()` refuses the row without it.
-    profileView: {
-      open: () => "no profiler to show — this session was built without `TuiConfig.profile`",
-      switchPane: () => false,
-      move: () => false,
-      pop: () => false,
-      dispose: () => undefined,
-      pane: null,
-    },
+    // **No `profile` and no `profileCapture`**, which is a session built without
+    // `TuiConfig.profile`: `execution.ts` folds both to `null` and `/profile`
+    // answers its own notice (C23 I68). A `profileView` stood here after the
+    // view retired (R-EXA-082, F1254) — a field no reader had, kept alive by
+    // the cast — the missing-field case above, in the other direction.
   } as unknown as PipelineDeps;
 
   const pipeline = createExecutionPipeline(deps);
@@ -318,11 +305,11 @@ function harness(script: Scripted = {}) {
     transcript,
     session,
     /**
-     * The layer stack, for the view routes.
+     * The layer stack.
      *
-     * **Exposed rather than asserted through `documentView`**: the question
-     * T1.41 asks is *what is on screen*, and the owner's own state is the thing
-     * that would agree with a projection bug. The layer is what C15 hands the
+     * **Exposed rather than asserted through an owner**: the question T1.41
+     * asks is *what is on screen*, and an owner's own state is the thing that
+     * would agree with a projection bug. The layer is what C15 hands the
      * composer.
      */
     overlays,
@@ -937,7 +924,7 @@ describe("C23 §2 — the seven routes", () => {
     expect(h.transcript.entries, "and nothing was appended after shutdown began").toHaveLength(0);
   });
 
-  it("T3.72 (C22 I99, F158, F1024): the reservation is filled, not appended beside", async () => {
+  it("C23 T3.72 (C22 I99, F158, F1024): the reservation is filled, not appended beside", async () => {
     // **The id is the control.** Asserting one entry holding the greeting is
     // green for a pipeline that appended and cleared, and green for one that
     // never reserved at all; asserting that the entry's id is the one
@@ -960,7 +947,7 @@ describe("C23 §2 — the seven routes", () => {
     ).toEqual(["welcome aboard"]);
   });
 
-  it("T3.73 (C22 I99): an abandoned slot is settled, empty and evictable", async () => {
+  it("C23 T3.73 (C22 I99): an abandoned slot is settled, empty and evictable", async () => {
     // C13 never evicts a streaming entry (C13 I6), so a reservation left alone
     // outlives the cap for the life of the process. Released and abandoned
     // differ in exactly one flag, which is why this row is the only place the
@@ -975,7 +962,7 @@ describe("C23 §2 — the seven routes", () => {
     expect(h.transcript.entries[0]?.doc.blocks, "and still draws nothing").toEqual([]);
   });
 
-  it("T3.74 (C22 I99): a slot the user cleared is gone, and the greeting appends", async () => {
+  it("C23 T3.74 (C22 I99): a slot the user cleared is gone, and the greeting appends", async () => {
     // `settle` answers `unknown` and the call site acts on it. Before C22 I99
     // the outcome was discarded, so the greeting would have vanished with no
     // refusal anywhere — the failure a returned `PatchOutcome` exists to make
@@ -1181,16 +1168,18 @@ describe("C23 tier 3 — edges", () => {
     expect(settledOrder, "typed order is settled order").toEqual(typed);
   });
 
-  it("T3.21 (I5, C22 §13a): a queued VIEW invocation settles the entry it was given", async () => {
-    // **§13a's sentence stopped covering this route the day the queue landed.**
-    // It ruled *it pops rather than settling, because there is no entry to
-    // settle* — true of a view submitted directly, which appends nothing on the
-    // way in. A deferred one appended its entry when it was typed, so without a
-    // settlement here that entry streams for ever, marked *queued behind*
-    // something that finished long ago.
+  it("T3.21 (I5, C22 §13a): a queued submission settles the entry it was given", async () => {
+    // **This row was written about the view route and outlived it** (R-EXA-082,
+    // F1253). §13a ruled *it pops rather than settling, because there is no entry
+    // to settle* — true of a view submitted directly, which appended nothing on
+    // the way in, and false of a **deferred** one, which appended its entry when
+    // it was typed and then streamed for ever, marked *queued behind* something
+    // long finished. Found by reading the diff rather than by a failing row.
     //
-    // Found by reading the diff rather than by a failing row, which is why the
-    // row exists: nothing else in the suite queues a view.
+    // With the route gone the claim is the general one and the second verb is an
+    // ordinary queued submission: an entry appended at typing time is settled by
+    // whatever runs it. The view-specific mutation went with the route
+    // (`c23-queue.mjs`); `runApp`'s pending-entry mutation reaches this shape.
     let release: (() => void) | undefined;
     let calls = 0;
     const h = harness({
@@ -1423,7 +1412,7 @@ describe("C23 tier 3 — edges", () => {
     const ok = harness();
     ok.pipeline.submit("echo hi");
     await settled(ok.pipeline);
-    expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice" && b.glyph !== "step")).toHaveLength(0); // C23 I54: block 0 is the card's header
+    expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice" && b.state === undefined)).toHaveLength(0); // C23 I54: block 0 is the card's header
   });
 
   it("T3.20a (C07 I22): a stream that overflowed carries the notice when it settles", async () => {
@@ -1445,7 +1434,7 @@ describe("C23 tier 3 — edges", () => {
     const doc = h.transcript.entries[0]?.doc;
     expect(h.transcript.entries[0]?.streaming, "settled").toBe(false);
     // C23 I54 — the card's `step` header is a notice too, and it is block 0, not the row's subject.
-    const notices = (doc?.blocks ?? []).filter((b) => b.kind === "notice" && b.glyph !== "step");
+    const notices = (doc?.blocks ?? []).filter((b) => b.kind === "notice" && b.state === undefined);
     expect(notices, "one notice, after the streamed block").toHaveLength(1);
     expect(doc?.blocks.at(-1)?.kind).toBe("notice");
     expect(notices[0]).toMatchObject({ tone: "warn", glyph: "warn" });
@@ -1462,7 +1451,7 @@ describe("C23 tier 3 — edges", () => {
     });
     ok.pipeline.submit("/tail");
     await settled(ok.pipeline);
-    expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice" && b.glyph !== "step")).toHaveLength(0); // C23 I54: block 0 is the card's header
+    expect(ok.transcript.entries[0]?.doc.blocks.filter((b) => b.kind === "notice" && b.state === undefined)).toHaveLength(0); // C23 I54: block 0 is the card's header
   });
 
   it("T3.16 (I5): a shell route holds the guard exactly as an app verb does", async () => {
@@ -2033,11 +2022,17 @@ describe("C23 §4 — the submit row's two other steps", () => {
     expect(ticks.adapter, "an adapter's b.live must be driven too (I33a)").toBeGreaterThan(0);
   });
 
-  it("T1.46 (C07 I18, I40): a transcript entry's producer is told `null`, a view's is told the region", async () => {
+  it("T1.46 (C07 I18, I40): every producer is told `null`, because no route states a bound", async () => {
     // **The row the mutation pass asked for.** Making `height` unconditional —
     // handing every producer the region — passed all 2575 tests, because the
     // adapter double declared `ctx: { command: string }` and erased the field.
     // A grant nothing observes is a grant nothing can be wrong about.
+    //
+    // **It had two arms and now has one** (C23 I41, C22 §13a, R-EXA-082). The
+    // view route was the only route that stated a bound, and a verb's result is
+    // a transcript entry — as tall as its blocks, scrolled by C14. The mutation
+    // this row exists to catch is unchanged and is easier to state: a `height`
+    // reaching *any* producer is a bound nothing defines.
     const entry = harness();
     entry.pipeline.submit("/ps");
     await settled(entry.pipeline);
@@ -2047,20 +2042,23 @@ describe("C23 §4 — the submit row's two other steps", () => {
     expect(onEntry?.height, "a transcript entry is windowed by rows and has no bound").toBe(null);
     expect(onEntry?.width).toBe(80);
 
-    // The view route, where a bound exists and C23 knows it before step 3.
-    const view = harness({
+    // The streaming route, which was the one that stated a bound. It states
+    // none, and the assertion is the same one the entry arm makes — which is
+    // the whole content of the amendment.
+    const streamed = harness({
       stream: async function* () {
         yield { kind: "data", value: { line: "one" } } as const;
         await new Promise(() => undefined);
       },
       adaptPatch: () => ({ op: "append", block: block({ kind: "raw", id: "l", text: "x" }) }),
     });
-    view.pipeline.submit("/tail --screen");
-    await settled(view.pipeline);
+    streamed.pipeline.submit("/tail --screen");
+    await settled(streamed.pipeline);
 
-    const onView = view.contexts.find((c) => c.where === "adaptPatch")?.ctx;
-    expect(onView, "the view route ran").toBeDefined();
-    expect(onView?.height, "a view is defined by the region — C15 §4").toBe(24);
+    const onStream = streamed.contexts.find((c) => c.where === "adaptPatch")?.ctx;
+    expect(onStream, "the streaming route ran").toBeDefined();
+    expect(onStream?.height, "and it is no more bounded than the other").toBe(null);
+    expect(onStream?.width, "the width is still handed down — it is what a body wraps at").toBe(80);
   });
 
   it("T1.47 (C07 I19, I20): the capabilities are the resolved record and `measure` is the frame's", async () => {
@@ -2081,221 +2079,19 @@ describe("C23 §4 — the submit row's two other steps", () => {
     expect(ctx?.measure(sample, 40)).toBeGreaterThan(0);
   });
 
-  it("T1.41 (C22 I48): a view+streams verb patches the view and releases the guard", async () => {
-    // **The route C22 §13a reserved, refused loudly, and this exercises.** The
-    // fixture's `tail --screen` is the first declaration that is both, and it
-    // had none until the route existed.
-    const patches: RawPatch[] = [
-      { kind: "data", value: { line: "one" } },
-      { kind: "data", value: { line: "two" } },
-    ];
-    let n = 0;
-    const h = harness({
-      stream: async function* () {
-        for (const p of patches) yield p;
-        // No `end` — a follow is still following, which is the state the whole
-        // route exists for and the one an entry-shaped test never sits in.
-        await new Promise(() => undefined);
-      },
-      adaptPatch: () => {
-        n += 1;
-        return { op: "append", block: block({ kind: "raw", id: `line-${String(n)}`, text: "x" }) };
-      },
-    });
-
-    h.pipeline.submit("/tail --screen");
-    await settled(h.pipeline);
-
-    // The patches reached the *view*, and the transcript is untouched — B03 §2
-    // in the strong sense §13a took it.
-    const content = h.overlays.stack[0]?.content ?? [];
-    expect(content.map((bl) => bl.id)).toEqual(["line-1", "line-2"]);
-    expect(h.transcript.entries, "a push leaves the transcript alone").toHaveLength(0);
-
-    // **C23 I6 — released before the loop, which is the whole reason the pair
-    // was refused.** The stream never ends, so a guard released after it is a
-    // guard held for ever: this assertion is the one that fails against the old
-    // fallthrough, where the pair blocked on `invoke` with the guard taken.
-    expect(h.pipeline.inFlight, "a follow does not hold the session").toBeNull();
-  });
-
-  it("T1.42 (C22 I48, C16 §5): the follow is registered, so Ctrl-C reaches it", async () => {
-    // **The rung nothing had exercised.** Omitting the registration on an entry
-    // loses a cancellation; omitting it here means Ctrl-C falls past the rung —
-    // and on this route the view's loop is the only thing on screen, so the
-    // next rung quits the session.
-    // **The fake honours the abort, because the real transport does.** A
-    // generator that ignores the signal leaves the loop parked for ever and the
-    // `finally` unreachable, which would make this row a claim about a
-    // transport nobody ships. A fake must not supply the behaviour, and it must
-    // not withhold it either.
-    let stop = (): void => undefined;
-    const stopped = new Promise<void>((r) => {
-      stop = r;
-    });
-    const h = harness({
-      stream: async function* () {
-        yield { kind: "data", value: { line: "one" } } as RawPatch;
-        await stopped;
-      },
-      adaptPatch: () => ({ op: "append", block: block({ kind: "raw", id: "l", text: "x" }) }),
-    });
-
-    h.pipeline.submit("/tail --screen");
-    await settled(h.pipeline);
-    expect(h.pipeline.liveStreams, "registered before the loop was awaited").toBe(1);
-
-    // And cancelling it pops the view — the asymmetry the walk ruled: Ctrl-C is
-    // the reader saying stop, where `end` is the far side saying it.
-    h.pipeline.cancelNewestStream();
-    await settled(h.pipeline);
-    expect(h.overlays.stack, "a cancelled view pops").toHaveLength(0);
-
-    stop();
-    await settled(h.pipeline);
-    expect(h.pipeline.liveStreams, "and the `finally` forgets its canceller").toBe(0);
-  });
-
-  it("T1.43 (C22 I48): the stream ending appends a notice and leaves the view open", async () => {
-    // **A view has no settlement, and must not pop on `end`.** `docker logs`
-    // without `-f` ends immediately; a view that popped would flash and vanish
-    // before anything could be read.
-    const h = harness({
-      stream: async function* () {
-        yield { kind: "data", value: { line: "one" } } as RawPatch;
-        yield { kind: "end", result: result({ exitCode: 0 }) } as RawPatch;
-      },
-      adaptPatch: () => ({ op: "append", block: block({ kind: "raw", id: "l", text: "x" }) }),
-    });
-
-    h.pipeline.submit("/tail --screen");
-    await settled(h.pipeline);
-
-    expect(h.overlays.stack, "the view is still there").toHaveLength(1);
-    const content = h.overlays.stack[0]?.content ?? [];
-    const notice = content.find((bl) => bl.kind === "notice");
-    expect(notice, "and it says the stream ended").toBeDefined();
-    expect(notice?.kind === "notice" ? notice.text : "").toContain("ended");
-    // C04 I6 — F29 is what happens when a toned notice loses its glyph.
-    expect(notice?.kind === "notice" ? notice.glyph : undefined).toBeDefined();
-  });
-
-  it("T1.44 (C22 I48): a non-zero exit is in the notice, which the walk said it could not be", async () => {
-    // The walk ruled that a `RawPatch` `end` carries no exit code. It carries a
-    // whole `RawResult` — the ruling was reasoned from what a patch is *for*
-    // rather than read off the type, and the type is what falsified it. A
-    // follow that ends because the container stopped is a different event from
-    // one whose log ran out.
-    const h = harness({
-      stream: async function* () {
-        yield { kind: "end", result: result({ exitCode: 137 }) } as RawPatch;
-      },
-    });
-
-    h.pipeline.submit("/tail --screen");
-    await settled(h.pipeline);
-
-    const content = h.overlays.stack[0]?.content ?? [];
-    const notice = content.find((bl) => bl.kind === "notice");
-    expect(notice?.kind === "notice" ? notice.text : "").toContain("137");
-    expect(notice?.kind === "notice" ? notice.tone : "").toBe("warn");
-
-    // **And the reason when the far side gave one**, which a frame-read added:
-    // *exited 1* tells the reader the follow failed and not why, and `stderr`
-    // is on the same `RawResult` the code came from.
-    const h2 = harness({
-      stream: async function* () {
-        yield {
-          kind: "end",
-          result: result({ exitCode: 1, stderr: "Error: No such container: nope\n" }),
-        } as RawPatch;
-      },
-    });
-    h2.pipeline.submit("/tail --screen");
-    await settled(h2.pipeline);
-    const n2 = (h2.overlays.stack[0]?.content ?? []).find((bl) => bl.kind === "notice");
-    expect(n2?.kind === "notice" ? n2.text : "").toContain("No such container");
-  });
-
-  it("T1.45 (C22 I48): a stream failure lands in the view rather than nowhere", async () => {
-    const h = harness({
-      stream: async function* () {
-        yield { kind: "data", value: {} } as RawPatch;
-        throw new Error("pipe died");
-      },
-      adaptPatch: () => ({ op: "append", block: block({ kind: "raw", id: "l", text: "x" }) }),
-    });
-
-    h.pipeline.submit("/tail --screen");
-    await settled(h.pipeline);
-
-    const content = h.overlays.stack[0]?.content ?? [];
-    const notice = content.find((bl) => bl.kind === "notice");
-    expect(notice?.kind === "notice" ? notice.text : "").toContain("pipe died");
-    expect(h.overlays.stack, "and the view stays, holding what arrived").toHaveLength(1);
-  });
-
-  it("T1.39 (C22 I45, C24 I12): a live part ticks on the *view* route, through the wiring", async () => {
-    // **The row gap 7's headline actually needs, and the one ten contract rows
-    // do not supply.** Those call `driver.declare` directly, so they verify the
-    // driver's `view` arm and say nothing about whether anything reaches it —
-    // which is exactly what F20 filed against T4.21, reproduced one branch later.
-    // Disabling `declareLiveInView` leaves every one of them green and fails
-    // this.
-    //
-    // **A test that calls the mechanism directly verifies the mechanism, never
-    // the wiring, and the only thing that tells the two apart is disabling the
-    // wiring.** That is the general form, and this row exists because of it.
-    const ticks = { entry: 0, view: 0 };
-    const live = (id: string, count: () => void): Block =>
-      b.live({
-        id,
-        title: id,
-        every: 1000,
-        fetch: () => {
-          count();
-          return Promise.resolve(null);
-        },
-        render: () => block({ kind: "raw", id: `${id}-body`, text: "x" }),
-      });
-
-    const h = harness({
-      adapt: (ctx) => {
-        const watching = ctx.command.includes("--watch");
-        return doc({
-          command: ctx.command,
-          blocks: [
-            live(watching ? "view-part" : "entry-part", () =>
-              watching ? (ticks.view += 1) : (ticks.entry += 1),
-            ),
-          ],
-        });
-      },
-    });
-
-    // **The control runs first**, and it is the entry route: if a part declared
-    // the ordinary way does not tick, the arm below failing says nothing about
-    // routes. T1.38's structure, one host over.
-    h.pipeline.submit("/ps");
-    await settled(h.pipeline);
-    h.tick(1500);
-    await settled(h.pipeline);
-    expect(ticks.entry, "the control must tick, or the row below proves nothing").toBeGreaterThan(
-      0,
-    );
-
-    // `--watch` declares `view: true` on the fixture's `ps` (C05 I20), so this
-    // submission pushes a view instead of appending an entry.
-    h.pipeline.submit("/ps --watch");
-    await settled(h.pipeline);
-    expect(h.transcript.entries.map((e) => e.doc.command), "and no entry was appended").not.toContain(
-      "/ps --watch",
-    );
-
-    h.tick(1500);
-    await settled(h.pipeline);
-    expect(ticks.view, "a live part inside a pushed view is driven (gap 7)").toBeGreaterThan(0);
-  });
+  // ~~**T1.41**–**T1.45**, **T1.39**~~ — **struck with the view route** (C22 §13a,
+  // R-EXA-082, F1253). Six rows over `view` + `streams`: the patch seam, the guard
+  // released before the loop, the canceller registered before it was awaited, the
+  // stream ending appending a notice rather than popping, a non-zero exit inside that
+  // notice, a stream failure landing in the view, and a live part ticking through
+  // `declareLiveInView`.
+  //
+  // **Every clause is the entry route's and is asserted there**, which is the finding
+  // the retirement records: a route whose distinguishing rule is implemented by a
+  // function the other route already calls is not a second route. T1.39 is the one
+  // worth naming twice — it exists because ten contract rows called `driver.declare`
+  // directly and said nothing about whether anything reached it, and the entry arm of
+  // that same wiring is what `declareLive` is, with rows of its own.
 
   it("T1.40 (C04 I6, C23 §3b): the default renderError can be constructed at all", async () => {
     // **The framework's own fallback threw, and nothing could see it.**
@@ -2351,7 +2147,12 @@ describe("C23 §4 — the submit row's two other steps", () => {
     // it replaced — reported by a reader with two screenshots. Framed, the box
     // draws no border of its own (the panel has one) and spends the rows on the
     // tag and the content: tag, message, activity line.
-    expect(child).toMatchObject({ state: "retrying", height: 3, framed: true, attempt: 1 });
+    expect(child).toMatchObject({ state: "retrying", framed: true, attempt: 1 });
+    // **Fitted, and the frame read survives as its consequence** (C09
+    // §3a-quater, table row F4): no height is declared, and a one-row message at
+    // 80 columns measures tag, message and activity line.
+    expect(child).not.toHaveProperty("height");
+    expect(createBlockRegistry().measure(child as Block, 80), "tag, message, activity line").toBe(3);
     expect((child as { retryInMs?: number }).retryInMs, "the countdown is the driver's").toBeGreaterThan(0);
     expect((child as { message: string }).message).toContain("the far side is gone");
   });
@@ -2403,11 +2204,11 @@ describe("C23 §4 — the submit row's two other steps", () => {
     // **A row asserting only the count could not tell those two apart**, which is
     // how the unframed pair looked right for an arc. `framed` is asserted beside
     // the height for that reason.
-    expect(child, "no retry is coming, so no countdown — the second row is the tag").toMatchObject({
-      state: "error",
-      height: 2,
-      framed: true,
-    });
+    expect(child, "no retry is coming, so no countdown").toMatchObject({ state: "error", framed: true });
+    // **Measured rather than declared** (C09 §3a-quater, table row F3): the box
+    // carries no height, and at 80 columns the fit is the tag and the message.
+    expect(child).not.toHaveProperty("height");
+    expect(createBlockRegistry().measure(child as Block, 80), "the second row is the tag").toBe(2);
     expect(child).not.toHaveProperty("retryInMs");
     expect((child as { message: string }).message).toContain("nothing there");
   });
@@ -2457,13 +2258,13 @@ describe("C23 §4 — the submit row's two other steps", () => {
 });
 
 describe("C23 §2, §3 — what the pipeline may not do", () => {
-  it("T1.60 (I41): `height` is non-null on the view route and null on every other", () => {
-    // **Decided from `isViewInvocation` before step 3** — the decision is
-    // already read there because after step 3 it is too late (C23 I3 appends
-    // the pending entry before the transport is invoked, and C13 has no
-    // delete). What this row asserts is the *partition*: a route that handed
-    // down the region's height everywhere would satisfy every assertion about
-    // a view's producer and quietly tell a transcript entry it is bounded.
+  it("T1.60 (I41): `height` is `null` at every call site, because no route states a bound", () => {
+    // **One answer, at every site** (C22 §13a, R-EXA-082). The partition had
+    // two cells and the view route held the other; with the route gone a verb's
+    // result is a transcript entry, and an entry is as tall as its blocks. What
+    // this row asserts is that no call site drifts back: a route handing down
+    // the region's height would satisfy every assertion a producer makes and
+    // quietly tell a transcript entry it is bounded.
     const src = readFileSync("src/shell/execution.ts", "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/^\s*\/\/.*$/gm, "");
@@ -2483,14 +2284,14 @@ describe("C23 §2, §3 — what the pipeline may not do", () => {
     // about which words appear somewhere in the file.
     const tally: Record<string, number> = {};
     for (const c of calls) tally[c] = (tally[c] ?? 0) + 1;
-    expect(tally, "two answers, and the partition between them").toEqual({
-      null: 5,
-      "deps.region().height": 2,
-    });
+    // Six since C23 I79: the key's emission is a transcript entry like every
+    // other route's, classified `null` deliberately rather than by default.
+    expect(tally, "one answer, and the count of the sites giving it").toEqual({ null: 6 });
 
-    // And the region's height is a real bound rather than a stand-in for the
-    // terminal's — the distinction I41 turns on (C07 I18).
-    expect(src, "the view route reads the region").toMatch(/deps\.region\(\)\.height/u);
+    // **And the height is read nowhere in the file**, which is the half a tally
+    // over `producerContext(…)` cannot see: a route computing the region's
+    // height and passing it under another name would keep the tally at five.
+    expect(src, "no route reads the region's height").not.toMatch(/region\(\)\.height/u);
   });
 
   it("T1.61 (I24): C23 inserts no vertical spacing of its own", () => {
@@ -2576,3 +2377,119 @@ function srcFiles(dir: string, out: string[] = []): string[] {
   }
   return out;
 }
+
+describe("C23 I104 — a submission carries its chips (ruling 104 c)", () => {
+  /** A line whose last `content.length` code units are one chip (C04 I152). */
+  const chipped = (before: string, content: string) => {
+    const line = `${before}${content}`;
+    return { line, echo: [{ from: before.length, to: line.length, ordinal: 1, kind: "paste" as const, name: "pasted", lines: 1 }] };
+  };
+  const echoOf = (h: ReturnType<typeof harness>, id?: string): unknown =>
+    (id === undefined ? h.transcript.entries.at(-1) : h.transcript.entries.find((e) => e.id === id))?.doc.meta.echo;
+
+  it("T1.108 (C23 I104, I15): every document written for a submission whose command is the line carries its echo, and an adapter command or a dollar-underscore line carries none", async () => {
+    // **The app route, streamed, typed with two spaces** — so the line as typed
+    // and the argv form are different strings, and *displays as typed* is
+    // something this row can see (I15 amended).
+    {
+      const { line, echo } = chipped("/tail  ", "a.log");
+      const h = harness({ stream: () => (async function* () { await new Promise<never>(() => undefined); })() });
+      h.pipeline.submit(line, echo);
+      await settled();
+      const pending = h.transcript.entries.at(-1);
+      expect(pending?.streaming, "the pending entry").toBe(true);
+      expect(pending?.doc.command, "displayed as typed").toBe(line);
+      expect(pending?.doc.meta.echo, "and carrying the chips").toEqual(echo);
+    }
+    {
+      const { line, echo } = chipped("/tail  ", "a.log");
+      const h = harness({
+        stream: () =>
+          (async function* () {
+            yield { kind: "data", value: { a: 1 } } as RawPatch;
+            // The stream route settles on its `end` (C23 I8), keeping the card.
+            yield { kind: "end", result: result({ exitCode: 0 }) } as RawPatch;
+          })(),
+      });
+      h.pipeline.submit(line, echo);
+      await settled(h.pipeline);
+      const entry = h.transcript.entries.at(-1);
+      expect(entry?.streaming, "settled").toBe(false);
+      expect(entry?.doc.command).toBe(line);
+      expect(entry?.doc.meta.echo, "the settle keeps them").toEqual(echo);
+    }
+
+    // **The shell route**: the pending append and the settle into it.
+    {
+      const { line, echo } = chipped("cat ", "x\ny");
+      let exit: (() => void) | undefined;
+      const h = harness({
+        spawnShell: () => ({
+          stdout: (async function* () { yield "out"; })(),
+          stderr: (async function* () { /* nothing */ })(),
+          exited: new Promise((r) => { exit = () => r({ code: 0, signal: null }); }),
+          overflowed: false,
+        }),
+      });
+      h.pipeline.submit(line, echo);
+      // The route fetches its emulator on first use (C23 I71), so the append is a
+      // module load away: bounded by the clock, not by a turn count.
+      const deadline = Date.now() + 5000;
+      while (h.transcript.entries.length === 0 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 5));
+      expect(h.transcript.entries.at(-1)?.streaming, "pending").toBe(true);
+      expect(echoOf(h), "the pending append carries them").toEqual(echo);
+      exit?.();
+      await settled(h.pipeline);
+      expect(h.transcript.entries.at(-1)?.streaming, "settled").toBe(false);
+      expect(echoOf(h), "and so does the settle, spread rather than rebuilt").toEqual(echo);
+    }
+
+    // **A queued line, then ⌃c**: the cancelled document carries them.
+    {
+      const { line, echo } = chipped("/tail ", "q.log");
+      const h = harness({ invoke: () => new Promise<never>(() => undefined) });
+      h.pipeline.submit("/ps");
+      await new Promise((r) => setTimeout(r, 0));
+      h.pipeline.submit(line, echo);
+      await settled(h.pipeline);
+      const queued = h.transcript.entries.at(-1)?.id;
+      expect(echoOf(h, queued), "the queued notice states the line").toEqual(echo);
+      h.pipeline.cancel();
+      await settled(h.pipeline);
+      expect(JSON.stringify(h.transcript.entries.find((e) => e.id === queued)?.doc)).toMatch(/cancelled before it ran/u);
+      expect(echoOf(h, queued), "and the cancelled document keeps them").toEqual(echo);
+    }
+
+    // **An adapter stating its own command** (C07 I16): the settled document carries none.
+    {
+      const { line, echo } = chipped("/promote ", "fam:x");
+      const h = harness();
+      h.pipeline.submit(line, echo);
+      await settled(h.pipeline);
+      const entry = h.transcript.entries.at(-1);
+      expect(entry?.doc.command, "the adapter's").toBe("adapted");
+      expect(entry?.doc.meta.echo, "and no chips").toBeUndefined();
+    }
+
+    // **`$_` beside a chip**: the argv form, and no chips — the ranges index a
+    // line the display is not (C22 §6t.5).
+    {
+      const { line, echo } = chipped("/tail $_ ", "a.log");
+      const h = harness({ stream: () => (async function* () { await new Promise<never>(() => undefined); })() });
+      h.session.execution.setLastUuid("u1");
+      h.pipeline.submit(line, echo);
+      await settled();
+      const entry = h.transcript.entries.at(-1);
+      expect(entry?.doc.command, "the argv form").toBe("/tail u1 a.log");
+      expect(entry?.doc.meta.echo).toBeUndefined();
+    }
+
+    // **The control: the same lines with no chips**, and no document carries any.
+    for (const line of ["/tail  a.log", "cat x\ny", "/promote fam:x"]) {
+      const h = harness();
+      h.pipeline.submit(line);
+      await settled(h.pipeline);
+      for (const e of h.transcript.entries) expect(e.doc.meta.echo, line).toBeUndefined();
+    }
+  });
+});

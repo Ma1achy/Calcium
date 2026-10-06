@@ -1,0 +1,80 @@
+SEMANTIC NAMES AND VISUAL ALIASES ARE NOT THE SAME THING
+
+the palette was reused for syntax, provenance and postures, and the
+argument for it was good: one palette, and a reader who has learnt that
+the identifier tone means A NAME learns nothing new looking at code.
+
+but reuse of a HUE became reuse of a NAME, and the names make claims:
+  a syntax string was ok        nothing succeeded
+  a syntax number was warn      nothing is near a limit
+  a config flag was error        nothing failed
+  the skip posture was error     it is a mode, not a failure
+
+★ so: six namespaces, and a theme may map them to the same hue
+
+  status.ok  status.warn  status.error  status.info
+  content.default  content.dim  content.muted  content.identifier
+  interaction.focus  interaction.selection  interaction.current
+  syntax.keyword  syntax.string  syntax.number  syntax.comment
+  provenance.default  provenance.config  provenance.env  provenance.flag
+  posture.manual  posture.acceptEdits  posture.plan  posture.auto  posture.skip
+
+  syntax.string RESOLVES to the same green as status.ok in every theme
+  shipped here. Nothing on screen changes. What changes is that a
+  theme CAN break the mapping, and that no token any longer says
+  something succeeded about a string literal.
+
+  this costs nothing visually and it is the audit the 1-bit rung
+  already gets: a distinction you cannot name is one you cannot check.
+
+★ semantic ink and surface resolve as one composition
+
+  ink(role, surface, state, theme)
+  themes may define composed tokens such as status.error.on.selection,
+  content.muted.on.focus and content.identifier.on.diffAdd. Inheritance
+  is valid only when the resulting pair passes the contrast audit.
+
+  normal text targets 4.5:1. UI boundaries, large marks and the dedicated
+  interaction.focusIndicator target 3:1 against adjacent colours.
+  Every supported tone × surface × theme × colour-depth pair is generated
+  and tested, including high-contrast themes at their declared target.
+
+★ state is a product, not a list of competing adjectives
+
+  lifecycle × outcome × resolution × ownership × focus × pointer × selection × choice
+  × disclosure × availability × freshness × validity. Hover and focus can coexist; pointer armed is
+  not a synonym for ownership or selection.
+  FOCUS IS NEVER INFERRED FROM SELECTION. A persistent focus mark or edge
+  survives when selection or a semantic ground already occupies the cell.
+
+  one cell still paints one ground. The composition table chooses it and
+  preserves displaced facts through mark, edge, weight, underline or text.
+  Required fixtures include focused+selected+failed, selection over diff,
+  focus over a heatmap, disabled+error and stale+running.
+
+and the tone budget is REGIONAL, not global
+
+  an ordinary entry   three semantic tones. Five is a smell
+  a code block        its own six-slot syntax palette
+  a plot              its own series palette
+  a patch             its own add/remove pair
+  identity chrome     its own ten hues
+
+  a full frame counting twelve tones is not breaking the rule — the
+  rule was about one ENTRY, and it was stated globally.
+
+status red, scoped so visual aliases do not inherit its meaning
+
+  WITHIN FRAMEWORK STATUS AND OVERRIDE TOKENS, RED MEANS FAILURE OR
+  UNSAFE OVERRIDE, and every use carries a TEXTUAL OR SYMBOLIC CARRIER.
+  syntax, patch removal, and reader-selected identity hues are visual
+  aliases. They keep their own named roles and do not inherit status meaning.
+
+   ERROR         a failure       — the word
+  !! skip         an unsafe mode  — the !! and the words
+  flag            an override     — the column says provenance
+   prod           a warning       — the reader typed it themselves
+
+  “error is the only red” was false four ways. What is true is that no
+  red is ever the ONLY carrier, which is the 1-bit rule doing the work
+  the colour rule was claiming.

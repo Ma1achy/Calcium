@@ -1,0 +1,102 @@
+seven required facts per component, all checkable; axis-specific rows may extend them.
+
+  ENTRY        what puts it on screen
+  CARRIERS     what says what it is — and there are always at least two
+  ACTIONS      what a key or a click does to it
+  ESC          where esc lands, by the published order
+  MOTION OFF   its form with no animation at all
+  1-BIT        its form with no colour at all
+  RESIDUE      what is left once it settles
+
+  prose said all of this. A table makes a missing cell VISIBLE, which is
+  the failure this document keeps finding — a rule stated in one section
+  and quietly unstated in the next.
+
+ A CALL
+  entry        the model invokes a tool
+  carriers     ● mark · verb · duration slot · result-summary slot · ⎿ gutter
+  running      ● white STILL, spinner in the duration slot
+  actions      ⏎ expand / enter · ⌃⇧C copies invocation AND output
+  esc          out to the transcript
+  motion off   the spinner is omitted; static ● plus elapsed carry liveness
+  1-bit        ● still; outcome in bold; the gutter unchanged
+  residue      ● ok · verb · duration · a NUMBER. Never “succeeded”
+
+ A QUESTION — CHOICE
+  entry        a tool, a command or the app needs an answer
+  placement    declared; replace is the default · blocking yes · owner question
+  carriers     ⟩ mark · focused choice painted · chosen answer keeps ✓ · safe path named
+  actions      ←→ move focus · ⏎ answer · click a choice · inspect suspends
+               the same unresolved question
+  esc          takes the declared safe path: answer, cancel, or step back one arm
+  motion off   unchanged — it never animated
+  1-bit        › on the focused choice; ✓ remains on a chosen answer
+  residue      question · terminal resolution · answer when one exists
+
+ A QUESTION — TEXT
+  entry        an answer needs a sentence, not a choice
+  placement    float · blocking yes · owner question editor
+  carriers     ⟩ and the question above the held prompt · shared editor code
+  actions      ⏎ submits · ⇧⏎ newline · editing operations are shared;
+               buffer, history and undo are question-scoped
+  esc          cancels the QUESTION, not the text
+  motion off   the caret stops blinking; nothing else changes
+  1-bit        unchanged
+  residue      question · terminal resolution · sentence when submitted
+
+ A BOUNDED BLOCK
+  entry        a call or a command produced more rows than fit
+  carriers     the window · a RESIDUE ROW saying how many are hidden
+  actions      ⏎ enters · ↑↓ rows · ⇧↑↓ selects · ⌃⇧C copies SOURCE
+  esc          out to the transcript, remembering the row
+  motion off   unchanged
+  1-bit        the focused row inverts; the residue row is unchanged
+  residue      the window and its count. It does not re-expand on its own
+
+ A STREAMING REPLY
+  entry        the model begins producing text
+  carriers     the TRAIL at the head · the agent’s mark one space past it
+  actions      ⌃C stops the turn and KEEPS the partial text
+  esc          nothing — it is not a temporary state
+  motion off   no trail, no bloom. The elapsed counter carries liveness
+  1-bit        the trail is a BOLD band; the head band is SGR 7
+  residue      settled text, no cursor. Nothing replaces the bloom
+
+ FOCUS
+  entry        ⇧⇥ from the prompt, ↑↓, a click, or restored from memory
+  carriers     the shape’s own treatment · the ▸ mark · the footer’s key row
+  actions      ↑↓ move · ←→ within a row · ⏎ enter or activate
+  esc          out one rung
+  motion off   unchanged — focus never animated
+  1-bit        INVERSE, and the ▸ carries the rest
+  residue      REMEMBERED by id. Inactive focus is the wash, not the paint
+
+ A WATCH
+  entry        a long-running job you started, or /watch
+  carriers     the footer row · a bar · the entry it points AT
+  actions      ←→ along the row · ⏎ scrolls to its entry and opens it
+  esc          nothing — the footer is not a scope
+  motion off   the bar stops shimmering; the percentage stays
+  1-bit        the bar is ## against ..; the name carries identity
+  residue      it DROPS ITSELF, and the completion earns a notification
+
+ A NOTIFICATION
+  entry        a blocked question · a turn over ~30s · a watched run ending
+  carriers     the bell · OSC 9 · the title — three rungs, all opt-in
+  actions      none. It is not on screen
+  esc          not applicable
+  motion off   unchanged
+  1-bit        unchanged
+  residue      the new-messages button, if you were scrolled away
+
+★ two cells that were BLANK until this table existed
+
+  a streaming reply’s MOTION OFF form. The trail and the bloom are
+  both motion, and with both gone nothing said the reply was still
+  arriving. The elapsed counter had to be promoted to carry it. Every live
+  thing retains a non-motion liveness carrier; indeterminate or streaming
+  work uses elapsed time.
+
+  a watch’s RESIDUE. It drops itself, so being away meant it vanished
+  with no trace. That is what put watched-run completion on the
+  notification ladder.

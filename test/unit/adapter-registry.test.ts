@@ -194,6 +194,31 @@ describe("§4 (T1.7) — every row of the mapping table", () => {
     valid(doc);
   });
 
+  it("T1.23 (C07 I24, F1493): a cancelled result's notice is muted with the cancelled mark, from cancelledNotice", () => {
+    // **The mark with the tone and the text, one string per document**: the
+    // defect was a `muted` notice with no glyph, so a row reading the tone alone
+    // passed it, and one reading the glyph alone would pass a build that moved
+    // the tone. Forty lines and none, because the notice is appended in both.
+    const last = (over: Partial<RawResult>): string => {
+      const doc = registry.adapt(raw(over), CTX);
+      valid(doc);
+      const b = doc.blocks.at(-1);
+      return b?.kind === "notice" ? `${doc.status} · notice ${b.tone} ${String(b.glyph)} · ${b.text}` : `${doc.status} · ${String(b?.kind)}`;
+    };
+    const lines = Array.from({ length: 40 }, (_, i) => ({ line: String(i) }));
+    expect([
+      last({ stdout: lines, cancelled: true, exitCode: 130 }),
+      last({ stdout: undefined, stdoutRaw: "", cancelled: true, exitCode: null }),
+    ]).toEqual([
+      "partial · notice muted cancelled · Cancelled. Output produced before the stop is shown above.",
+      "partial · notice muted cancelled · Cancelled. Output produced before the stop is shown above.",
+    ]);
+    // **The control**: a timeout is a failure, with the failure's tone and mark.
+    const timedOut = registry.adapt(raw({ timedOut: true, exitCode: null, durationMs: 30_000 }), CTX);
+    const box = timedOut.blocks[0];
+    expect(box?.kind === "notice" && `${box.tone} ${String(box.glyph)}`).toBe("error error");
+  });
+
   it("T3.20: cancelled and timedOut both set → partial, per the precedence", () => {
     const doc = registry.adapt(raw({ cancelled: true, timedOut: true, exitCode: null }), CTX);
     expect(doc.status).toBe("partial");
@@ -580,9 +605,14 @@ describe("§6 — streaming", () => {
     // ten-line floor. Which line trips it is C06's arithmetic, so the test reads
     // it off the patches rather than predicting it — predicting it once already
     // asserted the wrong line and passed for the wrong reason.
+    //
+    // **A value between the noise and the trip** (C07 I12, F1432): the run held
+    // is every `malformed` line since the last `data`, so noise adjacent to the
+    // trip is the remainder's head, and only a value makes it noise.
     const lines = [
       ...Array.from({ length: 10 }, (_, i) => JSON.stringify({ n: i })),
       "noise, dropped",
+      JSON.stringify({ n: 10 }),
       "the tripping line",
       "after one",
       "after two",
@@ -790,5 +820,39 @@ describe("§7a (I23) — the notice names the layer that actually failed", () =>
     );
     valid(parsed);
     expect(parsed.blocks.map((b) => b.id), "the adapter rendered it").toEqual(["out"]);
+  });
+});
+
+describe("C07 I12 — the remainder is the run", () => {
+  /** The `raw` block's text after every patch a real reader emits for `lines`. */
+  const remainderOf = (lines: readonly string[]): { text: string; degradedAt: number } => {
+    const reader = createNdjsonReader();
+    const registry = createAdapterRegistry();
+    const patches = lines.flatMap((line) => reader.push(`${line}\n`));
+    let text = "";
+    patches.forEach((patch, seq) => {
+      const view = registry.adaptPatch(patch, { ...CTX, seq });
+      if ((view?.op === "append" || view?.op === "replace") && view.block.kind === "raw") text = view.block.text;
+    });
+    return { text, degradedAt: patches.findIndex((p) => p.kind === "degraded") };
+  };
+
+  it("T3.22 (C07 I12, F1432): a stream of text from its first line reaches the document whole, and a run before a value is noise", () => {
+    // **Driven through C06's reader**, because when degradation trips is its
+    // rule: the floor is ten lines, so the notice is the eleventh patch, after
+    // nine lines the one-patch lookbehind dropped.
+    const text = Array.from({ length: 12 }, (_, i) => `nginx line ${String(i + 1)}`);
+    const whole = remainderOf(text);
+    expect(whole.degradedAt, "C06 trips after the tenth line, so the run is ten long").toBe(10);
+    expect(whole.text.split("\n")).toEqual(text);
+
+    // **The run ends at a value.** Two text lines among good ones are noise; the
+    // run after the last value is the remainder's head, whatever its length.
+    const values = (n: number, from: number) => Array.from({ length: n }, (_, i) => JSON.stringify({ n: from + i }));
+    const after = Array.from({ length: 6 }, (_, i) => `after ${String(i + 1)}`);
+    const mixed = remainderOf([...values(20, 0), "noise one", "noise two", ...values(1, 20), ...after]);
+    expect(mixed.degradedAt, "the fixture degrades").toBeGreaterThan(0);
+    expect(mixed.text).not.toContain("noise");
+    expect(mixed.text.split("\n")).toEqual(after);
   });
 });

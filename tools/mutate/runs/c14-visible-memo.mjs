@@ -54,8 +54,8 @@ const results = runPass({
         },
         {
           file: VP,
-          from: "    this.#setTop(this.#maxTop());\n    this.#followTail = true;\n    this.#anchor = null;",
-          to: "    this.#setTop(this.#maxTop());\n    this.#visibleMemo = null;\n    this.#followTail = true;\n    this.#anchor = null;",
+          from: "    this.#setTop(this.#maxTop());\n    this.#followTail = true;\n    this.#anchor = null;\n    this.#emit(",
+          to: "    this.#setTop(this.#maxTop());\n    this.#visibleMemo = null;\n    this.#followTail = true;\n    this.#anchor = null;\n    this.#emit(",
         },
       ],
       expect: "T1.23",

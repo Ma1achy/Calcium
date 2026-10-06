@@ -1,0 +1,649 @@
+/**
+ * Semantic copy mode's model (C14 §6a, C16 §5d, `R-SEL-003`, `R-SEL-005`,
+ * `R-SEL-008`, `R-SEL-015`).
+ *
+ * **Pure, and separate from `session.ts` for a reason that is not tidiness.**
+ * The one rule this mode has that nothing else in the tree has is C16 I51's
+ * asymmetry — `esc` clears then leaves, `⌃c` only leaves — and the surface that
+ * would otherwise show it is the footer's mode label, which is **parked** on a
+ * word the design does not supply (C14 §6a). A rule whose only observation point
+ * is unbuilt is a rule nothing can be written against, which is A03 §2's class
+ * arriving by scheduling rather than by wording. So the transition is a function
+ * and the state is its argument.
+ *
+ * `null` is *not in the mode*, and it is the same value as *no selection*
+ * deliberately: `R-SEL-005` says a selection is state **within** a rung rather
+ * than a rung of its own, so the pair that cannot exist — not in the mode, three
+ * entries selected — has no representation here rather than a guard against it.
+ */
+
+import type { Block } from "../data/viewmodel/index.js";
+import type { TranscriptEntry } from "../viewport/transcript/index.js";
+import { sliceCells } from "../presentation/text.js";
+import type { AmbiguousWidth } from "../presentation/text.js";
+import { sgrPattern } from "../terminal/escapes.js";
+
+/**
+ * An entry plus a row within it (C14 I36, §6c).
+ *
+ * **The row is the entry's own and never the viewport's.** A viewport row moves
+ * when anything above it changes height — C14 I6's argument about the anchor —
+ * and the caret has to survive a resize, because a resize re-lays the held
+ * document (C14 I31).
+ */
+export type Caret = Readonly<{ entryId: string; row: number }>;
+
+/**
+ * One block's entry-local rows, `[from, to)` — what an extend intersects — and
+ * the columns its run lays it at, `[from, to)` in entry-line cells (C14 I60).
+ *
+ * `cols` is what a rectangle's column is clamped into: a card's body sits
+ * `BODY_INDENT` cells in, and the gutter before it is the entry's and not the
+ * block's. Absent, nothing is clamped, which is the model's own case.
+ */
+export type BlockSpan = Readonly<{
+  key: string;
+  from: number;
+  to: number;
+  cols?: Readonly<{ from: number; to: number }>;
+}>;
+
+/** The caret, the anchor, and the blocks a copy would take (`R-SEL-015`). */
+export type SemanticSelection = Readonly<{
+  /** Where the reader is. `null` when the transcript is empty. */
+  caret: Caret | null;
+  /**
+   * Where the extend began, or `null` with none in flight (C14 I37).
+   *
+   * Planted by the first extend rather than by entering, so a plain arrow can
+   * move the caret without selecting on the way — and the range is re-derived
+   * from the pair on every step, so over-shooting and coming back gives what
+   * going there directly gives.
+   */
+  anchor: Caret | null;
+  /**
+   * **Block keys, and the split from the caret is what makes atomicity a rule**
+   * (`R-SEL-003`, C14 I36). With the caret at the block too, *all of it or none
+   * of it* would be a property of the type: satisfied by construction, violable
+   * by nothing, asserted by no row. The caret is a row and this is a block, so
+   * the map between them — intersection, never containment — is the rule.
+   */
+  blocks: ReadonlySet<string>;
+  /**
+   * The rectangle, or `null` at block granularity (C14 I60, ruling 36).
+   *
+   * **Rectangle mode is this being set, and there is no flag beside it** that
+   * could disagree. The block set is kept underneath and neither washed nor
+   * counted while it is, so `⌃V` off gives back what `⌃V` on found (ruling 71).
+   */
+  rect: RectState | null;
+}>;
+
+/** The rectangle's two cursors: where it was planted and where the reader is (C14 I60). */
+export type RectState = Readonly<{ anchor: Cursor; head: Cursor }>;
+
+/**
+ * One block's address across the transcript.
+ *
+ * A block id is unique within its document and a transcript holds many (C04
+ * I14), so the entry is part of the key. `\u0000` cannot appear in either half.
+ */
+export const keyOf = (entryId: string, blockId: string): string => `${entryId}\u0000${blockId}`;
+
+/** The entry half of a key — what the copy groups by. */
+export const entryOf = (key: string): string => key.slice(0, key.indexOf("\u0000"));
+
+/** The mode, or `null` when it is not up. */
+export type SemanticMode = SemanticSelection | null;
+
+const frozen = (
+  caret: Caret | null,
+  anchor: Caret | null,
+  blocks: ReadonlySet<string>,
+  rect: RectState | null = null,
+): SemanticSelection => Object.freeze({ caret, anchor, blocks, rect });
+
+/** Enter, seeded with a caret. A second call is a no-op (C16 §5d D3). */
+export function enter(mode: SemanticMode, caret: Caret | null): SemanticMode {
+  return mode ?? frozen(caret, null, new Set<string>());
+}
+
+/**
+ * *A selection exists* — the rectangle is up, or the block set is not empty
+ * (C14 I59, `R-SEL-005`).
+ *
+ * **The one predicate, read by `escape` and by the footer's `esc` label.** The
+ * label read `size === null`, which is a different fact: a selection of a
+ * `rule` alone copies nothing, so the footer said `esc out` over the press
+ * that cleared. Two predicates each correct alone, and they disagreed.
+ */
+export const hasSelection = (mode: SemanticMode): boolean =>
+  mode !== null && (mode.rect !== null || mode.blocks.size > 0);
+
+/**
+ * `esc` — clear the selection if there is one, otherwise leave (C16 I51, §5d D1/D2).
+ *
+ * The reader presses one key twice and the footer says which press they are on.
+ * `⌃c` does **not** come through here: it is `null` directly, because the
+ * ladder's rung answers *cancel the innermost thing* and a rung that also tidied
+ * up would be answering two questions (C16 I23).
+ */
+export function escape(mode: SemanticMode): SemanticMode {
+  if (mode === null) return null;
+  // The anchor goes with the selection: a cleared selection has no extend in
+  // flight, and an anchor left standing would make the next `⇧↓` re-derive a
+  // range from where the last one started (C14 I37). **And the rectangle with
+  // both** (C14 I59): it is a selection, so the press over it is the clearing
+  // one, and the next leaves.
+  return hasSelection(mode) ? frozen(mode.caret, null, new Set<string>()) : null;
+}
+
+/**
+ * Every block of one entry, as keys (`R-SEL-008`).
+ *
+ * The unit changed and the rule's sentence did not: *the entry under the caret*
+ * still means the entry, and what goes into the set is its blocks (C14 I38).
+ */
+const blocksOfEntry = (
+  entryId: string,
+  spans: readonly BlockSpan[],
+): readonly string[] => spans.filter((sp) => entryOf(sp.key) === entryId).map((sp) => sp.key);
+
+/** `a` — take the entry under the caret (`R-SEL-008`). */
+export function selectCaret(mode: SemanticMode, spans: readonly BlockSpan[]): SemanticMode {
+  if (mode === null || mode.caret === null) return mode;
+  // **A block verb, so the rectangle goes** (C14 I60): the blocks it adds would
+  // otherwise be taken under a rectangle that neither washes nor counts them.
+  return frozen(
+    mode.caret,
+    mode.anchor,
+    new Set([...mode.blocks, ...blocksOfEntry(mode.caret.entryId, spans)]),
+  );
+}
+
+/**
+ * `A` — take every loaded entry (`R-SEL-008`).
+ *
+ * *Says what it did, because the window is not the record*: the spans are the
+ * **held** document's, not the session's, and `⌃a` is deliberately unbound
+ * because a key that silently produces a clipboard of megabytes is a trap.
+ */
+export function selectAll(mode: SemanticMode, spans: readonly BlockSpan[]): SemanticMode {
+  // The rectangle goes, as with `a` (C14 I60).
+  return mode === null ? null : frozen(mode.caret, mode.anchor, new Set(spans.map((sp) => sp.key)));
+}
+
+/**
+ * The blocks a row range **touches**, taken whole (`R-SEL-003`, C14 I36).
+ *
+ * **Intersection, never containment, and that is the whole rule.** A range
+ * reaching one row of a ten-row table takes the table; the two answers differ
+ * for every block taller than the range, which is the case the rule was written
+ * about and the case a containment test gets wrong silently — it returns fewer
+ * blocks and every one it returns is right.
+ *
+ * The range is inclusive of both caret and anchor rows, because both are places
+ * the reader is looking at rather than a half-open interval they chose.
+ */
+export function blocksTouched(
+  from: Caret,
+  to: Caret,
+  spans: readonly BlockSpan[],
+  order: readonly string[],
+): ReadonlySet<string> {
+  const a = order.indexOf(from.entryId);
+  const b = order.indexOf(to.entryId);
+  if (a === -1 || b === -1) return new Set<string>();
+  // **Ordered by row inside one entry, not only by entry** (C14 I51). With
+  // both ends in one entry the pair kept press-then-pointer order, so an upward
+  // drag clipped low at the press and high at the pointer and took nothing.
+  const forward = a < b || (a === b && from.row <= to.row);
+  const [lo, hi] = forward ? [from, to] : [to, from];
+  const [loI, hiI] = forward ? [a, b] : [b, a];
+
+  const out = new Set<string>();
+  for (const sp of spans) {
+    const i = order.indexOf(entryOf(sp.key));
+    if (i < loI || i > hiI) continue;
+    // Entries strictly between the two ends are taken whole; the ends are
+    // clipped by their own row, and one entry holding both ends is clipped by
+    // both — which is the arm a two-entry fixture never reaches.
+    const lowRow = i === loI ? lo.row : -Infinity;
+    const highRow = i === hiI ? hi.row : Infinity;
+    if (sp.to > lowRow && sp.from <= highRow) out.add(sp.key);
+  }
+  return out;
+}
+
+/**
+ * A press — put the caret where the pointer is and start a new selection
+ * (C14 §6f, I37).
+ *
+ * **The old blocks go, and that is derived rather than chosen.** I37 says the
+ * range is re-derived from the pair on every step and `R-SEL-015` says the count
+ * is always the size of what return would copy right now; a press that kept the
+ * previous set would make the count the union of two gestures, which no release
+ * could produce. The anchor goes with it, for `escape`'s reason.
+ */
+export function placeCaret(mode: SemanticMode, caret: Caret): SemanticMode {
+  return mode === null ? null : frozen(caret, null, new Set<string>(), mode.rect);
+}
+
+/**
+ * A motion with the button held — extend from the anchor to here (C14 §6f).
+ *
+ * {@link extendCaret} with the caret given rather than stepped: a pointer names
+ * a position and a key names a delta, and everything after that is the same
+ * function, including the anchor being planted by the **first** extend so a
+ * press alone selects nothing.
+ */
+export function extendTo(
+  mode: SemanticMode,
+  caret: Caret,
+  spans: readonly BlockSpan[],
+  order: readonly string[],
+): SemanticMode {
+  if (mode === null || mode.caret === null) return mode;
+  const anchor = mode.anchor ?? mode.caret;
+  return frozen(caret, anchor, blocksTouched(anchor, caret, spans, order), mode.rect);
+}
+
+/**
+ * A plain arrow — move the caret, touch nothing else (C14 I37).
+ *
+ * Without this the mode has no way to put the caret anywhere without selecting
+ * on the way, and the anchor stays where it was so an extend already in flight
+ * is not silently re-based.
+ */
+export function moveCaret(
+  mode: SemanticMode,
+  delta: number,
+  spans: readonly BlockSpan[],
+  order: readonly string[],
+): SemanticMode {
+  if (mode === null || mode.caret === null) return mode;
+  return frozen(step(mode.caret, delta, spans, order), mode.anchor, mode.blocks, mode.rect);
+}
+
+/**
+ * A shifted arrow — plant the anchor if there is none, move, and **re-derive**
+ * the whole range from the pair (C14 I37).
+ *
+ * Re-deriving rather than accumulating is what makes an over-shoot recoverable:
+ * three down and two up is one down, by equality and not by size, which is
+ * `R-SEL-015`'s *the count is always the size of what return would copy right
+ * now* said for a keyboard.
+ */
+export function extendCaret(
+  mode: SemanticMode,
+  delta: number,
+  spans: readonly BlockSpan[],
+  order: readonly string[],
+): SemanticMode {
+  if (mode === null || mode.caret === null) return mode;
+  const anchor = mode.anchor ?? mode.caret;
+  const caret = step(mode.caret, delta, spans, order);
+  return frozen(caret, anchor, blocksTouched(anchor, caret, spans, order), mode.rect);
+}
+
+/**
+ * One row up or down, crossing into the neighbouring entry at its edge.
+ *
+ * Clamped at both ends of the transcript: a caret that fell off would have to be
+ * `null`, and `null` is *the transcript is empty* here (C14 I36).
+ */
+function step(
+  caret: Caret,
+  delta: number,
+  spans: readonly BlockSpan[],
+  order: readonly string[],
+): Caret {
+  const heightOf = (entryId: string): number =>
+    spans.reduce((h, sp) => (entryOf(sp.key) === entryId ? Math.max(h, sp.to) : h), 0);
+  let { entryId, row } = { entryId: caret.entryId, row: caret.row + delta };
+  let i = order.indexOf(entryId);
+  if (i === -1) return caret;
+  while (row < 0 && i > 0) {
+    i -= 1;
+    entryId = order[i] as string;
+    row += heightOf(entryId);
+  }
+  while (row >= heightOf(entryId) && i < order.length - 1) {
+    row -= heightOf(entryId);
+    i += 1;
+    entryId = order[i] as string;
+  }
+  const height = heightOf(entryId);
+  return Object.freeze({ entryId, row: Math.min(Math.max(row, 0), Math.max(0, height - 1)) });
+}
+
+/**
+ * How many **blocks** a copy right now would take (`R-SEL-015`, C14 I38).
+ *
+ * The rule counts what a copy would take, and an entry count reports a
+ * half-taken entry as a whole one — the number wrong in exactly the direction
+ * the rule exists to prevent.
+ */
+export const count = (mode: SemanticMode): number => mode?.blocks.size ?? 0;
+
+/** The fields of an entry C13 moves when its content changes — the rest are the store's bookkeeping. */
+type Arrival = Pick<TranscriptEntry, "id" | "rev" | "streaming">;
+
+/**
+ * How many of the record's entries the held view does not show (C14 I34,
+ * §6b *The count*, `R-SEL-010`).
+ *
+ * **By C13's own statements about an entry, never by length and never by
+ * object identity.** An entry is waiting when the view has no entry with its
+ * `id`, or holds it at another `rev` (its document changed, C13 I13) or
+ * another `streaming` (it settled). A length reads a patch as nothing and lets
+ * an eviction cancel an append; identity reads an append as two, because C13
+ * replaces the previous live entry's record to clear `live`, and counts the
+ * marker on every write, because the sweep rebuilds it. The marker is an
+ * ordinary entry (C13 I14): it counts when the hold did not have it.
+ */
+export function waitingEntries(record: readonly Arrival[], held: readonly Arrival[]): number {
+  const seen = new Map<string, Arrival>();
+  for (const e of held) seen.set(e.id, e);
+  let n = 0;
+  for (const e of record) {
+    const h = seen.get(e.id);
+    if (h === undefined || h.rev !== e.rev || h.streaming !== e.streaming) n += 1;
+  }
+  return n;
+}
+
+/**
+ * What `y` takes — the selected blocks, in document order, entries one blank
+ * line apart (C14 §6a, `R-SEL-004`).
+ *
+ * **Document order is the transcript's, not the selection's.** `blocks` is a set
+ * and a set has no order; taking the order from the transcript is what makes a
+ * copy of three entries paste as the session read, whichever order the reader
+ * selected them in — and within an entry the blocks keep the document's order
+ * for the same reason.
+ *
+ * **One blank line is the entry separator and nothing inside an entry may
+ * produce one** (C09 I86). That is why a block declining contributes no line at
+ * all rather than an empty one, and why this joins on `"\n\n"` over entries
+ * while `copySequence` joins on `"\n"` within one.
+ *
+ * An entry whose selected blocks all decline is dropped rather than contributing
+ * a blank paragraph — the same rule one level up, and the case a selection of a
+ * `rule` alone produces.
+ */
+export function copyTextOf(
+  mode: SemanticMode,
+  loaded: readonly Readonly<{ id: string; blocks: readonly Block[] }>[],
+  copySequence: (blocks: readonly Block[]) => string,
+): string {
+  return copyParts(mode, loaded, copySequence).join("\n\n");
+}
+
+/** Each contributing entry's text, in document order — the one walk `copyTextOf` and `sizeOf` share. */
+function copyParts(
+  mode: SemanticMode,
+  loaded: readonly Readonly<{ id: string; blocks: readonly Block[] }>[],
+  copySequence: (blocks: readonly Block[]) => string,
+): readonly string[] {
+  if (mode === null) return [];
+  const selected = mode.blocks;
+  return loaded
+    .map((e) => copySequence(e.blocks.filter((b) => selected.has(keyOf(e.id, b.id)))))
+    .filter((t) => t !== "");
+}
+
+/**
+ * How much `⏎` would copy right now — the count the footer draws (C14 I38,
+ * I55, `R-SEL-015`).
+ *
+ * **Over the copy text, not the block set**: a block that copies nothing adds
+ * nothing, and an entry whose blocks all decline is not counted, so the number
+ * is the size of the paste. `chars` is code points including line breaks — the
+ * `wc -m` reading of what lands on the clipboard; `rows` its lines. `null` when
+ * nothing is selected, or when what is selected copies nothing.
+ */
+export function sizeOf(
+  mode: SemanticMode,
+  loaded: readonly Readonly<{ id: string; blocks: readonly Block[] }>[],
+  copySequence: (blocks: readonly Block[]) => string,
+): Readonly<{ chars: number; rows: number; entries: number }> | null {
+  if (mode === null || mode.blocks.size === 0) return null;
+  const parts = copyParts(mode, loaded, copySequence);
+  if (parts.length === 0) return null; // cells-ok — an entry count
+  return textSize(parts.join("\n\n"), parts.length);
+}
+
+/**
+ * The count's three numbers over a copy text (C14 I38, I55) — code points with
+ * the line breaks, lines, and the entries that contributed. `null` for the
+ * empty text, which is no count rather than a count of zero.
+ */
+export function textSize(
+  text: string,
+  entries: number,
+): Readonly<{ chars: number; rows: number; entries: number }> | null {
+  if (text === "") return null;
+  let chars = 0;
+  for (const _ of text) chars += 1;
+  return Object.freeze({ chars, rows: text.split("\n").length, entries }); // cells-ok — counts, not widths
+}
+
+/**
+ * A cursor — a caret with a column (C14 §6e).
+ *
+ * The block selection needs no column: its unit is the block, and a block has
+ * no columns. The rectangle does, and it is a second shape rather than a field
+ * on {@link Caret} for the reason §6c gives about granularity — a caret that
+ * always carried a column would make *the selection's unit is the block* a
+ * sentence with a spare coordinate in it.
+ */
+export type Cursor = Readonly<{ entryId: string; row: number; column: number }>;
+
+/**
+ * A rectangular selection — cells inside **one** block (`R-SEL-007`, C14 I42).
+ *
+ * Rows are the entry's own, as {@link Caret}'s are, and both ends are inclusive:
+ * the reader put the head somewhere and the cell under it is theirs.
+ */
+export type CellRect = Readonly<{
+  /** The block it started in, and the only one it can ever cover. */
+  key: string;
+  fromRow: number;
+  toRow: number;
+  fromColumn: number;
+  toColumn: number;
+}>;
+
+/**
+ * The rectangle between an anchor and a head, **clipped** to the anchor's block
+ * (`R-SEL-007`, C14 I42).
+ *
+ * **A clip, not a containment test, and the two read as one sentence.** *Never
+ * crosses a block boundary* is satisfied by refusing — a head that has left the
+ * block gives no rectangle — and that behaves as the rule's opposite: the
+ * selection empties while the reader extends past the edge and returns when they
+ * come back. Clipping selects to the last row and stays there. The two differ on
+ * every extend that leaves, which is most of them.
+ *
+ * **A head in another entry has no row in this one's space**, so the direction
+ * comes from the transcript's order: later clamps to the block's last row,
+ * earlier to its first. An order resolving neither entry clamps to the anchor's
+ * own row — *clips to where it started* taken to its limit, and never a
+ * rectangle somewhere the reader has not been.
+ *
+ * `null` is the one refusal, and it is *the anchor is in no block*: with nothing
+ * to clip to there is no region it started in.
+ */
+export function rectBetween(
+  anchor: Cursor,
+  head: Cursor,
+  spans: readonly BlockSpan[],
+  order: readonly string[],
+): CellRect | null {
+  const span = spans.find(
+    (sp) => entryOf(sp.key) === anchor.entryId && sp.from <= anchor.row && anchor.row < sp.to,
+  );
+  if (span === undefined) return null;
+
+  const raw = rowOfHead(anchor, head, order);
+  const headRow = Math.min(Math.max(raw, span.from), span.to - 1);
+  const anchorRow = Math.min(Math.max(anchor.row, span.from), span.to - 1);
+  // **The columns clip to the block as the rows do** (C14 I60, ruling 70) —
+  // here and not only where a key stores the head, because a resize re-lays
+  // the spans under a rectangle already stored.
+  const a = clampColumn(anchor.column, span);
+  const h = clampColumn(head.column, span);
+
+  return Object.freeze({
+    key: span.key,
+    fromRow: Math.min(anchorRow, headRow),
+    toRow: Math.max(anchorRow, headRow),
+    fromColumn: Math.min(a, h),
+    toColumn: Math.max(a, h),
+  });
+}
+
+/** A column inside a span's `[from, to)`, or unchanged where the span carries none. */
+function clampColumn(column: number, span: BlockSpan): number {
+  if (span.cols === undefined) return column;
+  return Math.min(Math.max(column, span.cols.from), Math.max(span.cols.from, span.cols.to - 1));
+}
+
+/** The span holding a caret's row, or `undefined` where no block covers it. */
+function spanAt(entryId: string, row: number, spans: readonly BlockSpan[]): BlockSpan | undefined {
+  return spans.find((sp) => entryOf(sp.key) === entryId && sp.from <= row && row < sp.to);
+}
+
+/**
+ * `⌃V` — the rectangle on at the caret, or off (C14 I60, rulings 36, 71).
+ *
+ * **On, it is seeded at the caret's row and its block's first column**, which is
+ * the first cell the block drew; a caret on no block seeds column 0 and the
+ * rectangle resolves to nothing until the reader moves onto one. **Off, it is
+ * discarded** and the block set is what it was, because nothing touched it.
+ */
+export function toggleRect(mode: SemanticMode, spans: readonly BlockSpan[]): SemanticMode {
+  if (mode === null) return null;
+  if (mode.rect !== null) return frozen(mode.caret, mode.anchor, mode.blocks, null);
+  if (mode.caret === null) return mode;
+  const span = spanAt(mode.caret.entryId, mode.caret.row, spans);
+  const at = Object.freeze({ ...mode.caret, column: span?.cols?.from ?? 0 });
+  return frozen(mode.caret, mode.anchor, mode.blocks, Object.freeze({ anchor: at, head: at }));
+}
+
+/**
+ * An arrow in the rectangle (C14 I60, I37).
+ *
+ * The head moves `rows` by the caret's own `step` and `columns` by cells;
+ * `extend` keeps the anchor and a plain arrow moves it too, a 1×1 rectangle.
+ * **The row is stored free and the column clamped** — I42 clips a row that has
+ * left the block and a head may be in another entry, while a column past the
+ * block's edge is past the entry's too, and storing it would make coming back
+ * cost presses nobody can see. The caret follows the head, so the viewport's
+ * edge scroll and a later `⌃V` off start where the reader is.
+ */
+export function moveRect(
+  mode: SemanticMode,
+  rows: number,
+  columns: number,
+  extend: boolean,
+  spans: readonly BlockSpan[],
+  order: readonly string[],
+): SemanticMode {
+  if (mode === null || mode.rect === null) return mode;
+  const { head } = mode.rect;
+  const caret = rows === 0 ? Object.freeze({ entryId: head.entryId, row: head.row }) : step(head, rows, spans, order);
+  const anchor = extend ? mode.rect.anchor : null;
+  // Clamped into the block the rectangle will clip to: the anchor's when one
+  // stands, the head's own when the arrow moves both.
+  const home = anchor === null ? spanAt(caret.entryId, caret.row, spans) : spanAt(anchor.entryId, anchor.row, spans);
+  const column = home === undefined ? Math.max(0, head.column + columns) : clampColumn(head.column + columns, home);
+  const next = Object.freeze({ ...caret, column });
+  return frozen(caret, mode.anchor, mode.blocks, Object.freeze({ anchor: anchor ?? next, head: next }));
+}
+
+/** A press in the rectangle — both cursors at the pointer's cell (C14 I60). */
+export function placeRect(mode: SemanticMode, at: Cursor): SemanticMode {
+  if (mode === null || mode.rect === null) return mode;
+  const caret = Object.freeze({ entryId: at.entryId, row: at.row });
+  return frozen(caret, mode.anchor, mode.blocks, Object.freeze({ anchor: at, head: at }));
+}
+
+/** A drag, or a tick's extend, in the rectangle — the head to the cell, the anchor held (C14 I60). */
+export function extendRectTo(mode: SemanticMode, at: Cursor): SemanticMode {
+  if (mode === null || mode.rect === null) return mode;
+  const caret = Object.freeze({ entryId: at.entryId, row: at.row });
+  return frozen(caret, mode.anchor, mode.blocks, Object.freeze({ anchor: mode.rect.anchor, head: at }));
+}
+
+/** The rectangle the mode draws and copies, or `null` at block granularity or where it resolves to nothing. */
+export function rectOf(
+  mode: SemanticMode,
+  spans: readonly BlockSpan[],
+  order: readonly string[],
+): CellRect | null {
+  if (mode === null || mode.rect === null) return null;
+  return rectBetween(mode.rect.anchor, mode.rect.head, spans, order);
+}
+
+/**
+ * *Every loaded entry is selected* — every span of the held view is in the
+ * block set, and there is at least one (C14 I55, `R-SEL-008`).
+ *
+ * **Derived by equality on every frame, never stored**: `A` then `⇧↑`
+ * re-derives a smaller set, and a flag set by `A` would still say *all*. An
+ * empty span set is not *all* — `every` over nothing is true, and a footer
+ * saying `all loaded entries` over an empty transcript says nothing true.
+ * `false` while the rectangle is up, whose copy is its cells.
+ */
+export function selectsAll(mode: SemanticMode, spans: readonly BlockSpan[]): boolean {
+  if (mode === null || mode.rect !== null || spans.length === 0) return false;
+  return spans.every((sp) => mode.blocks.has(sp.key));
+}
+
+/** The head's row in the anchor's coordinate space, or the edge it lies past. */
+function rowOfHead(anchor: Cursor, head: Cursor, order: readonly string[]): number {
+  if (head.entryId === anchor.entryId) return head.row;
+  const a = order.indexOf(anchor.entryId);
+  const h = order.indexOf(head.entryId);
+  if (a === -1 || h === -1) return anchor.row;
+  return h > a ? Infinity : -Infinity;
+}
+
+/**
+ * What a rectangular copy takes — the rendered cells, with the ink off
+ * (`R-SEL-007`, C14 I43).
+ *
+ * `lines` are the **frame's** lines for the rectangle's entry, indexed
+ * entry-locally, which is what *cells, not source* means: this is the single
+ * exception `R-SEL-004` names to copy taking the source, and the rule requires
+ * it to be explicit rather than discovered in a paste.
+ *
+ * **The window is `sliceCells` and not a substring**, the same walk `paint`
+ * uses, so a cluster straddling either edge is blanked rather than halved (C09
+ * I9) — half a double-width glyph is a row one cell wide, and a copy is not the
+ * place to invent one. On a painted line the two are not close: three characters
+ * from column 2 of a line whose ink opens at column 0 are three bytes of the
+ * escape.
+ *
+ * **And the style comes off**, because a clipboard is text and an escape
+ * sequence in it is the rendering arriving where the content was asked for. The
+ * *order* of the slice and the strip is not a rule here and reads as though it
+ * were: `sliceCells` skips escapes when it counts cells, so both orders give the
+ * same string (C14 I43).
+ */
+export function cellTextOf(
+  rect: CellRect | null,
+  lines: readonly string[],
+  ambiguous: AmbiguousWidth = "narrow",
+): string {
+  if (rect === null) return "";
+  const sgr = sgrPattern();
+  const out: string[] = [];
+  for (let row = rect.fromRow; row <= rect.toRow; row += 1) {
+    const line = lines[row] ?? "";
+    out.push(sliceCells(line, rect.fromColumn, rect.toColumn + 1, ambiguous).replace(sgr, ""));
+  }
+  return out.join("\n");
+}

@@ -1,5 +1,5 @@
-import { b, createTui, defaultTheme } from "@fmx/calcium";
-import type { Adapter } from "@fmx/calcium";
+import { b, createTui, defaultTheme } from "calcium-tui";
+import type { Adapter } from "calcium-tui";
 
 /** What operations exist. One tool, no arguments, no flags. */
 const manifest = {
@@ -35,7 +35,7 @@ const list: Adapter = {
               state: {
                 text: String(r["state"]),
                 tone: r["state"] === "running" ? "ok" : "muted",
-                glyph: r["state"] === "running" ? "running" : "queued",
+                glyph: r["state"] === "running" ? "work-unit" : "queued",
               },
               replicas: { text: String(r["replicas"]) },
             },

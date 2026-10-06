@@ -17,7 +17,7 @@
  * is the failure mode confirms exist to prevent.
  */
 
-import type { ToolDef } from "@fmx/calcium";
+import type { ToolDef } from "calcium-tui";
 
 const FORCE = {
   name: "force",

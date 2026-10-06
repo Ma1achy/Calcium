@@ -37,6 +37,69 @@ function isControl(cp: number): boolean {
   return cp < 0x20 || (cp >= 0x7f && cp <= 0x9f);
 }
 
+/**
+ * The bidi format characters (C04 I110, C09 I128, ruling 71): the Arabic letter
+ * mark U+061C, the marks U+200E and U+200F, the embeddings and overrides
+ * U+202A–U+202E, and the isolates U+2066–U+2069.
+ *
+ * **Not controls by `isControl`'s test, and that is why they are named.** They
+ * are printable by category (`Cf`), so a filter over C0 and C1 passes them
+ * whole, and an override reorders every cell after it on the row — a path that
+ * reads `txt.exe` and is `exe.txt`. The marks are on the list too, which is the
+ * stricter answer and has a cost the ruling states: legitimate right-to-left
+ * text shows its marks.
+ */
+export function isBidiFormat(cp: number): boolean {
+  return (
+    cp === 0x061c ||
+    cp === 0x200e ||
+    cp === 0x200f ||
+    (cp >= 0x202a && cp <= 0x202e) ||
+    (cp >= 0x2066 && cp <= 0x2069)
+  );
+}
+
+/**
+ * The visible form of one code unit, or `null` when it is shown as itself
+ * (C09 I128) — the one table `neutraliseControl` and a span's re-basing both
+ * read, so the two cannot disagree about how long a replacement is.
+ *
+ * `cat -v`'s convention for C0, DEL and C1 — `^[`, `^?`, `M-^[` — and
+ * `<U+202E>` for a bidi format character. Every character this answers for is
+ * in the BMP, so a code unit is the whole question and a surrogate is never
+ * split.
+ */
+export function controlForm(unit: number): string | null {
+  if (unit === 0x09 || unit === 0x0a) return null; // tab, newline
+  if (unit < 0x20) return `^${String.fromCharCode(unit + 0x40)}`;
+  if (unit === 0x7f) return "^?";
+  if (unit >= 0x80 && unit <= 0x9f) return `M-^${String.fromCharCode(unit - 0x40)}`;
+  if (isBidiFormat(unit)) return `<U+${unit.toString(16).toUpperCase().padStart(4, "0")}>`;
+  return null;
+}
+
+/**
+ * A control **shown** rather than deleted (C09 I128, `R-TRU-001`: content is
+ * *escaped*).
+ *
+ * `stripControl` deletes, and a deleted escape leaves its printable residue —
+ * `[2J` — which reads as text a tool meant to print. This leaves `^[[2J`, which
+ * reads as what it is. The output is printable ASCII wherever the input was
+ * not, so it measures the same at every rung, and it is idempotent: nothing it
+ * writes is a character it rewrites. A clean string is returned as itself,
+ * which is the common case and allocates nothing.
+ */
+export function neutraliseControl(text: string): string {
+  let i = 0;
+  while (i < text.length && controlForm(text.charCodeAt(i)) === null) i += 1;
+  if (i === text.length) return text;
+  let out = text.slice(0, i);
+  for (; i < text.length; i += 1) {
+    out += controlForm(text.charCodeAt(i)) ?? text[i];
+  }
+  return out;
+}
+
 /** Every text field passes through here before it is measured or rendered. */
 export function stripControl(text: string): string {
   let clean = true;

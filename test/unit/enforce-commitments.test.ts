@@ -36,6 +36,10 @@ import {
   seamRows,
   specFiles,
   checkInvariantCoverage,
+  checkRowFiles,
+  checkRowResolves,
+  retiredRowsOf,
+  rowIdsIn,
   tableColumn,
   testRowsOf,
   mnemonicRowsOf,
@@ -86,6 +90,28 @@ const at =
   (source: string, self = "docs/components/C99_x.md") =>
   (file: string): string =>
     file === self ? source : readFileSync(file, "utf8");
+
+/**
+ * **An invariant id C09 cannot reach**, for the two fabrications that need one.
+ *
+ * Both read `C09 I99` and both were disarmed the day C09 declared an I99 — the
+ * gate went on working and the rows failed, which is the right way round and
+ * still a morning spent. `C09_DECLARES` is read from the spec so the premise is
+ * measured rather than remembered, and each row asserts it before fabricating.
+ */
+const UNREACHABLE = "I9999";
+/**
+ * **And the premise check needs a premise.** A regex that matched nothing would
+ * leave this empty, `not.toContain` would be trivially true, and the guard
+ * against a disarmed fabrication would itself be disarmed — one turn of the same
+ * screw. Asserted at module scope so it cannot be skipped by a row not running.
+ */
+const C09_DECLARES: readonly string[] = [
+  ...readFileSync("docs/components/C09_block_library.md", "utf8").matchAll(/^- \*\*(I\d+[a-z]?)\*\*/gmu),
+].map((m) => m[1] as string);
+if (C09_DECLARES.length < 50) {
+  throw new Error(`C09_DECLARES read ${String(C09_DECLARES.length)} invariants — the reader is broken, so the fabrications below are unguarded`);
+}
 
 describe("A03 SP1 — commitment/invariant pairing", () => {
   it("SP1: the real corpus is clean, and it is a corpus", () => {
@@ -165,9 +191,15 @@ describe("A03 SP1 — commitment/invariant pairing", () => {
   });
 
   it("SP1: a cross-reference that does not resolve fails", () => {
-    // "the overclaim it was meant to replace, one indirection on" — C09 has no
-    // I99, so pointing at it is the same unbacked claim wearing a citation.
-    const source = spec([["I1", "one."]], ["Someone else's rule (→ C09 I99)."]);
+    // **The number is unreachable by construction, and the row checks that.**
+    // This read `C09 I99` above a comment saying *C09 has no I99* — true when it
+    // was written, and false the day C09 declared one. The fabrication then
+    // resolved, the gate correctly reported no violation, and this row failed
+    // with nothing wrong in the enforcer: a fabrication disarmed from two
+    // components away. The remedy is not a higher number that will also be
+    // reached one day, it is a premise the row asserts for itself.
+    expect(C09_DECLARES, `C09 declares ${UNREACHABLE} now — this fabrication is disarmed`).not.toContain(UNREACHABLE);
+    const source = spec([["I1", "one."]], [`Someone else's rule (→ C09 ${UNREACHABLE}).`]);
     const violations = checkCommitments(["docs/components/C99_x.md"], at(source));
 
     expect(violations).toHaveLength(1);
@@ -565,9 +597,19 @@ describe("A03 SP9 — every invariant is named by at least one test row", () => 
     const r = run(["I1", retired], 'it("T1.1 (C99 I1): text", () => {});', []);
     expect(r.retired, "the fabrication has one").toBe(1);
     expect(r.declared, "and it is still declared — SP1 and SP2 read the whole list").toBe(2);
-    // The real tree: C09's width pair and C24's launcher hooks, both retired by
-    // F1209 in the same pass, and the count is what moves when a third lands.
-    expect(checkInvariantCoverage(specFiles(), walkTests()).retired, "two, both F1209's").toBe(2);
+    // The real tree: C09's width pair and C24's launcher hooks, retired by F1209
+    // when Ink went; C25's three offset-and-snap rules, retired by F1251 when the pushed
+    // patch view went; C22's six and C05's one, retired by F1253 when the pushed
+    // *document* view went with the route and the manifest tier that selected it;
+    // C28's three view rules and C15's two, retired by F1254 when the layer kind
+    // itself went (R-EXA-082); and C24's `b.live` sameness rule under the same
+    // finding a batch later — *identically in an entry and a pushed view*, which
+    // review batch 3 replaced. Named without its number, because SP9 reads a
+    // comment as a citation. The count is what moves when a nineteenth lands.
+    expect(
+      checkInvariantCoverage(specFiles(), walkTests()).retired,
+      "eighteen: two of F1209's, three of F1251's, seven of F1253's, six of F1254's",
+    ).toBe(18);
   });
 
   it("SP9: the exemption list is compared by equality, both ways", () => {
@@ -583,6 +625,153 @@ describe("A03 SP9 — every invariant is named by at least one test row", () => 
     const uncited = 'it("T1.1 (C99 I1): text", () => {});';
     expect(run(["I1", "I2"], uncited, ["C99 I2"]).violations, "and a listed one that is still uncited passes")
       .toEqual([]);
+  });
+});
+
+describe("A03 SP15 — within one spec, a test row's id is titled in one file", () => {
+  const A = "test/unit/a.test.ts";
+  const B = "test/unit/b.test.ts";
+
+  /** Two test sources, each a list of lines, judged with an exemption list. */
+  function run(a: readonly string[], b: readonly string[], exempt: readonly string[] = []) {
+    const read = (f: string): string => (f === A ? a : b).join("\n");
+    return checkRowFiles([A, B], read, exempt);
+  }
+  const row = (title: string): string => `it("${title}", () => {});`;
+
+  it("SP15: the real corpus, and it is a corpus", () => {
+    // **The vacuity half first**: a reader that stopped seeing titles reports a
+    // clean corpus in the same green line the correct answer prints.
+    const r = checkRowFiles(walkTests());
+    expect(r.rows, "3952 titled rows when the rule was wired").toBeGreaterThan(3_000); // cells-ok — a row count
+    expect(r.split, "and the debt it lists is still debt").toBeGreaterThan(0);
+    expect(r.violations, "run `make enforce` for the detail").toEqual([]);
+  });
+
+  it("SP15: one id titled in two files within one spec fails, and names both files", () => {
+    // The parse first, so the judgement below is about the rule and not about
+    // a reader that saw nothing.
+    expect(rowIdsIn(A, row("T1.1 (C99 I1): text"))).toEqual([{ id: "T1.1", spec: "C99", line: 1 }]);
+    const { violations } = run([row("T1.1 (C99 I1): one thing")], [row("T1.1 (C99 I2): another")]);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP15");
+    expect(violations[0]?.message).toContain(`C99 T1.1 (${A}, ${B})`);
+  });
+
+  it("SP15: the controls — two specs, one file, and a deferral are not a split", () => {
+    expect(run([row("T1.1 (C99 I1): x")], [row("T1.1 (C98 I1): y")]).violations, "two specs' T1.1").toEqual([]);
+    expect(run([row("T1.1 (C99 I1): x"), row("T1.1 (C99 I2): y")], []).violations, "one file").toEqual([]);
+    expect(
+      // Spelled in two halves, because TD6 reads this file too and a deferral
+      // written whole here would be one.
+      run([row("T1.1 (C99 I1): x")], [`it.${"todo"}("T1.1 (C99 I1): the code lands next");`]).violations,
+      "an it.todo is not a row",
+    ).toEqual([]);
+    expect(
+      run([row("T1.1 (C99 I1): x")], ["/*", row("T1.1 (C99 I1): quoted in a comment"), "*/"]).violations,
+      "nor is a row a block comment quotes",
+    ).toEqual([]);
+  });
+
+  it("SP15: the attribution is SP9's — a bare title belongs to its file's owner, and a wrapped one is read", () => {
+    // `TOPICS` attributes a bare id in `plot.test.ts`, so a bare `T1.1` there and
+    // a qualified one elsewhere are one row in two files.
+    const PLOT = "test/unit/plot.test.ts";
+    const owner = rowIdsIn(PLOT, row("T1.1: bare"))[0]?.spec;
+    expect(owner, "the fixture's file has an owner").toMatch(/^C\d{2}$/u);
+    const read = (f: string): string =>
+      f === PLOT ? row("T1.1: bare") : ["it(", `  "T1.1 (${String(owner)} I1): wrapped by the formatter",`, "  () => {},", ");"].join("\n");
+    const { violations } = checkRowFiles([PLOT, B], read, []);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.message).toContain(`${String(owner)} T1.1`);
+    // And a title naming a spec in its prose, after the id's own citation, is
+    // the citation's: the first parenthesis decides.
+    expect(rowIdsIn(A, row("T1.2 (C99 I1): unlike C98"))[0]?.spec).toBe("C99");
+  });
+
+  it("SP15: the debt list is compared by equality, both ways", () => {
+    const split = [[row("T1.1 (C99 I1): x")], [row("T1.1 (C99 I1): y")]] as const;
+    expect(run(...split, ["C99 T1.1"]).violations, "listed, and still split").toEqual([]);
+    const stale = run([row("T1.1 (C99 I1): x")], [], ["C99 T1.1"]);
+    expect(stale.violations).toHaveLength(1);
+    expect(stale.violations[0]?.message).toContain("titled in one file now");
+  });
+});
+
+describe("A03 SP16 — a titled row locates the row its spec declares", () => {
+  // **A file with an owner**, found by asking the attribution rather than
+  // assumed: a bare title there is its owner's, which is the half of F1489 a
+  // fabrication has to construct.
+  const PLOT = "test/unit/plot.test.ts";
+  const row = (title: string): string => `it("${title}", () => {});`;
+  const OWNER = String(rowIdsIn(PLOT, row("T9.9: bare"))[0]?.spec);
+  const MINE = `docs/components/${OWNER}_owner.md`;
+  const THEIRS = "docs/components/C98_cited.md";
+
+  /** The owner's spec, the cited spec, and one test file, judged with a list. */
+  function run(test: readonly string[], owner: readonly string[], cited: readonly string[], exempt: readonly string[] = []) {
+    const read = (f: string): string => (f === PLOT ? test : f === MINE ? owner : cited).join("\n");
+    return checkRowResolves([PLOT], [MINE, THEIRS], read, exempt);
+  }
+
+  it("SP16: the real corpus, and it is a corpus", () => {
+    const r = checkRowResolves(walkTests(), specFiles());
+    expect(r.rows, "4060 titled rows a spec owns when the rule was wired").toBeGreaterThan(3_000); // cells-ok — a row count
+    expect(r.misfiled, "and the debt it lists is still debt").toBeGreaterThan(0);
+    expect(r.dangling, "the dangling are counted, not dropped").toBeGreaterThan(0);
+    expect(r.violations, "run `make enforce` for the detail").toEqual([]);
+  });
+
+  it("SP16: F1489's shape fails — a title citing another spec first, under an id only the file's owner declares", () => {
+    expect(OWNER, "the fixture's file has an owner").toMatch(/^C\d{2}$/u);
+    // The parse first: the title is the cited spec's, which is the attribution
+    // SP9 and SP15 both make.
+    expect(rowIdsIn(PLOT, row("T4.1 (C98 I1): the menu's indicator"))[0]?.spec).toBe("C98");
+    const { violations, misfiled } = run(
+      [row("T4.1 (C98 I1): the menu's indicator")],
+      ["- **T4.1** (I66): a different row"],
+      ["- **T4.2** (I1): something else"],
+    );
+    expect(misfiled).toBe(1);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP16");
+    expect(violations[0]?.message).toContain(`C98 T4.1 ${PLOT} (${OWNER}, which owns the file, declares T4.1`);
+  });
+
+  it("SP16: a live row reusing a retired id fails, struck or headed superseded", () => {
+    expect(retiredRowsOf(THEIRS, () => [
+      "- ~~**T3.1**~~ — struck with the view.",
+      "- **T3.2** (I31): **Superseded with the pushed view** (F1254) — gone.",
+      "- **T3.3** (I31): **retired with I16** (F1209).",
+      "- **T3.4** (I5): a live row that says superseded in prose, not in its head.",
+    ].join("\n"))).toEqual(new Set(["T3.1", "T3.2", "T3.3"]));
+    const retired = ["- ~~**T3.1**~~ — struck.", "- **T3.2** (I31): **Superseded with the view**."];
+    for (const id of ["T3.1", "T3.2"]) {
+      const { violations } = run([row(`${id} (C98 I5): Ctrl-C clears the queue`)], [], retired);
+      expect(violations, id).toHaveLength(1);
+      expect(violations[0]?.message).toContain(`C98 retired ${id}`);
+    }
+  });
+
+  it("SP16: the controls — declared, named, dangling, and a deferral are not misfiled", () => {
+    const owner = ["- **T4.1** (I66): the owner's row"];
+    expect(run([row("T4.1 (C98 I1): x")], owner, ["- **T4.1** (I1): the cited spec's own"]).violations, "the cited spec declares it").toEqual([]);
+    expect(run([row(`${OWNER} T4.1 (C98 I1): x`)], owner, []).violations, "the title names its spec").toEqual([]);
+    const dangling = run([row("T4.7 (C98 I1): x")], owner, []);
+    expect(dangling.violations, "neither declares it: counted, not judged").toEqual([]);
+    expect(dangling.dangling).toBe(1);
+    expect(
+      run([`it.${"todo"}("T4.1 (C98 I1): lands next");`], owner, []).violations,
+      "an it.todo is not a row",
+    ).toEqual([]);
+  });
+
+  it("SP16: the debt list is compared by equality, both ways", () => {
+    const misfiled = [[row("T4.1 (C98 I1): x")], ["- **T4.1** (I66): y"], []] as const;
+    expect(run(...misfiled, [`C98 T4.1 ${PLOT}`]).violations, "listed, and still misfiled").toEqual([]);
+    const stale = run([row("T4.1 (C98 I1): x")], [], ["- **T4.1** (I1): declared now"], [`C98 T4.1 ${PLOT}`]);
+    expect(stale.violations).toHaveLength(1);
+    expect(stale.violations[0]?.message).toContain("locate their row now");
   });
 });
 
@@ -845,6 +1034,8 @@ describe("A03 SP10 — a mnemonic test-row label is unique within its spec", () 
       SP12: "checkOpenSet",
       SP13: "checkCommitmentOrder",
       SP14: "checkGroupTallies",
+      SP15: "checkRowFiles",
+      SP16: "checkRowResolves",
     };
 
     // Equality, so a rule added to `SPEC_RULES` without a carrier fails here
@@ -1306,12 +1497,20 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
   });
 
   it("SP3: a qualified reference to an invariant that does not exist fails", () => {
-    const read = at("// C09 I99 says so.\n", "src/fake.ts");
+    // **The number is unreachable by construction, and the row checks that.**
+    // This read `C09 I99` above a comment saying *C09 has no I99* — true when it
+    // was written, and false the day C09 declared one. The fabrication then
+    // resolved, the gate correctly reported no violation, and this row failed
+    // with nothing wrong in the enforcer: a fabrication disarmed from two
+    // components away. The remedy is not a higher number that will also be
+    // reached one day, it is a premise the row asserts for itself.
+    expect(C09_DECLARES, `C09 declares ${UNREACHABLE} now — this fabrication is disarmed`).not.toContain(UNREACHABLE);
+    const read = at(`// C09 ${UNREACHABLE} says so.\n`, "src/fake.ts");
     const { violations } = checkReferences(["src/fake.ts"], read, {});
 
     expect(violations).toHaveLength(1);
     expect(violations[0]?.rule).toBe("SP3");
-    expect(violations[0]?.message).toContain("cites C09 I99");
+    expect(violations[0]?.message).toContain(`cites C09 ${UNREACHABLE}`);
   });
 
   it("SP3 fires: the C02 test citing C01's invariants, restored", () => {
@@ -1619,8 +1818,8 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
 
   /** The ledger and the triage as they are, for the two fabrications below. */
   const inventoryIo = (): { ledger: string; triage: string } => ({
-    ledger: readFileSync("examples/docker/FINDINGS.md", "utf8"),
-    triage: readFileSync("examples/docker/TRIAGE.md", "utf8"),
+    ledger: readFileSync("docs/archive/records/FINDINGS.md", "utf8"),
+    triage: readFileSync("docs/archive/records/TRIAGE.md", "utf8"),
   });
   const io = (l: string, t: string) => ({
     read: (f: string) => (f.endsWith("TRIAGE.md") ? t : l),
@@ -1791,7 +1990,7 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     // heading and a two-row table above the real entry, and every citation of
     // that id resolved to the stub. `declared()` answers *does this exist*, so
     // it was green throughout.
-    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const ledger = readFileSync("docs/archive/records/FINDINGS.md", "utf8");
     const dup = `${ledger}\n\n## F164 — a second section under a live id\n`;
     const v = checkFindingIds({ read: () => dup });
     expect(v).toHaveLength(1);
@@ -1804,7 +2003,7 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     // The other arm, and the reason the convention is a list rather than a
     // pattern: matching any heading with text before the dash would excuse a
     // real duplicate written the same way.
-    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const ledger = readFileSync("docs/archive/records/FINDINGS.md", "utf8");
     const extra = `${ledger}\n\n## F164 revisited — a fifth continuation nobody decided on\n`;
     const v = checkFindingIds({ read: () => extra });
     expect(v).toHaveLength(1);
@@ -1930,7 +2129,7 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     // carries for the other reason. **A number is never written out in a file
     // this rule reads**, which is a limit on how the fixture may be phrased and
     // not on the rule.
-    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const ledger = readFileSync("docs/archive/records/FINDINGS.md", "utf8");
     const next =
       Math.max(0, ...[...ledger.matchAll(/^## F(\d+)/gmu)].map((m) => Number(m[1]))) + 1; // cells-ok — a finding number
     const id = `F${String(next)}`;

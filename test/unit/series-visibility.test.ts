@@ -108,7 +108,11 @@ describe("C22 I78 — the writer alone", () => {
     graph.router.dispatch(press("2"));
     expect(graph.seriesVisibility.get(id, "p", 1), "shown again — recorded, not erased").toBe(false);
 
-    // **The horizontal pair still moves the crosshair** beside the digits.
+    // **The horizontal pair still moves the crosshair** beside the digits — and
+    // it moved inside with the camera (C26 I27, §102), where the digits stay at
+    // `liveBlock` because they collide with nothing. Two halves of one block at
+    // two targets, which is C16 I27's ruling seen from the plot's side.
+    graph.router.dispatch(press("enter")); // ⏎ into the plot
     graph.router.dispatch(press("right"));
     expect(graph.cursorPositions.get(id, "p"), "→ still lands on the first sample").toBe(0);
     graph.router.dispatch(press("1"));
@@ -130,7 +134,7 @@ describe("C22 I78 — the writer alone", () => {
     expect(graph.seriesVisibility.get(id, "p", 1), "the effective state was hidden (the member), so the toggle shows it").toBe(false);
   });
 
-  it("T4.18g (C22 §6c): the store joins the eviction subscription — clear takes it", async () => {
+  it("T4.18g (C22 I78): a series toggled by 2 leaves one visibility entry, and transcript.clear() leaves none", async () => {
     const { graph } = await buildGraph();
     graph.transcript.append(doc([plot("p")]) as never);
     graph.router.dispatch(press("down"));

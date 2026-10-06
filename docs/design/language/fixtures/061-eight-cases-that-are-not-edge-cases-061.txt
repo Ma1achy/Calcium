@@ -1,0 +1,90 @@
+eight cases that look like edge cases and are not — every one is
+something a reader hits by accident on the first afternoon.
+
+1 · ORDINARY CONTENT ARRIVES. Three states, three answers.
+  at the bottom     follow it. You were reading the end
+  scrolled up       DO NOT MOVE. The anchor holds, and the chrome
+                    counts what arrived — a button, above the prompt
+  navigating        DO NOT MOVE. Focus is a position and a new
+                    entry is not a reason to leave it
+  an ownership-request event is different: a new question explicitly
+  raises its owner and arms it against in-flight input.
+
+  one of these three is wrong in most terminal apps, and it is
+  always the second: the view yanks to the bottom while you read.
+
+2 · TYPING WHILE A CHOICE-ONLY QUESTION IS OPEN
+  the prompt is held, so a letter has nowhere to land. But a SILENT
+  no-op reads as a frozen app.
+
+──────────────────────────────────────────────────────────────────────────────
+ ⟩ Apply this change?     ▲ answer this first
+  › no    yes    show full diff
+──────────────────────────────────────────────────────────────────────────────
+←→ move     ⏎ answer   — esc resolves to NO
+
+  the first keystroke that is not an answer puts that notice on the
+  question, once. It is not an error and it does not repeat.
+
+3 · PASTE, IN FOUR PLACES
+  the prompt, small    inserted at the caret, as text
+  the prompt, large    a chip — [#1 json · 47L] — at the caret
+  a text question      into its isolated editor; implementation shared, state separate
+  not focused          focus the prompt first, then paste. A paste is
+                       a request to type, so it goes where typing goes
+
+  and a paste is NEVER submitted by its own newlines — bracketed
+  paste exists precisely so a pasted \n is a newline and not a send.
+
+4 · ⌃C INSIDE A SUBAGENT CANCELS THAT AGENT
+  not all of them, and not the parent. You are looking at one, and
+  the frame you are looking at is the one your keys act on.
+
+  cancelling the whole fan-out is ⌃C on the PARENT's entry, where
+  the head says 3 agents — which is a different place, deliberately.
+
+5 · A GRAPHEME IS ONE THING TO THE CARET AND TWO CELLS TO THE SCREEN
+  ❯ ship it ⚡ now
+  ←→ move ONE index and the caret jumps TWO columns. ⌫ removes the
+  whole cluster — never half an emoji, never a lone combining mark.
+
+  the same rule the span model takes, one layer down: the unit is
+  the cluster and the WIDTH is a separate question.
+
+6 · THE WINDOW LOSES FOCUS
+  held keys stop repeating. The cursor stops blinking. Spinners and
+  ramps keep going, because the work has not stopped.
+
+  a held arrow that keeps repeating after you alt-tab away is a
+  scroll position you did not choose, and the release event never
+  arrives to end it.
+
+7 · A FOCUSED BLOCK IS REPLACED OR EVICTED WHILE YOU ARE IN IT
+  a streaming block is replaced whole on every patch, and the
+  transcript evicts at its cap. Focus resolves BY ID and falls
+  forward to the nearest survivor — the same operation a resize and
+  focus memory both use.
+
+  and if the whole ENTRY went, focus lands on its neighbour rather
+  than at the prompt. Being moved is survivable; being ejected is
+  not.
+
+8 · THE CONNECTION DROPS MID-TURN
+  ● The parser tracks quotes with a boolean, so a nes
+
+  ─────────  ERROR  ─────────
+  ✗ transport closed after 312 tokens
+
+  ✦ retrying in 8s · attempt 2     2 queued, held
+
+  the partial reply STAYS. The queue is HELD rather than dropped or
+  sent — and it says so, because a queue that silently fired on
+  reconnect is the worst outcome of the three.
+
+the thread through all eight
+
+  nothing moves the reader without their asking, and no accepted or rejected
+  command silently does nothing.
+
+  those are the two failures people describe as the app feeling
+  broken, and neither of them is a bug in the usual sense.

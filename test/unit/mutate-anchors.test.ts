@@ -17,10 +17,13 @@
 //         resolving again fails, so a dead excuse cannot outlive its reason.
 import { execFileSync } from "node:child_process";
 import { SWEEP_BUDGET_MS } from "../support/budget.js";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
+import { ANCHORS, knownStale } from "../../tools/mutate/sweep.mjs";
 
 const DIR = mkdtempSync(join(tmpdir(), "mutate-anchors-"));
 
@@ -57,6 +60,22 @@ const MUTATIONS = [
     file: SRC,
     from: "export function hasChildren(block: Block): block is ContainerBlock {",
     to: "export function hasChildren(block: Block): boolean {",
+  },
+];
+`;
+
+/**
+ * The same, anchored inside `src/presentation/text.ts` — which is one of the
+ * three modules `test/unit/text.test.ts` can import, so a fixture using it puts
+ * nothing unreachable in front of the reach check (MA10).
+ */
+const resolvingText = `
+const SRC = "src/presentation/text.ts";
+const MUTATIONS = [
+  {
+    file: SRC,
+    from: "export function cells(text: string, ambiguous",
+    to: "export function cellsRenamed(text: string, ambiguous",
   },
 ];
 `;
@@ -165,6 +184,31 @@ const MUTATIONS = [
     const unread = run(runsDir("fake.mjs", computed));
     expect(unread.out, "counted by name, never as stale").toMatch(/1 interpolated/u);
     expect(unread.out, "and not reported as a missing anchor").not.toMatch(/1 anchor\(s\) missing/u);
+  });
+
+  it("MA1d (F1245): an anchor whose `file:` and `from:` share a line is read", () => {
+    // **The fifth form, and the separator rather than the value.** The pattern
+    // required `,` then a newline between the two keys, because every mutation
+    // in this tree is written across lines — and an `also:` edit is one object
+    // inside a one-line array, so its keys share a line and it matched nothing.
+    // Four of them in the tree on the day this was written, each an edit a run
+    // actually applies, and each invisible: breaking one by hand left the sweep
+    // printing *no run drifted from what the list says*. Widening the reader
+    // moved the count 2433 → 2437.
+    const oneLine = [
+      `const SRC = "src/data/viewmodel/tree.ts";`,
+      `const MUTATIONS = [{ file: SRC, from: "export function hasChildren(block: Block): block is ContainerBlock {", to: "export function hasChildrenRenamed(block: Block): block is ContainerBlock {" }];`,
+    ].join("\n");
+    const seen = run(runsDir("fake.mjs", oneLine));
+    expect(seen.ok, seen.out).toBe(true);
+    expect(seen.out, "counted, not skipped").toMatch(/· 1 anchors/u);
+
+    // **The control**, for MA1b's and MA1c's reason: a reader that dropped the
+    // row rather than resolving it passes the line above by finding nothing.
+    const stale = oneLine.replace("hasChildren(block: Block): block is", "hasChildren(b: Block): b is");
+    const missed = run(runsDir("fake.mjs", stale));
+    expect(missed.ok, "a stale one-line anchor is reported").toBe(false);
+    expect(missed.out).toContain("fake.mjs");
   });
 
   it("MA2: one stale anchor fails, and the run is named", () => {
@@ -280,7 +324,7 @@ const MUTATIONS = [
     // brackets from a row named `F3 (b):`, and one is deliberate and on `CROSS_TIER`.
     const withRow = [
       `const CMD = "npx vitest run test/unit/view-model.test.ts";`,
-      `export const M = [{ name: "x", file: "src/data/viewmodel/types.ts", from: "export", to: "", expect: "T1.1 " }];`,
+      `export const M = [{ name: "x", expect: "T1.1 " }];`,
       resolving,
     ].join("\n");
     expect(run(runsDir("fake.mjs", withRow)).ok, "a row the run's own corpus contains is fine").toBe(true);
@@ -299,12 +343,114 @@ const MUTATIONS = [
     // nothing passes exactly like one that is satisfied.
     const reserved = [
       `const CMD = "npx vitest run test/unit/view-model.test.ts";`,
-      `export const M = [{ name: "x", file: "src/data/viewmodel/types.ts", from: "export", to: "", expect: "baseline" }];`,
+      `export const M = [{ name: "x", expect: "baseline" }];`,
       resolving,
     ].join("\n");
     const r = run(runsDir("fake.mjs", reserved));
     expect(r.ok, r.out).toBe(true);
     expect(r.out, "the expectation was counted, not skipped").toMatch(/· 1 expectations ·/u);
+  });
+
+  it("MA6c (F1243): a row id matches on its own boundary, in a string and not in a comment", () => {
+    // **The substring is how the gate was green on the case it was built for.**
+    // `spans.mjs` expected C11 `T2.13` and its command names five files, none of
+    // which is a table's — and MA6 passed it, because `test/unit/text.test.ts`
+    // mentions `T2.133` in a comment and `"T2.133".includes("T2.13")` is true.
+    // A gate satisfied by a prefix of an unrelated row in prose is a gate that
+    // reports on nothing, and it is A03 §2's vacuity class reached through the
+    // matcher rather than through the rule.
+    //
+    // Two properties, and both are needed: the id ends where the id ends, and a
+    // row lives in a string rather than in a sentence about one.
+    const expecting = (row: string): string =>
+      [
+        `const CMD = "npx vitest run test/unit/text.test.ts";`,
+        `export const M = [{ name: "x", expect: "${row}" }];`,
+        resolvingText,
+      ].join("\n");
+
+    const prefix = run(runsDir("fake.mjs", expecting("T2.13")));
+    expect(prefix.ok, "T2.13 is a prefix of T2.133 and is not that row").toBe(false);
+    expect(prefix.out).toContain("no test path it runs contains");
+
+    const inProse = run(runsDir("fake.mjs", expecting("T2.133")));
+    expect(inProse.ok, "and T2.133 is only ever mentioned, never declared, in that file").toBe(false);
+
+    const real = run(runsDir("fake.mjs", expecting("T1.13")));
+    expect(real.ok, real.out).toBe(true);
+  });
+
+  it("MA10 (F1243): a mutation no test file the command runs can import fails, and one it can does not", () => {
+    // **A mutation reaches only as far as its run's command**, and the two
+    // failures read identically from outside: a survivor is a survivor whether
+    // the test is weak or absent. This asks the half that is mechanical — can
+    // any file this command invokes import the module being mutated — and says
+    // nothing about the other half, which is F277 and which
+    // `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass says not to build.
+    //
+    // **What it does not catch, stated so the row is not read as more than it
+    // is.** `spans.mjs`'s own case passes this check: `test/contract/spans.test.ts`
+    // imports the blocks barrel, so `src/presentation/table/cells.ts` is inside
+    // its import closure and the reach is real while the coverage is not. MA6c
+    // is what catches that one. This row holds the coarser failure — the module
+    // is not in the graph at all.
+    // **The fixture's command is chosen by measurement, not by looking narrow.**
+    // `test/unit/text.test.ts` reaches **3 of 396** modules under `src/`;
+    // `test/unit/mosaic.test.ts` reaches 180 and `test/unit/render-focus.test.ts`
+    // 355, because a barrel drags a layer in behind it. That spread is the size
+    // of this gate: on a suite that imports a barrel almost nothing is
+    // unreachable, so a passing check here is weak evidence and a failing one is
+    // strong.
+    const fixture = (module: string, anchor: string): string =>
+      [
+        `const CMD = "npx vitest run test/unit/text.test.ts";`,
+        `const SRC = "${module}";`,
+        `const MUTATIONS = [`,
+        `  {`,
+        `    file: SRC,`,
+        `    from: "${anchor}",`,
+        `    to: "${anchor}X",`,
+        `    expect: "T1.13",`,
+        `  },`,
+        `];`,
+      ].join("\n");
+
+    const r = run(runsDir("fake.mjs", fixture("src/data/viewmodel/mosaic.ts", "export function mosaicRects")));
+    expect(r.ok, "a text suite cannot import the view model's mosaic").toBe(false);
+    expect(r.out).toContain("which no test file its command runs can import");
+
+    const reachable = run(runsDir("fake.mjs", fixture("src/presentation/text.ts", "export function cells")));
+    expect(reachable.ok, reachable.out).toBe(true);
+  });
+
+  it("MA10b (F1243, C10 I44): a directory a reached support module lists is reach, and only that directory", () => {
+    // **C10 T2.40 reaches a module by listing its directory**, inside
+    // `test/support/curated.ts`, and hands it to the type checker — no import,
+    // no path. `c10-curated-discovery.mjs` mutates `budget.ts`, which nothing
+    // imports, and the mutation is caught; before this arm the sweep called it
+    // unreachable. The fixture is that run's shape.
+    const fixture = (module: string): string =>
+      [
+        `const CMD = "npx vitest run test/contract/curated.test.ts";`,
+        `const MUTATIONS = [`,
+        `  {`,
+        `    file: "${module}",`,
+        `    from: "export const TONE_SMELL = 5;",`,
+        `    to: "export const TONE_SMELL = 6;",`,
+        `    expect: "T2.40",`,
+        `  },`,
+        `];`,
+      ].join("\n");
+    const listed = run(runsDir("fake.mjs", fixture("src/presentation/theme/budget.ts")));
+    expect(listed.ok, listed.out).toBe(true);
+
+    // **The control: a sibling directory the support module does not list.**
+    // The same command and the same row, pointed at a module one directory
+    // over that nothing it runs imports, still fails — so the arm is the
+    // listing's directory and not "a test that lists anything".
+    const other = run(runsDir("fake.mjs", fixture("src/presentation/table/cells.ts")));
+    expect(other.ok, "a directory nobody lists is not reached by a listing").toBe(false);
+    expect(other.out).toContain("which no test file its command runs can import");
   });
 
   it("MA7 (F768): a run that runs and says nothing fails, and one that prints and exits does not", () => {
@@ -492,5 +638,24 @@ const MUTATIONS = [
     // the argument for keeping the number in a comment with its date and out of
     // the pattern.
     expect(r.out, "every run in the tree was parsed").toMatch(/· \d{2,} parsed ·/u);
+
+    // **MS3's cross-check, moved here because the output is here** — *the total
+    // `sweep.mjs`' reader takes off `anchors.mjs` is the total `anchors.mjs`
+    // prints*, one computed from the source text and one from the runs. It used
+    // to spawn the sweep a second time for that one number: 69.0 s and 66.4 s
+    // inside one `make test`, two assertions about one output, and the
+    // duplication was what forced this row's budget up.
+    const list = (knownStale as (src: string) => Readonly<Record<string, number>>)(
+      readFileSync(ANCHORS as string, "utf8"),
+    );
+    const total = Object.values(list).reduce((a, b) => a + b, 0);
+    const stale = /(\d+) known stale, and no run drifted/u.exec(r.out);
+    expect(stale, "the sweep's summary line").not.toBeNull();
+    expect(Number(stale![1]), "the list's total and the sweep's own count").toBe(total);
+    // **Both sides are 0 while the debt list is empty**, and that is carried
+    // rather than hidden: this compares two readings of the same fact and the
+    // fact is currently *nothing owed*. What keeps the reader honest meanwhile
+    // is MS3's fabricated list, which drives both arms whatever the tree holds
+    // — the same division F1119 forced on MA3.
   });
 });

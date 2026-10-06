@@ -28,10 +28,24 @@ const CMD =
   "npx vitest run test/unit/session-paint.test.ts test/unit/theme.test.ts " +
   "test/integration/theme.test.ts test/contract/theme.test.ts";
 const PAINT = "src/shell/paint.ts";
+// **`based` moved to L1** (C11 I25): C11's expanded detail needs the same
+// ground-behind-painted-lines pass, so the one implementation lives in
+// `presentation/blocks/paint.ts` and `shell/paint.ts` calls it. The two
+// mutations that cut into its body follow it; the ones about the session's
+// base sequence and the `--no-bg` flag stay, because those are L4's.
+const BASED = "src/presentation/blocks/paint.ts";
 const RESOLVE = "src/presentation/theme/resolve.ts";
 const HANDLERS = "src/shell/local/handlers.ts";
 const FRAMEWORK = "src/data/manifest/framework.ts";
-const LIGHT = "src/presentation/theme/tokens-light.ts";
+// **Re-pointed at `tokens.generated.ts` 2026-09-21, because the file this named
+// stopped being the subject.** `tokens-dark.ts`, `tokens-light.ts` and
+// `tokens-high-contrast.ts` were the shipped themes; since M2 the shipped set is
+// the registry's projection and those three are a frozen oracle and a lender of
+// palettes the registry does not carry. Mutating one changes nothing any row
+// measures — **the control went blind and the harness said so**, which is the
+// one failure mode a mutation report cannot show you, because an uncaught live
+// mutant and a blind harness produce the same clean page.
+const LIGHT = "src/presentation/theme/tokens.generated.ts";
 const ESCAPES = "src/terminal/escapes.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -61,7 +75,7 @@ const MUTATIONS = [
     // rest of the row is the terminal's — visible in a frame read and in
     // nothing else.
     name: "a reset returns to the terminal's default",
-    file: PAINT,
+    file: BASED,
     from: "    (line) => `${base}${line.replace(toDefault, (seq) => `${seq}${base}`)}${SGR_RESET}`,",
     to: "    (line) => `${base}${line}${SGR_RESET}`,",
     expect: "T1.23",
@@ -82,7 +96,7 @@ const MUTATIONS = [
     // `release()` for this; closing the row makes the state unreachable, and
     // this is the mutation that says so.
     name: "a painted row ends with the base live",
-    file: PAINT,
+    file: BASED,
     from: "(seq) => `${seq}${base}`)}${SGR_RESET}`,",
     to: "(seq) => `${seq}${base}`)}`,",
     expect: "T1.23b",
@@ -170,8 +184,11 @@ const MUTATIONS = [
     // sets dark foregrounds and emits nothing behind them.
     name: "the light theme inherits again",
     file: LIGHT,
-    from: '  background: "surface",',
-    to: '  background: "terminal",',
+    // Scoped by the theme's own header, because `background: "surface"` is now
+    // four themes' answer and an unqualified anchor would mutate whichever came
+    // first in the file.
+    from: '    name: "Light",\n    variant: "light",\n    background: "surface",',
+    to: '    name: "Light",\n    variant: "light",\n    background: "terminal",',
     expect: "T1.17",
   },
 ];

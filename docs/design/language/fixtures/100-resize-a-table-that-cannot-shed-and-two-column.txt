@@ -1,0 +1,35 @@
+A RESIZE — the tree re-solves and the reader’s place does not move
+
+the one case where everything re-solves while someone is watching.
+
+  the ANCHOR holds on an ENTRY, not a row — a row is a rendering fact
+  and the whole point of a resize is that rows changed
+  the CARET stays visible — if the prompt re-wraps past its cap, the
+  offset follows the caret rather than the top
+  FOCUS falls forward by id, and if the part it was on SHED, it lands
+  on the +n that replaced it rather than nowhere
+
+★ A TABLE THAT CANNOT SHED ENOUGH STOPS BEING A TABLE
+
+   run      family            status     metric
+   a3f9b21  digit-classifier  running    0.0372
+
+  ↓ and when even the FIRST column will not fit
+
+   a3f9b21   running
+     digit-classifier · 0.0372
+
+  columns have a drop order, but if the first alone exceeds the width
+  there is nothing left to drop. THE REPRESENTATION BELOW A TABLE IS A
+  LIST — same data, no columns, and the identifier keeps its ground so
+  the eye still finds it.
+
+★ A SPLIT DIFF, and a PLOT BESIDE THE TABLE that summarises it
+
+  − before            │ + after
+  40 const out = [];  │ 40 const out = [];
+  41 let inQuote = f…│ 41 let depth = 0;
+
+  two columns the vertical stack could not express — and each truncates
+  independently, at its OWN share, which is the whole reason the row
+  model had to grow columns.

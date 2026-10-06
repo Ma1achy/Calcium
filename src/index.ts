@@ -37,7 +37,7 @@
  * names a symbol is a claim to check by grepping this file, not by reading on.
  *
  * Two sibling entry points carry what must never reach production (I8):
- * `@fmx/calcium/testing` and `@fmx/calcium/fixtures`.
+ * `calcium-tui/testing` and `calcium-tui/fixtures`.
  */
 
 // --- entry ------------------------------------------------------------------
@@ -53,8 +53,8 @@ export type {
 } from "./shell/types.js";
 export { SurfaceError } from "./shell/surface.js";
 export type {
-  PushedSurface,
-  PushedSurfaceHandle,
+  ChildSurface,
+  ChildSurfaceHandle,
   SurfaceActionEvent,
   SurfaceCloseOutcome,
   SurfaceContext,
@@ -85,10 +85,13 @@ export type { CursorShape, CursorStyle } from "./terminal/escapes.js";
  * hand and drift from it.
  */
 export type {
+  // C24 I42 — what `ctx.ask` resolves with, so a handler can name what it awaits.
+  AskAnswer,
   AskOptions,
   Choice,
   LocalContext,
   LocalHandler,
+  QuestionOutcome,
 } from "./shell/local/registry.js";
 
 // --- blocks — the type a consumer returns -----------------------------------
@@ -119,7 +122,7 @@ export type {
   Action,
   Block,
   // **The interface an app augments to declare its own kind** (C04 I119,
-  // F405). Published beside `Block` because `declare module "@fmx/calcium"`
+  // F405). Published beside `Block` because `declare module "calcium-tui"`
   // merges against this entry point and nowhere else.
   BlockKinds,
   Camera,
@@ -366,13 +369,13 @@ export type { LanguageFn } from "highlight.js";
  * from there, which is how a plot becomes an image inside a transcript.
  */
 export { plotToSvg, svgLayout, SVG_FONT_SIZE, type SvgLayout } from "./presentation/plot/svg.js";
-// `mermaidCode` is `@fmx/calcium/mermaid` and not here (C24 I36): its renderer
+// `mermaidCode` is `calcium-tui/mermaid` and not here (C24 I36): its renderer
 // is a quarter of a cold import, and no line of this barrel may load it (F1188).
 /**
  * A banner, from a sparse set of variants (roadmap 22).
  *
  * **Published for the same reason and by the same argument as `mermaidCode`**
- * (which sits on `@fmx/calcium/mermaid`, C24 I36).
+ * (which sits on `calcium-tui/mermaid`, C24 I36).
  * Art is pre-composed text: nothing about it needs a renderer, so it is a
  * transform in front rather than a seventeenth kind in the vocabulary — which
  * is what keeps the freeze from having to carry it.
@@ -425,6 +428,9 @@ export { halfBlockEligible } from "./presentation/image/index.js";
 export { barStyleNames, spinnerSetNames } from "./presentation/blocks/index.js";
 export type { Measure, MeasureFn } from "./data/viewmodel/index.js";
 export type { BlockKeymap } from "./interaction/router/types.js";
+// What `TuiConfig.keyActions` is keyed by — the registry's ids for the reserved
+// chords (C24 I39, C16 §6c).
+export type { ReservedKeyAction } from "./interaction/router/types.js";
 
 export type {
   Fixture,
@@ -463,7 +469,7 @@ export type {
  * C24 I29's silent failure — the rule fired on the first run with the functions
  * alone. What a `FixtureHandler` returns — `RawResult`, `RawPatch` — was
  * already on the entry through the adapters block above. `Fixture` was already
- * on `@fmx/calcium/fixtures`; it is here because the runtime entry may not
+ * on `calcium-tui/fixtures`; it is here because the runtime entry may not
  * import that one (C24 I8), and the type is C06's.
  */
 export {
@@ -474,7 +480,7 @@ export {
 } from "./data/transport/index.js";
 
 /**
- * C08's, not the `@fmx/calcium/fixtures` entry point's.
+ * C08's, not the `calcium-tui/fixtures` entry point's.
  *
  * `WorldDriver` is declared in `data/fixtures/world.ts` — L0 data — and the
  * dev-only entry re-exports it alongside the recording tooling. Taking it from
@@ -512,23 +518,24 @@ export { planColumns } from "./presentation/table/index.js";
  * draw it. An entry point shipping behaviour the runtime surface cannot reach
  * would be a second way in.
  *
- * `profileCard` and `profileDeck` are pure functions from a report and a region
- * to blocks, which is why they are safe to publish: they compose the same
- * builders an application already has. The framework's own view (`/profile`,
- * C28 §3c) draws with exactly these exports and nothing that opens it is
- * published (C24 I33) — `paneTitle`, the surface these replace, had no consumer
- * anywhere until that view (F945).
+ * `profileCard` is a pure function from a report and a region to blocks, which
+ * is why it is safe to publish: it composes the same builders an application
+ * already has. The framework's own verb (`/profile`, C28 §3c) draws every card
+ * with it and nothing that opens a deck is published (C24 I33) — `paneTitle`,
+ * the surface it replaced, had no consumer anywhere (F945), and `profileDeck`
+ * was unpublished and deleted when its one consumer, the pushed view, retired
+ * (ruling 78, F1327).
  *
  * **`CARDS` is published with them because a card's id is its address.** A
  * consumer drawing its own deck needs the questions and the groups to build a
  * menu from, and a hard-coded list of ids in an application is the register
  * written a second time by someone who cannot see it change.
  */
-export { CARDS, SECTIONS, profileCard, profileDeck } from "./shell/profiling/panes/index.js";
+export { CARDS, SECTIONS, profileCard } from "./shell/profiling/panes/index.js";
 
 /**
  * **The exporters, and they run — which is not a contradiction of C24 I31.**
- * `@fmx/calcium/profiling` publishes types and nothing that runs; these are on
+ * `calcium-tui/profiling` publishes types and nothing that runs; these are on
  * the *root*, where behaviour lives, and they are pure functions from a report
  * to a string. Neither constructs a recorder, so importing one cannot start a
  * profiler, which is what C24 I31's rule is about.

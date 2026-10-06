@@ -48,8 +48,8 @@ const results = runPass({
       // falls too. A row asserting only *the six fall* passes here.
       name: "braille is treated as narrow-only, so a wide terminal loses it too",
       file: FILE,
-      from: "  braille: Object.freeze({ on: \"⣿\", off: \" \" }),",
-      to: "  braille: Object.freeze({ on: \"⣿\", off: \" \", narrowOnly: true }),",
+      from: "  braille: Object.freeze({\n    on: \"⣿\",\n    off: \" \",\n",
+      to: "  braille: Object.freeze({\n    on: \"⣿\",\n    off: \" \",\n    narrowOnly: true,\n",
       expect: "T2.91",
     },
     {
@@ -60,6 +60,27 @@ const results = runPass({
       from: "  if (caps.unicode === \"ascii\") return BAR_ASCII;\n  return style.narrowOnly === true",
       to: "  if (false) return BAR_ASCII;\n  return style.narrowOnly === true",
       expect: "T2.93",
+    },
+    {
+      // **The pair that shipped wrong, put back** (C09 I94, F-§033). `.` for
+      // `-` is the divergence T2.158 was written against, and the four rows
+      // above it all stay green: each measures a width or a fallback, and `.`
+      // is one cell exactly as `-` is.
+      name: "the ASCII bar's empty cell is `.` again",
+      file: FILE,
+      from: "const BAR_ASCII: BarStyle = Object.freeze({ on: \"#\", off: \"-\" });",
+      to: "const BAR_ASCII: BarStyle = Object.freeze({ on: \"#\", off: \".\" });",
+      expect: "T2.158",
+    },
+    {
+      // **A name on one side alone**, which is what makes the comparison an
+      // equality rather than a containment: a style the registry does not
+      // register reads as covered by any subset check.
+      name: "a tenth alphabet the registry never registered",
+      file: FILE,
+      from: "  ascii: BAR_ASCII,\n});",
+      to: "  ascii: BAR_ASCII,\n  hatch: Object.freeze({ on: \"▩\", off: \"▨\", narrowOnly: true }),\n});",
+      expect: "T2.158",
     },
     {
       name: "an unknown name throws instead of falling to the default",

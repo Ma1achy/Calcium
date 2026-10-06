@@ -1,0 +1,25 @@
+⌃⇧C takes the SOURCE, and what the source is depends on the scope
+
+  the prompt, no selection  the whole line
+  the prompt, a selection   the selected characters
+  transcript scope          the focused entry, whole
+  block scope, one row      that row's source
+  block scope, a range      those rows, in order
+  a focused link            the target, not the label
+
+and SOURCE means the thing, never the rendering
+
+  a table row     its values, tab-separated — not the padded cells
+  a code block    the source, not the highlighted version
+  a plot          its data — not braille
+  a patch         a unified diff — not the coloured gutter
+  a call          the invocation AND its output, because a result
+                  without its command is unattributable
+  a chip          its content, not [#1 json · 47L]
+
+  which is the thing a raw terminal cannot offer, and the reason
+  element selection exists at all: a terminal can only give you the
+  cells it drew.
+
+  and it writes OSC 52 where the terminal allows it, so the system
+  clipboard gets it over ssh too.

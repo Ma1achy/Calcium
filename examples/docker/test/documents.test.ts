@@ -33,13 +33,14 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 // F36: no public validator. Resolved through the package — see `deep.ts`,
 // which is also the reason `make proof` was red for two PRs.
-import { expectDocument, localContext, producerContext } from "@fmx/calcium/testing";
-import type { ViewDocument } from "@fmx/calcium";
+import { expectDocument, localContext, producerContext } from "calcium-tui/testing";
+import { toneBudgetSuite, TONE_BUDGET, TONE_SMELL } from "calcium-tui/testing";
+import type { ViewDocument } from "calcium-tui";
 import { createCompareHandler, createDriftHandler } from "../src/drift.ts";
 import { createPsAdapter } from "../src/ps.ts";
 import { createContainerAdapter } from "../src/container.ts";
 import { createInspectAdapter } from "../src/inspect.ts";
-import { createConfigHandler, type Far } from "../src/config.ts";
+import { createFilediffHandler, type Far } from "../src/filediff.ts";
 import {
   createDiffAdapter,
   createImagesAdapter,
@@ -49,10 +50,10 @@ import {
 import { createEventsHandler } from "../src/events.ts";
 
 
-import { createAdapterRegistry } from "@fmx/calcium";
-import type { Adapter, AdapterContext, RawResult } from "@fmx/calcium";
-import { completeLocal } from "@fmx/calcium";
-import type { LocalDocument } from "@fmx/calcium";
+import { createAdapterRegistry } from "calcium-tui";
+import type { Adapter, AdapterContext, RawResult } from "calcium-tui";
+import { completeLocal } from "calcium-tui";
+import type { LocalDocument } from "calcium-tui";
 
 /**
  * A row's answer as a *document*, completing the local ones.
@@ -171,14 +172,14 @@ const DOCUMENTS: readonly (readonly [
   // S8's arms. The far side is injected so every one of them is reachable —
   // three of these are daemon states that occur only sometimes, and an arm that
   // cannot be driven is an arm that never runs.
-  ["/config — no container", () => createConfigHandler(FAR({ facts: () => Promise.resolve(null) }))(["nope", "/x"], { ...localContext(), command: "/config nope /x" })],
-  ["/config — no path, with candidates", () => createConfigHandler(FAR())(["dtui-cfg"], { ...localContext(), command: "/config dtui-cfg" })],
-  ["/config — no path, no mounts", () => createConfigHandler(FAR({ facts: () => Promise.resolve({ image: "i", mounts: [] }) }))(["c"], { ...localContext(), command: "/config c" })],
-  ["/config — no arguments", () => createConfigHandler(FAR())([], { ...localContext(), command: "/config" })],
-  ["/config — the running file is unreadable", () => createConfigHandler(FAR({ running: () => Promise.resolve(null) }))(["c", "/x"], { ...localContext(), command: "/config c /x" })],
-  ["/config — the image side is unavailable", () => createConfigHandler(FAR({ fromImage: () => Promise.resolve(null) }))(["c", "/x"], { ...localContext(), command: "/config c /x" })],
-  ["/config — the files agree", () => createConfigHandler(FAR({ fromImage: () => Promise.resolve("a\nb\n") }))(["c", "/x"], { ...localContext(), command: "/config c /x" })],
-  ["/config — ok", () => createConfigHandler(FAR())(["c", "/x.conf"], { ...localContext(), command: "/config c /x.conf" })],
+  ["/filediff — no container", () => createFilediffHandler(FAR({ facts: () => Promise.resolve(null) }))(["nope", "/x"], { ...localContext(), command: "/filediff nope /x" })],
+  ["/filediff — no path, with candidates", () => createFilediffHandler(FAR())(["dtui-cfg"], { ...localContext(), command: "/filediff dtui-cfg" })],
+  ["/filediff — no path, no mounts", () => createFilediffHandler(FAR({ facts: () => Promise.resolve({ image: "i", mounts: [] }) }))(["c"], { ...localContext(), command: "/filediff c" })],
+  ["/filediff — no arguments", () => createFilediffHandler(FAR())([], { ...localContext(), command: "/filediff" })],
+  ["/filediff — the running file is unreadable", () => createFilediffHandler(FAR({ running: () => Promise.resolve(null) }))(["c", "/x"], { ...localContext(), command: "/filediff c /x" })],
+  ["/filediff — the image side is unavailable", () => createFilediffHandler(FAR({ fromImage: () => Promise.resolve(null) }))(["c", "/x"], { ...localContext(), command: "/filediff c /x" })],
+  ["/filediff — the files agree", () => createFilediffHandler(FAR({ fromImage: () => Promise.resolve("a\nb\n") }))(["c", "/x"], { ...localContext(), command: "/filediff c /x" })],
+  ["/filediff — ok", () => createFilediffHandler(FAR())(["c", "/x.conf"], { ...localContext(), command: "/filediff c /x.conf" })],
   // S10 and S11's arms. **Four verbs is four more failure arms nobody reaches
   // by accident**, which is why they arrive with the verbs rather than after
   // the first time one is seen — step 4's lesson, applied ahead of the defect
@@ -207,7 +208,7 @@ describe("F35: every document this app produces is one C13 will accept", () => {
     // **`expectDocument().isValid()`, not a deep import** (F36). The workaround
     // reached past `exports` into `dist/` because "an app cannot validate a
     // document it built" — and it could: the assertion has been public in
-    // `@fmx/calcium/testing` since C24 §7, and nobody re-checked the finding
+    // `calcium-tui/testing` since C24 §7, and nobody re-checked the finding
     // against the surface. It throws with the errors in the message, which is
     // what the hand-rolled message was for.
     expect(() => expectDocument(doc).isValid(), name).not.toThrow();
@@ -234,5 +235,46 @@ describe("F35: every document this app produces is one C13 will accept", () => {
       () => expectDocument(stripped as never).isValid(),
       "C04 I3 is what makes this file necessary",
     ).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The regional tone budget over real documents — C10 I58, `R-COL-002`, §090.
+// ---------------------------------------------------------------------------
+
+describe("R-COL-002: every document this app produces is inside the tone budget", () => {
+  // **The second corpus, and the honest reading of it is that it is not much
+  // stronger than the first.** The framework's own rows count fixtures, which
+  // spend almost nothing; these are entries an application builds. Measured:
+  // **38 entries, none above three**, and **nine spend none at all** — those
+  // nine are `raw` blocks, the adapter's passthrough rather than the parsed
+  // table `ps.ts` tones by container state. So the gate has counted and found
+  // nothing over, which is a measurement rather than a vindication: neither
+  // corpus in this repository has ever put an entry near §090's threshold, and
+  // the row that proves the gate can fire is the framework's fabricated one.
+  it("no entry spends more than five semantic tones, and the counts are reported", async () => {
+    const entries = [];
+    for (const [name, make] of DOCUMENTS) {
+      const doc = complete(await (make as () => Promise<LocalDocument | ViewDocument>)());
+      entries.push({ name, blocks: doc.blocks });
+    }
+
+    const findings = toneBudgetSuite(entries);
+    const over = findings.filter((f) => f.over);
+    const above = findings.filter((f) => f.above && !f.over);
+
+    // Reported rather than only asserted: the count is the useful output even
+    // where nothing is over, and a suite that printed only failures could not
+    // tell *inside the budget* from *not counted* — which is the distinction
+    // this rule was missing before it had a counter at all.
+    console.log(
+      `tone budget · ${String(findings.length)} entries · ` +
+        `${String(above.length)} above ${String(TONE_BUDGET)} · ${String(over.length)} over ${String(TONE_SMELL)}\n` +
+        findings
+          .map((f) => `  ${String(f.tones.length)}  ${f.name}  [${f.tones.join(" ")}]`)
+          .join("\n"),
+    );
+
+    expect(over.map((f) => `${f.name}: ${f.tones.join(" ")}`), "over the smell").toEqual([]);
   });
 });

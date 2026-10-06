@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
 """Record and render every image the READMEs embed.
 
-    make fixtures && python3 tools/media.py ../../docs/media
+    python3 tools/media.py ../../docs/media            # record, then render if agg is here
+    python3 tools/media.py --render ../../docs/media   # render existing casts only
+
+**Recorded against the demo world, never the daemon** (the person's ruling,
+2026-09-29). The app draws the whole docker host, so a shot made against a real
+one publishes that machine's other containers and images — the last re-record
+did exactly that and was deleted. `capture.run_world` drives `src/world.ts`
+under virtual time instead: no `make fixtures`, no socket, and the same bytes on
+every run. Record where there is no docker CLI at all (calcium-dev) and render
+where `agg` and its fonts are (docker-tui-dev): the two halves are separate for
+that reason, and `--render` is the second.
 
 **Everything here is generated from a `.cast`, and that is the rule rather than
 a convenience.** A hand-cropped screenshot cannot be regenerated: it is right on
@@ -31,12 +41,13 @@ timestamp lands mid-redraw and produces a torn frame that looks like a defect
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from beats import load, settled_before  # noqa: E402
-from capture import forget_theme, run  # noqa: E402
+from capture import assert_private, run_world  # noqa: E402
 
 UTF8 = {"LANG": "en_GB.UTF-8"}
 TRUE = {**UTF8, "COLORTERM": "truecolor"}
@@ -52,7 +63,7 @@ TRUE = {**UTF8, "COLORTERM": "truecolor"}
 # is the weaker fix the call-site note names, moved by a measurement.
 #
 # **F813's mechanism is settled and it is F158's** (F1024). Eighteen captures at
-# 120x40 through `bin/docker-tui.js`, typing `/config` at four moments: the diff
+# 120x40 through `bin/docker-tui.js`, typing `/filediff` at four moments: the diff
 # is in the byte stream in *every* one, including the shots whose final frame has
 # no sign of it, and three PageUps find it as the transcript's **first** entry
 # with the banner below. So the verb's result is not lost — the greeting appended
@@ -74,6 +85,12 @@ TRUE = {**UTF8, "COLORTERM": "truecolor"}
 # The addendum's other symptom — `/ps` never echoing, a command sitting in the
 # prompt unsubmitted — did **not** reproduce in any of the eighteen and is not
 # covered by the above. If it recurs it is an input-path finding, not this one.
+#
+# **Under `run_world` the race above has one outcome, not a likely one**
+# (2026-09-29). Time is virtual and the world answers without waiting, so the
+# greeting lands at the same instant in every recording and long before 4.0 s.
+# The numbers are kept because each shot's still point is measured from them;
+# they no longer protect anything, and F813 itself is untouched by this.
 TYPE_AT_DEFAULT = 4.0
 TYPE_AT: dict[str, float] = {
     # The comparison runs two `docker inspect`s and the greeting is still
@@ -88,13 +105,24 @@ TYPE_AT: dict[str, float] = {
     # result. Until that is fixed the shot waits it out, and the finding is where
     # the reason lives rather than this number.
     "config-diff": 6.0,
+    # The same diff as `config-diff`, so the same wait.
+    "menu-over-diff": 6.0,
 }
 
 # name, cols, rows, command, hold, env, still-at (None = animate)
 SHOTS: list[tuple[str, int, int, bytes, float, dict[str, str], float | None]] = [
     # 1 — the headline. Animated, and it has to run long enough for the plot to
     #     become a shape: one sample per tick at TICK_MS = 2000.
-    ("s3-live", 120, 34, b"/container stats dtui-load", 26.0, TRUE, None),
+    #
+    #     **46 rows, and the stats view is why** (2026-09-29, read off the
+    #     frame). Since batch 3 the view is a transcript entry under the
+    #     dashboard rather than a pushed layer, and the entry alone is 41 rows:
+    #     command, card, head, the CPU panel, the IO panel, DETAILS. At 34 the
+    #     region follows its tail and the plot's top, its title and the
+    #     container's name are above the fold — and `/clear` first does not help,
+    #     measured, because it is the entry itself that is taller than the
+    #     region. 46 is the first height that holds all of it.
+    ("s3-live", 120, 46, b"/container stats worker", 26.0, TRUE, None),
 
     # 2 — the same table at two widths. Two images rather than one composite,
     #     because a 120-column capture squeezed into half a README is unreadable
@@ -152,19 +180,23 @@ SHOTS: list[tuple[str, int, int, bytes, float, dict[str, str], float | None]] = 
     #     shot at a height nobody uses is arguing at a disadvantage the reader
     #     did not ask for. 34 rows is an ordinary terminal.
     #
+    #     **Except for this view, which is 46 now** — shot 1 says why. And the
+    #     still is later than it was, 19 s: the plot opens at 6 s and a still at
+    #     12 held three samples, which is a picture of an axis. Seven is a curve.
+    #
     #     `COLORTERM` unset (not empty) for the 256 row: C02 §3 distinguishes
     #     absent from empty, and only the first gives 8-bit.
-    ("depth-24", 100, 34, b"/container stats dtui-load", 14.0, TRUE, 12.0),
-    ("depth-8", 100, 34, b"/container stats dtui-load", 14.0, {**UTF8, "COLORTERM": ""}, 12.0),
-    ("depth-4", 100, 34, b"/container stats dtui-load", 14.0, {**UTF8, "COLORTERM": "", "TERM": "xterm"}, 12.0),
-    ("depth-1", 100, 34, b"/container stats dtui-load", 14.0, {**UTF8, "DOCKER_TUI_DEPTH": "1"}, 12.0),
-    ("depth-ascii", 100, 34, b"/container stats dtui-load", 14.0, {"LANG": "C", "DOCKER_TUI_DEPTH": "1"}, 12.0),
+    ("depth-24", 100, 46, b"/container stats worker", 20.0, TRUE, 19.0),
+    ("depth-8", 100, 46, b"/container stats worker", 20.0, {**UTF8, "COLORTERM": ""}, 19.0),
+    ("depth-4", 100, 46, b"/container stats worker", 20.0, {**UTF8, "COLORTERM": "", "TERM": "xterm"}, 19.0),
+    ("depth-1", 100, 46, b"/container stats worker", 20.0, {**UTF8, "DOCKER_TUI_DEPTH": "1"}, 19.0),
+    ("depth-ascii", 100, 46, b"/container stats worker", 20.0, {"LANG": "C", "DOCKER_TUI_DEPTH": "1"}, 19.0),
 
     # 4 — the block vocabulary, at its least table-like.
-    ("config-diff", 120, 40, b"/config dtui-cfg /etc/nginx/conf.d/default.conf", 16.0, TRUE, 13.0),
+    ("config-diff", 120, 40, b"/filediff proxy /etc/nginx/conf.d/default.conf", 16.0, TRUE, 13.0),
 
     # 5 — the comparison block: two sources, one row per field, verdict-toned.
-    ("drift", 120, 34, b"/drift dtui-web", 12.0, TRUE, 10.0),
+    ("drift", 120, 34, b"/drift web", 12.0, TRUE, 10.0),
 
     # 6 — completion, which is the manifest's doing and no code's. The menu is
     #     an overlay (C15) drawn over the transcript, with each verb's summary
@@ -175,13 +207,18 @@ SHOTS: list[tuple[str, int, int, bytes, float, dict[str, str], float | None]] = 
     #     and `❯ /co` are adjacent rows of text and read as one path.
     ("completion", 120, 34, b"/co", 8.0, TRUE, 4.0),
 
-    # 7 — the light variant, **rendered on a light terminal on purpose.**
-    #     C10 paints no background: §4a's channel exists for diff rows, and the
-    #     surface tones stop at 1-bit precisely because "background colours are
-    #     the emulator's and a user may override them". So a variant is a set of
-    #     foregrounds chosen to pair with a terminal, not a skin that repaints
-    #     one — and showing `/theme light` on a dark terminal would be dark text
-    #     on a dark background, which is a picture of the wrong thing.
+    # 7 — the light variant, **rendered on a light terminal, and the reason this
+    #     comment used to give was false.** It read *C10 paints no background*,
+    #     which is true of `dark` and not of `light`: `tokens-light.ts:24` takes
+    #     `background: "surface"` and paints, for the reason its own comment
+    #     gives — dark foregrounds emitting nothing behind them are dark-on-dark
+    #     and the name is the lie. So `/theme light` on a dark terminal would
+    #     work.
+    #
+    #     The shot stays on a light terminal for a smaller and checkable reason:
+    #     a capture of a painting theme over a dark emulator shows the paint as
+    #     a rectangle inside a dark field, and the picture is then about the
+    #     capture's frame rather than about the variant.
     ("theme-light", 120, 34, b"/theme light", 10.0, TRUE, 8.0),
 
     # 8 — scrolling a transcript taller than the screen.
@@ -195,7 +232,16 @@ SHOTS: list[tuple[str, int, int, bytes, float, dict[str, str], float | None]] = 
     #      combination C05 I20 permits and this is the only verb that uses.
     #
     #      No `still`: a tail that is not moving is a table.
-    ("logs", 110, 30, b"/logs dtui-web", 16.0, TRUE, None),
+    ("logs", 110, 30, b"/logs web", 16.0, TRUE, None),
+
+    # 15 — **the menu over a surface coloured to its right edge**, F68's evidence
+    #      in FINDINGS. It had no row here, so it could not be regenerated, and
+    #      the only copy was recorded against a real docker host (F1434). The
+    #      diff is `config-diff`'s, paged to its first hunk so both signs are on
+    #      screen; `/co` then opens the completion menu over it (C19 I19), and a
+    #      cell the menu failed to write would show the diff's red or green
+    #      through the box.
+    ("menu-over-diff", 120, 40, b"/filediff proxy /etc/nginx/conf.d/default.conf", 16.0, TRUE, 13.5),
 ]
 
 # Rendered on a different terminal palette. See shot 7.
@@ -224,7 +270,11 @@ AFTER: dict[str, bytes] = {
     # at all. A probe with no keys put the last hunk on screen by 8.4 s; one
     # page up from there is the first hunk under the dashboard's tail.
     "config-diff": b"\x1b[5~",
+    "menu-over-diff": b"\x1b[5~",
 }
+
+# Text typed after the AFTER keys, as one write — a partial verb, not a submit.
+THEN: dict[str, bytes] = {"menu-over-diff": b"/co"}
 
 FONT = "13"
 
@@ -246,6 +296,25 @@ def settle(frames: list[tuple[float, bytes]], at: float) -> int:
     return settled_before(frames, at)[0]
 
 
+def render(cast: str, gif: str, name: str, still: bool, agg: str | None) -> None:
+    """The cast to a gif — or a line saying where to do it.
+
+    `agg` and the font that carries `⎿` live in docker-tui-dev, and the
+    recording belongs in a box with no docker CLI at all, so a missing `agg`
+    is the ordinary case on the recording side rather than a failure.
+    """
+    if agg is None:
+        print(f"  -> {cast} (no agg here: render with --render where it is)")
+        return
+    subprocess.run(
+        [agg, "--font-size", FONT, "--theme", THEME.get(name, "asciinema"),
+         *(["--last-frame-duration", "1"] if still else ["--speed", "1.3"]),
+         cast, gif],
+        check=True, capture_output=True,
+    )
+    print(f"  -> {gif} ({os.path.getsize(gif) // 1024} KiB)")
+
+
 def collapse(cast: str, at: float) -> None:
     """Rewrite `cast` so everything up to a settled point is one instant."""
     with open(cast, encoding="utf8") as fh:
@@ -262,15 +331,23 @@ def collapse(cast: str, at: float) -> None:
 
 
 if __name__ == "__main__":
-    out = sys.argv[1] if len(sys.argv) > 1 else "../../docs/media"
+    argv = sys.argv[1:]
+    render_only = "--render" in argv
+    argv = [a for a in argv if a != "--render"]
+    out = argv[0] if argv else "../../docs/media"
     os.makedirs(out, exist_ok=True)
-    only = sys.argv[2:] if len(sys.argv) > 2 else None
+    only = argv[1:] or None
+    agg = shutil.which("agg")
 
     for name, cols, rows, command, hold, env, still in SHOTS:
         if only and name not in only:
             continue
         print(f"{name} ({cols}x{rows})")
         raw = os.path.join(out, name)
+        cast = raw + ".cast"
+        if render_only:
+            render(cast, os.path.join(out, name + ".gif"), name, still is not None, agg)
+            continue
         pre = PRE.get(name)
         # **The opening frame is async, so a fixed delay races it** (F158).
         #
@@ -320,20 +397,17 @@ if __name__ == "__main__":
             # paged the greeting, the diff then landed below a viewport that had
             # stopped following, and the still was the banner (read 2026-09-05).
             script += [(at + 4.0 + i * 1.5, k) for i, k in enumerate(keys)]
-        # Every shot opens in the set's first variant, whatever the last one
-        # typed (F811). Without this the light shot recolours everything after it.
-        forget_theme()
-        run(cols, rows, script, raw, hold, env)
-        cast = raw + ".cast"
+            then = THEN.get(name)
+            if then:
+                script.append((at + 4.0 + len(keys) * 1.5, then))
+        # **F811 cannot happen here any more, and that is structural**: each
+        # recording's state directory is in memory and dies with it, so the
+        # light shot's `/theme light` reaches no later shot. `forget_theme` is
+        # `capture.run`'s now, for the PTY captures that still share a disk.
+        run_world(cols, rows, script, raw, hold, env)
         if still is not None:
             collapse(cast, still)
-        gif = os.path.join(out, name + ".gif")
-        subprocess.run(
-            ["agg", "--font-size", FONT, "--theme", THEME.get(name, "asciinema"),
-             *(["--last-frame-duration", "1"] if still is not None else ["--speed", "1.3"]),
-             cast, gif],
-            check=True, capture_output=True,
-        )
         os.remove(raw)
         os.remove(raw + ".teardown")
-        print(f"  -> {gif} ({os.path.getsize(gif) // 1024} KiB)")
+        assert_private(cast)
+        render(cast, os.path.join(out, name + ".gif"), name, still is not None, agg)

@@ -14,14 +14,14 @@
 // reads the arm a block took — there is one, and a row asserting that is a row
 // asserting the composition happened at all.
 import { describe, expect, it } from "vitest";
-import { NO_PROBE, NO_SPAN } from "../../src/data/viewmodel/index.js";
+import { NO_PROBE, NO_SPAN, digestOf } from "../../src/data/viewmodel/index.js";
 import type { Block, Probe } from "../../src/data/viewmodel/index.js";
 import { DEFAULT_WIDTHS } from "../../src/testing/measurement-conformance.js";
 import type { BlockDefinition, RenderContextInput } from "../../src/presentation/blocks/index.js";
 import { rows } from "../../src/presentation/blocks/paint.js";
 import { renderSequenceToLines, renderToLines } from "../../src/presentation/render-lines.js";
 import { CORPUS, ONE_PER_KIND } from "../support/blocks.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_CAPS, registry } from "../support/render.js";
+import { ASCII_CAPS, ORACLE_THEME, FULL_CAPS, MONO_CAPS, registry } from "../support/render.js";
 import { TEST_KINDS } from "../support/lifted.js";
 import { InkOracle, oracleName } from "../support/ink-oracle.js";
 
@@ -74,9 +74,21 @@ describe("C09 I72 — the two arms agree", () => {
       for (const width of WIDTHS) {
         for (const [capsName, capabilities] of NAMED_CAPS) {
           const name = oracleName(`t2143-${keyOf(b)}`, capsName, width);
-          const expected = oracle.frozen(name);
           const { probe, names } = recording();
-          const got = renderToLines(r, b, width, { theme: DARK_THEME, capabilities, probe });
+          const got = renderToLines(r, b, width, { theme: ORACLE_THEME, capabilities, probe });
+          // **A kind Ink never drew is swept for its arm and not for its
+          // bytes**, and the exemption is driven from the other side: there
+          // must be no capture under its key, so the day one appears this
+          // fails rather than the entry sitting in the list being true of
+          // nothing.
+          const beyond = oracle.postInk(b.kind);
+          if (beyond !== null) {
+            expect(oracle.has(name), `${name} is ${beyond}, and a capture exists`).toBe(false);
+            expect(names.filter((n) => n === "rows"), `${b.kind} at ${String(width)}`).toHaveLength(1);
+            rowsArm += 1;
+            continue;
+          }
+          const expected = oracle.frozen(name);
           // **A retired capture is asserted to differ, never skipped** (F1233).
           // A ruling changed what this kind draws, so Ink's bytes are the
           // record of the frame before it — and the day the two agree again the
@@ -140,7 +152,7 @@ describe("C09 I72 — the two arms agree", () => {
         // than `rows`: there is no thunk to call, and this capture is finished
         // rather than failing.
         const expected = oracle.frozen(oracleName("t2143-sequence", capsName, width));
-        const got = renderSequenceToLines(capped, sequence, width, { theme: DARK_THEME, capabilities });
+        const got = renderSequenceToLines(capped, sequence, width, { theme: ORACLE_THEME, capabilities });
         expect(got, `sequence at ${String(width)}`).toEqual(expected);
         // The fixture responds: the cap's marker is in the frame, and the floor's
         // rows are, so the composition rules were exercised rather than absent.
@@ -177,7 +189,12 @@ describe("C09 I72 — the two arms agree", () => {
         rows: ((ONE_PER_KIND.table as unknown as { rows: readonly Record<string, unknown>[] }).rows).map((row, i) =>
           i === 0 ? { ...row, expanded: true, detail: [notice("t-d-a", "detail"), { ...raw("t-d-b", "more"), padding: { t: 1 } }] } : row) }),
       B({ ...(ONE_PER_KIND.table as unknown as Record<string, unknown>), id: "t-actions", actionBar: true }),
-      { ...(ONE_PER_KIND.image as unknown as Record<string, unknown>), id: "img-fault", data: "not-a-png" } as unknown as Block,
+      // **A digest of its own, derived as the builder derives one** (F1473,
+      // C04 I73). The fixture kept the corpus image's, and the decode cache is
+      // keyed on the digest and never on the data — so once T2.143 had decoded
+      // the corpus image this block was handed its picture, and the row drew
+      // `▀▀` in a whole-file run and the fault only alone.
+      { ...(ONE_PER_KIND.image as unknown as Record<string, unknown>), id: "img-fault", data: "not-a-png", digest: digestOf("not-a-png") } as unknown as Block,
       ONE_PER_KIND.image,
       B({ kind: "group", id: "all", direction: "column", children: [
         notice("all-n", "3 tiles"),
@@ -195,21 +212,46 @@ describe("C09 I72 — the two arms agree", () => {
     for (const b of withPlacement) {
       for (const width of widths) {
         for (const [capsName, capabilities] of capsFor(b)) {
-          const expected = oracle.frozen(oracleName(`t2144-${keyOf(b)}`, capsName, width));
+          const oracleKey = oracleName(`t2144-${keyOf(b)}`, capsName, width);
+          const expected = oracle.frozen(oracleKey);
           const { probe, names } = recording();
           const got = renderToLines(r, b, width, {
-            theme: DARK_THEME, capabilities, probe, scrollOffsets,
+            theme: ORACLE_THEME, capabilities, probe, scrollOffsets,
             ...(b.id === "img-place" ? { placementScope: "e1" } : {}),
           } as never);
-          expect(got, `${b.id} at ${String(width)}`).toEqual(expected);
+          // **A retired capture is asserted to differ, never skipped** (F1233),
+          // exactly as T2.143 does — this arm had no such branch, so a ruling
+          // that changed a container's frame had nowhere to be recorded.
+          const ruling144 = oracle.retired(oracleKey);
+          if (ruling144 !== null) {
+            expect(got, `${oracleKey} is retired by ${ruling144}, and still matches`).not.toEqual(expected);
+          } else {
+            expect(got, `${b.id} at ${String(width)}`).toEqual(expected);
+          }
           expect(names.filter((n) => n === "rows"), `${b.id} at ${String(width)} took the rows arm`).toHaveLength(1);
+          // **The fault arm, by shape** (F1473, C09 I38). Its captures are the
+          // corpus picture and are retired, so the retirement's *still differs*
+          // is all the oracle can say — and any frame but the picture satisfies
+          // it. What the arm draws is a failed status carrying the decoder's
+          // reason over the dimmed `alt`, so that is asserted: three rows, the
+          // failure mark leading the first, the reason in it wherever a word
+          // fits, and the caption last.
+          if (b.id === "img-fault") {
+            const plain = got.map((l) => l.replace(/\u001b\[[0-9;]*m/gu, ""));
+            const at = `img-fault at ${String(width)} under ${capsName}`;
+            expect(plain, `${at}: the box's two rows and the caption`).toHaveLength(3);
+            expect(plain[0]?.[0], `${at}: led by the failure mark`).toBe(capsName === "full" ? "\u2717" : "x");
+            if (width >= 12) expect(plain[0], `${at}: the decoder's reason`).toContain("not a PNG");
+            const caption = (plain[2] ?? "").replace(/[\u2026~]$/u, "");
+            expect(caption.length > 0 && "an eight by eight red square".startsWith(caption), `${at}: the alt last`).toBe(true);
+          }
           compared += 1;
         }
       }
     }
     expect(compared).toBeGreaterThan(400);
     // **The fixtures respond**: the seams the composition exists for are in the frames.
-    const ctx: RenderContextInput = { width: 60, theme: DARK_THEME, capabilities: FULL_CAPS, focus: null, tick: 0 };
+    const ctx: RenderContextInput = { width: 60, theme: ORACLE_THEME, capabilities: FULL_CAPS, focus: null, tick: 0 };
     const rowGroup = r.render(containers[1] as Block, ctx) as readonly string[];
     expect(rowGroup[0], "both cells on one line, a pad between").toMatch(/left\s+.*right/u);
     const panel = r.render(containers[6] as Block, ctx) as readonly string[];
@@ -238,7 +280,7 @@ describe("C09 I72 — the two arms agree", () => {
       for (const [capsName, capabilities] of NAMED_CAPS) {
         const expected = oracle.frozen(oracleName(`t2147-${keyOf(block)}`, capsName, width));
         const { probe, names } = recording();
-        const got = renderToLines(r, block, width, { theme: DARK_THEME, capabilities, probe });
+        const got = renderToLines(r, block, width, { theme: ORACLE_THEME, capabilities, probe });
         expect(got, `the clipped mosaic at ${String(width)}`).toEqual(expected);
         expect(names.filter((n) => n === "rows"), "the mosaic takes the rows arm").toHaveLength(1);
         expect(got.length, "the grid is its declared height").toBe(6); // cells-ok — rows
@@ -254,7 +296,7 @@ describe("C09 I72 — the two arms agree", () => {
     const floored = { ...(block as unknown as Record<string, unknown>), id: "m-floor", height: 0 } as unknown as Block;
     for (const width of [8, 20, 60]) {
       const expected = oracle.frozen(oracleName(`t2147-${keyOf(floored)}`, "full", width));
-      const got = renderToLines(r, floored, width, { theme: DARK_THEME, capabilities: FULL_CAPS });
+      const got = renderToLines(r, floored, width, { theme: ORACLE_THEME, capabilities: FULL_CAPS });
       expect(got, `the floored mosaic at ${String(width)}`).toEqual(expected);
       expect(got, "one blank row, not none").toEqual([""]);
     }
@@ -287,12 +329,12 @@ describe("C09 I72 — the two arms agree", () => {
         { kind: "counted", id: "sb" },
       ],
     } as unknown as Block;
-    const squeezedRows = renderToLines(r2, squeezed, 40, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    const squeezedRows = renderToLines(r2, squeezed, 40, { theme: ORACLE_THEME, capabilities: FULL_CAPS });
     // The control first: the fixture answers when it has room, or a count of
     // zero says nothing about the guard (test/support/README.md).
     expect(drawn, "the fixture is reached when the cell has room").toBe(0);
     const roomy = { ...(squeezed as unknown as Record<string, unknown>), id: "m-room", columns: [1, 1] } as unknown as Block;
-    renderToLines(r2, roomy, 40, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    renderToLines(r2, roomy, 40, { theme: ORACLE_THEME, capabilities: FULL_CAPS });
     expect(drawn, "and it is, once the column has cells").toBe(1);
     expect(squeezedRows, "the squeezed grid is still its declared height").toHaveLength(2); // cells-ok — rows
 
@@ -315,7 +357,7 @@ describe("C09 I72 — the two arms agree", () => {
         { kind: "raw", id: "wr", text: "RIGHT" },
       ],
     } as unknown as Block;
-    const wideRows = renderToLines(r, overflowing, 20, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    const wideRows = renderToLines(r, overflowing, 20, { theme: ORACLE_THEME, capabilities: FULL_CAPS });
     expect(wideRows, "one row, the grid's declared height").toHaveLength(1); // cells-ok — rows
     const row0 = wideRows[0] ?? "";
     expect(row0.startsWith("W".repeat(10)), `the left cell fills its ten columns: ${JSON.stringify(row0)}`).toBe(true);
@@ -344,7 +386,7 @@ describe("C09 I72 — the two arms agree", () => {
         kind: "raw", id: `p${t.toLowerCase()}`, text: Array.from({ length: 6 }, () => t.repeat(4)).join("\n"),
       })),
     } as unknown as Block;
-    const pin = renderToLines(r, pinwheel, 30, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    const pin = renderToLines(r, pinwheel, 30, { theme: ORACLE_THEME, capabilities: FULL_CAPS });
     expect(pin, "the grid's declared height").toHaveLength(6); // cells-ok — rows
     // Row 0 is the top band: A across two columns, B in the third.
     expect(pin[0], "the top band").toBe(`AAAA${" ".repeat(16)}BBBB`);

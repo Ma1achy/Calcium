@@ -1044,7 +1044,7 @@ describe("C24 — the public surface", () => {
       exports: Record<string, { types?: string; default?: string }>;
     };
     const sub = pkg.exports["./profiling"];
-    expect(sub?.default, "@fmx/calcium/profiling resolves to the barrel").toBe(
+    expect(sub?.default, "calcium-tui/profiling resolves to the barrel").toBe(
       "./dist/bundle/shell/profiling/index.js",
     );
 

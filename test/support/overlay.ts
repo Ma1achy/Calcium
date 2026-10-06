@@ -56,21 +56,34 @@ export function anchored(
   id: string,
   height: number,
   at: Readonly<{ row: number; rows?: number; prefer: "above" | "below" }>,
-  opts: Readonly<{ width?: number; dismissable?: boolean }> = {},
+  opts: Readonly<{ width?: number; blocking?: boolean; dismissal?: Layer["dismissal"] }> = {},
 ): Layer {
-  return {
+  return overlayOf({
     id,
     kind: "overlay",
     placement: { kind: "anchored", row: at.row, prefer: at.prefer, ...(at.rows !== undefined && { rows: at.rows }) },
     content: rows(height, id),
-    dismissable: opts.dismissable ?? true,
+    blocking: opts.blocking ?? false,
+    dismissal: opts.dismissal ?? (opts.blocking === true ? "answer" : "escape"),
     ...(opts.width !== undefined && { width: opts.width }),
-  };
+  });
+}
+
+/**
+ * **An overlay whose fields the caller chose, typed as a `Layer` by assertion**
+ * (C15 I30). `blocking` and `dismissal` are parameters here, so the helpers can
+ * build any row of §2d's table — the refused ones included, which is what the
+ * refusal rows need and what `push` exists to catch. The union would reject a
+ * combination a parameter cannot promise, and this is the caller the run-time
+ * check is for.
+ */
+function overlayOf(fields: Readonly<{ blocking: boolean; dismissal: Layer["dismissal"] }> & Omit<Layer, "blocking" | "dismissal" | "owner">): Layer {
+  return fields as Layer;
 }
 
 /**
  * A peek of `height` rows anchored at a span — the layer that takes no keys
- * (C15 §2a, I21). `dismissable` is carried because the type asks for it and
+ * (C15 §2a, I21). `blocking` and `dismissal` are carried because the type asks for them and
  * read by nothing: `pop` never reaches a peek.
  */
 export function peek(
@@ -83,7 +96,8 @@ export function peek(
     kind: "peek",
     placement: { kind: "anchored", row: at.row, prefer: at.prefer, ...(at.rows !== undefined && { rows: at.rows }) },
     content: rows(height, id),
-    dismissable: true,
+    blocking: false,
+    dismissal: "focus",
   };
 }
 
@@ -99,33 +113,68 @@ export function peek(
 export function centred(
   id: string,
   height: number,
-  opts: Readonly<{ width?: number; dismissable?: boolean }> = {},
+  opts: Readonly<{ width?: number; blocking?: boolean; dismissal?: Layer["dismissal"] }> = {},
 ): Layer {
+  return overlayOf({
+    id,
+    kind: "overlay",
+    placement: { kind: "centred" },
+    content: rows(height, id),
+    blocking: opts.blocking ?? false,
+    dismissal: opts.dismissal ?? (opts.blocking === true ? "answer" : "escape"),
+    width: opts.width ?? REGION.width,
+  });
+}
+
+/**
+ * A panel of `n` rows anchored at a span — the layer that is a prompt substate
+ * (C15 §2c, I27).
+ *
+ * **`blocking` and `dismissal` are not parameters**, and that is the fixture
+ * carrying the invariant rather than repeating it: a panel is anchored,
+ * non-blocking and closed by `escape`, and a helper that let a row vary them
+ * would let a row construct the thing `push` refuses. The rows that mean to
+ * construct a refused panel build the object by hand, which is what makes them
+ * legible as refusals.
+ */
+export function panel(
+  id: string,
+  height: number,
+  at: Readonly<{ row: number; rows?: number; prefer: "above" | "below" }> = { row: 10, prefer: "above" },
+): Layer {
+  return {
+    id,
+    kind: "panel",
+    placement: { kind: "anchored", row: at.row, prefer: at.prefer, ...(at.rows !== undefined && { rows: at.rows }) },
+    content: rows(height, id),
+    blocking: false,
+    dismissal: "escape",
+  };
+}
+
+/**
+ * A layer as large as the region — a centred overlay declaring the region's
+ * width and `maxHeightFraction: 1`.
+ *
+ * **It was `filling`, over the `fill` placement, and the placement is deleted**
+ * (C15 §4, parked 3). The rows that used it were about the stack, about
+ * truncation being reported rather than clipped, and about a large layer that
+ * owns nothing; none of them was about `fill` itself, so each keeps its subject
+ * on a placement that exists.
+ */
+export function covering(id: string, height = 3): Layer {
   return {
     id,
     kind: "overlay",
     placement: { kind: "centred" },
     content: rows(height, id),
-    dismissable: opts.dismissable ?? true,
-    width: opts.width ?? REGION.width,
+    blocking: false,
+    dismissal: "escape",
+    width: REGION.width,
+    maxHeightFraction: 1,
   };
 }
 
-export function view(id: string, height = 3): Layer {
-  return {
-    id,
-    kind: "view",
-    placement: { kind: "fill" },
-    content: rows(height, id),
-    dismissable: true,
-  };
-}
-
-/**
- * A layer whose measured height genuinely depends on its width — the subject of
- * I16, and inert if built from `raw`, which carries its text verbatim and
- * measures one row at every width.
- */
 export function wrappingLayer(id: string, width: number): Layer {
   return {
     id,
@@ -142,7 +191,8 @@ export function wrappingLayer(id: string, width: number): Layer {
           "a narrow confirm and occupies far fewer across the whole region",
       }),
     ],
-    dismissable: true,
+    blocking: false,
+    dismissal: "escape",
   };
 }
 

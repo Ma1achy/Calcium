@@ -234,6 +234,8 @@ const DIVIDES: Readonly<Record<string, string>> = {
  * the cost being invisible until someone measures a frame.
  */
 const KEPT_WHOLE: Readonly<Record<string, string>> = {
+  choice: "one row at every width (C09 I105): a choice is its mark and its label as one shape, and half a shape is not a smaller choice",
+  control: "one row at every width (C09 I106): label, track and value are one control, and a track cut in two is a different reading",
   comparison: "`rows + 1`, so it divides in principle and does not — an unmeasured F424 candidate, kept named rather than kept quiet",
   events: "one row per event, `logs`' shape exactly, so it divides in principle and does not — an unmeasured F424 candidate",
   image: "one picture — `imageCells` derives the rows from the whole image at the width, so fewer rows is a different picture and not less of one",
@@ -245,9 +247,13 @@ const KEPT_WHOLE: Readonly<Record<string, string>> = {
   progress: "one row — label, bar and percentage, with the bar taking the residual width",
   rule: "one row — a label, an optional `meta`, and a fill to the width",
   scroll: "a region whose height is declared cannot measure less without becoming a different box; it bounds its own content instead (C04 I47, I49)",
+  form: "one question put to the reader: its fields and its buttons answer it together, a field's element spans its value and its error, and a slice would hand a submit the values of fields it no longer shows — no producer draws one taller than its box yet (C04 I136)",
+  split: "`height` exactly, a box whose height is declared, as `scroll`'s is: its panes scroll inside it, so a slice of it is a smaller split and not less of this one (C04 I132)",
   status: "a bordered box the registry draws rather than the definition, with two ladders on it and neither may change the row count (I27, §3a)",
   steps: "one row per step, `logs`' shape again, so it divides in principle and does not — an unmeasured F424 candidate",
+  tape: "one row at every width, and the window it slides is horizontal — there is no vertical unit to divide into, and shedding a member is the one thing §095 exists to refuse (C04 I124)",
   tip: "`ceil(cells(text) / w)` of one text, as `notice` — dim, with fill actions, and nothing to divide into",
+  tree: "the ladder is chosen over every visible row (C04 I130), so a slice of the rows picks a different rung than the whole and draws different cells — dividing needs the rung carried into the window, which is a field no block has. The cost is F424's, paid by a tree taller than its box, and no producer draws one yet",
 };
 
 describe("C09 §2a — a block reduced to a valid smaller block", () => {
@@ -630,7 +636,10 @@ describe("C09 §2a — a block reduced to a valid smaller block", () => {
 
 describe("C09 §2c width — the registry's answer (I42, I44)", () => {
   const FILLING = ["rule", "progress", "plot", "image", "scroll", "mosaic"] as const;
-  const DECLARING = ["notice", "raw", "pills", "keyValue", "code", "table", "group", "panel"];
+  // `choice` declares one — its natural width is where the last option ends
+  // (C09 I105). `control` declares none: §018's track takes the residual, so a
+  // control fills and the registry's default already says that.
+  const DECLARING = ["notice", "raw", "pills", "tape", "tree", "choice", "keyValue", "code", "table", "group", "panel"];
 
   it("T2.110 (C09 I42): a kind declaring no width answers the width, and an answer outside the range is clamped and reported", () => {
     const kit = measurable({ definitions: [plotDefinition as never, tableDefinition as never] });

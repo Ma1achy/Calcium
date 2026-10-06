@@ -1,0 +1,52 @@
+FOCUS SURVIVES A DROP — and the +n inherits it
+
+a part can VANISH on a resize (§93), and focus memory is by id — so a
+shed part’s id renders nothing.
+
+  val loss  0.0372  ↓ from 0.41
+  ↓ the width goes
+  val loss  0.0372  +1
+
+  focus falls to the NEAREST SURVIVING part in declaration order — and
+  if the +n that replaced it is on screen, FOCUS LANDS THERE. ⏎ expands
+  what it stands for, so the shed parts stay REACHABLE rather than gone.
+
+  a focus that vanishes is a focus the reader has to go and find again.
+
+★ A BLOCK MAY EMIT SEVERAL ELEMENTS ON ONE ROW
+
+       1 val loss    2 accuracy    3 gpu util
+
+  a legend is THREE buttons where it was one block; a mosaic is three
+  cells. ←→ moves BETWEEN them; ↑↓ leaves the row — and the conformance
+  checker’s ordering and disjointness predicates were written when this
+  could not happen.
+
+★ ←→ HAS FIVE JOBS, and the SCOPE decides which
+
+  the prompt          move the caret
+  the transcript      nothing — ↑↓ moves, and rows are whole
+  a row of elements   move BETWEEN elements on the row
+  inside a block      the crosshair, the camera, or a value
+  a question          choose
+
+  it had three when §18 was written. The rows-of-elements case did not
+  exist, and neither did the tape.
+
+★ THE CLICK THAT DISMISSES DOES NOT ALSO ACT
+
+  the thing you meant to hit was COVERED a moment ago, so a press that
+  closed the panel AND activated what was underneath would be acting on
+  something you could not see when you decided to press.
+
+  ONE GESTURE, ONE EFFECT — which is the same shape as esc pops one
+  rung, on the pointer instead of the keyboard.
+
+★ and one REFUSAL, stated rather than left out
+
+  NOTHING MOVES THE TAPE’S WINDOW WITHOUT MOVING THE CURRENT. There is
+  no scroll-the-switcher key and there should not be: the window exists
+  to keep the current visible, so a key that moved one without the other
+  would make the › and the window disagree.
+
+  an omission reads as an oversight; a refusal reads as a decision.

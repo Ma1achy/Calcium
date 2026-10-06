@@ -429,6 +429,12 @@ function codeRows(block: Code, width: number): readonly Row[] {
 export const codeDefinition: BlockDefinition<Code> = {
   kind: "code",
 
+  // §7a — *code with its original indentation* (I86, `R-SEL-004`). `text` is
+  // the source as it arrived; the highlighting, the wrap and the gutter are all
+  // rendering, and the inset especially so — *a block's content is not
+  // re-indented to match its rendered inset.*
+  copy: (block) => block.text,
+
   // No tokenisation here, and none reachable from here (T2.13). The height of a
   // code block is a property of its text, not of anyone's grammar — which is
   // what lets a language ship tomorrow without reflowing yesterday's transcript.

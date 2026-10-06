@@ -7,7 +7,7 @@
  * ladder is documentation of behaviour derived from it, not a second list: its
  * rungs are handlers registered on these targets, so the ladder cannot hold an
  * order of its own to disagree with. The disagreement C16's spec pass found —
- * copy mode above both overlay rungs, against A02 §2 — was possible only because
+ * native selection above both overlay rungs, against A02 §2 — was possible only because
  * the ladder existed as a separate artefact, and the moment for it to reappear is
  * the commit where both files exist. `FOCUS_ORDER` below is that single artefact.
  */
@@ -23,10 +23,53 @@ import type { ElementAddress, FocusTarget, StoredFocus } from "./types.js";
  * file free of an import from `viewport/`, which is a real edge C16 does have but
  * has no reason to spend here.
  */
+/**
+ * A keyed layer as the ladder reads it: its kind and its declared owner
+ * (C15 I29). Structural, for the reason `FocusInputs` is.
+ */
+export type KeyedTop = Readonly<{
+  kind: "overlay" | "panel";
+  owner?: Readonly<{ rung: "question" | "substate" }>;
+}>;
+
+/**
+ * The rung a keyed layer answers at — its declared owner, else its kind's
+ * (C16 I63, C15 I29, R-QST-001).
+ *
+ * **One derivation, and there were two.** `activeTarget` read the kind, and the
+ * intercept table read *is an answer callback registered* — so a blocking
+ * overlay nothing could answer was `question` to the footer, the guard and the
+ * epoch, and `scope` to the table, which then cancelled a verb beneath it (C16
+ * §3b S13). Every reader of the rung now reads this.
+ */
+export function rungOfLayer(top: KeyedTop): "question" | "substate" {
+  return top.owner?.rung ?? (top.kind === "panel" ? "substate" : "question");
+}
+
 export type FocusInputs = Readonly<{
   /** C15's `top`. `null` when the stack is empty. */
-  overlayTop: Readonly<{ kind: "overlay" | "view" }> | null;
-  copyMode: boolean;
+  overlayTop: KeyedTop | null;
+  nativeSelection: boolean;
+  /**
+   * Semantic copy mode is up (C14 §6a, I50).
+   *
+   * **Two booleans rather than one three-valued field**, and the reason is that
+   * they are two facts rather than one with three settings: the handoff is a
+   * statement about the terminal's mouse and this is a statement about the
+   * app's own selection. A terminal cannot be in both, but nothing here is what
+   * makes that true — the entry rows are, because neither resolves once
+   * `activeTarget` answers the other. A union here would encode the exclusion in
+   * the type and put the guard in two places.
+   */
+  semanticSelection: boolean;
+  /**
+   * A child process holds the terminal (§103, R-OWN-002).
+   *
+   * Read from the same fact the Ctrl-C ladder reads — `inFlight() === "shell"` —
+   * rather than from a second source, because two answers to *is a child
+   * attached* is the disagreement this component has paid for before.
+   */
+  attachedChild: boolean;
   /** C13's live entry, or `null` when the transcript is empty. */
   liveEntry: Readonly<{ id: string }> | null;
   stored: StoredFocus;
@@ -40,18 +83,38 @@ export type FocusInputs = Readonly<{
  * keymap is a compile-level gap only while these two things are the same thing.
  */
 export const FOCUS_ORDER = Object.freeze([
+  // **The child is the top rung** (§103, R-OWN-002): *the CHILD · an attached PTY
+  // · takes all but host.detach ⌃] · leaves by host escape.* Above a question,
+  // because a child that has the terminal cannot be interrupted by something the
+  // host drew over it.
+  "child",
   "overlay",
-  "copyMode",
-  "pushedView",
+  "nativeSelection",
+  // **The second target at `copy`** (I50, C14 §6a). Beside `nativeSelection`
+  // rather than at a rung of its own: `RUNG_OF` maps both here, and the pair
+  // differs only in what `escape` does.
+  "semanticSelection",
+  // **A ninth target at an existing rung** (§2c, R-BLK-109). `RUNG_OF` maps it
+  // to `substate`. It stood beside `pushedView`, which is what "targets are not
+  // rungs" bought — two targets at one rung, separate because their `escape`
+  // rows disagreed. The view went with R-EXA-082 (F1254) and the mapping is
+  // still many-to-one; `prompt` and `liveBlock` below share `scope`.
+  "panel",
   // **Above `prompt` and below every layer** (C26 I2). A block being interacted
   // with outranks the prompt, which is the whole of the navigation/interaction
-  // split; it does not outrank an overlay that must be answered, copy mode,
-  // which takes every key, or a view, which covers the region.
+  // split; it does not outrank an overlay that must be answered, or native selection,
+  // which takes every key.
   //
   // Its position needs no argument of its own beyond that, and that is the
   // point: adding a rung to C16 §5's ladder is this line and nothing else.
   "interaction",
   "prompt",
+  // **The watch row, a third position of `scope`** (I76, §6d). Its place among
+  // `prompt` and `liveBlock` decides nothing — the three are one stored
+  // location and never true together — so it sits where the row is drawn
+  // relative to the prompt's own reading order, and below every layer, which
+  // is the only ordering that carries weight.
+  "watchRow",
   "liveBlock",
   "global",
 ] as const satisfies readonly FocusTarget[]);
@@ -59,39 +122,94 @@ export const FOCUS_ORDER = Object.freeze([
 /**
  * First match wins, recomputed on every dispatch (I1, I15).
  *
- * `pushedView` needs no separate "is there a view" input, and that is worth
- * saying because the obvious reading is that it does. Overlays always sit above
- * views (C15 I2), so a view is reachable as the *top* exactly when no overlay is
- * open — and when an overlay is open, the first row wins anyway. The top alone is
- * therefore sufficient, and asking C15 for `hasView` as well would add an input
- * that can disagree with the one beside it.
+ * **Every layer row reads the top and nothing else**, and that is worth saying
+ * because the obvious reading is that each needs its own *is one of these open*
+ * input. The stack is ordered, so a layer is reachable as the top exactly when
+ * nothing above it is open — and when something is, the earlier row wins anyway.
+ * A second input per kind would be a thing that can disagree with the one beside
+ * it. (The rule was written for `pushedView`, which R-EXA-082 retired; it is the
+ * panel's and the overlay's now.)
  */
 export function activeTarget(deps: FocusInputs): FocusTarget {
-  if (deps.overlayTop?.kind === "overlay") return "overlay";
-  if (deps.copyMode) return "copyMode";
-  if (deps.overlayTop?.kind === "view") return "pushedView";
+  if (deps.attachedChild) return "child";
+  const layerRung = deps.overlayTop === null ? null : rungOfLayer(deps.overlayTop);
+  if (layerRung === "question") return "overlay";
+  if (deps.nativeSelection) return "nativeSelection";
+  // **The same rung, and the order between them decides nothing** (I50). Both
+  // map to `copy`, and the two cannot be up at once because each mode's entry
+  // rows stop resolving once `activeTarget` answers the other. So this line's
+  // position relative to the one above is not a priority ruling — there is no
+  // state in which both are true for it to rule on.
+  if (deps.semanticSelection) return "semanticSelection";
+  // **A panel is a SUBSTATE and not a question** (§2c, R-BLK-109, R-BLK-866).
+  // *FIND and COMPLETION are PROMPT SUBSTATES — the prompt, relabelled*, and
+  // *a command palette is a PANEL whose list is a ladder*. So a panel takes the
+  // `substate` rung: the mapping M5 wrote down and could not express while a
+  // completion menu was an `overlay` and therefore a question. It sits below
+  // `nativeSelection` because a frozen screen outranks a thing you opened on top of a
+  // live one.
+  if (layerRung === "substate") return "panel";
   // **Before the `prompt` row, and gated on the live entry** (C26 I2). The mode
   // is stored, so it can outlive the entry that was being interacted with —
   // freezing is a mode exit nobody signals (C26 §8a trace, the live-block
   // freeze), and answering `interaction` for an entry that is no longer live
   // would hand every key to a block the reader cannot act on.
   //
-  // **And gated on the focused entry being the live one, not on a live entry
-  // existing** (C26 §4g row d). The two tests were the same while focus could
-  // only be in the live entry; now a settled entry can hold focus with the mode
-  // stored, and A01 D4 has withdrawn its block's keys, so there is nothing to
-  // interact with there.
-  if (
-    deps.stored.at === "liveBlock" &&
-    deps.stored.mode === "interact" &&
-    deps.liveEntry !== null &&
-    deps.stored.entryId === deps.liveEntry.id
-  ) {
+  // **The liveness gate is withdrawn** (C26 I2, §8b.9, §102, `R-INT-005`). It
+  // read `deps.liveEntry !== null && deps.stored.entryId === deps.liveEntry.id`,
+  // on §4g row d's ground that A01 D4 withdraws a block's keys on freeze so a
+  // settled entry has nothing to interact with. §102's heading is *VIEW STATE IS
+  // NOT LIVENESS* and its starred line answers it: *A 3D PLOT IS INTERACTIVE
+  // BECAUSE IT HAS A CAMERA, not because it is live. Settled an hour ago, from a
+  // call that finished — it STILL ORBITS.* The row was right about D4 and wrong
+  // about what D4 withdraws — the adapter's bindings, not the camera the block
+  // declared, which lives in `Cameras` per entry and survives the freeze.
+  //
+  // **And the mode cannot arrive here by drift**: `focusRow` clears it on every
+  // move between rows, so the one way in is `⏎` on an element declaring view
+  // state (C26 I26).
+  if (deps.stored.at === "liveBlock" && deps.stored.mode === "interact") {
     return "interaction";
   }
   if (deps.stored.at === "prompt") return "prompt";
-  if (deps.liveEntry !== null) return "liveBlock";
-  return "global";
+  // **Stored, so a watch dropping cannot move it** (I76, `R-COR-002`). The row
+  // with nothing left on it is still where the reader is standing.
+  if (deps.stored.at === "watches") return "watchRow";
+  // **The transcript is the owner whether or not anything is live** (R-COR-002,
+  // C16 §3a W1). This row read `if (deps.liveEntry !== null) return "liveBlock"`,
+  // and the `null` arm fell through to `global` — so with focus stored in the
+  // transcript the owner was `global` while nothing ran and `liveBlock` the
+  // moment an entry appeared. **A content arrival moved the keyboard's owner**,
+  // which is the one thing R-COR-002 forbids: *a render event may change drawing
+  // but never keyboard ownership.*
+  //
+  // Measured rather than reasoned: the two calls differ on `liveEntry` alone and
+  // return different targets. It was invisible to every existing row because each
+  // asserts the owner for a *state*, and this is a property of a *transition* —
+  // the sequence trace's job, and the ladder had no trace until M5.
+  //
+  // `interaction` above still needs the live entry, and that gate is untouched:
+  // being *inside* a block is a thing you cannot be once it has settled, where
+  // *standing in the transcript* is not. One rung, `scope`, either way.
+  return "liveBlock";
+}
+
+/**
+ * Which watch the row is on, over the watches as they stand now (I76, §6d).
+ *
+ * **By id first, then by the index clamped** — the id keeps the selection on
+ * its watch when one ahead of it drops, and the index is where to land when the
+ * selected one itself drops, since an id that no longer exists says nothing
+ * about position. `null` exactly when there is no watch.
+ */
+export function resolveWatch(
+  stored: Readonly<{ id: string; index: number }>,
+  ids: readonly string[],
+): number | null {
+  if (ids.length === 0) return null; // graphemes-ok: a watch count, not text
+  const exact = ids.indexOf(stored.id);
+  if (exact !== -1) return exact;
+  return Math.min(Math.max(0, stored.index), ids.length - 1); // graphemes-ok: a watch count, not text
 }
 
 /**
@@ -240,6 +358,12 @@ export interface FocusStore {
    */
   toPrompt(): void;
   /**
+   * Onto the footer's watch row, at the watch `id` in position `index` (I76,
+   * §6d). From any location — `⇧⇥` at the prompt is the way in, and `←`/`→` at
+   * the row are this call with a neighbour.
+   */
+  toWatches(id: string, index: number): void;
+  /**
    * Movement to an element in `entryId`; a no-op at the prompt. Collapses a
    * selection.
    *
@@ -294,6 +418,9 @@ export function createFocusStore(): FocusStore {
     },
     toPrompt() {
       stored = AT_PROMPT;
+    },
+    toWatches(id, index) {
+      stored = Object.freeze({ at: "watches", id, index });
     },
     focusRow(entryId, element) {
       // Deliberately a no-op at the prompt rather than a way in. Entering the

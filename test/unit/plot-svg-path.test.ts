@@ -1257,7 +1257,15 @@ describe("RC — the callout displaces the label it lands on (C12 I114, §3ak.50
    * label is drawn in the theme's `label` slot. Read off the document rather
    * than off the block, because what is on the page is the subject.
    */
-  const LABEL_INK = "#626262";
+  // **Resolved, not copied.** This was the literal `#626262` — dark's `tone.muted`
+  // at the time it was written — and it does not merely describe the label ink, it
+  // CLASSIFIES by it: a text whose fill is not this is read as a callout. When the
+  // registry port moved `muted` to `#8c8c8c` the filter stopped excluding labels
+  // and `callouts(svg)[0]` came back as the axis label `50`, failing seven rows in
+  // a file about label displacement. `svg.ts:667` is the one source
+  // (`const LABEL: ColourRef = "tone.muted"`), and `hexOf` is the call the renderer
+  // itself makes, so the two cannot drift again.
+  const LABEL_INK = hexOf("tone.muted");
   const callouts = (svg: string): ReturnType<typeof texts> =>
     texts(svg).filter((t) => t.anchor === "start" && t.fill !== LABEL_INK && !t.clipped && t.text !== "");
 

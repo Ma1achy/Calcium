@@ -22,6 +22,9 @@
  */
 
 import {
+  CALL_HEAD_GLYPH,
+  CALL_STATE_TONE,
+  CALL_STATES,
   GLYPH_REQUIRED_TONES,
   type Block,
   type Cell,
@@ -29,11 +32,12 @@ import {
   type Notice,
   type Plot,
   type PlotForm,
+  type Table,
   type Tone,
   type ViewDocument,
   IS_MATRIX,
 } from "./types.js";
-import { childBlocks } from "./tree.js";
+import { childBlocks, hasChildren } from "./tree.js";
 
 /**
  * I1 — freeze at every nesting depth. A shallow `Object.freeze` on a document
@@ -111,6 +115,57 @@ function requireGlyph(tone: Tone | undefined, glyph: Glyph | undefined, where: s
 }
 
 /**
+ * I6's exemption (ruling 44) — the columns that declare a closed vocabulary,
+ * each as its set of words.
+ *
+ * **The set is refused unless it can be closed**: empty, an empty word or a
+ * word twice, and the declaration says nothing a reader could check a cell
+ * against. The same refusal `validateDocument` makes at the wire.
+ */
+function vocabularies(table: Table): ReadonlyMap<string, ReadonlySet<string>> {
+  const out = new Map<string, ReadonlySet<string>>();
+  for (const column of table.columns) {
+    const words = column.vocabulary;
+    if (words === undefined) continue;
+    const set = new Set(words);
+    if (words.length === 0 || set.size !== words.length || words.some((w) => typeof w !== "string" || w.length === 0)) {
+      throw new BlockShapeError(
+        `table "${table.id}" column "${column.key}": "vocabulary" is a non-empty list of distinct, ` +
+          `non-empty words (C04 I6, ruling 44)`,
+      );
+    }
+    out.set(column.key, set);
+  }
+  return out;
+}
+
+/**
+ * A call head's state names its tone and its glyph (I141) — the same refusal
+ * `validateDocument` makes, at construction, so `block()` cannot build a notice
+ * the validator would refuse. Refused, never corrected: a head saying `failed`
+ * in `info` is a document its own fields contradict.
+ */
+function checkCallState(notice: Notice): void {
+  const state = notice.state;
+  if (state === undefined) return;
+  const where = `notice "${notice.id}"`;
+  if (!CALL_STATES.includes(state)) {
+    throw new BlockShapeError(`${where}: "state" is outside its union (I141) — one of ${CALL_STATES.join(", ")}`);
+  }
+  if (notice.tone !== CALL_STATE_TONE[state]) {
+    throw new BlockShapeError(`${where}: "tone" must be "${CALL_STATE_TONE[state]}" for state "${state}" (I141) — the state names its tone`);
+  }
+  // **Absent is admitted on a running head alone** (I141): an operation's
+  // walking mark leads its text, so a gutter mark would be a second one. The
+  // fields cannot tell an operation from a call, so a running call head with no
+  // glyph passes too — `callHead` always writes one, and that is the limit.
+  if (notice.glyph === undefined && state === "running") return;
+  if (notice.glyph !== CALL_HEAD_GLYPH[state]) {
+    throw new BlockShapeError(`${where}: "glyph" must be "${CALL_HEAD_GLYPH[state]}" for state "${state}" (I141) — the state names its mark`);
+  }
+}
+
+/**
  * §3 — `form: "line"` requires `height`. No default: a plot's height is a
  * layout decision the surface must make, and a magic default produces silently
  * wrong-sized plots that nobody notices are wrong. `sparkline` is always 1 and
@@ -153,6 +208,21 @@ const DECLARES_HEIGHT: Readonly<Record<PlotForm, boolean>> = {
  * renderer took and the picture is plausible either way.
  */
 function checkCellContent(cell: Cell, where: string): void {
+  // **I128 — a trend's arrow and tone are derived**, so a field that would
+  // supply either is a second answer, and §088 says what that costs: *a trend
+  // that always paints DOWN as ok misleads on half of every ML metric*.
+  if (cell.trend !== undefined) {
+    const second = (["glyph", "tone", "spark", "bar"] as const).filter((k) => cell[k] !== undefined);
+    if (second.length > 0) {
+      throw new BlockShapeError(
+        `${where}: a trend cell carries ${second.map((k) => `"${k}"`).join(", ")} (C04 I128) — the arrow is ` +
+          `the sign of the trend and its tone the column's polarity, so a supplied one is a second answer`,
+      );
+    }
+    if (!Number.isFinite(cell.trend.from) || !Number.isFinite(cell.trend.to)) {
+      throw new BlockShapeError(`${where}: "trend.from" and "trend.to" are finite numbers (C04 I128)`);
+    }
+  }
   if (cell.spark !== undefined && cell.bar !== undefined) {
     throw new BlockShapeError(
       `${where}: a cell carries a "spark" and a "bar" (C04 I50c) — both fill the ` +
@@ -319,6 +389,7 @@ function checkShape(block: Block): void {
   switch (block.kind) {
     case "notice":
       requireGlyph(block.tone, (block as Notice).glyph, `notice "${block.id}"`);
+      checkCallState(block as Notice);
       break;
     case "plot":
       checkHeatmap(block);
@@ -326,11 +397,36 @@ function checkShape(block: Block): void {
       checkPlotFormat(block);
       checkOrientation(block);
       break;
-    case "table":
+    case "table": {
+      const closed = vocabularies(block);
       for (const row of block.rows) {
         for (const [key, cell] of Object.entries(row.cells)) {
-          requireGlyph(cell.tone, cell.glyph, `table "${block.id}" row "${row.id}" cell "${key}"`);
-          checkCellContent(cell, `table "${block.id}" row "${row.id}" cell "${key}"`);
+          const where = `table "${block.id}" row "${row.id}" cell "${key}"`;
+          // **The exemption is the column's, and it holds only for its words**
+          // (ruling 44). A cell outside the set is refused whatever its tone:
+          // a closed vocabulary a cell could leave is free text by another name.
+          const words = closed.get(key);
+          if (words === undefined) {
+            requireGlyph(cell.tone, cell.glyph, where);
+          } else if (!words.has(cell.text)) {
+            throw new BlockShapeError(
+              `${where}: "${cell.text}" is not a word of column "${key}"'s vocabulary (C04 I6, ruling 44) — ` +
+                `the set is closed, and only its words may carry a tone without a glyph`,
+            );
+          }
+          checkCellContent(cell, where);
+        }
+      }
+      break;
+    }
+    case "form":
+      // I140 — the registry's availability axis, word for word, at this door as
+      // at the wire; a typo here would otherwise draw an enabled field.
+      for (const field of block.fields) {
+        if (field.availability !== undefined && !["enabled", "readonly", "disabled"].includes(field.availability)) {
+          throw new BlockShapeError(
+            `form "${block.id}" field "${field.id}": "availability" is "enabled", "readonly" or "disabled" (C04 I140)`,
+          );
         }
       }
       break;
@@ -451,6 +547,52 @@ export function* descendants(b: Block, seen: WeakSet<object> = new WeakSet()): G
     yield child;
     yield* descendants(child, seen);
   }
+}
+
+/**
+ * The document with every block's `streaming: true` removed, at any depth — or
+ * **the same value** when no block carries it (C13 I22).
+ *
+ * **Settling ends the stream in the document too.** `settle` flipped the entry's
+ * flag and left the blocks as given, so a notice a producer marked streaming kept
+ * the agent's mark and its two reserved cells on a settled entry for the rest of
+ * the session, and on disk. The store calls this in the one change that settles.
+ *
+ * **Identity is the answer to *did anything change*.** `patch.ts`'s `rewrite`
+ * shape: a subtree with nothing to strip is returned as itself, so the store can
+ * compare by reference and leave `rev` alone where the document did not move
+ * (C13 I13). The walk is `hasChildren` and a table row's `detail` — `rewrite`'s
+ * two arms, and the same two `childBlocks` answers.
+ *
+ * The flag is read off the record rather than off `Notice`, because it is a
+ * fact about streaming and not about one kind: a kind that gains the member is
+ * stripped without this function learning its name.
+ */
+export function withoutStreaming(doc: ViewDocument): ViewDocument {
+  const strip = (b: Block): Block => {
+    let next: Block = b;
+    if ((b as { readonly streaming?: unknown }).streaming === true) {
+      const { streaming: _dropped, ...rest } = b as Block & { readonly streaming?: boolean };
+      next = rest as Block;
+    }
+    if (hasChildren(next)) {
+      const container = next;
+      const children = container.children.map(strip);
+      if (children.some((c, i) => c !== container.children[i])) next = { ...container, children } as Block;
+    } else if (next.kind === "table") {
+      const table = next;
+      const rows = table.rows.map((row) => {
+        if (row.detail === undefined) return row;
+        const detail = row.detail.map(strip);
+        return detail.some((d, i) => d !== row.detail?.[i]) ? { ...row, detail } : row;
+      });
+      if (rows.some((r, i) => r !== table.rows[i])) next = { ...table, rows };
+    }
+    return next;
+  };
+  const blocks = doc.blocks.map(strip);
+  if (blocks.every((b, i) => b === doc.blocks[i])) return doc;
+  return deepFreeze({ ...doc, blocks });
 }
 
 /**

@@ -66,7 +66,45 @@ export type TerminalCapabilities = Readonly<{
    */
   keyboardProtocol: "none" | "kitty";
   altScreen: boolean;
+  /**
+   * **The route, not the terminal's** (I15, C22 §6m, §107): `linear` is an
+   * append-only stream of semantic events, `rich` the cursor-addressed frame.
+   * Read from `CALCIUM_RENDER_MODE` and never gated on `TERM` — a terminal that
+   * says `dumb` is one a screen reader may well be driving, and the route is
+   * the reader's to choose.
+   */
+  renderMode: "rich" | "linear";
+  /**
+   * A system notification the terminal takes (I16, C22 §6n): OSC 9, read from
+   * the one identification. Every terminal the table names documents OSC 9
+   * except Windows Terminal, whose OSC 9 is ConEmu's family.
+   */
+  notification: "none" | "osc9";
+  /**
+   * **The rungs the reader opted into** (I17, §014 *every one is opt-in*), from
+   * `CALCIUM_NOTIFY`, in the canonical order `bell`, `system`, `title`. Empty
+   * by default, so nothing rings unasked.
+   */
+  notify: readonly NotifyRung[];
+  /**
+   * Whether the terminal takes an OSC 52 clipboard write (I18, ruling 72), read
+   * from the one identification. **Taken, never worked**: nothing comes back, so
+   * a consumer says *sent to the terminal's clipboard* and not *copied*.
+   */
+  clipboard: "none" | "osc52";
+  /**
+   * The reader's editor command (I19): `$VISUAL`, else `$EDITOR`, else `null`.
+   * A command line, handed to a shell whole — C22 I144's `⌥o` runs it with the
+   * file as an argument, never as text in the command.
+   */
+  editor: string | null;
 }>;
+
+/** §014's three rungs (C22 I128). */
+export type NotifyRung = "bell" | "system" | "title";
+
+/** The canonical order, which is also the order a fact fires them in (C22 I128). */
+export const NOTIFY_RUNGS: readonly NotifyRung[] = Object.freeze(["bell", "system", "title"]);
 
 /**
  * **How a field was answered, named for what would falsify it** (I13, §3).
@@ -176,7 +214,29 @@ export const DEGRADATION: Readonly<
     owner: "C01 C16",
   }),
   altScreen: Object.freeze({
-    behaviour: "The shell refuses to open, prints help, exits 0",
+    behaviour: "The shell refuses to open, prints help, exits 0 — on the rich route; linear needs none",
+    owner: "L4",
+  }),
+  renderMode: Object.freeze({
+    behaviour: "Linear: an append-only stream of semantic events, and no frame",
+    owner: "L4",
+  }),
+  notification: Object.freeze({
+    behaviour: "The system rung writes nothing; the bell and the title still reach a reader who opted into them",
+    owner: "L4",
+  }),
+  notify: Object.freeze({
+    behaviour: "Nothing is opted in, so no rung fires and focus reporting is not taken",
+    owner: "C01 L4",
+  }),
+  clipboard: Object.freeze({
+    behaviour:
+      "A copy goes to a platform clipboard tool when one is found (C21 I20); otherwise the reader is offered a file and told so. Nothing is ever claimed as copied that was not",
+    owner: "L4",
+  }),
+  editor: Object.freeze({
+    behaviour:
+      "The chip preview's open key says `no editor — set $VISUAL or $EDITOR` and runs nothing; the chip stays in the prompt as it was",
     owner: "L4",
   }),
 });
@@ -536,7 +596,83 @@ function detect(env: Readonly<NodeJS.ProcessEnv>): Answers {
     // because the identification is, not because this line remembered to ask.
     keyboardProtocol: fromIdentity(identified, terminal, KEYBOARD_PROTOCOL, "none"),
     altScreen: [usable, "assumed"],
+    renderMode: detectRenderMode(read(env, RENDER_MODE)),
+    // The same `terminal`, so the same gate (I11, I16).
+    notification: fromIdentity(identified, terminal, NOTIFICATION, "none"),
+    notify: detectNotify(read(env, NOTIFY)),
+    // The same `terminal`, so the same gate (I11, I18): tmux's default
+    // `set-clipboard external` ignores an application's OSC 52.
+    clipboard: fromIdentity(identified, terminal, CLIPBOARD, "none"),
+    // **Not gated by `usable` or `TMUX`** (I19, §3's boundary): the rule is
+    // derived from neither `TERM` nor the identification. `read` treats an
+    // empty string as unset, so `VISUAL=""` falls through to `EDITOR`.
+    editor: detectEditor(read(env, "VISUAL"), read(env, "EDITOR")),
   };
+}
+
+/** I19 — `$VISUAL`, else `$EDITOR`: `stated` when either speaks, `null` and `assumed` when neither does. */
+function detectEditor(visual: string | undefined, editor: string | undefined): Answer<string | null> {
+  const said = visual ?? editor;
+  return said === undefined ? [null, "assumed"] : [said, "stated"];
+}
+
+/**
+ * **By each terminal's own documentation** (I16, C22 §6n.1), read 2026-09-25:
+ * iTerm2's escape codes, WezTerm's escape sequences, kitty's desktop
+ * notifications (*also supports the legacy OSC 9 protocol*), Ghostty's OSC 9
+ * page and foot's `foot-ctlseqs(7)`. Windows Terminal's OSC 9 is ConEmu's
+ * family of sub-commands and is unmeasured here, so it is `none`.
+ */
+const NOTIFICATION: Readonly<Record<TerminalName, "none" | "osc9">> = {
+  kitty: "osc9",
+  ghostty: "osc9",
+  iterm2: "osc9",
+  wezterm: "osc9",
+  foot: "osc9",
+  windowsterminal: "none",
+};
+
+/**
+ * **By each terminal's own documentation, unmeasured here** (I18, ruling 72),
+ * as `NOTIFICATION` is. kitty's `clipboard_control` and Ghostty's
+ * `clipboard-write` allow a write by default; WezTerm, foot and Windows Terminal
+ * take one. **iTerm2 is `none` on a default, not on an absence**: it takes the
+ * sequence only once the reader enables *Applications in terminal may access
+ * clipboard*, which ships off — and a reader who has declares `clipboard:
+ * "osc52"`, which is the override D-M10-3 asks for (I4).
+ */
+const CLIPBOARD: Readonly<Record<TerminalName, "none" | "osc52">> = {
+  kitty: "osc52",
+  ghostty: "osc52",
+  iterm2: "none",
+  wezterm: "osc52",
+  foot: "osc52",
+  windowsterminal: "osc52",
+};
+
+/** §014's opt-in (I17). */
+const NOTIFY = "CALCIUM_NOTIFY";
+
+const members = (value: string): string[] =>
+  value.split(",").map((m) => m.trim()).filter((m) => m !== "");
+
+/** The known members, canonical and deduplicated; the unknown are `detectCapabilities`' to warn about. */
+function detectNotify(value: string | undefined): Answer<readonly NotifyRung[]> {
+  if (value === undefined) return [Object.freeze([]), "assumed"];
+  const asked = new Set(members(value));
+  return [Object.freeze(NOTIFY_RUNGS.filter((r) => asked.has(r))), "stated"];
+}
+
+/** §107's environment setting (I15); `--linear` and persistent config wait on 28. */
+const RENDER_MODE = "CALCIUM_RENDER_MODE";
+
+/**
+ * `linear` or `rich` is the reader's statement; anything else is not, and the
+ * route stays `rich` as though the variable were absent — the warning that
+ * names the value is `detectCapabilities`', where warnings are collected (I8).
+ */
+function detectRenderMode(value: string | undefined): Answer<"rich" | "linear"> {
+  return value === "linear" || value === "rich" ? [value, "stated"] : ["rich", "assumed"];
 }
 
 // --- overrides --------------------------------------------------------------
@@ -565,6 +701,13 @@ const VALIDATORS: Readonly<Record<keyof TerminalCapabilities, (v: unknown) => bo
     imageProtocol: oneOf("none", "iterm2", "kitty", "sixel"),
     keyboardProtocol: oneOf("none", "kitty"),
     altScreen: isBoolean,
+    renderMode: oneOf("rich", "linear"),
+    notification: oneOf("none", "osc9"),
+    notify: (v: unknown) =>
+      Array.isArray(v) && v.every((r) => (NOTIFY_RUNGS as readonly unknown[]).includes(r)),
+    clipboard: oneOf("none", "osc52"),
+    // A declared editor is a non-empty command line, or `null` for none (I19).
+    editor: (v: unknown) => v === null || (typeof v === "string" && v.trim() !== ""),
   });
 
 const FIELDS = Object.keys(VALIDATORS) as (keyof TerminalCapabilities)[];
@@ -600,6 +743,27 @@ export function detectCapabilities(
     sources[field] = source;
   }
   const warnings: string[] = [];
+  // **An unreadable route is said out loud** (I15): a reader who set
+  // `CALCIUM_RENDER_MODE=braile` asked for something, and a silent `rich` is
+  // the one answer that looks like it worked.
+  const route = read(env, RENDER_MODE);
+  if (route !== undefined && route !== "linear" && route !== "rich") {
+    warnings.push(
+      `${RENDER_MODE}: ${JSON.stringify(route)} is not a route; ` +
+        `keeping "rich" — the values are "rich" and "linear"`,
+    );
+  }
+
+  // **An unknown rung is said out loud** (I17), as an unknown route is.
+  const notify = read(env, NOTIFY);
+  if (notify !== undefined) {
+    for (const m of new Set(members(notify))) {
+      if ((NOTIFY_RUNGS as readonly string[]).includes(m)) continue;
+      warnings.push(
+        `${NOTIFY}: ${JSON.stringify(m)} is not a rung; dropped — the rungs are "bell", "system" and "title"`,
+      );
+    }
+  }
 
   if (overrides !== undefined) {
     for (const field of FIELDS) {
@@ -607,7 +771,12 @@ export function detectCapabilities(
       const value: unknown = overrides[field];
       if (value === undefined) continue;
       if (VALIDATORS[field](value)) {
-        resolved[field] = value;
+        // The one array field (I17): canonical and frozen, as the environment's is,
+        // so a record never holds a reader's array by reference.
+        resolved[field] =
+          field === "notify"
+            ? Object.freeze(NOTIFY_RUNGS.filter((r) => (value as readonly unknown[]).includes(r)))
+            : value;
         // **Only here** (I13). I4 says an out-of-domain value *is not an
         // override*, and this is the line where that sentence becomes something
         // a reader can observe: the rejected arm below keeps the detected value
@@ -636,9 +805,11 @@ export function detectCapabilities(
 }
 
 /**
- * Alternate screen is the sole hard requirement (D28). No other capability can
- * prevent the shell opening (I7) — everything else has a fallback in §4.
+ * Alternate screen is the sole hard requirement (D28), **on the rich route**
+ * (I7, I15). No other capability can prevent the shell opening — everything
+ * else has a fallback in §4 — and on the linear route nothing can, because the
+ * alternate screen is what a frame needs and linear draws none (C01 I22).
  */
 export function isUsable(caps: TerminalCapabilities): boolean {
-  return caps.altScreen;
+  return caps.renderMode === "linear" || caps.altScreen;
 }

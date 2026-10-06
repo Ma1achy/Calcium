@@ -19,8 +19,17 @@ import { fsIo, report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
 const CONTRAST = "src/presentation/theme/contrast.ts";
-const DARK = "src/presentation/theme/tokens-dark.ts";
-const FOURBIT = "src/presentation/theme/four-bit.ts";
+// **Re-pointed at `tokens.generated.ts` 2026-09-21, because the file this named
+// stopped being the subject.** `tokens-dark.ts`, `tokens-light.ts` and
+// `tokens-high-contrast.ts` were the shipped themes; since M2 the shipped set is
+// the registry's projection and those three are a frozen oracle and a lender of
+// palettes the registry does not carry. Mutating one changes nothing any row
+// measures — **the control went blind and the harness said so**, which is the
+// one failure mode a mutation report cannot show you, because an uncaught live
+// mutant and a blind harness produce the same clean page.
+const DARK = "src/presentation/theme/tokens.generated.ts";
+// The indices moved into the registry by C10 I62; `four-bit.ts` names them.
+const FOURBIT = "src/presentation/theme/four-bit.generated.ts";
 
 // **`test/edge/status.test.ts` is in the set because T3.46 is where the pair is
 // read off a frame.** The two theme suites check the pair as *values*; only the
@@ -50,8 +59,8 @@ const results = runPass({
   run,
   control: {
     file: DARK,
-    from: '    errorGround: "#c62828",',
-    to: '    errorGround: "#ffeeee",',
+    from: '      "errorGround": "#c62828",',
+    to: '      "errorGround": "#ffeeee",',
     why: "white on near-white is 1.1 : 1, so the tag's own 4.5 check and the equality row both go",
   },
   mutations: [
@@ -76,12 +85,22 @@ const results = runPass({
       expect: "T2.14f",
     },
     {
-      // C10 I32's equality half. One literal moves and the frame is two reds —
-      // the defect that survived five rounds of adjusting values by eye.
-      name: "the tag's ground drifts from `tone.error`",
+      // **C10 I32's equality half, inverted — and the inversion is the point.**
+      // This drifted `errorGround` off `tone.error` by one shade, because the
+      // equality was the rule and drifting was the defect that survived five
+      // rounds of adjusting values by eye. R-THM-001 splits the two, so drifting
+      // is now correct and a mutation that does it would survive: `#b71c1c`
+      // holds white at over 4.5 and nothing should object.
+      //
+      // What replaced the equality is a **count** — two themes of ten have the
+      // ground and the tone equal, as a consequence of a loud palette rather
+      // than as a rule. So the mutation is the equality coming back: put
+      // `dark`'s ground on its own tone and three themes have it, which is the
+      // rule re-forming out of a coincidence and is exactly what T2.14e watches.
+      name: "the tag's ground is welded back onto `tone.error`",
       file: DARK,
-      from: '    errorGround: "#c62828",',
-      to: '    errorGround: "#b71c1c",',
+      from: '      "errorGround": "#c62828",',
+      to: '      "errorGround": "#f05a5a",',
       expect: "T2.14e",
     },
     {
@@ -92,8 +111,8 @@ const results = runPass({
       // open key, so no value assertion can ask whether a slot has an answer.
       name: "the 4-bit arm goes back to being absent",
       file: FOURBIT,
-      from: 'not a measurement.\n  "surface.errorGround": 9,\n  "surface.errorInk": 0,',
-      to: "not a measurement.",
+      from: '    "surface.errorGround": 9,\n    "surface.errorInk": 0,\n  }),\n  light:',
+      to: "  }),\n  light:",
       expect: "T3.46",
     },
     {
@@ -103,20 +122,22 @@ const results = runPass({
       // arm is most likely to take, because the ground is the visible half.
       name: "the 4-bit ground arrives without its ink",
       file: FOURBIT,
-      from: 'not a measurement.\n  "surface.errorGround": 9,\n  "surface.errorInk": 0,',
-      to: 'not a measurement.\n  "surface.errorGround": 9,',
+      from: '    "surface.errorGround": 9,\n    "surface.errorInk": 0,\n  }),\n  light:',
+      to: '    "surface.errorGround": 9,\n  }),\n  light:',
       expect: "T3.46",
     },
     {
-      // **The floor put back to the default**, which is the state before §4d.
-      // It is not a defect being restored — it is the exception removed, and the
-      // row exists so the shipped red is measured against the number that
-      // rejects it rather than against a comment saying it was lowered.
-      name: "the `error` floor goes back to 4.5",
+      // **The exception put back**, which is the state before R-THM-001. It
+      // reversed direction when the exception was retired: the mutation used to
+      // be *the floor goes back to 4.5*, restoring the pre-§4d default, and 4.5
+      // is now what ships. So what has to be shown is that the old 2.5 would be
+      // caught if someone reinstated it — a lowered floor forbids nothing and
+      // reads exactly like one that is satisfied (A03 §2).
+      name: "the `error` floor is lowered to 2.5 again",
       file: CONTRAST,
-      from: "  error: 2.5,",
-      to: "  error: 4.5,",
-      expect: "T2.4",
+      from: "  comment: 3,",
+      to: "  comment: 3,\n  error: 2.5,",
+      expect: "T1.7",
     },
   ],
 });

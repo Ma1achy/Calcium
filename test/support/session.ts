@@ -95,6 +95,7 @@ export function fakeFs(): FileSystem {
    * shown to respond to the thing under test* — applied to the filesystem.
    */
   const dirs = new Set<string>();
+  let made = 0;
   const parentOf = (p: string) => p.slice(0, Math.max(0, p.lastIndexOf("/")));
   const ensure = (p: string) => {
     const dir = parentOf(p);
@@ -148,6 +149,19 @@ export function fakeFs(): FileSystem {
       dirs.add(p);
       return Promise.resolve();
     },
+    // C22 I144 — a fresh directory per call, and a removal that takes what is
+    // in it, so a row can ask whether a file outlived its directory.
+    makeTempDir: (prefix) => {
+      made += 1;
+      const dir = `/tmp/${prefix}${String(made)}`;
+      dirs.add(dir);
+      return Promise.resolve(dir);
+    },
+    removeDir: (dir) => {
+      dirs.delete(dir);
+      for (const f of [...files.keys()]) if (f.startsWith(`${dir}/`)) files.delete(f);
+      return Promise.resolve();
+    },
     // A real answer, not an empty list: C19's path and executable sources take
     // this, and a fake returning nothing makes a completion assertion pass for
     // the wrong reason (`test/support/README.md`).
@@ -159,13 +173,43 @@ export function fakeFs(): FileSystem {
   };
 }
 
+/**
+ * The two copy modes, settable so a row can put the graph in one.
+ *
+ * **They were constants and one row was passing on a leak.** T1.4h walks every
+ * binding at its own target, and the `copy` rung's targets were unreachable with
+ * `() => false` hard-wired — so `nativeSelection`'s `escape` row was consumed by
+ * whatever layer the previous iteration had left open, which is the state leak
+ * the loop's own comment warns about at a different target. A second target at
+ * the same rung is what made it visible (M10b).
+ */
+export const COPY_MODES = { native: false, semantic: false };
+
 export const FRAME: FrameQueries = {
-  copyMode: () => false,
-    enterCopyMode: () => undefined,
-  exitCopyMode: () => undefined,
-  region: () => ({ top: 1, height: 20 }),
+  nativeSelection: () => COPY_MODES.native,
+  semanticSelection: () => COPY_MODES.semantic,
+  semanticSelectionCount: () => 0,
+  semanticDrag: () => false,
+  enterSemanticSelection: () => undefined,
+  escapeSemanticSelection: () => undefined,
+  selectEntryUnderCaret: () => undefined,
+  selectAllLoadedEntries: () => undefined,
+  copySelectedEntries: () => undefined,
+  copyAndLeaveSemanticSelection: () => undefined,
+  toggleSemanticRect: () => undefined,
+  toast: () => undefined,
+  moveSemanticCaret: () => undefined,
+  enterNativeSelection: () => undefined,
+  exitNativeSelection: () => undefined,
+  // The transcript's box as the frame composes it (C14 I57): one column in
+  // for the rail. Its width is the 80 the unit rows resize their viewport to
+  // (`graphAt80` and its siblings), since element columns are placed at it; a
+  // real frame's layer region is one wider, and nothing here derives one from
+  // the other.
+  region: () => ({ top: 1, left: 1, height: 20, width: 80 }),
   overlayRegion: () => ({ width: 80, height: 24 }),
   promptAnchor: () => ({ row: 21, rows: 1 }),
+  promptCap: () => 12,
   mouseEnabled: () => true,
   raiseExitConfirm: () => undefined,
 };

@@ -109,8 +109,9 @@ const results = runPass({
       // read none.
       name: "SCRATCH-NOT-HANDED: the session windows the entry with no scratch",
       file: SESSION,
-      from: "    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, memoised, graph.scratch);",
-      to: "    const pieces = windowEntry(entryLayout(entry.doc.blocks, width), from, to, memoised);",
+      // Re-anchored 2026-09-27 (C22 I131): the entry is stamped before it is laid out.
+      from: "    const pieces = windowEntry(entryLayout(blocks, width), from, to, memoised, graph.scratch);",
+      to: "    const pieces = windowEntry(entryLayout(blocks, width), from, to, memoised);",
       expect: "T4.89g",
     },
     {

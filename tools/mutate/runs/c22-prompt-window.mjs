@@ -94,6 +94,19 @@ const MUTATIONS = [
     to: "  const last = out.length - 1;",
     expect: "T1.21e",
   },
+  {
+    // **The echo wrapped whole** (C22 I33, amended), as it shipped: the
+    // break measured as nothing, one row holding every line, and the
+    // terminal moving down mid-row.
+    name: "the command echo wraps the command whole",
+    file: PAINT,
+    // Re-anchored on review batch 4 (F1401): the chain now neutralises each
+    // line (C17 I36), so the anchor is the split alone and the revert makes the
+    // whole command one line.
+    from: "  const wrapped = command\n    .split(/\\r\\n|\\r|\\n/u)\n",
+    to: "  const wrapped = [command]\n",
+    expect: "T1.172 (C22",
+  },
 ];
 
 /**

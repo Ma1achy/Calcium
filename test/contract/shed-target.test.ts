@@ -1,0 +1,402 @@
+// C09 I113, I108 — a row that sheds says so with `+n`, and is a target whose
+// peek holds what it withheld (§104, parked 19).
+//
+// **Read from the frame and from the registry, never from `shedRow`.** The mark
+// and the elements are two readers of one plan, so a row asserting the plan
+// would agree with both whether or not they agree with each other.
+import { describe, expect, it } from "vitest";
+
+import { block, type Block } from "../../src/data/viewmodel/index.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, measurable, registry } from "../support/render.js";
+import { styledScreenFrom, type StyledCell } from "../support/styled-screen.js";
+import { background, focusStyle, selectionStyle } from "../../src/presentation/blocks/paint.js";
+import { sgr } from "../../src/terminal/escapes.js";
+import { cells } from "../../src/presentation/text.js";
+
+const SGR = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "gu");
+const plain = (line: string): string => line.replace(SGR, "");
+
+/** The row's last token, which is where the mark is drawn. */
+const lastToken = (row: string): string => row.trimEnd().split(" ").at(-1) ?? "";
+
+/**
+ * Each shedding kind, the width it sheds at, the width it does not, and what
+ * each item withheld at the narrow one — label against full text.
+ *
+ * **The narrow widths were read off the frame**, one per kind, as the widest
+ * width at which the kind draws a mark — `keyValue` 7–9, `events` 16–24,
+ * `comparison` 14 and below, `steps` 9 alone (below it the reservation gives
+ * way and the detail goes unmarked). The expected detail is what the frame at
+ * that width does not show.
+ */
+const CASES: readonly Readonly<{
+  kind: string;
+  block: Block;
+  narrow: number;
+  wide: number;
+  firstRow: number;
+  withheld: readonly (readonly Readonly<{ label: string; value: string }>[])[];
+}>[] = [
+  {
+    kind: "keyValue",
+    block: block({
+      kind: "keyValue",
+      id: "k",
+      rows: [
+        { label: "endpoint", value: "https://api.internal.example/v2" },
+        { label: "region", value: "eu-west-1" },
+      ],
+    }),
+    narrow: 9,
+    wide: 60,
+    firstRow: 0,
+    withheld: [
+      [{ label: "endpoint", value: "https://api.internal.example/v2" }],
+      [{ label: "region", value: "eu-west-1" }],
+    ],
+  },
+  {
+    kind: "events",
+    block: block({
+      kind: "events",
+      id: "e",
+      events: [
+        { ts: "22:13:20", type: "deploy", message: "rolled the fleet forward" },
+        { ts: "22:14:02", type: "warn", message: "one node lagged" },
+      ],
+    }),
+    narrow: 24,
+    wide: 60,
+    firstRow: 0,
+    withheld: [
+      [{ label: "type", value: "deploy" }],
+      [{ label: "type", value: "warn" }],
+    ],
+  },
+  {
+    kind: "comparison",
+    block: block({
+      kind: "comparison",
+      id: "c",
+      labels: ["before", "after"],
+      rows: [
+        { field: "latency", a: "412 ms", b: "119 ms" },
+        { field: "throughput", a: "3.2k/s", b: "9.8k/s" },
+      ],
+    }),
+    narrow: 14,
+    wide: 60,
+    firstRow: 1,
+    withheld: [
+      [{ label: "before", value: "412 ms" }],
+      [{ label: "before", value: "3.2k/s" }],
+    ],
+  },
+  {
+    kind: "steps",
+    block: block({
+      kind: "steps",
+      id: "s",
+      steps: [
+        { label: "install dependencies", state: "done", detail: "412 packages in 9s" },
+        { label: "run the whole suite", state: "active" },
+      ],
+    }),
+    narrow: 9,
+    wide: 60,
+    firstRow: 0,
+    // The second step has no detail: it draws the block's mark and withheld
+    // nothing of its own, so it is a target with no peek.
+    withheld: [[{ label: "install dependencies", value: "412 packages in 9s" }], []],
+  },
+];
+
+describe("C09 I113 — a shed row is a target", () => {
+  it("T1.80 (C09 I108, I113): the shed mark is `+n` and the same string at both rungs", () => {
+    for (const c of CASES) {
+      const full = measurable({ capabilities: FULL_CAPS }).renderToLines(c.block, c.narrow).map(plain);
+      const ascii = measurable({ capabilities: ASCII_CAPS }).renderToLines(c.block, c.narrow).map(plain);
+      const items = full.slice(c.firstRow);
+      expect(items.length, `${c.kind} draws its items`).toBe(c.withheld.length);
+      for (const row of items) expect(lastToken(row), `${c.kind}@${String(c.narrow)} |${row}|`).toMatch(/^\+[0-9]+$/u);
+      // The same mark at both rungs, row for row — the lead is not a slot.
+      expect(ascii.map(lastToken), `${c.kind}: the rungs draw one mark`).toEqual(full.map(lastToken));
+      // The old lead is in no shed row, at either rung.
+      for (const row of [...full, ...ascii]) expect(row, `${c.kind}: no residue lead`).not.toMatch(/(⋯|\.\.\.)[0-9]/u);
+    }
+  });
+
+  it("T1.81 (C09 I113, C26 §5): a shedding kind publishes one row element per item whose detail is exactly the withheld parts, and none when nothing sheds", () => {
+    const r = registry();
+    for (const c of CASES) {
+      const elements = r.elementsOf(c.block, c.narrow);
+      expect(elements.map((e) => e.id), `${c.kind}: one element per item`).toEqual(
+        c.withheld.map((_, i) => `shed-${String(i)}`),
+      );
+      elements.forEach((e, i) => {
+        expect(e.level, `${c.kind} ${e.id}`).toBe("row");
+        expect(e.rows, `${c.kind} ${e.id} sits on its item's row`).toEqual({ from: c.firstRow + i, to: c.firstRow + i + 1 });
+        const want = c.withheld[i] ?? [];
+        if (want.length === 0) {
+          expect(e.detail, `${c.kind} ${e.id} lost nothing, so it has no peek`).toBeUndefined();
+        } else {
+          expect(e.detail?.kind, `${c.kind} ${e.id}`).toBe("keyValue");
+          expect(e.detail?.kind === "keyValue" ? e.detail.rows.map(({ label, value }) => ({ label, value })) : null, `${c.kind} ${e.id}: exactly what it withheld`).toEqual(want);
+        }
+      });
+      // **The frame agrees**: every withheld value is absent from the drawn row.
+      const drawn = measurable({ capabilities: FULL_CAPS }).renderToLines(c.block, c.narrow).map(plain);
+      c.withheld.forEach((parts, i) => {
+        for (const p of parts) expect(drawn[c.firstRow + i], `${c.kind} row ${String(i)} does not draw ${p.value}`).not.toContain(p.value);
+      });
+      // The control: at a width that sheds nothing the kind is atomic, as it was.
+      expect(r.elementsOf(c.block, c.wide), `${c.kind}@${String(c.wide)} sheds nothing`).toEqual([]);
+    }
+  });
+
+  it("T1.82 (C09 I113, C02 I9): the elements never under-list at the wide convention", () => {
+    // `±` is East-Asian Ambiguous: `±±` is two cells at `narrow` and four at
+    // `wide`, which moves the value's floor and so the width the row sheds at.
+    const kv = block({
+      kind: "keyValue",
+      id: "k",
+      rows: [
+        { label: "tolerance", value: "±±" },
+        { label: "drift", value: "±±" },
+      ],
+    });
+    const WIDE = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+    const r = registry();
+    let covered = 0;
+    let overListed = 0;
+    for (let width = 4; width <= 14; width += 1) {
+      const ids = new Map(r.elementsOf(kv, width).map((e) => [e.id, e]));
+      const wide = measurable({ capabilities: WIDE }).renderToLines(kv, width).map(plain);
+      wide.forEach((row, i) => {
+        if (!/^\+[0-9]+$/u.test(lastToken(row))) return;
+        const e = ids.get(`shed-${String(i)}`);
+        expect(e, `wide@${String(width)} row ${String(i)} draws a mark and has no element`).toBeDefined();
+        expect(e?.detail?.kind === "keyValue" ? e.detail.rows.map((x) => x.value) : [], `wide@${String(width)} row ${String(i)}`).toEqual(["±±"]);
+        covered += 1;
+      });
+      // The limit, in its chosen direction: a narrow row that draws the value
+      // can still be a target — over-listing, never under-listing.
+      const narrow = measurable({ capabilities: FULL_CAPS }).renderToLines(kv, width).map(plain);
+      narrow.forEach((row, i) => {
+        if (row.includes("±±") && ids.has(`shed-${String(i)}`)) overListed += 1;
+      });
+    }
+    // Read off the frame: marks at 7, 8 and 9 on both rows at `wide`, and the
+    // two rows at 8 and 9 that a narrow terminal still draws whole.
+    expect(covered, "the wide render sheds, so there are marks to cover").toBe(6);
+    expect(overListed, "the narrow render over-lists at 8 and 9, as stated").toBe(4);
+  });
+});
+
+describe("C09 I124, I125 — ruling 42: a shed row expands its block in place", () => {
+  const foldOf = (b: Block): Block => {
+    const next = registry().fold(b);
+    if (next === null) throw new Error(`${b.kind} declared no fold`);
+    return next;
+  };
+  /** A detail line: two cells of indent, then `label  value` or the value alone, the value cut and never shed. */
+  const readsAs = (line: string, part: Readonly<{ label: string; value: string }>): boolean => {
+    const body = line.trimEnd();
+    if (!body.startsWith("  ")) return false;
+    const text = body.slice(2);
+    const rest = text.startsWith(`${part.label}  `) ? text.slice(part.label.length + 2) : text;
+    const cut = rest.replace(/[…~]$/u, "");
+    return cut.length > 0 && part.value.startsWith(cut);
+  };
+
+  it("T1.86 (C09 I124, I113, ruling 42): each shedding kind's shed elements carry expand on the block, the registry's fold sets and removes expanded, and expanded draws each item's withheld parts beneath its row as label and value", () => {
+    for (const c of CASES) {
+      // `⏎` on any shed row expands the whole block (ruling 42 (a)).
+      const collapsedEls = registry().elementsOf(c.block, c.narrow);
+      for (const e of collapsedEls) {
+        expect(e.activate, `${c.kind} ${e.id}`).toEqual({ kind: "expand", label: "expand", target: c.block.id });
+      }
+      const open = foldOf(c.block);
+      expect((open as { expanded?: boolean }).expanded, `${c.kind}: the fold writes the flag`).toBe(true);
+      expect(foldOf(open), `${c.kind}: folded twice, the producer's block`).toEqual(c.block);
+
+      for (const caps of [FULL_CAPS, ASCII_CAPS]) {
+        const kit = measurable({ capabilities: caps });
+        const closed = kit.renderToLines(c.block, c.narrow).map(plain);
+        const lines = kit.renderToLines(open, c.narrow).map(plain);
+        const els = registry().elementsOf(open, c.narrow);
+        expect(els.map((e) => e.id), `${c.kind}: the same targets expanded`).toEqual(collapsedEls.map((e) => e.id));
+        els.forEach((e, i) => {
+          const want = c.withheld[i] ?? [];
+          expect(e.rows.to - e.rows.from, `${c.kind} ${e.id} spans its row and its parts`).toBe(1 + want.length);
+          expect(e.detail, `${c.kind} ${e.id}: nothing withheld from view, so no peek`).toBeUndefined();
+          expect(e.activate?.label, `${c.kind} ${e.id}`).toBe("collapse");
+          // The item's own row is the row the collapsed block drew.
+          expect(lines[e.rows.from], `${c.kind} ${e.id}: the row itself`).toBe(closed[c.firstRow + i]);
+          want.forEach((part, k) => {
+            const line = lines[e.rows.from + 1 + k] ?? "";
+            expect(readsAs(line, part), `${c.kind} ${e.id} part ${part.label}: |${line}|`).toBe(true);
+          });
+        });
+        // The header — `comparison`'s — is the collapsed header.
+        expect(lines.slice(0, c.firstRow), `${c.kind}: the header`).toEqual(closed.slice(0, c.firstRow));
+
+        // **The control**: at a width that sheds nothing, expanded draws exactly
+        // the collapsed frame and there is nothing to press.
+        expect(kit.renderToLines(open, c.wide).map(plain), `${c.kind}@${String(c.wide)}`).toEqual(
+          kit.renderToLines(c.block, c.wide).map(plain),
+        );
+      }
+      expect(registry().elementsOf(open, c.wide), `${c.kind}@${String(c.wide)}: atomic`).toEqual([]);
+    }
+
+    // `events`' withheld type reads `label  value` whole at twenty-four columns,
+    // which is the case the label is kept for; `keyValue` at nine gives the
+    // label up so its value shows — the one the frame ruled.
+    const events = measurable({ capabilities: FULL_CAPS }).renderToLines(foldOf(CASES[1]!.block), 24).map(plain);
+    expect(events[1]?.trimEnd()).toBe("  type  deploy");
+    const kv = measurable({ capabilities: FULL_CAPS }).renderToLines(foldOf(CASES[0]!.block), 9).map(plain);
+    expect(kv[1]).toBe("  https:…");
+
+    // **The controls on the hook**: a kind with no fold, and a scroll with none declared.
+    const r = registry();
+    expect(r.fold(block({ kind: "logs", id: "l", lines: [{ ts: "1", level: "info", message: "m" }] }))).toBeNull();
+    expect(r.fold(block({ kind: "scroll", id: "sc", height: 2, children: [block({ kind: "raw", id: "x", text: "a" })] }))).toBeNull();
+  });
+
+  it("T2.191 (C09 I125, I124, I1, I26): the four kinds expanded measure exactly the rows they draw from 4 to 80 columns at both rungs and wide, and keyValue's window keeps I26's equality", () => {
+    const WIDE = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
+    const ambiguous = block({
+      kind: "keyValue",
+      id: "amb",
+      rows: [
+        { label: "tolerance", value: "±±" },
+        { label: "drift", value: "±±" },
+      ],
+    });
+    const subjects = [...CASES.map((c) => c.block), ambiguous].map(foldOf);
+    let responded = 0;
+    for (const caps of [FULL_CAPS, ASCII_CAPS, WIDE, { ...FULL_CAPS, ambiguousWidth: "narrow" as const }]) {
+      const kit = measurable({ capabilities: caps });
+      for (const open of subjects) {
+        for (let width = 4; width <= 80; width += 1) {
+          const lines = kit.renderToLines(open, width);
+          const m = kit.measure(open, width);
+          expect(m, `${open.kind}@${String(width)} ${caps.unicode}/${caps.ambiguousWidth}`).toBe(lines.length);
+          for (const line of lines) {
+            expect(cells(plain(line), caps.ambiguousWidth), `${open.kind}@${String(width)} |${plain(line)}|`).toBeLessThanOrEqual(width);
+          }
+          const els = registry().elementsOf(open, width);
+          let next = els[0]?.rows.from ?? 0;
+          for (const e of els) {
+            expect(e.rows.from, `${open.kind}@${String(width)} ${e.id} follows its predecessor`).toBe(next);
+            expect(e.rows.to, `${open.kind}@${String(width)} ${e.id} inside the block`).toBeLessThanOrEqual(m);
+            next = e.rows.to;
+          }
+          if (els.length > 0) expect(next, `${open.kind}@${String(width)}: the last item ends the block`).toBe(m);
+          if (m > kit.measure(CASES.find((c) => c.block.id === open.id)?.block ?? ambiguous, width)) responded += 1;
+        }
+      }
+    }
+    // **The fixture is shown to respond**: the sweep reaches widths that shed.
+    expect(responded, "expanded measures above collapsed somewhere in the sweep").toBeGreaterThan(20);
+
+    // keyValue's window over an expanded block that sheds (C09 I26), at every range.
+    const kit = measurable({ capabilities: FULL_CAPS });
+    const open = subjects[0]!;
+    const whole = kit.renderToLines(open, 9).map(plain);
+    const total = kit.measure(open, 9);
+    expect(total, "the subject sheds and is expanded at 9").toBe(4);
+    for (let from = 0; from < total; from += 1) {
+      for (let to = from + 1; to <= total; to += 1) {
+        const w = kit.window(open, 9, from, to);
+        expect(w).toBeDefined();
+        if (w === undefined) continue;
+        expect(kit.measure(w.block, 9) - w.skipRows - w.dropRows, `[${String(from)}, ${String(to)})`).toBe(to - from);
+        const piece = kit.renderToLines(w.block, 9).map(plain);
+        expect(piece.slice(w.skipRows, piece.length - w.dropRows)).toEqual(whole.slice(from, to));
+      }
+    }
+  });
+});
+
+describe("C09 I137 — a shed row is a row shape and draws its focus", () => {
+  /** A frame as styled cells, one grid row per line. */
+  const grid = (lines: readonly string[], width: number): readonly (readonly StyledCell[])[] =>
+    styledScreenFrom([lines.join("\r\n")], { columns: width, rows: lines.length });
+  /** The background parameters a surface resolves to, as `styled-screen` records them. */
+  const bgOf = (style: ReturnType<typeof background>): string => (sgr(style).match(/\u001b\[([0-9;]*)m/u) ?? [])[1] ?? "";
+  const FOCUS_BG = bgOf(focusStyle(DARK_THEME, FULL_CAPS));
+  const SELECTION_BG = bgOf(background("surface.selection", DARK_THEME, FULL_CAPS));
+  const drawn = (row: readonly StyledCell[]): readonly StyledCell[] => row.filter((c) => c.ch !== " ");
+
+  it("T1.151 (C09 I137, I113): a focused shed row takes focusGround and weight, a selected one selection's ground, and a stale focus at a wide width paints nothing", () => {
+    expect(FOCUS_BG, "the focus ground resolves at 24-bit").toMatch(/^48;/u);
+    expect(SELECTION_BG, "and so does selection's").toMatch(/^48;/u);
+    expect(selectionStyle(DARK_THEME, MONO_UNICODE_CAPS).inverse, "selection's 1-bit rung is inversion").toBe(true);
+    for (const c of CASES) {
+      const kit = (caps: typeof FULL_CAPS, focus: unknown) =>
+        measurable({ capabilities: caps, focus: focus as never }).renderToLines(c.block, c.narrow);
+      const els = registry().elementsOf(c.block, c.narrow);
+      expect(els.map((e) => e.id), `${c.kind} publishes its rows`).toEqual(["shed-0", "shed-1"]);
+      const at = (id: string): number => els.find((e) => e.id === id)!.rows.from;
+
+      for (const caps of [FULL_CAPS, MONO_UNICODE_CAPS]) {
+        const rest = kit(caps, null);
+        // The head alone.
+        const head = kit(caps, { blockId: c.block.id, rowId: "shed-1", selected: undefined });
+        rest.forEach((line, i) => {
+          if (i !== at("shed-1")) expect(head[i], `${c.kind} depth=${String(caps.colourDepth)}: row ${String(i)} is untouched`).toBe(line);
+        });
+        const lit = drawn(grid(head, c.narrow)[at("shed-1")]!);
+        expect(lit.length, `${c.kind}: the head row draws something`).toBeGreaterThan(0);
+        for (const cell of lit) {
+          expect(cell.style.attrs, `${c.kind} depth=${String(caps.colourDepth)} '${cell.ch}': the head is bold`).toContain(1);
+          expect(cell.style.attrs, `${c.kind}: focus is never inversion`).not.toContain(7);
+          expect(cell.style.attrs, `${c.kind}: bold replaces dim`).not.toContain(2);
+          if (caps === FULL_CAPS) expect(cell.style.bg, `${c.kind} '${cell.ch}': on focusGround`).toBe(FOCUS_BG);
+        }
+        // An extent: shed-0 and shed-1, the head on shed-1.
+        const extent = kit(caps, {
+          blockId: c.block.id,
+          rowId: "shed-1",
+          selected: [{ blockId: c.block.id, rowId: "shed-0" }, { blockId: c.block.id, rowId: "shed-1" }],
+        });
+        const g = grid(extent, c.narrow);
+        const resting = grid(rest, c.narrow)[at("shed-0")]!;
+        for (const [k, cell] of g[at("shed-0")]!.entries()) {
+          if (cell.ch === " ") continue;
+          // The extent adds no weight: a cell is bold exactly where its resting
+          // ink already was (a `done` step's mark is bold at 1-bit by its tone).
+          expect(cell.style.attrs.includes(1), `${c.kind} '${cell.ch}': the extent adds no weight`).toBe(resting[k]!.style.attrs.includes(1));
+          if (caps === FULL_CAPS) expect(cell.style.bg, `${c.kind}: the extent on selection's ground`).toBe(SELECTION_BG);
+          else expect(cell.style.attrs, `${c.kind}: the extent inverts at 1-bit`).toContain(7);
+        }
+        for (const cell of drawn(g[at("shed-1")]!)) {
+          expect(cell.style.attrs, `${c.kind}: the selected head keeps its weight`).toContain(1);
+          if (caps === FULL_CAPS) expect(cell.style.bg, `${c.kind}: the selected head on selection's ground`).toBe(SELECTION_BG);
+          else expect(cell.style.attrs, `${c.kind}: and inverts with the extent`).toContain(7);
+        }
+        // Attributes only: no cell moves.
+        for (const frame of [head, extent]) expect(frame.map(plain), `${c.kind}: visible text`).toEqual(rest.map(plain));
+      }
+
+      // **The gate** (S2): the same focus where nothing sheds paints nothing.
+      const wideRest = measurable({ capabilities: FULL_CAPS, focus: null }).renderToLines(c.block, c.wide);
+      const wideFocus = measurable({ capabilities: FULL_CAPS, focus: { blockId: c.block.id, rowId: "shed-0" } as never }).renderToLines(c.block, c.wide);
+      expect(registry().elementsOf(c.block, c.wide), `${c.kind} publishes nothing wide`).toEqual([]);
+      expect(wideFocus, `${c.kind}: a stale shed-0 at ${String(c.wide)} paints nothing`).toEqual(wideRest);
+
+      // **Expanded** (S5): the ground and the weight on the item's row only.
+      const open = { ...c.block, expanded: true } as Block;
+      const openEls = registry().elementsOf(open, c.narrow);
+      const openRest = measurable({ capabilities: FULL_CAPS, focus: null }).renderToLines(open, c.narrow);
+      const openFocus = measurable({ capabilities: FULL_CAPS, focus: { blockId: c.block.id, rowId: "shed-0" } as never }).renderToLines(open, c.narrow);
+      const headRow = openEls.find((e) => e.id === "shed-0")!.rows.from;
+      openRest.forEach((line, i) => {
+        if (i !== headRow) expect(openFocus[i], `${c.kind} expanded: line ${String(i)} keeps its own ground`).toBe(line);
+      });
+      expect(openFocus[headRow], `${c.kind} expanded: the head row is lit`).not.toBe(openRest[headRow]);
+    }
+  });
+});

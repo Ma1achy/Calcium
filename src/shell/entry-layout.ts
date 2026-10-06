@@ -18,9 +18,9 @@
  */
 
 import type { Block, Group } from "../data/viewmodel/index.js";
-import { block as rebuild } from "../data/viewmodel/index.js";
-import { glyphFor } from "../presentation/blocks/index.js";
-import type { BlockRegistry, NavElement } from "../presentation/blocks/index.js";
+import { block as rebuild, contentWidth, hasChildren, paddingOf } from "../data/viewmodel/index.js";
+import { glyphCells, glyphFor } from "../presentation/blocks/index.js";
+import type { BlockRegistry, PlacedElement } from "../presentation/blocks/index.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
 import { paint as paintSpans, tone } from "../presentation/blocks/paint.js";
 import { glyphForMask, LINE_DOWN, LINE_LEFT, LINE_RIGHT, LINE_UP } from "../presentation/plot/linedraw.js";
@@ -40,8 +40,16 @@ import type { EntryParts } from "./render-cache.js";
  */
 export const HOOK_INDENT = 2;
 
-/** The body's indent under the hook, in cells — the hook's column, the mark, and its trailing space. */
-export const BODY_INDENT = HOOK_INDENT + 2;
+/**
+ * The body's indent under the hook, in cells — the hook's column, the mark's
+ * reservation, and its trailing space (C22 I83).
+ *
+ * **Derived from the reservation, not written**: five cells, because the
+ * registry's ASCII hook is `` `- `` and the slot reserves two at every rung
+ * (C09 I5, R-GLY-003). It was `HOOK_INDENT + 2`, which was right only while the
+ * ASCII hook was one character and drew `` `-text `` the day it became two.
+ */
+export const BODY_INDENT = HOOK_INDENT + glyphCells("continuation") + 1;
 
 /**
  * One gutter column per level of nesting, and it is the body's indent (C22 I89,
@@ -90,14 +98,14 @@ function runRows(
   return run.blank ? ENTRY_GAP : measureSequence(run.blocks, run.width);
 }
 
-/** Whether a document begins as a card — a `step` notice at block 0 (C23 I54). */
+/** Whether a document begins as a card — a call head at block 0 (C23 I54). */
 export function isCard(blocks: readonly Block[]): boolean {
   const head = blocks[0];
-  return head !== undefined && head.kind === "notice" && head.glyph === "step";
+  return head !== undefined && head.kind === "notice" && head.state !== undefined;
 }
 
 /**
- * A nested card (C22 I89): a `group` column whose first block is a `step`
+ * A nested card (C22 I89): a `group` column whose first block is a call head
  * notice. The composer builds one per child call (C23 I62); the layout reads the
  * shape and never a flag, so a producer cannot declare a card it did not draw.
  */
@@ -282,8 +290,8 @@ export function elementsOfEntry(
   blocks: readonly Block[],
   width: number,
   command?: string,
-): readonly Readonly<{ blockId: string; element: NavElement }>[] {
-  const out: Readonly<{ blockId: string; element: NavElement }>[] = [];
+): readonly PlacedElement[] {
+  const out: PlacedElement[] = [];
   // **The head copies the invocation** (I90): `y` on a card's head yields what
   // ran, and `⌃a y` yields it first, followed by the body's own copies through
   // C26 I16's one aggregator. Every other element's `copy` is its block's — a
@@ -291,9 +299,15 @@ export function elementsOfEntry(
   const headId = command !== undefined && isCard(blocks) ? blocks[0]?.id : undefined;
   let top = 0;
   for (const run of entryLayout(blocks, width)) {
-    for (const { blockId, element } of registry.elementsIn(run.blocks, run.width)) {
+    for (const { blockId, element, pane } of registry.elementsIn(run.blocks, run.width)) {
       out.push({
         blockId,
+        // **Carried, not dropped** (C26 I28): the walk records the split pane
+        // and this lift is a layer above it, so a record rebuilt from two of
+        // its three members loses the one `↓` needs to keep to a pane.
+        ...(pane === undefined
+          ? {}
+          : { pane: Object.freeze({ ...pane, top: top + pane.top, left: run.indent + pane.left }) }),
         element: Object.freeze({
           ...element,
           ...(blockId === headId && command !== undefined ? { copy: command } : {}),
@@ -304,6 +318,89 @@ export function elementsOfEntry(
           }),
         }),
       });
+    }
+    top += runRows(registry.measureSequence, run);
+  }
+  return Object.freeze(out);
+}
+
+/**
+ * The width block `id` is handed inside an entry, and the width inside its
+ * padding, or `null` where the entry holds no such block (C22 I117, C09 I126).
+ *
+ * **`outer` is what a registry member takes** — `measure`, `elementsOf` — and
+ * **`inner` is what a definition computes its own columns at**: a split's
+ * divider, a tape's window. The runs' widths, then the block library's
+ * `childWidthsOf` down the path, which is the width each renderer draws each
+ * child at — a scroll's bar, a right pane's bar and an aligned cell included.
+ *
+ * **It descended by C04's `childWidths` and that was one width too many**
+ * (C09 §7i). The division is right for a panel and a share and blind to the
+ * three narrowings the library owns, so a split inside a box with a bar was
+ * clamped one column wider than it was drawn. A nested split is narrower than
+ * the frame, and a clamp at the frame's width writes a divider the renderer
+ * then clamps again, which is a key that did nothing while a patch said it had.
+ */
+export function blockWidthInEntry(
+  registry: Pick<BlockRegistry, "childWidthsOf">,
+  blocks: readonly Block[],
+  width: number,
+  id: string,
+): Readonly<{ outer: number; inner: number }> | null {
+  const find = (block: Block, outer: number): Readonly<{ outer: number; inner: number }> | null => {
+    // **Inside the padding** for `inner`, which the registry takes off before a
+    // definition sees its width (C09 I80).
+    if (block.id === id) return { outer, inner: contentWidth(block, outer) };
+    if (!hasChildren(block)) return null;
+    const widths = registry.childWidthsOf(block, outer);
+    for (const [i, child] of block.children.entries()) {
+      const w = widths[i];
+      if (w === undefined) continue;
+      const found = find(child, w);
+      if (found !== null) return found;
+    }
+    return null;
+  };
+  for (const run of entryLayout(blocks, width)) {
+    for (const block of run.blocks) {
+      const found = find(block, run.width);
+      if (found !== null) return found;
+    }
+  }
+  return null;
+}
+
+/** A top-level block's content rows and its run's columns, in entry space (C14 I51, I60). */
+export type BlockSpanOfEntry = Readonly<{
+  blockId: string;
+  from: number;
+  to: number;
+  cols: Readonly<{ from: number; to: number }>;
+}>;
+
+/**
+ * Each top-level block's **content** rows in entry space (C14 I51) — the runs
+ * and the row cursor `elementsOfEntry` uses, so the two cannot disagree about
+ * where a block is. Padding is trimmed from both ends: the selection's ground
+ * goes on a block's first row (C14 I39), and a `gapBefore` row is blank.
+ */
+export function blockSpansOfEntry(
+  registry: Pick<BlockRegistry, "measure" | "measureSequence">,
+  blocks: readonly Block[],
+  width: number,
+): readonly BlockSpanOfEntry[] {
+  const out: BlockSpanOfEntry[] = [];
+  let top = 0;
+  for (const run of entryLayout(blocks, width)) {
+    let row = top; // cells-ok — a row cursor, not a width
+    // **The run's columns, in entry-line cells** (C14 I60): the gutter before
+    // `run.indent` is the entry's, and a rectangle's column clamps inside this.
+    const cols = Object.freeze({ from: run.indent, to: run.indent + run.width });
+    for (const block of run.blocks) {
+      const height = registry.measure(block, run.width);
+      const pad = paddingOf(block);
+      out.push(Object.freeze({ blockId: block.id, from: row + pad.t, to: row + height - pad.b, cols }));
+      row += height;
     }
     top += runRows(registry.measureSequence, run);
   }
@@ -449,9 +546,11 @@ function assemble(
 /**
  * One gutter cell's text, `GUTTER_UNIT` cells wide (I88, I89): `HOOK_INDENT`
  * blanks, then the glyph or glyphs, muted, padded to the unit. Every glyph is
- * one cell at both width conventions — `continuation` is Neutral (C09 I5) and
+ * one cell per character at both width conventions — `continuation` is Neutral
+ * and its ASCII `` `- `` is two characters in two cells (C09 I5), and
  * `glyphForMask` flattens to ASCII where box drawing would double (F293) — so
- * the geometry the measurer committed is the geometry drawn.
+ * padding by character count is padding by cells, and the geometry the
+ * measurer committed is the geometry drawn.
  */
 function gutterCell(cell: GutterCell, options: RenderOptions): string {
   if (cell === "blank") return " ".repeat(GUTTER_UNIT);
@@ -463,7 +562,7 @@ function gutterCell(cell: GutterCell, options: RenderOptions): string {
         ? glyphForMask(LINE_UP | LINE_DOWN, "sharp", caps)
         : `${glyphForMask(cell === "branch" ? LINE_UP | LINE_DOWN | LINE_RIGHT : LINE_UP | LINE_RIGHT, "sharp", caps)}${glyphForMask(LINE_LEFT | LINE_RIGHT, "sharp", caps)}`;
   const painted = paintSpans([{ text: glyphs, style: tone("muted", options.theme, caps) }]);
-  const pad = GUTTER_UNIT - HOOK_INDENT - [...glyphs].length; // cells-ok — every gutter glyph is one cell by construction (C09 I5, F293)
+  const pad = GUTTER_UNIT - HOOK_INDENT - [...glyphs].length; // cells-ok — one cell per character by construction (C09 I5, F293)
   return `${" ".repeat(HOOK_INDENT)}${painted}${" ".repeat(Math.max(0, pad))}`;
 }
 

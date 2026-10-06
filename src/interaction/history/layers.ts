@@ -18,11 +18,7 @@ import { cells, type Block, type Layer } from "./deps.js";
 import type { Anchor, HistoryEntry, SearchState } from "./types.js";
 
 export const SEARCH_ID = "reverse-search";
-export const CONFIRM_ID = "history-clear-confirm";
 export const LIST_ID = "history-list";
-
-/** Padding either side plus C15's border, as C19's menu reckons it. */
-const CHROME_CELLS = 4;
 
 /**
  * The prompt line.
@@ -37,8 +33,17 @@ export function searchLine(state: SearchState): string {
   return `${label} \`${state.query}': ${match}`;
 }
 
+/**
+ * **The upper edge, then the line** (I30, §097, ruling 90). *A transient panel
+ * floats, between two rules*: the lower one is the prompt's, which C22 I81
+ * draws on every frame, and the upper one is the layer's own first row, as
+ * C19's menu draws it. Without it the search line sat directly on the
+ * transcript's last row and read as one more line of it (F1502). An empty
+ * label is a plain line, and it degrades with the rest (C09 I21).
+ */
 export function searchBlocks(state: SearchState): readonly Block[] {
   return Object.freeze([
+    { kind: "rule", id: `${SEARCH_ID}-edge-top`, label: "" } satisfies Block,
     { kind: "raw", id: `${SEARCH_ID}-line`, text: searchLine(state) } satisfies Block,
   ]);
 }
@@ -53,7 +58,11 @@ export function searchBlocks(state: SearchState): readonly Block[] {
 export function searchLayer(state: SearchState, anchor: Anchor): Layer {
   return Object.freeze({
     id: SEARCH_ID,
-    kind: "overlay" as const,
+    // **A panel** (C15 §2c, I27, R-BLK-109, R-BLK-323). *search — the prompt
+    // stays, the panel grows above it*, and find is a PROMPT SUBSTATE rather
+    // than a question: reverse-i-search relabels the prompt, it does not ask
+    // anything, and nothing is waiting on an answer from it.
+    kind: "panel" as const,
     placement: Object.freeze({
       kind: "anchored" as const,
       row: anchor.row,
@@ -61,8 +70,15 @@ export function searchLayer(state: SearchState, anchor: Anchor): Layer {
       prefer: "above" as const,
     }),
     content: searchBlocks(state),
-    dismissable: true,
-    width: cells(searchLine(state)) + CHROME_CELLS,
+    blocking: false,
+    dismissal: "escape",
+    owner: Object.freeze({ rung: "substate" as const, name: "find" as const }),
+    // **No `width`, which is how a layer says *the whole region*** (I30, C15
+    // I16). It declared `cells(line) + 4`, and the declaration was taken at the
+    // push — from the empty query — and never again, because narrowing updates
+    // `content` and `cursor`: `⌃r h` over `/help` drew `/h…` in 27 cells, and
+    // `his` over `/history` drew `…` alone (F1502). The region's width is
+    // resolved at every layout, so the hit is whole wherever it fits.
     // **The search has a cursor and the menu does not** (C15 I19). Text is
     // being typed into this one, and leaving the terminal's cursor blinking at
     // a prompt that is not taking keys is the *somewhere invisible* symptom
@@ -72,8 +88,8 @@ export function searchLayer(state: SearchState, anchor: Anchor): Layer {
     // the history's text, not the user's, and a caret sitting after a recalled
     // command claims the recall is editable here. Relative to the layer's own
     // origin, which is what lets this be stated without knowing where the
-    // layer will be placed.
-    cursor: Object.freeze({ row: 0, col: cells(queryPrefix(state)) }),
+    // layer will be placed — row 1, because the rule is row 0 (I30).
+    cursor: Object.freeze({ row: 1, col: cells(queryPrefix(state)) }),
   });
 }
 
@@ -81,46 +97,6 @@ export function searchLayer(state: SearchState, anchor: Anchor): Layer {
 function queryPrefix(state: SearchState): string {
   const label = state.failed ? "(failed reverse-i-search)" : "(reverse-i-search)";
   return `${label} \`${state.query}`;
-}
-
-/**
- * The confirm, frozen non-dismissable (I14).
- *
- * **It declared no width and C15 I20 refuses that now.** A centred layer with
- * no width is placed at `left = 0` across the whole region — `fill`, wearing
- * `centred`'s name — and this was the second instance in the tree, found by the
- * rule rather than by reading. The number is the question's own extent, as
- * `searchLayer` reckons it: nothing else here can measure content, and C15 knows
- * the region and nothing else (C15 I16).
- *
- * C15 already guarantees the behaviour — `pop()` inspects only the top layer and
- * returns `null` without removing a non-dismissable one, and C16's single
- * `overlay:escape → dismiss` row respects that. What was left to get wrong is
- * the layer handed over, which is why this is a function with no `dismissable`
- * argument rather than a call site's decision.
- */
-export function clearConfirmLayer(count: number): Layer {
-  return Object.freeze({
-    id: CONFIRM_ID,
-    kind: "overlay" as const,
-    placement: Object.freeze({ kind: "centred" as const }),
-    content: Object.freeze([
-      {
-        kind: "notice",
-        id: `${CONFIRM_ID}-text`,
-        tone: "warn",
-        glyph: "warn",
-        text: clearQuestion(count),
-      } satisfies Block,
-    ]),
-    dismissable: false,
-    width: cells(clearQuestion(count)) + CHROME_CELLS,
-  });
-}
-
-/** The question, in one place, because the width is measured from it. */
-function clearQuestion(count: number): string {
-  return `Clear ${String(count)} history ${count === 1 ? "entry" : "entries"}? (y/N)`;
 }
 
 const DAYS_TO_MONTH = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334] as const;

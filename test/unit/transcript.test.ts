@@ -7,6 +7,8 @@
 // to protect: a `--watch` that keeps updating in the scrollback after focus moved on.
 import { describe, expect, it } from "vitest";
 import { createTranscriptStore, TranscriptError } from "../../src/viewport/transcript/index.js";
+import { descendants } from "../../src/data/viewmodel/index.js";
+import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
 import { INVALID_DOC, appendPatch, docOf } from "../support/transcript.js";
 import { doc } from "../support/blocks.js";
 import type { Change } from "../../src/viewport/transcript/index.js";
@@ -426,5 +428,89 @@ describe("C13 unit", () => {
 
     expect(out).toMatchObject({ ok: true, rev: before + 1 });
     expect(s.entries[0]?.rev, "and the entry carries it").toBe(before + 1);
+  });
+});
+
+describe("C13 I22 — settling ends the stream in the document (review batch 4 M13.3)", () => {
+  /** Every block id carrying `streaming: true`, at any depth — the property I22 is about. */
+  const streaming = (d: ViewDocument): readonly string[] =>
+    d.blocks
+      .flatMap((b) => [b, ...descendants(b)])
+      .filter((b) => (b as { readonly streaming?: unknown }).streaming === true)
+      .map((b) => b.id);
+  const notice = (id: string, text = "partial"): Block =>
+    ({ kind: "notice", id, tone: "default", text, streaming: true }) as unknown as Block;
+  const withBlocks = (blocks: readonly Block[]): ViewDocument => doc({ blocks: [...blocks] });
+
+  it("T1.41 (C13 I22): the settle trace's rows, each asserting the whole entry", () => {
+    // Rows 1 and 2 — the stream is running and the notice says so.
+    const s = createTranscriptStore();
+    const changes: Change[] = [];
+    s.subscribe((c) => void changes.push(c));
+    const id = s.append(withBlocks([notice("n")]), { streaming: true });
+    expect(s.entries[0]).toMatchObject({ streaming: true, rev: 0 });
+    expect(streaming(s.entries[0]!.doc), "row 1: the notice streams").toEqual(["n"]);
+    expect(s.patch(id, appendPatch("more"))).toMatchObject({ ok: true, rev: 1 });
+    expect(streaming(s.entries[0]!.doc), "row 2: a patch leaves it streaming").toEqual(["n"]);
+
+    // Row 3a — a bare settle strips the flag, and the document changed, so `rev` moves.
+    changes.length = 0;
+    const before = s.entries[0]!.doc;
+    expect(s.settle(id), "row 3a").toEqual({ ok: true, rev: 2 });
+    const settled = s.entries[0]!;
+    expect(settled).toMatchObject({ streaming: false, rev: 2 });
+    expect(streaming(settled.doc), "row 3a: nothing streams once settled").toEqual([]);
+    expect(settled.doc.blocks.map((b) => b.id), "and nothing else moved").toEqual(before.blocks.map((b) => b.id));
+    expect((settled.doc.blocks[0] as { text?: string }).text).toBe((before.blocks[0] as { text?: string }).text);
+    expect(changes.map((c) => c.kind), "row 3a: one change, not two").toEqual(["settle"]);
+
+    // Row 3b — a final document still streaming is stripped in the same change.
+    const b = s.append(withBlocks([notice("m")]), { streaming: true });
+    changes.length = 0;
+    expect(s.settle(b, withBlocks([notice("m", "final")])), "row 3b").toEqual({ ok: true, rev: 1 });
+    expect(s.entries[1]).toMatchObject({ streaming: false, rev: 1 });
+    expect(streaming(s.entries[1]!.doc), "row 3b").toEqual([]);
+    expect((s.entries[1]!.doc.blocks[0] as { text?: string }).text, "row 3b: the final text").toBe("final");
+    expect(changes.map((c) => c.kind)).toEqual(["settle"]);
+
+    // Row 3c — a final document with nothing streaming is taken as it is.
+    const c = s.append(withBlocks([notice("k")]), { streaming: true });
+    const quiet = withBlocks([{ kind: "notice", id: "k", tone: "default", text: "done" } as unknown as Block]);
+    expect(s.settle(c, quiet), "row 3c").toEqual({ ok: true, rev: 1 });
+    expect(s.entries[2]!.doc, "row 3c: the document, as given").toEqual(quiet);
+
+    // Row 3d — a bare settle where nothing streams leaves the document and `rev` alone (I13).
+    const d = s.append(withBlocks([{ kind: "notice", id: "q", tone: "default", text: "x" } as unknown as Block]), {
+      streaming: true,
+    });
+    const held = s.entries[3]!.doc;
+    expect(s.settle(d), "row 3d").toEqual({ ok: true, rev: 0 });
+    expect(s.entries[3]!.doc, "row 3d: the same document value").toBe(held);
+
+    // Row 3e — an invalid document throws before anything is stripped.
+    const e = s.append(withBlocks([notice("z")]), { streaming: true });
+    expect(() => s.settle(e, INVALID_DOC as never), "row 3e").toThrow(TranscriptError);
+    expect(s.entries[4]).toMatchObject({ streaming: true, rev: 0 });
+    expect(streaming(s.entries[4]!.doc), "row 3e: the flag is still there").toEqual(["z"]);
+
+    // Row 4 — at every depth: a scroll's child, a panel's child and a table row's detail.
+    const nested = withBlocks([
+      { kind: "scroll", id: "sc", height: 2, children: [notice("in-scroll")] } as unknown as Block,
+      { kind: "panel", id: "p", title: "t", children: [notice("in-panel")] } as unknown as Block,
+      {
+        kind: "table",
+        id: "t",
+        columns: [{ key: "a", label: "A" }],
+        rows: [{ key: "r", cells: { a: "1" }, expanded: true, detail: [notice("in-detail")] }],
+      } as unknown as Block,
+    ]);
+    const f = s.append(nested, { streaming: true });
+    expect(streaming(s.entries[5]!.doc), "row 4: three streams, three depths").toEqual([
+      "in-scroll",
+      "in-panel",
+      "in-detail",
+    ]);
+    expect(s.settle(f), "row 4").toEqual({ ok: true, rev: 1 });
+    expect(streaming(s.entries[5]!.doc), "row 4: none survives").toEqual([]);
   });
 });

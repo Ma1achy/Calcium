@@ -31,7 +31,13 @@ const run = () => {
   }
 };
 
-const META_LINE = "    meta: (bits & 2) !== 0 || (bits & 8) !== 0,";
+// **Re-anchored for C16 I41.** The line used to read `(bits & 2) !== 0 || (bits & 8)
+// !== 0` — bit 8 folded into `meta` unconditionally. It is now conditional on the
+// negotiated protocol, because bit 8 is Meta in xterm's encoding and Super in
+// kitty's, and the same bytes mean different chords. The mutations below keep
+// their subjects: dropping bit 8, and reading it instead of bit 2.
+const META_LINE = "    meta: (bits & 2) !== 0 || (eight && !isSuper),";
+const SUPER_LINE = '  const isSuper = eight && protocol === "kitty";';
 
 const MUTATIONS = [
   {
@@ -45,6 +51,32 @@ const MUTATIONS = [
     expect: "T1.3e",
   },
   {
+    // **The protocol condition removed, which is the ruling this run now also
+    // covers** (C16 I41). Folding bit 8 into `meta` always is the state the
+    // tree shipped in, and it makes `⌘↑` and `⌥↑` one key on a terminal that
+    // distinguishes them — the collision that was then written down as *there
+    // is no wire form for the chord*. Every sequence still decodes to a real
+    // key with a real name, so only a row feeding the same bytes through two
+    // protocols can see it.
+    name: "bit 8 folds to meta whatever the protocol",
+    file: DECODE,
+    from: SUPER_LINE,
+    to: "  const isSuper = false;",
+    expect: "T1.93",
+  },
+  {
+    // **The other direction: Super whatever the terminal said.** This is the
+    // careless fix — it makes the two chords distinct everywhere, including on
+    // a terminal where `⌘` never reached the application and bit 8 genuinely is
+    // Meta. I34's reason is what this breaks, and T1.93's `"none"` half is what
+    // catches it.
+    name: "bit 8 is super whatever the protocol",
+    file: DECODE,
+    from: SUPER_LINE,
+    to: "  const isSuper = eight;",
+    expect: "T1.93",
+  },
+  {
     // **The other direction, and it is the one a careless fix produces.**
     // Reading bit 8 *instead of* bit 2 fixes Meta-sending terminals and breaks
     // Alt-sending ones — which are the majority, and which every existing test
@@ -52,7 +84,7 @@ const MUTATIONS = [
     name: "meta reads bit 8 instead of bit 2",
     file: DECODE,
     from: META_LINE,
-    to: "    meta: (bits & 8) !== 0,",
+    to: "    meta: eight && !isSuper,",
     expect: "T1.3e",
   },
   {

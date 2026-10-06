@@ -1,0 +1,60 @@
+THE QUESTION IS NOT WHERE IS FOCUS — IT IS WHO OWNS THE KEYBOARD
+
+exactly one thing does, at every moment. §15 listed SCOPES and never
+said what a scope competes with, so a question, copy mode, an attached
+PTY and a block’s interior were four separate special cases.
+
+   owner       raised by            takes                  leaves by
+   the CHILD   an attached PTY      all but host.detach ⌃] host escape
+   COPY MODE   ⌥⇧V froze the screen every key            esc, or a copy
+   a QUESTION  choice or text        declared actions;   resolves exactly once
+                                     rejects held scope   by answer · safe exit
+   a SUBSTATE  find · completion     its own, then the    esc closes the
+               history search        prompt’s            SUBSTATE
+   the INSIDE  a camera · a cursor   ←→ ↑↓ and letters   esc leaves it
+   the SCOPE   prompt · transcript   everything else      esc out one rung
+
+★ EVERY ROUTED ACTION GETS ONE DECISION AT EACH RUNG.
+
+  HANDLE             this is the one owner that acts
+  REJECT             consume it and explain when silence would look broken
+  PASS               continue downward
+  GLOBAL-INTERCEPT   take the registry-declared exception
+
+  a blocking question handles its answer actions and REJECTS unrelated
+  typing; it never passes keys into the held prompt. Esc still resolves
+  exactly one temporary owner.
+  While it is open, pointer activation may commit only answer or inspection
+  targets. Hits on the held scope are consumed without action. Wheel/page
+  scroll needs a declared question/inspection viewport or background-scroll policy.
+
+global-intercept candidates use an explicit OWNER-APPLICABILITY table
+
+  interrupt   CHILD handles; QUESTION and COPY MODE reject; an ordinary
+                running owner handles tool/turn interrupt; idle rejects silently
+  page-scroll COPY MODE rejects while frozen; otherwise the active viewport
+                handles without moving focus
+  the wheel   is not delivered in COPY MODE or while mouse tracking is off;
+                otherwise its pointer-hit owner handles it
+
+  these are declared overrides, not contradictions in the ladder. Apps
+  may register one only with an owner, fallback and collision test.
+
+★ EVERY OWNER SAYS SO, in the footer’s last line
+
+  ⏎ send   ⇧⏎ newline   ⇥ complete   ⇧⇥ transcript
+   inside   ←→ orbit   ↑↓ tilt   o auto   r reset   esc out
+   find   ↑↓ hits   ⏎ open   esc close   3 of 14
+   question   declared actions   esc safe path
+   copy   ←→↑↓ extend   ⏎ copy   esc out · the screen is frozen
+   attached   keys → child   ⌃] host escape   ⌥esc enhanced detach
+
+  AN OWNER YOU CANNOT SEE IS AN OWNER YOU WILL FIGHT. Every rung retains
+  owner plus its highest-ranked reachable safe action. Ordinary rungs also
+  show primary action, safe exit and help; the complete map is reachable.
+
+★ A TAB IS ITS OWN FRAME — its transcript, prompt, scroll AND focus
+
+  ⌃⇥ away and back finds it exactly as you left it. That persistence is
+  what makes a tab a TAB rather than a view toggle — if switching lost
+  your place, esc would want to leave it.

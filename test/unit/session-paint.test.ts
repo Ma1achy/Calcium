@@ -8,17 +8,20 @@
 //   - **One width per frame** (`docs/notes/resize-and-compositor.md`). A frame
 //     composed at two widths is coherent at neither, and the wrap it causes
 //     scrolls the alternate screen.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
 import { compose, heightsSum, type Composed } from "../../src/shell/frame.js";
-import { cursorFor, paint, placedLayers, type PaintDeps } from "../../src/shell/paint.js";
+import { commandRows, cursorFor, paint, paintEchoRows, placedLayers, type PaintDeps } from "../../src/shell/paint.js";
+import { echoRows } from "../../src/shell/echo.js";
+import { PROMPT_GUTTER } from "../../src/shell/config.js";
 import { exact, FrameError } from "../../src/shell/frame-error.js";
-import { displayCells } from "../../src/presentation/text.js";
+import { displayCells, sliceCells } from "../../src/presentation/text.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, MONO_UNICODE_CAPS } from "../support/render.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { patchDefinition } from "../../src/presentation/patch/definition.js";
+import { chipLabel, chipSpans, createEditor, selectionSpans } from "../../src/interaction/editor/index.js";
 import { SGR_RESET, sgr } from "../../src/terminal/escapes.js";
 import { resolveBase } from "../../src/presentation/theme/index.js";
 import type { SessionSnapshot } from "../../src/shell/types.js";
@@ -26,9 +29,14 @@ import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import type { Placed } from "../../src/viewport/overlay/index.js";
 import type { ProfileReport } from "../../src/shell/profiling/types.js";
 import { registry as measurer, rows as contentRows } from "../support/overlay.js";
-import { buildSession } from "../support/session.js";
-import { makeDefaultChrome } from "../../src/shell/chrome.js";
-import { tone } from "../../src/presentation/blocks/paint.js";
+import { buildGraph, buildSession } from "../support/session.js";
+import { fakeStdin } from "../support/fake-terminal.js";
+import { childBorderLegend, makeDefaultChrome, ownerLine, shedToWidth } from "../../src/shell/chrome.js";
+import type { Key, OwnerRung } from "../../src/interaction/router/types.js";
+import { chordText, createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
+import type { Binding } from "../../src/interaction/router/types.js";
+import type { OwnerHints } from "../../src/shell/types.js";
+import { background, tone, withBackground } from "../../src/presentation/blocks/paint.js";
 import type { Block, Pills } from "../../src/data/viewmodel/index.js";
 
 /** C09's measurer, for the footer's height (C22 I82). */
@@ -39,7 +47,7 @@ const SESSION: SessionSnapshot = Object.freeze({
   env: Object.freeze({}),
   lastUuid: null,
   identity: null,
-  cluster: "fmx-prod",
+  cluster: "corp-prod",
   health: "live",
   version: "1.0.0",
   retained: null,
@@ -58,8 +66,10 @@ function deps(over: Partial<PaintDeps> = {}): PaintDeps {
     // C22 I50 — the ghost is a paint-time read like the spinner beside it.
     ghost: () => null,
     overlays: () => [],
-    promptCursor: () => ({ row: 0, col: 2 }),
+    promptReplaced: () => false,
+  promptCursor: () => ({ row: 0, col: 2 }),
     promptSelection: () => [],
+    promptChips: () => [],
     suppressBackground: () => false,
     promptFocused: () => true,
     ...over,
@@ -71,7 +81,9 @@ function frameAt(columns: number, rows: number, promptRows = 1): Composed {
     chrome: { header: () => [], footer: () => [] },
     measureSequence: MEASURE,
     session: () => SESSION,
-    copyMode: () => false,
+    owner: () => null,
+      ownerArmed: () => false,
+    capabilities: () => null,
     now: () => 1_700_000_000_000,
     size: () => ({ columns, rows }),
     promptRows: () => promptRows,
@@ -155,7 +167,7 @@ describe("C22 §6 — the paint", () => {
 
     const broken: Composed = Object.freeze({
       ...good,
-      region: Object.freeze({ top: 1, height: good.region.height + 1, width: good.region.width }),
+      region: Object.freeze({ ...good.region, height: good.region.height + 1 }),
     });
 
     expect(heightsSum(broken)).toBe(false);
@@ -179,7 +191,9 @@ describe("C22 §6 — the paint", () => {
       chrome: { header: () => [], footer: () => [] },
       measureSequence: MEASURE,
       session: () => SESSION,
-      copyMode: () => false,
+      owner: () => null,
+      ownerArmed: () => false,
+    capabilities: () => null,
       now: () => 1_700_000_000_000,
       size: shrinking,
       promptRows: () => 1,
@@ -241,7 +255,7 @@ describe("C22 §6 — the paint", () => {
     // cap of one needs three, so at three rows the sum is false and the fallback
     // draws. The cap path in `promptWindow` is still code, so the frame that
     // exercises it is built by hand with a region of zero rows, and it still sums.
-    const f: Composed = { ...frameAt(40, 5, 3), promptRows: 1, promptWanted: 3, region: { top: 2, height: 0, width: 39 }, overlayRegion: { width: 39, height: 0 } };
+    const f: Composed = { ...frameAt(40, 5, 3), promptRows: 1, promptWanted: 3, region: { top: 2, left: 1, height: 0, width: 38 }, overlayRegion: { width: 39, height: 0 } };
     expect(f.promptRows, "a cap of one").toBe(1);
 
     const lines = paint(f, deps({ promptRows: () => ["first", "second", "third"] }));
@@ -421,7 +435,7 @@ describe("C22 — the selection wash (roadmap entry 23)", () => {
   /** The painted index of prompt row `i`: header + viewport, then the prompt. */
   const promptAt = (f: Composed, i: number): number => f.region.top + f.region.height + 1 + i; // header, its rule, region, the upper rule
 
-  it("T4.22 (C11 I17, I9): the wash is appearance — no row and no cell moves", () => {
+  it("C22 T4.22 (C11 I17, I9): the wash is appearance — no row and no cell moves", () => {
     // **The invariant at every step, not a note about this one.** A row of
     // chrome — a marker line, a bracket, a status row — is forbidden by the
     // same rule that makes the wash free.
@@ -665,7 +679,13 @@ describe("C22 §6g — the theme's background is a base, not a span (C22 I65)", 
     //
     // Reuse is safe *within one pass* because `String.replace` with a global
     // pattern sets `lastIndex` to 0 before it iterates and leaves it there.
-    const src = readFileSync("src/shell/paint.ts", "utf8")
+    // **The file moved and the row follows it** (C11 I25). `based` went to
+    // `presentation/blocks/paint.ts` when C11's expanded detail needed the same
+    // ground-behind-painted-lines pass one layer down; a source assertion that
+    // kept naming `shell/paint.ts` would have gone green the day the function
+    // it watches stopped being there, which is the failure this row's own
+    // subject is about.
+    const src = readFileSync("src/presentation/blocks/paint.ts", "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/(^|[^:])\/\/.*$/gm, "$1");
     const body = /function based\([\s\S]*?\n}/.exec(src)?.[0] ?? "";
@@ -686,7 +706,8 @@ describe("C22 §4a — one overlay layout per frame, shared by the rows and the 
       kind: "overlay" as const,
       placement: { kind: "anchored" as const, row: 6, prefer: "above" as const },
       content: contentRows(1, id),
-      dismissable: true,
+      blocking: false,
+      dismissal: "escape" as const,
       width: 20,
       cursor: { row: 0, col: 5 },
     };
@@ -752,7 +773,7 @@ describe("C22 §4a — one overlay layout per frame, shared by the rows and the 
     expect(calls, "the thunk answered once for both").toBe(1);
   });
 
-  it("T4.64 (C09 I61, C22 I86; C28 I31): a real session's chrome children are measured once per registry call — the header pair once per frame and the footer pair twice, for compose's own call", async () => {
+  it("C22 T4.64 (C09 I61, C22 I86; C28 I31): a real session's chrome children are measured once per registry call — the header pair once per frame and the footer pair twice, for compose's own call", async () => {
     let seen: ProfileReport | null = null;
     const { tui } = await buildSession({
       profile: {
@@ -823,7 +844,7 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
   /**
    * Every chip the default chrome emits, with all three conditional ones up.
    *
-   * **`copyMode`, `stopping` and `lastFrame` are all set** because each gates a
+   * **`nativeSelection`, `stopping` and `lastFrame` are all set** because each gates a
    * chip, and a corpus assembled from the quiet session is three chips short —
    * two of which are the only two in the file whose tone is not the default, so
    * a walk over the quiet session would be a walk over the inert ones alone.
@@ -836,7 +857,7 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
         env: Object.freeze({ HOME: "/home/ada" }),
         lastUuid: null,
         identity: null,
-        cluster: "fmx-prod",
+        cluster: "corp-prod",
         health: "live" as const,
         version: "1.0.0",
         retained: null,
@@ -844,7 +865,8 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
       } satisfies SessionSnapshot,
       now: 1_700_000_000_000,
       columns: 80,
-      copyMode: true,
+      owner: "copy" as const,
+      capabilities: FULL_CAPS,
       lastFrame: 12.4,
     };
     const out: Pills["chips"][number][] = [];
@@ -880,7 +902,13 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
     // The corpus, before anything is asserted over it: a walk that found nothing
     // satisfies every for-loop below it (`an exit status is the same bit for
     // clean and for did-not-run`).
-    expect(all.map((c) => c.label), "eight chips, with all three conditional ones up").toEqual([
+    // **Fourteen, and the last six are M5's owner line** (R-KEY-004, §103) —
+    // `⌃V rect` joined it with the rectangle (C14 I60), last. The
+    // fixture's owner is `copy`, so `COPY` in the header and the owner line in
+    // the footer are one fact stated at both ends — the header says *which* mode
+    // and the last line says *what your keys do in it*, which is the half §103
+    // says a reader fights without.
+    expect(all.map((c) => c.label), "fourteen chips, with all three conditional ones up and an owner raised").toEqual([
       "calcium",
       "/usr/local/bin/prism",
       "COPY",
@@ -889,6 +917,15 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
       "stopping",
       "last  12.4ms",
       "~/work",
+      "copy",
+      // The keymap's extend rows (C22 I133) — the bare arrows move the caret.
+      "⇧↑⇧↓ extend",
+      "⏎ copy",
+      // Two chips: the separator between them is the cluster's to draw, and a
+      // literal `·` inside a label is the unresolved join T2.116 refuses.
+      "esc out",
+      "the screen is frozen",
+      "⌃V rect",
     ]);
     for (const chip of all) {
       expect(chip.tone, `${chip.label} inherits C09's default instead of naming its own`).toBeDefined();
@@ -914,5 +951,561 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
     expect(tone(all[3]?.tone ?? "muted", DARK_THEME, FULL_CAPS), "the clock and the cwd are both chrome").toEqual(
       tone(all[7]?.tone ?? "muted", DARK_THEME, FULL_CAPS),
     );
+  });
+
+  it("T1.46e (R-KEY-004, R-OWN-001, §103): every raised owner says so, and the idle ladder says nothing", () => {
+    // **§103: *EVERY OWNER SAYS SO, in the footer's last line*, and *AN OWNER
+    // YOU CANNOT SEE IS AN OWNER YOU WILL FIGHT*.** The rule is over the rung
+    // set, not over one rung, which is what the tree had: `nativeSelection` was the
+    // only owner with a cell, because native selection is the only one anyone had
+    // followed the argument to the end for.
+    const ALL_RUNGS = ["child", "copy", "question", "substate", "inside", "scope"] as const;
+    const OWNER_WORD: Readonly<Record<Exclude<OwnerRung, "scope">, string>> = {
+      child: "attached",
+      copy: "copy",
+      question: "question",
+      substate: "find",
+      inside: "inside",
+    };
+    for (const [rung, word] of Object.entries(OWNER_WORD)) {
+      const line = ownerLine(rung as OwnerRung, FULL_CAPS);
+      expect(line[0]?.label, `the ${rung} rung leads with its owner`).toBe(word);
+      // *Every rung retains owner plus its highest-ranked reachable safe
+      // action.* Every one of these five is left by an escape of some kind, and
+      // a rung that names an owner and no way out is the fight §103 describes.
+      expect(
+        line.some((c) => c.label.includes("esc") || c.label.includes("⌃]")),
+        `the ${rung} rung shows the way out — the line was ${line.map((c) => c.label).join(" · ")}`,
+      ).toBe(true);
+    }
+
+    // **`scope` carries no owner word, and that is the rule rather than an
+    // omission**: it is the rung a reader is on when nothing has been raised, so
+    // a label on it would name the absence of an owner. It still carries its
+    // primary action, because it is the *ordinary* rung §103's footer clause
+    // gives the full set to.
+    const scope = ownerLine("scope", FULL_CAPS).map((c) => c.label);
+    expect(scope, "the ordinary rung shows its primary action").toContain("⏎ send");
+    expect(Object.values(OWNER_WORD).some((w) => scope.includes(w)), "no owner word on the scope rung").toBe(false);
+
+    // **The idle ladder is the control**, and it is what stops the row being
+    // satisfied by a function that returns a line for anything: `null` is no
+    // owner, and no owner is no row rather than an empty one.
+    expect(ownerLine(null, FULL_CAPS), "nothing owns the keyboard and nothing is claimed").toEqual([]);
+
+    // **The narrow ladder, which is §103’s own sentence and not a tidiness
+    // measure**: *every rung retains owner plus its highest-ranked reachable
+    // safe action.* Read off a golden frame first — `pills` wraps rather than
+    // sheds, so at 60 columns the ASCII line took a second row and the frame
+    // grew by one. A footer that spends a transcript row to say what the keys do
+    // has inverted what the line is for.
+    // **At both rungs** (C16 I58): the ladder found the exit by a literal
+    // `"esc"`, and the ASCII chip reads `Esc out` — so at ASCII the way out was
+    // shed like any other chip, and this row, run at Unicode alone, agreed.
+    for (const caps of [FULL_CAPS, ASCII_CAPS]) for (const rung of ALL_RUNGS) {
+      const full = ownerLine(rung, caps);
+      const narrow = shedToWidth(full, 24, caps);
+      expect(narrow.length, `the ${rung} rung sheds at 24 columns`).toBeLessThan(full.length);
+      expect(narrow[0], `the ${rung} rung keeps its owner`).toEqual(full[0]);
+      const exit = full.find((c) => /^(esc|Esc) /u.test(c.label) || c.label.includes("host escape"));
+      // `scope` has no escape: its second survivor is the primary action, which
+      // is the same rule reaching the same place by the same order.
+      expect(narrow, `the ${rung} rung keeps the way out`).toContain(exit ?? full[1]);
+      // And it is a *subsequence*, not a re-ordering — the ladder sheds, so what
+      // survives is still in rank order and a reader’s eye does not have to move.
+      expect(full.filter((c) => narrow.includes(c)), `the ${rung} rung keeps its order`).toEqual(narrow);
+    }
+    // The control: a line that fits is not touched, so the row above is about
+    // shedding rather than about a function that always returns two chips.
+    expect(shedToWidth(ownerLine("inside", FULL_CAPS), 200, FULL_CAPS)).toEqual(ownerLine("inside", FULL_CAPS));
+
+    // **And the ASCII rung, which is A03 SS47 arriving at the owner line.** The
+    // line is the only chrome that draws chords, and `⏎ ⇧ ⇥ ⌃] ←→ ↑↓` are seven
+    // marks an ASCII terminal cannot render — so a reader on one would be told
+    // there is an owner and shown boxes for the way out. The fallback spells the
+    // modifier rather than dropping it: `S-enter` is a key you can press where
+    // `enter` is a different one.
+    for (const rung of ALL_RUNGS) {
+      for (const chip of ownerLine(rung, ASCII_CAPS)) {
+        expect(
+          /^[\x20-\x7e]*$/.test(chip.label),
+          `the ${rung} rung is renderable in ASCII — \`${chip.label}\` is not`,
+        ).toBe(true);
+      }
+    }
+  });
+});
+
+// C22 §6l.11 — the ground the prompt paints over a chip's cells.
+//
+// **Read off the emitted rows**, because the session's screen model folds SGR
+// away and a row asserting a ground against it can only say what a stripped
+// frame says — the same reason C22's label row reads bytes.
+describe("C22 §6l.11 — the chip's ground in the prompt", () => {
+  const SEP = "\u00b7";
+  const LOOK = { separator: SEP, painted: true, unicode: "full" } as const;
+  const PASTE = { ordinal: 1, kind: "paste", name: "json", lines: 47, content: "{}" } as const;
+  const GUTTER = { first: 2, cont: 2 } as const;
+
+  /**
+   * Every SGR parameter, read as **tokens** rather than as digits.
+   *
+   * `38` and `48` take their colour inline — `5;n` for an index, `2;r;g;b` for
+   * rgb — so a parameter list is not a set of independent numbers. Walking it
+   * is what tells a background token from a 256-colour foreground whose index
+   * spells the same two digits.
+   */
+  const sgrTokens = (bytes: string): readonly number[] => {
+    const out: number[] = [];
+    for (const m of bytes.matchAll(new RegExp(`${String.fromCharCode(27)}\\[([0-9;]*)m`, "gu"))) {
+      const params = (m[1] ?? "").split(";").map((q) => (q === "" ? 0 : Number(q)));
+      for (let i = 0; i < params.length; i += 1) {
+        const q = params[i] ?? 0;
+        out.push(q);
+        if (q === 38 || q === 48 || q === 58) i += params[i + 1] === 2 ? 4 : 2;
+      }
+    }
+    return out;
+  };
+  const grounds = (bytes: string): number =>
+    sgrTokens(bytes).filter((t) => t === 48 || (t >= 40 && t <= 47) || (t >= 100 && t <= 107)).length;
+
+  const promptRow = (chip: boolean, selection: { from: number; to: number } | null): string => {
+    const e = createEditor({ chips: LOOK });
+    e.insert("look at ");
+    if (chip) e.insertChip(PASTE);
+    else e.insert(chipLabel(PASTE, LOOK));
+    e.insert(" then");
+    const rows = e.layout(80, GUTTER);
+    const painted = paint(
+      frameAt(80, 30, rows.length),
+      deps({
+        promptRows: () => rows,
+        promptCursor: () => e.cursorCell(80, GUTTER),
+        promptChips: () => chipSpans(e.text, 80, GUTTER, e.drawAs),
+        promptSelection: () =>
+          selection === null
+            ? []
+            : selectionSpans(e.text, selection.from, selection.to, 80, GUTTER, e.drawAs),
+      }),
+    );
+    // **Found on the stripped text, not the painted bytes.** By its text rather
+    // than by an index, so the row survives a change to the header's height —
+    // but a selection puts SGR inside the word, so a raw `includes` finds
+    // nothing and the helper returns an empty row. That read as the painter
+    // drawing no ground at all.
+    const bare = (r: string): string => r.replaceAll(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "gu"), "");
+    return painted.find((r) => bare(r).includes("look at")) ?? "";
+  };
+
+  it("T1.67 (C22 I112, §6l.11, C17 §5c): a chip in the prompt paints a ground; the same text without one paints none", () => {
+    // **The control is the same characters with no chip behind them.** A row
+    // asserting only that a ground appears is satisfied by any theme that
+    // paints the prompt at all; here the label's text is identical in both
+    // arms, so the difference is the chip and nothing else.
+    expect(grounds(promptRow(false, null)), "the same text, no chip").toBe(0);
+    expect(grounds(promptRow(true, null)), "a chip is a ground").toBe(1);
+  });
+
+  it("T1.68 (C22 I112, §6l.11, R-STA-002): a selection over a chip leaves one ground, and it is the selection's", () => {
+    // **One ground per cell.** With the region covering the whole chip there is
+    // one painted range on the row and not two — the chip's has given way.
+    // Counted rather than named, so the row says *one ground* rather than
+    // pinning a theme's value.
+    expect(grounds(promptRow(true, { from: 0, to: 40 })), "the selection alone").toBe(1);
+
+    // **And a region that begins *at* the chip, which is the case the guard is
+    // for.** A mutation removing the overlap check survived every arm here
+    // until this one: where the region starts before the chip, `styled`'s own
+    // ordering already swallows the chip's range, so the guard looks
+    // redundant. Starting at the chip and running past it, the chip's ground
+    // would take its own cells and leave the wash one — two grounds, and a
+    // selected chip drawn as a chip.
+    //
+    // The buffer is `"look at "` (8), the chip (1) and `" then"` (5), so 8→10
+    // is the chip plus the space after it.
+    expect(grounds(promptRow(true, { from: 8, to: 10 })), "a region beginning at the chip").toBe(1);
+
+    // **And a region that stops short of the chip leaves both**, which is the
+    // control the arm above needs: without it, *one ground* is satisfied by a
+    // painter that has stopped drawing chips at all.
+    expect(grounds(promptRow(true, { from: 0, to: 4 })), "the selection and the chip, apart").toBe(2);
+
+    // **A region endpoint can never fall inside a chip, and that is what makes
+    // *the selection wins* a whole answer rather than a partial one.** A chip
+    // is one grapheme (C17 I25), so every region either contains it or does
+    // not — measured here across every endpoint in the buffer rather than
+    // argued, because the painter's simplification rests on it and a painter
+    // cannot check it.
+    const e = createEditor({ chips: LOOK });
+    e.insert("look at ");
+    e.insertChip(PASTE);
+    e.insert(" then");
+    const chip = chipSpans(e.text, 80, GUTTER, e.drawAs)[0];
+    expect(chip, "the fixture has a chip").toBeDefined();
+    for (let to = 1; to <= 14; to += 1) {
+      for (const span of selectionSpans(e.text, 0, to, 80, GUTTER, e.drawAs)) {
+        if (chip === undefined || span.row !== chip.row) continue;
+        const partial = span.from < chip.to && span.to > chip.from
+          && !(span.from <= chip.from && span.to >= chip.to);
+        expect(partial, `a region to ${String(to)} covers part of the chip: ${JSON.stringify(span)}`).toBe(false);
+      }
+    }
+  });
+});
+
+
+describe("C16 I58 — the owner line asks chordText", () => {
+  it("T1.111 (C16 I58, C22 §6l): the owner line spells every chord as chordText does, at both rungs", () => {
+    const RUNGS: readonly OwnerRung[] = ["child", "copy", "question", "substate", "inside", "scope"];
+    const labels = (rung: OwnerRung, caps: typeof FULL_CAPS): string[] => ownerLine(rung, caps).map((c) => c.label);
+
+    // **By equality**, the scope rung at ASCII — the line a reader on a plain
+    // terminal sees most, and the one whose table had drifted.
+    const scope = labels("scope", ASCII_CAPS);
+    for (const want of ["Enter send", "S-Enter newline", "Tab complete", "S-Tab transcript"]) {
+      expect(scope, "the scope rung at ASCII").toContain(want);
+    }
+    // The registry writes `⌃C`, and the line's own table wrote `⌃c`. It is the
+    // child's border legend that draws it — the child rung's owner line names
+    // `⌃]` alone.
+    expect(childBorderLegend(FULL_CAPS), "the child's legend at Unicode").toContain("⌃C interrupts child");
+    expect(childBorderLegend(FULL_CAPS)).not.toContain("⌃c");
+    expect(childBorderLegend(ASCII_CAPS), "and at ASCII").toContain("C-c interrupts child");
+
+    // **Every chord on the line, at both rungs, is chordText's**: the key part of
+    // a chip is everything before its first space, and it must be a spelling
+    // chordText produces for some binding — or a pair of them, joined by one
+    // rule. A label that is not a chord (`keys → child`, an owner word) has no
+    // chordText spelling and is read as prose.
+    const spellings = (unicode: boolean): Set<string> =>
+      new Set([
+        ...defaultKeymap.map((b) => chordText(b.key, unicode)),
+        ...["enter", "tab", "up", "down", "left", "right", "escape"].flatMap((name) =>
+          [{ name }, { name, shift: true }].map((k) => chordText(k as Key, unicode))),
+        chordText({ name: "]", ctrl: true } as Key, unicode),
+        chordText({ name: "escape", meta: true } as Key, unicode),
+        chordText({ name: "c", ctrl: true } as Key, unicode),
+      ]);
+    let chords = 0;
+    for (const [caps, unicode] of [[FULL_CAPS, true], [ASCII_CAPS, false]] as const) {
+      const known = spellings(unicode);
+      for (const rung of RUNGS) {
+        for (const label of [...labels(rung, caps), ...childBorderLegend(caps).split(/ [:\u00b7] /u)]) {
+          const head = label.split(" ")[0] ?? "";
+          const parts = unicode ? [head] : head.split("/");
+          const pair = unicode && !known.has(head) ? [head.slice(0, 1), head.slice(1)] : parts;
+          if (!pair.every((p) => known.has(p))) continue;
+          chords += 1;
+          // The pair rule: nothing between two keys at Unicode, `/` at ASCII.
+          if (pair.length === 2) expect(head, `${rung}: \`${label}\``).toBe(pair.join(unicode ? "" : "/"));
+        }
+      }
+      // And the old ASCII spellings are gone. At Unicode `esc` is the
+      // registry's own spelling (§019), so the check is the ASCII rung's.
+      if (!unicode) for (const rung of RUNGS) {
+        for (const label of labels(rung, caps)) {
+          expect(label, `${rung}: \`${label}\``).not.toMatch(/^(arrows|up\/down|left\/right|enter|tab|S-enter|S-tab|esc) /u);
+        }
+      }
+    }
+    // The count is read, not assumed: the lines draw chords, so a matcher that
+    // recognised nothing would pass every row above.
+    expect(chords, "the owner lines drew chords the matcher recognised").toBeGreaterThan(20);
+  });
+});
+
+describe("C22 I133 — the owner line's chords are the keymap's (review batch 2, M5 items 2 and 5)", () => {
+  /** Hints over a table, as the graph builds them: first row, this profile. */
+  const hintsOver = (rows: readonly Binding[]): OwnerHints => {
+    const entries = createKeymap(rows, "default-terminal").entries();
+    return { chord: (target, action) => entries.find((b) => b.target === target && b.action === action)?.key };
+  };
+  const labelsOf = (rung: OwnerRung, hints: OwnerHints, opts: { field?: boolean; semantic?: boolean } = {}) =>
+    ownerLine(rung, ASCII_CAPS, false, 0, opts.semantic === true ? { mode: "semantic", size: null, clears: false, all: false, rect: null } : { mode: "native" }, opts.field === true, hints)
+      .map((c) => c.label);
+  const ASK = { question: "Discard the draft?", choices: [{ key: "y", label: "discard" }, { key: "n", label: "keep", default: true as const }] };
+
+  it("T1.171 (C16 I19, C22 I133, ruling 63): every chord on the owner line is the session keymap's first row for its action", async () => {
+    const { graph } = await buildGraph();
+    graph.lifecycle.acquire();
+
+    // **The graph's resolver is the table's, over every pair the table holds** —
+    // derived from `defaultKeymap`, not listed, so a row added tomorrow is in it.
+    const entries = createKeymap(defaultKeymap, "default-terminal").entries();
+    const hints = graph.ownerHints();
+    const pairs = new Set(entries.map((b) => `${b.target}\t${b.action}`));
+    expect(pairs.size, "the walk has a corpus").toBeGreaterThan(80);
+    for (const pair of pairs) {
+      const [target, action] = pair.split("\t") as [Binding["target"], Binding["action"]];
+      const first = entries.find((b) => b.target === target && b.action === action);
+      expect(hints.chord(target, action as never), `${target} ${action}`).toBe(first?.key);
+    }
+
+    // **And the line spells nothing of its own.** With every action unbound, no
+    // rung the keymap serves draws a chip that starts with a chord — at either
+    // rung, since a literal spelled in one form and not the other would pass
+    // half of this. ASCII, so `keys -> child`'s arrow is not mistaken for `→`.
+    const spelled = new Set(defaultKeymap.flatMap((b) => [chordText(b.key, true), chordText(b.key, false)]));
+    const unbound: OwnerHints = { chord: () => undefined };
+    const drawn: string[] = [];
+    for (const [rung, opts] of [
+      ["scope", {}], ["child", {}], ["inside", {}], ["inside", { field: true }],
+      ["copy", { semantic: true }], ["copy", {}], ["substate", {}],
+    ] as const) {
+      for (const label of labelsOf(rung, unbound, opts)) {
+        drawn.push(label);
+        expect(spelled.has(label.split(" ")[0] ?? ""), `${rung}: \`${label}\` spells a chord nobody bound`).toBe(false);
+      }
+    }
+    // The control: the same lines over the real table do draw chords, so the
+    // loop above had chips that could have failed it.
+    const bound = labelsOf("scope", hints);
+    expect(bound.length, "the scope line over the real table has its four").toBe(4);
+    expect(bound.every((l) => spelled.has(l.split(" ")[0] ?? ""))).toBe(true);
+    expect(labelsOf("scope", unbound), "and with nothing bound it has none").toEqual([]);
+    expect(drawn.length, "the owner words and facts were drawn").toBeGreaterThan(6);
+
+    // The copy line names the extend rows — `⇧↑⇧↓` — and not the caret's `↑↓`.
+    expect(ownerLine("copy", FULL_CAPS, false, 0, { mode: "semantic", size: null, clears: false, all: false, rect: null }, false, hints).map((c) => c.label))
+      .toContain("⇧↑⇧↓ extend");
+
+    // **A question's line is its own vocabulary**, read through the graph: the
+    // state and the default's label come from the open question, not the rung.
+    void graph.confirm.ask(ASK);
+    const asked = graph.ownerHints();
+    expect(asked.question).toEqual({ state: "choice", resolvesTo: "keep" });
+    expect(ownerLine("question", FULL_CAPS, false, 0, undefined, false, asked).map((c) => c.label)).toEqual([
+      "question", "←→ move", "⏎ answer", "esc → keep",
+    ]);
+  });
+
+  it("T1.77 (C22 I133): a rebound or unbound action moves or drops its chip; the substate and the question name themselves", async () => {
+    // `insertNewline` on `⌃j` alone: the chip follows the binding.
+    const ctrlJ = defaultKeymap.filter((b) => b.action !== "insertNewline" || (b.key.name === "j" && b.key.ctrl === true));
+    const rebound = ownerLine("scope", FULL_CAPS, false, 0, undefined, false, hintsOver(ctrlJ)).map((c) => c.label);
+    expect(rebound).toContain(`${chordText({ name: "j", ctrl: true })} newline`);
+    expect(rebound, "the old chord is not named").not.toContain("⇧⏎ newline");
+    // The control: over the default table the chip is `⇧⏎`, so the move above
+    // is the rebinding's doing.
+    expect(ownerLine("scope", FULL_CAPS).map((c) => c.label)).toContain("⇧⏎ newline");
+
+    // `complete` unbound: no chip, rather than a chip nobody can press.
+    const noComplete = defaultKeymap.filter((b) => b.action !== "complete");
+    const scope = ownerLine("scope", FULL_CAPS, false, 0, undefined, false, hintsOver(noComplete)).map((c) => c.label);
+    expect(scope.some((l) => l.endsWith(" complete")), "an unbound action draws no chip").toBe(false);
+    expect(scope, "and the others stay").toHaveLength(3);
+
+    // **The substate names itself** (C15 I29), read through the graph from the
+    // top layer's declared owner — `find` was all it ever said.
+    const { graph } = await buildGraph();
+    graph.lifecycle.acquire();
+    const substate = (name: "find" | "complete" | "preview"): readonly string[] => {
+      graph.overlays.push({
+        id: `probe-${name}`,
+        kind: "panel",
+        owner: { rung: "substate", name },
+        placement: { kind: "anchored", row: 20, rows: 1, prefer: "above" },
+        content: [],
+        blocking: false,
+        dismissal: "escape",
+      });
+      const line = ownerLine("substate", FULL_CAPS, false, 0, undefined, false, graph.ownerHints()).map((c) => c.label);
+      graph.overlays.dismiss(`probe-${name}`);
+      return line;
+    };
+    expect(substate("complete")[0]).toBe("complete");
+    expect(substate("preview")[0]).toBe("preview");
+    // **§103's find line, word for word** — and the keys are the panel's first
+    // rows, so this is also what holds `↓` ahead of `⇥` for `menuNext`: the
+    // other order spells `↑⇥ hits`, which every row asserting against the
+    // table alone would accept.
+    expect(substate("find")).toEqual(["find", "↑↓ hits", "⏎ open", "esc close"]);
+    expect(graph.ownerHints().substate, "and nothing named with no panel up").toBeUndefined();
+
+    // **A question's line ends on its default's label** — a different default
+    // from T1.171's, so the label is the question's and not a constant.
+    void graph.confirm.ask({ question: "Stop?", choices: [{ key: "y", label: "stop", default: true as const }, { key: "n", label: "go on" }] });
+    expect(ownerLine("question", FULL_CAPS, false, 0, undefined, false, graph.ownerHints()).at(-1)?.label).toBe("esc → stop");
+  });
+});
+
+describe("C22 I150 — the completion footer names what each key does", () => {
+  /** Hints over a table for a completion panel, at rest or holding a selection. */
+  const over = (rows: readonly Binding[], rest: boolean): OwnerHints => {
+    const entries = createKeymap(rows, "default-terminal").entries();
+    return {
+      chord: (target, action) => entries.find((b) => b.target === target && b.action === action)?.key,
+      substate: "complete",
+      ...(rest ? { promptUnderMenu: true } : {}),
+    };
+  };
+  const line = (hints: OwnerHints): readonly string[] =>
+    ownerLine("substate", FULL_CAPS, false, 0, undefined, false, hints).map((c) => c.label);
+
+  it("T1.182 (C22 I150, ruling 96, ruling 99): at rest the line offers the prompt's run and complete chords and the way out; once selected, the move keys and accept", async () => {
+    // **At rest the prompt answers first** (C19 I20): `⏎` submits and `↑` is
+    // history, so a chip saying `accept` or `move` names a key that goes
+    // somewhere else. F1486 measured `⏎` submitting `/c` under `⏎ accept`.
+    const rest = line(over(defaultKeymap, true));
+    // **`⏎ run` is ruling 99's amendment** (§029): at rest `⏎` runs the line.
+    expect(rest).toEqual(["complete", "⏎ run", "⇥ complete", "esc close"]);
+    expect(rest.some((l) => /accept|move/u.test(l)), "no chip names a key the menu does not hold").toBe(false);
+
+    // **The control, and the other state**: with a selection the menu owns its
+    // keys and the line is the one it always drew.
+    expect(line(over(defaultKeymap, false))).toEqual(["complete", "↑↓ move", "⏎ accept", "esc close"]);
+
+    // **The chord is the keymap's** (C22 I133): the prompt's `complete` moved to
+    // `⌃o` moves the rest line's chip, which a literal `⇥` would not.
+    const ctrlO = defaultKeymap.map((b) =>
+      b.target === "prompt" && b.action === "complete" ? { ...b, key: { name: "o", ctrl: true } } : b,
+    );
+    const moved = line(over(ctrlO, true));
+    expect(moved).toContain(`${chordText({ name: "o", ctrl: true })} complete`);
+    expect(moved, "and the old chord is not named").not.toContain("⇥ complete");
+    // And the prompt's `submit`: moved to `⌃o` alone, the rest line says so.
+    const submitO = defaultKeymap.filter((b) => !(b.target === "prompt" && b.action === "submit")).concat(
+      defaultKeymap
+        .filter((b) => b.target === "prompt" && b.action === "submit")
+        .slice(0, 1)
+        .map((b) => ({ ...b, key: { name: "o", ctrl: true } })),
+    );
+    const run = line(over(submitO, true));
+    expect(run).toContain(`${chordText({ name: "o", ctrl: true })} run`);
+    expect(run, "and the old chord is not named").not.toContain("⏎ run");
+
+    // **Through the graph, from the router's own predicate** (C22 I51, I145): a
+    // `complete` panel declaring `promptLive` answers the hint, and one that
+    // does not answers nothing.
+    const { graph } = await buildGraph();
+    graph.lifecycle.acquire();
+    const hintsWith = (promptLive: boolean): OwnerHints => {
+      graph.overlays.push({
+        id: "probe-complete",
+        kind: "panel",
+        owner: { rung: "substate", name: "complete" },
+        placement: { kind: "anchored", row: 20, rows: 1, prefer: "above" },
+        content: [],
+        blocking: false,
+        dismissal: "escape",
+        promptLive,
+      });
+      const hints = graph.ownerHints();
+      graph.overlays.dismiss("probe-complete");
+      return hints;
+    };
+    expect(hintsWith(true).promptUnderMenu, "a menu at rest").toBe(true);
+    expect(hintsWith(false).promptUnderMenu, "a menu holding a selection").toBeUndefined();
+    expect(line(hintsWith(true))).toEqual(["complete", "⏎ run", "⇥ complete", "esc close"]);
+  });
+});
+
+describe("C22 I33 — a command of several lines", () => {
+  it("T1.172 (C22 I33): commandRows draws each line of the command and no row carries a line break", async () => {
+    const W = 30;
+    // **The control**: one line is one row, the prompt and the text.
+    expect(commandRows("/ps --all", W, FULL_CAPS)).toEqual(["❯ /ps --all"]);
+
+    // `\n`, `\r\n`, a blank line, and a line wider than the body.
+    const long = "x".repeat(40);
+    const rows = commandRows(`echo a\r\necho b\n\n${long}`, W, FULL_CAPS);
+    const cont = " ".repeat(PROMPT_GUTTER.cont);
+    const body = W - PROMPT_GUTTER.first;
+    expect(rows, "one row per line, the long one wrapped within its own rows").toEqual([
+      "❯ echo a",
+      `${cont}echo b`,
+      cont,
+      `${cont}${long.slice(0, body)}`,
+      `${cont}${long.slice(body)}`,
+    ]);
+    // **Over every row**, because the defect was one row holding the rest.
+    for (const r of rows) expect(/[\r\n]/u.test(r), `${JSON.stringify(r)} holds a break`).toBe(false);
+
+    // **Through a session**: a bracketed paste of six lines, submitted, writes
+    // no bare line feed into the frame's bytes — it wrote five.
+    vi.useFakeTimers();
+    try {
+      const stdin = fakeStdin();
+      // **Thirty rows, not 24**: the six echo rows and `/help`'s answer must all
+      // be on screen for the last assertion to read them. At 24 the answer's
+      // two watch rows (C22 §6p) scrolled `line-0`…`line-4` off the top, and the
+      // row failed on the screen's height rather than on a line break.
+      const s = await buildSession({ stdin: stdin as never } as never, { columns: 80, rows: 30 });
+      const step = async (): Promise<void> => {
+        await vi.advanceTimersByTimeAsync(50);
+        for (let i = 0; i < 4; i += 1) await Promise.resolve();
+      };
+      await step();
+      const before = s.stdout.output.length;
+      // Four lines: **under the chip threshold**, so the paste stays text and the
+      // echo draws its lines as rows (C22 I33). Five or more is a chip, whose echo
+      // is one row (I153, T4.123) and so cannot hold a line break to test.
+      stdin.emit(`\u001b[200~${Array.from({ length: 4 }, (_, i) => `/help line-${String(i)}`).join("\n")}\u001b[201~`);
+      await step();
+      stdin.emit("\r");
+      for (let i = 0; i < 10; i += 1) await step();
+      const out = s.stdout.output.slice(before);
+      expect(out, "the submission reached the frame").toContain("/help line-3");
+      expect((out.match(/\n/gu) ?? []).length, "bare line feeds written into the frame").toBe(0);
+      expect(s.screen().text.some((r) => r.trimStart().startsWith("/help line-3")), "each line on its own row").toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("C22 I33 — the echo neutralised (F1401)", () => {
+  it("T1.179 (C22 I33, C17 I36): commandRows draws U+2066 and U+202E as their forms, no row holds a bidi format character, and the height counts the forms' cells", () => {
+    // Escapes, never literals (A03 SS69).
+    const typed = "/show a\u2066b\u202ec";
+    const bidi = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u;
+    expect(commandRows(typed, 30, FULL_CAPS)).toEqual(["❯ /show a<U+2066>b<U+202E>c"]);
+    // **The height counts the forms.** At 20 columns the body is 18: the raw
+    // line measures 9 cells and would be one row, the drawn one is 25 and is
+    // two — and the measurer calls this same function (C14 I20).
+    const narrow = commandRows(typed, 20, FULL_CAPS);
+    expect(narrow, "two rows, the form's cells counted").toEqual(["❯ /show a<U+2066>b<U", `${" ".repeat(PROMPT_GUTTER.cont)}+202E>c`]);
+    for (const r of [...narrow, ...commandRows(typed, 30, FULL_CAPS)]) {
+      expect(bidi.test(r), `${JSON.stringify(r)} holds a bidi character`).toBe(false);
+    }
+    // **The control**: a clean command's rows are unchanged.
+    expect(commandRows("/show abc", 20, FULL_CAPS)).toEqual(["❯ /show abc"]);
+  });
+});
+
+describe("C22 I153 — the echo draws its chips (ruling 104 c, F1521)", () => {
+  it("T1.187 (C22 I153, §6t.2 rows 1–7): an echo holding a chip is the prompt row, one wrap unit, grounded bgDeep; without an echo the rows are unchanged", () => {
+    const paste = Array.from({ length: 6 }, (_, i) => `alpha ${String(i)}`).join("\n");
+    const command = `echo hi ${paste}`;
+    const chip = { from: 8, to: command.length, ordinal: 1, kind: "paste" as const, name: "pasted", lines: 6 };
+    const echo = [chip];
+
+    // §6t.1's measured case: one row, as the prompt showed it.
+    expect(commandRows(command, 80, FULL_CAPS, echo)).toEqual(["❯ echo hi  #1 pasted · 6L "]);
+    expect(commandRows(command, 80, MONO_UNICODE_CAPS, echo), "1 bit: the bracketed rung").toEqual(["❯ echo hi [#1 pasted · 6L]"]);
+
+    // **The control: no echo, and an echo that does not describe the command**,
+    // each the six rows `hardWrapCells` draws.
+    const six = commandRows(command, 80, FULL_CAPS);
+    expect(six).toHaveLength(6);
+    expect(six[1]).toBe(`${" ".repeat(PROMPT_GUTTER.cont)}alpha 1`);
+    expect(commandRows(command, 80, FULL_CAPS, [{ ...chip, to: command.length + 1 }]), "a range past the command").toEqual(six);
+
+    // **One wrap unit**: at 24 columns the label does not fit beside `echo hi `
+    // and moves whole to the second row.
+    expect(commandRows(command, 24, FULL_CAPS, echo)).toEqual(["❯ echo hi ", `${" ".repeat(PROMPT_GUTTER.cont)} #1 pasted · 6L `]);
+
+    // **The cells**: the chip's span covers the label exactly, and painted, it
+    // is the only run on the row carrying a background — `bgDeep`'s.
+    const drawn = echoRows(command, echo, 80, FULL_CAPS);
+    const row = drawn?.rows[0] ?? "";
+    const span = drawn?.chips[0];
+    expect(span).toEqual({ row: 0, from: 10, to: 26 });
+    expect(sliceCells(row, span?.from ?? 0, span?.to ?? 0)).toBe(" #1 pasted · 6L ");
+    const [painted] = paintEchoRows(drawn?.rows ?? [], drawn?.chips ?? [], null, DARK_THEME, FULL_CAPS);
+    const well = withBackground(tone("meta", DARK_THEME, FULL_CAPS, "bgDeep"), background("surface.bgDeep", DARK_THEME, FULL_CAPS));
+    expect(well.background, "the fixture resolves a bgDeep ground").toBeDefined();
+    expect(painted).toBe(`❯ echo hi ${sgr(well)} #1 pasted · 6L ${SGR_RESET}`);
   });
 });

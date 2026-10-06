@@ -29,7 +29,7 @@
  */
 
 import { descendants } from "../data/viewmodel/index.js";
-import type { Action, Block, Scroll } from "../data/viewmodel/index.js";
+import type { Action, Block, TreeNode } from "../data/viewmodel/index.js";
 import type { EntryId, TranscriptStore } from "../viewport/transcript/index.js";
 
 /** The schemes an `open` action may use. Nothing else reaches the OS handler. */
@@ -55,15 +55,15 @@ export type ActionDeps = Readonly<{
   /** For a refusal with no entry to patch — a malformed URL from a chrome action. */
   notify: (text: string) => void;
   /**
-   * Raise the fullscreen view over `target` (C23 I31, C25 §3b).
+   * A block's fold, or `null` where it declares none — the registry's hook
+   * (C09 I124, C23 I84).
    *
-   * Returns a refusal string, or `null` when the view opened. **A string rather
-   * than a throw**, and that is the second half of the ruling: C15's `push`
-   * throws when a view is raised onto a non-empty stack (C15 I1), and this
-   * dispatcher runs inside a renderer's callback where an `OverlayError` has no
-   * frame to be reported in. The owner checks and answers instead.
+   * **The one thing `expand` asks of a block that is not a row**, and a
+   * function rather than the registry so this file stays the dispatcher it
+   * says it is: it names no kind, and a kind registered by an app with its own
+   * fold is expandable with no edit here.
    */
-  pushView: (from: EntryId | null, target: string) => string | null;
+  fold: (block: Block) => Block | null;
 }>;
 
 /**
@@ -72,6 +72,16 @@ export type ActionDeps = Readonly<{
  * Exported because the refusal is the interesting half and a test that derives
  * its expectation from the same walk agrees with itself.
  */
+/** The node carrying `id`, at any depth of a tree (C04 I129), or undefined. */
+function findNode(nodes: readonly TreeNode[], id: string): TreeNode | undefined {
+  for (const n of nodes) {
+    if (n.id === id) return n;
+    const inner = n.children === undefined ? undefined : findNode(n.children, id);
+    if (inner !== undefined) return inner;
+  }
+  return undefined;
+}
+
 export function isFrozen(transcript: TranscriptStore, entryId: EntryId | null): boolean {
   if (entryId === null) return false;
   return transcript.liveId !== entryId;
@@ -138,19 +148,6 @@ export function createActionDispatcher(deps: ActionDeps) {
         return;
       }
 
-      case "view": {
-        // **The target is resolved against the source entry and nowhere wider**
-        // (C04 I34, C23 I31). `expand` needs no resolution — it names a row on
-        // the entry already in hand — and this is the first kind whose target is
-        // a free string an adapter supplies. Resolved against the transcript it
-        // would let one entry's action fill the screen with another's data;
-        // resolved against nothing it is a key that does nothing and says
-        // nothing. The owner does the lookup because it holds the entry.
-        const refusal = deps.pushView(from, action.target);
-        if (refusal !== null) deps.refuse(from, refusal);
-        return;
-      }
-
       case "expand": {
         // **A `replace` patch toggling the row's `expanded` flag** (C23 §3a,
         // C04 §3). Expansion is a document patch and not view state (C11 T4.7's
@@ -182,8 +179,15 @@ export function createActionDispatcher(deps: ActionDeps) {
         ];
 
         for (const b of reachable) {
-          if (b.kind !== "table") continue;
-          const row = b.rows.find((r) => r.id === action.target);
+          // **A tree's node is a row here** (C04 I129, §3ap E1), found at any
+          // depth of its tree; the first block in document order holding the id
+          // answers, as it does between two tables (C23 I31, §3ap E4).
+          const row =
+            b.kind === "table"
+              ? b.rows.find((r) => r.id === action.target)
+              : b.kind === "tree"
+                ? findNode(b.nodes, action.target)
+                : undefined;
           if (row === undefined) continue;
 
           const outcome = deps.transcript.patch(
@@ -202,23 +206,24 @@ export function createActionDispatcher(deps: ActionDeps) {
           return;
         }
 
-        // **A block declaring a collapsed form, at any depth** (C04 I98). Rows
+        // **A block declaring a fold, at any depth** (C23 I84, C09 I124). Rows
         // first — the arm above, reading the same `reachable` — then blocks, so
         // a row id equalling a block id has a known answer (C04 §3c S5). The
-        // toggle is a shell-origin `replace` with the flag inverted:
-        // `op: "expand"` names a row and `patch.ts` refuses a scroll (*is a
-        // scroll, which has no rows*), which was measured before this arm was
-        // written rather than assumed.
-        const folded = reachable.find(
-          (b: Block): b is Scroll =>
-            b.kind === "scroll" && b.id === action.target && b.collapsed !== undefined,
-        );
-        if (folded !== undefined) {
-          const outcome = deps.transcript.patch(
-            from,
-            { op: "replace", blockId: folded.id, block: { ...folded, collapsed: folded.collapsed !== true } },
-            "shell",
-          );
+        // toggle is a shell-origin `replace` with the block the kind's fold
+        // returns: `op: "expand"` names a row and `patch.ts` refuses a scroll
+        // (*is a scroll, which has no rows*), which was measured before the
+        // first fold arm was written rather than assumed.
+        //
+        // **No kind is named here, and that is ruling 42's clause** (C09 I124).
+        // This read `b.kind === "scroll" && b.collapsed !== undefined`, and a
+        // patch's cap and four shedding kinds were four more tests of the same
+        // shape waiting to be written beside it. Whether a block folds, and
+        // what folding it means, is its definition's answer.
+        for (const b of reachable) {
+          if (b.id !== action.target) continue;
+          const folded = deps.fold(b);
+          if (folded === null) continue;
+          const outcome = deps.transcript.patch(from, { op: "replace", blockId: b.id, block: folded }, "shell");
           if (outcome.ok) deps.scheduler.commit("input");
           return;
         }

@@ -26,7 +26,7 @@
 
 import { block, hasChildren } from "../data/viewmodel/index.js";
 import type { Block, ErrorLike, Panel, Status } from "../data/viewmodel/index.js";
-import { countdown, elapsed, glyphs } from "../presentation/blocks/index.js";
+import { age, countdown, elapsed } from "../presentation/blocks/index.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import { b, framedStatus } from "./builders/index.js";
 import type { ProducerContext } from "../data/adapters/types.js";
@@ -39,8 +39,12 @@ export const STALL_MS = 120_000;
 /** C23 §3b — a failing refresh doubles from its interval to here (C23 I21). */
 export const BACKOFF_CAP_MS = 300_000;
 
-/** The block id a stall notice always uses, so it can be found and removed. */
-const STALL_BLOCK = "stall-notice";
+/**
+ * The block id a stall notice always uses, so it can be found and replaced —
+ * and left out of a cancel's document, which the shell composes (C23 I98,
+ * ruling 100 d).
+ */
+export const STALL_BLOCK = "stall-notice";
 
 export type ViewRefresh = Readonly<{
   /** Which part — never which host. The host is `declare`'s argument (C23 I32). */
@@ -154,11 +158,16 @@ export type ViewRefresh = Readonly<{
  * staggered across members with no shared lifetime — and `release(host)` is what
  * makes I33's five triggers one call rather than five sites agreeing.
  */
-export type RefreshHost =
-  | Readonly<{ kind: "entry"; id: EntryId }>
-  | Readonly<{ kind: "view"; id: string }>;
+/**
+ * **One kind, and it was two** (R-EXA-082, F1254). `{ kind: "view"; id }` named a
+ * pushed layer's parts; the three surfaces that pushed one are transcript
+ * entries now, so an entry is the only host. The discriminant stays — a union of
+ * one is what a second host kind is added to, and `keyOf` below is already
+ * written for it.
+ */
+export type RefreshHost = Readonly<{ kind: "entry"; id: EntryId }>;
 
-/** The key a host is held under. Two kinds share one map; the kind disambiguates. */
+/** The key a host is held under. The kind disambiguates when there is more than one. */
 const keyOf = (host: RefreshHost): string => `${host.kind}:${String(host.id)}`;
 
 /**
@@ -241,11 +250,14 @@ const defaultErrorBlock = (
 ): ((err: ErrorLike, retryInMs: number | null, attempt: number) => Block) =>
   (err, retryInMs, attempt) => framedStatus(err, retryInMs, attempt, true, { id: `${id}-error` });
 
-export function livePanel(id: string, title: string, child: Block): Panel {
+export function livePanel(id: string, title: string, child: Block, staleForMs?: number): Panel {
   // `live` is what makes the panel say so (C04 I39, F18). Two surfaces draw the
   // `▌` rail and the slot existed unreachable: this is the only place in the
   // tree that knows a region refreshes, so it is the only place that can name it.
-  return block({ kind: "panel", id, title, live: true, children: [child] } as Panel);
+  // `staleForMs` is the same argument for §047's notice (C04 I127, C23 I78).
+  return block({
+    kind: "panel", id, title, live: true, ...(staleForMs === undefined ? {} : { staleForMs }), children: [child],
+  } as Panel);
 }
 
 /**
@@ -340,27 +352,7 @@ export type RefreshDeps = Readonly<{
    */
   fault: (stage: string, cause: unknown) => void;
   stopping: () => boolean;
-  /**
-   * Replaces a part's block on a pushed view (C15 §2's `update`).
-   *
-   * A second seam because the two hosts are different components: a transcript
-   * entry is patched through C13 and a layer through C15, and C23 §3b commits
-   * that both are driven by *the same code*, not that they are the same store.
-   * Returns whether the layer was still there.
-   */
-  updateView: (id: string, blockId: string, next: Block) => boolean;
   /** The block a pushed view currently shows for a part, so staleness can retitle. */
-  /**
-   * The part's **panel** as the view currently holds it (F22).
-   *
-   * It returned the panel's child, so `currentPanel` had to rebuild the panel
-   * through `livePanel` — which sets no `gapBefore`, making `existing?.gapBefore
-   * === true` structurally false on this arm and only this arm. The entry arm
-   * reads the real block and carries the gap; C24 I12 says `b.live` behaves
-   * identically in a transcript entry and in a pushed view, and here it could
-   * not. Returning the panel makes both arms one code path with one answer.
-   */
-  viewPanel: (id: string, blockId: string) => Panel | null;
   /**
    * Whether anyone is looking at this host (C23 I46).
    *
@@ -527,6 +519,11 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     readonly startedAt: number;
     lastOk: number | null;
     stale: boolean;
+    /**
+     * The age this part's panel last drew, as `age` draws it (C23 I78) — so the
+     * sweep writes when the **figure** moves and not when the clock does.
+     */
+    staleFigure: string | null;
   };
 
   /**
@@ -686,16 +683,9 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
 
   const put = (host: RefreshHost, part: Part, child: Block): PutResult => {
     const existing = currentPanel(host, part);
-    const base = livePanel(part.spec.id, titleOf(part), child);
+    const base = livePanel(part.spec.id, part.spec.title, child, staleAge(part));
     const panel: Block =
       existing?.padding === undefined ? base : ({ ...base, padding: existing.padding } as Block);
-    // **One boolean and one meaning on this arm** (§8h): C15 answers whether the
-    // layer is still there, and a view that cannot take a well-formed block is a
-    // state this seam cannot report — stated as the limit it is.
-    if (host.kind === "view") {
-      return deps.updateView(host.id, part.spec.id, panel) ? { kind: "ok" } : { kind: "hostGone" };
-    }
-
     const outcome = deps.transcript.patch(
       host.id,
       { op: "replace", blockId: part.spec.id, block: panel },
@@ -778,19 +768,19 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   const write = (part: Part, child: Block): boolean => landed(part, put(part.host, part, child));
 
   /**
-   * C23 I35 — the age lives in the title, and nowhere else does it fit.
+   * C23 I35, I78 — how old the reading is, or `undefined` while it is fresh.
    *
-   * **One guard, not two.** This read `!part.stale || part.lastOk === null`, and
-   * the second arm cannot fire: `stale` is only ever set where `lastOk` is
-   * already non-null. It read as care and was the vacuity class — a condition
-   * with nothing to be wrong about passes exactly like one that is satisfied,
-   * and the mutation pass found it by producing a mutant nothing could kill.
+   * **A number on the panel, and the title stays the declared one** (C04 I127).
+   * This was `titleOf`, which appended `· 240s ago` to the title in accent:
+   * §047 draws `updated 4m ago` at the border's inline end in warn, with the
+   * content dimmed, and only C09 can draw that from a fact.
+   *
+   * **One guard, not two.** `stale` is only ever set where `lastOk` is already
+   * non-null, so the `?? 0` is for the type rather than a case — the mutation
+   * pass once found a second arm here that nothing could kill.
    */
-  const titleOf = (part: Part): string => {
-    if (!part.stale) return part.spec.title;
-    const secs = Math.max(0, Math.round((deps.elapsed() - (part.lastOk ?? 0)) / 1000));
-    return `${part.spec.title} ${glyphs(deps.capabilities).separator} ${String(secs)}s ago`;
-  };
+  const staleAge = (part: Part): number | undefined =>
+    part.stale ? Math.max(0, deps.elapsed() - (part.lastOk ?? 0)) : undefined;
 
   /**
    * C23 I72 — the next deadline is one interval after the **last deadline**,
@@ -900,6 +890,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     }
     part.lastOk = deps.elapsed();
     part.stale = false;
+    part.staleFigure = null;
     return write(part, child);
   };
 
@@ -1009,21 +1000,38 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
       }
     }
 
+    // **Staleness never stops a refresh** (C23 I35) — and it does not run for a
+    // host nobody is looking at, because I46's pause is *no patch* and a
+    // re-dating is a patch.
+    //
+    // **Its own loop, and not the sources' one below** (C23 I78). That loop
+    // skips a source with a fetch in flight, which is right for starting a
+    // fetch and wrong here: a hung fetch is the stale reading §047 draws — the
+    // last good content standing while nothing replaces it — and it was the one
+    // case this could not reach. **And it rewrites when the figure moves**: the
+    // age used to be written once, at onset, so an hour-old reading said
+    // `120s ago` for the whole hour.
+    let dated = false;
     for (const src of sources.values()) {
-      if (src.done || src.inFlight) continue;
-
-      // **Staleness never stops a refresh** (C23 I35) — and it does not run for a
-      // host nobody is looking at, because I46's pause is *no patch* and a
-      // re-title is a patch.
+      if (src.done) continue;
       for (const part of src.parts) {
         if (!deps.visible(part.host)) continue;
-        if (part.stale || part.lastOk === null) continue;
-        if (mono - part.lastOk < part.spec.staleAfterMs) continue;
+        if (part.lastOk === null) continue;
+        if (!part.stale && mono - part.lastOk < part.spec.staleAfterMs) continue;
         part.stale = true;
+        const figure = age(mono - part.lastOk);
+        if (figure === part.staleFigure) continue;
         const current = currentChild(part.host, part);
-        if (current !== null && write(part, current)) deps.commit("stream");
+        if (current !== null && write(part, current)) {
+          part.staleFigure = figure;
+          dated = true;
+        }
       }
+    }
+    if (dated) deps.commit("stream");
 
+    for (const src of sources.values()) {
+      if (src.done || src.inFlight) continue;
       if (now >= src.dueAt && anyoneLooking(src)) runSource(src);
     }
 
@@ -1163,11 +1171,10 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
   };
 
   const currentPanel = (host: RefreshHost, part: Part): Panel | null => {
-    // **The real block on both arms** (F22). This reconstructed on the view arm
-    // and read on the entry arm, so every field the reconstruction did not set
-    // was invisible here — `gapBefore` measurably, and anything added to `Panel`
-    // later by construction.
-    if (host.kind === "view") return deps.viewPanel(host.id, part.spec.id);
+    // **The real block, read rather than reconstructed** (F22). There were two
+    // arms and the view's reconstructed, so every field the reconstruction did
+    // not set was invisible here — `gapBefore` measurably, and anything added to
+    // `Panel` later by construction. One arm now, and it is the reading one.
     const entry = deps.transcript.entries.find((e) => e.id === host.id);
     const found = entry === undefined ? null : findBlock(entry.doc.blocks, part.spec.id);
     return found !== null && found.kind === "panel" ? found : null;
@@ -1322,6 +1329,21 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
     );
     if (counting) soonest = Math.min(soonest, now + ELAPSED_TICK_MS);
 
+    // **A reading about to go stale, or already stale, wakes the sweep** (C23
+    // I78). Nothing else would: the `dueAt` loop skips a fetch in flight, and a
+    // hung fetch is the case the notice exists for. Stale, it wakes once a
+    // tick so the figure can move; fresh, it wakes at the moment it turns.
+    // Gated on visibility the way the write is.
+    const mono = deps.elapsed();
+    for (const src of sources.values()) {
+      if (src.done) continue;
+      for (const p of src.parts) {
+        if (p.lastOk === null || !deps.visible(p.host)) continue;
+        const turns = p.stale ? ELAPSED_TICK_MS : Math.max(0, p.lastOk + p.spec.staleAfterMs - mono);
+        soonest = Math.min(soonest, now + turns);
+      }
+    }
+
     // **A running card wakes the sweep too, once for all of them** (C23 I53).
     // Gated the way its write is: a card nobody is looking at arms no timer, and
     // `visibilityChanged` re-arms it when it is back on screen (I46).
@@ -1352,7 +1374,18 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
    * listens for exactly this.
    */
   const watchHosts = deps.transcript.subscribe((change) => {
-    if (change.kind === "settle") release({ kind: "entry", id: change.id });
+    if (change.kind === "settle") {
+      release({ kind: "entry", id: change.id });
+      // **The stall watch ends here too** (C23 I102, F1509). `settled` was the
+      // only thing that ended it, and a cancel, a malformed patch and a stream
+      // throw settle without calling it — so two minutes later a `"shell"`
+      // patch, which C13 admits on a settled entry, appended `no output for 2m`
+      // under the ending (§8a A6.10 rows 3–5). Not in `release`, which the
+      // sweep also calls for a host with nothing left to refresh while its
+      // entry still streams. Dropped without `resolveStall`: a settle that
+      // wanted *resumed after* called `settled` before it.
+      watched.delete(change.id);
+    }
     else if (change.kind === "evict") {
       for (const id of change.ids) release({ kind: "entry", id });
     } else if (change.kind === "clear") {
@@ -1531,6 +1564,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
             startedAt: deps.elapsed(),
             lastOk: null,
             stale: false,
+            staleFigure: null,
           };
           made.push(part);
           drawn.push({ part, message: why });
@@ -1571,6 +1605,7 @@ export function createRefreshDriver(deps: RefreshDeps): RefreshDriver {
           startedAt: deps.elapsed(),
           lastOk: null,
           stale: false,
+          staleFigure: null,
         };
         src.parts.add(part);
         made.push(part);

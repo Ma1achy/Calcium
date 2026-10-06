@@ -24,6 +24,7 @@ const key = (k: { name: string; ctrl?: boolean; meta?: boolean; shift?: boolean 
 });
 const press = (name: string): InputEvent => ({ kind: "key", key: key({ name }) });
 
+
 const DOWN = "[B";
 const RIGHT = "[C";
 const LEFT = "[D";
@@ -103,6 +104,7 @@ describe("C22 I76 — the writer alone", () => {
     // either reason.
     expect(graph.liveElements().map((e) => e.blockId), "the plot is focusable").toEqual(["p"]);
     graph.router.dispatch(press("down"));
+    graph.router.dispatch(press("enter")); // ⏎ into the plot (C26 I26, §102)
     expect(graph.cursorPositions.get(id, "p"), "no crosshair until a key asks").toBeUndefined();
 
     graph.router.dispatch(press("right"));
@@ -134,6 +136,7 @@ describe("C22 I76 — the writer alone", () => {
     expect(graph.cursorPositions.forEntry(id), "nothing written for a table").toEqual({});
 
     graph.router.dispatch(press("down"));
+    graph.router.dispatch(press("enter")); // ⏎ into the plot (C26 I26, §102)
     graph.router.dispatch(press("left"));
     expect(graph.cursorPositions.get(id, "p"), "← from nowhere appears at the far end").toBe(3);
   });
@@ -142,9 +145,16 @@ describe("C22 I76 — the writer alone", () => {
     const { graph } = await buildGraph();
     const id = graph.transcript.append(doc([plot("p1", [1, 2, 3]), plot("p2", [4, 5, 6])]) as never);
     graph.router.dispatch(press("down"));
+    graph.router.dispatch(press("enter")); // ⏎ into the plot (C26 I26, §102)
     graph.router.dispatch(press("right"));
     graph.router.dispatch(press("right"));
+    // **`esc` widens before `↓` steps** (§018: *esc widens ordinary states*;
+    // C26 I14's two-level escape). Inside the first plot `↓` is the inside's
+    // own — tilt — and steps no element, which is §018's *entering narrows it,
+    // and the arrows change what they drive* observed from the outside.
+    graph.router.dispatch(press("escape"));
     graph.router.dispatch(press("down"));
+    graph.router.dispatch(press("enter")); // ⏎ into the second plot
     graph.router.dispatch(press("right"));
     // **Different values on purpose**: equal ones would pass a store keyed on
     // the entry alone.
@@ -165,6 +175,13 @@ describe("C22 I76 — the writer alone", () => {
     });
     expect(graph.router.dispatch(click(41))).toBe(true);
     expect(graph.cursorPositions.get(id, "p"), "the pointer wrote the store").toBe(2);
+    // **Hover previews; the keyboard commits from inside** (§102). The pointer
+    // reached the store with focus still at the prompt, which is the design's
+    // own split — *pointer preview moves the readout without entering* — so
+    // the key half needs the way in before it can continue from what the
+    // pointer left.
+    graph.router.dispatch(press("down"));
+    graph.router.dispatch(press("enter"));
     graph.router.dispatch(press("right"));
     expect(graph.cursorPositions.get(id, "p"), "→ continues from the pointer's index").toBe(3);
     graph.router.dispatch(click(78));
@@ -180,6 +197,7 @@ describe("C22 I76 — the writer alone", () => {
     const { graph } = await buildGraph();
     graph.transcript.append(doc([plot("p", [1, 2, 3])]) as never);
     graph.router.dispatch(press("down"));
+    graph.router.dispatch(press("enter")); // ⏎ into the plot (C26 I26, §102)
     graph.router.dispatch(press("right"));
     expect(graph.cursorPositions.size).toBe(1);
     graph.transcript.clear();
@@ -214,6 +232,7 @@ describe("C22 I76 — the pair, through a frame", () => {
     await Promise.resolve();
     await type(DOWN); // the card's head is the first element (C09 I47)
     await type(DOWN);
+    await type("\r"); // ⏎ into the plot (C26 I26, §102: *the way IN*)
     const before = built.screen().text.join("\n");
     expect(before, "no readout without a cursor").not.toMatch(/train: \d/);
 

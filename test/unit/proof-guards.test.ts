@@ -68,24 +68,31 @@ describe("proof.sh guards", () => {
   });
 
   it("PG2: and refuses the one npm would have used — the defect, restored", () => {
-    // **F12.** `publishConfig.registry` beats both `--registry` and
+    // **F12.** A `publishConfig.registry` beats both `--registry` and
     // `npm_config_registry`, and npm reports the override as *accepted* while
-    // publishing to the configured host. A CI job wiring a local registry with
-    // `--registry` would have aimed at the real one and read the auth failure as
-    // a problem with the local one. The scoped form is what wins, which is why
-    // the script passes `--@fmx:registry=` and then asserts the line rather than
-    // trusting the flag.
+    // publishing to the configured host. A CI job wiring a local registry would
+    // have aimed at the real one and read the auth failure as a problem with the
+    // local one. That is why the script asserts the line rather than trusting
+    // the flag, whichever flag it passes.
     expect(guardAccepts(TO_CONFIGURED)).toBe(false);
     expect(TO_CONFIGURED, "and npm really does report it as a publish").toContain(
       "Publishing to",
     );
   });
 
-  it("PG3: the scoped override is what is passed, not the bare flag", () => {
-    expect(SCRIPT).toContain("--@fmx:registry=$LOCAL");
-    // The bare `--registry` form is the one that fails silently. It must not be
-    // what the gate uses.
-    expect(/npm publish --dry-run --registry/.test(SCRIPT)).toBe(false);
+  it("PG3: the bare override is passed, and only because nothing configures a registry", () => {
+    // **F1469.** The package is unscoped and carries no `publishConfig` (A04 §9),
+    // so `--registry` is the flag that takes. The scrub's rewrite left
+    // `--@calcium-tui:registry=` — a scope no package has, which npm accepts and
+    // ignores — and nothing local ran `make proof` to see it. The two halves are
+    // one fact: the bare flag is right exactly while `publishConfig` is absent.
+    expect(CODE).toContain('npm publish --dry-run "--registry=$LOCAL"');
+    expect(/--@[\w-]+:registry=/.test(CODE), "no scoped override for an unscoped package").toBe(
+      false,
+    );
+    const pkg = JSON.parse(readFileSync("package.json", "utf8")) as Record<string, unknown>;
+    expect(pkg.name).toBe("calcium-tui");
+    expect(pkg.publishConfig, "a publishConfig makes `--registry` lie (F12)").toBeUndefined();
   });
 
   it("PG4: the install is checked for being a real directory", () => {

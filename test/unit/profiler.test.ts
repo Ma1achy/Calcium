@@ -17,13 +17,9 @@
 import { describe, expect, it } from "vitest";
 
 import { createProfiler } from "../../src/shell/profiling/recorder.js";
+import type { Tier } from "../../src/shell/profiling/types.js";
 import { CARDS, profileCard } from "../../src/shell/profiling/panes/index.js";
-import { createProfileView } from "../../src/shell/profile-view.js";
-import { createOverlayManager } from "../../src/viewport/overlay/index.js";
 import type { Block, Notice } from "../../src/data/viewmodel/index.js";
-import type { Profiler, Tier } from "../../src/shell/profiling/types.js";
-import { registry } from "../support/overlay.js";
-import { FULL_CAPS } from "../support/render.js";
 
 /** A counter clock. Every row here asks *what was drawn*, never *how long*. */
 const counterClock = (): (() => number) => {
@@ -222,35 +218,13 @@ describe("C28 — profiler, tier 1 spec-first rows", () => {
     expect(after.excluded.selfInflicted, "after a throw inside the bracket").toBe(0);
   });
 
-  it("T1.16d (C28 I23, C28 I50): the view opened at `counters` raises to `spans`, and closing restores `counters` — not `off`", () => {
-    // **Live since the drawing round.** This was deferred for as long as
-    // `profilePane` had no caller in `src/` that opens and closes a pane; the
-    // view in `src/shell/profile-view.ts` is that caller. The spy is what makes
-    // *exactly twice* an assertion rather than an inference from the tier: a
-    // close that called `setTier` on every path would read the same tier here
-    // and reset the ring on the way (I18).
-    const real = createProfiler({ tier: "counters" }, { elapsed: counterClock() });
-    const calls: Tier[] = [];
-    const profiler = Object.create(real) as Profiler;
-    profiler.setTier = (tier: Tier): void => {
-      calls.push(tier);
-      real.setTier(tier);
-    };
-    const overlays = createOverlayManager({ registry });
-    const view = createProfileView({
-      overlays,
-      profiler,
-      capabilities: FULL_CAPS,
-      measureSequence: (blocks, width) => registry.measureSequence(blocks, width),
-      region: () => ({ width: 80, height: 24 }),
-      schedule: () => ({ [Symbol.dispose]: () => undefined }),
-      redraw: () => undefined,
-    });
-
-    expect(view.open(), "opened").toBeNull();
-    expect(profiler.tier, "raised while open").toBe("spans");
-    expect(view.pop(), "closed").toBe(true);
-    expect(profiler.tier, "restored to what was found, not to `off`").toBe("counters");
-    expect(calls, "exactly twice, once each way").toEqual(["spans", "counters"]);
-  });
+  // **T1.16d is struck with the tier-for-a-lifetime rule** (R-EXA-082, F1254).
+  // It opened the pushed
+  // view at `counters`, watched the tier rise to `spans` and fall back to
+  // `counters` rather than to `off`, and counted `setTier` exactly twice so that
+  // a close calling it on every path could not pass by reading the right tier.
+  // There is nothing that raises a tier: `/profile` is a transcript entry and
+  // holds `() => ProfileReport | null`, which is a reader with no recorder
+  // behind it (C28 §3c). The rule the row protected — a raise resets the ring
+  // (I18) — is asserted at the recorder, where it is about the recorder.
 });

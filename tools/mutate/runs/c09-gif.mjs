@@ -137,8 +137,11 @@ const results = runPass({
       file: SESSION,
       // Re-anchored 2026-09-05: the ninth axis (`seriesKey`, C22 I78) follows `framesKey`.
       // Re-anchored 2026-09-16: the tick left the slot for its own axis (C22 I103).
-      from: "\\u0000${cursorKey}\\u0000${framesKey}\\u0000${seriesKey}`;",
-      to: "\\u0000${cursorKey}\\u0000${seriesKey}`;",
+      // Re-anchored 2026-09-24: short of the line end, which the tenth axis
+      // (`washedKey`, C14 I54) moved — an anchor reaching the end rots whenever
+      // an axis is appended.
+      from: "\\u0000${cursorKey}\\u0000${framesKey}\\u0000${seriesKey}",
+      to: "\\u0000${cursorKey}\\u0000${seriesKey}",
       expect: "T4.17o",
     },
     {
@@ -151,8 +154,10 @@ const results = runPass({
       expect: "T4.17o",
     },
     {
-      // **Armed at the floor rather than at the delay.** Thirty wakes in 990 ms
-      // instead of six; the picture is right and the cost is not.
+      // **Armed at the floor rather than at the delay.** Eight wakes in 990 ms
+      // instead of six — the floor is 100 ms, and this said *thirty* until it
+      // was measured (2026-09-24). The picture is right and the cost is not,
+      // so T4.17o reads the wake delays: renders survived this mutation.
       name: "the frame wake is armed at the floor, not at the next frame",
       file: SESSION,
       from: "      framesMs = Math.max(floor, Number.isFinite(due) ? due : floor);",

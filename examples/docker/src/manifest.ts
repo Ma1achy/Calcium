@@ -17,7 +17,7 @@
  * mapping stops being checkable against `docker ps --format json`.
  */
 
-import type { ManifestDocument } from "@fmx/calcium";
+import type { ManifestDocument } from "calcium-tui";
 import { READ_TOOLS } from "./manifest/read.ts";
 import { LIFECYCLE_TOOLS } from "./manifest/lifecycle.ts";
 import { DESTRUCTIVE_TOOLS } from "./manifest/destructive.ts";

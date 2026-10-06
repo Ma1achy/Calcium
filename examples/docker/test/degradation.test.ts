@@ -1,7 +1,7 @@
 /**
  * S12 — every document this app produces, put through B04's compliance sweep.
  *
- * **`degradesTo1Bit` is the one assertion in `@fmx/calcium/testing` that no
+ * **`degradesTo1Bit` is the one assertion in `calcium-tui/testing` that no
  * consumer would write themselves**, which is C24 I13's argument for the module
  * existing, and this file is the first time an application has run it. It makes
  * two mechanical claims:
@@ -18,8 +18,8 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { expectDocument, localContext, producerContext } from "@fmx/calcium/testing";
-import type { ViewDocument } from "@fmx/calcium";
+import { expectDocument, localContext, producerContext } from "calcium-tui/testing";
+import type { ViewDocument } from "calcium-tui";
 import { containerView, createContainerAdapter } from "../src/container.ts";
 import { dashboard } from "../src/dashboard.ts";
 import { parseNdjson } from "../src/ndjson.ts";
@@ -34,10 +34,10 @@ import {
 } from "../src/verbs.ts";
 
 
-import { createAdapterRegistry } from "@fmx/calcium";
-import type { Adapter, AdapterContext, RawResult } from "@fmx/calcium";
-import { completeLocal } from "@fmx/calcium";
-import type { LocalDocument } from "@fmx/calcium";
+import { createAdapterRegistry } from "calcium-tui";
+import type { Adapter, AdapterContext, RawResult } from "calcium-tui";
+import { completeLocal } from "calcium-tui";
+import type { LocalDocument } from "calcium-tui";
 
 /** A local handler's answer, completed the way `runLocal` completes it (F13). */
 async function viaLocal(
@@ -140,7 +140,7 @@ describe("B04: the same information at every depth", () => {
     // alone — the dot is in the dashboard's panel title and summary, and the
     // view has its own. A per-surface check is a per-surface claim.
     const surfaces: readonly (readonly [string, unknown])[] = [
-      ["the S3 view", containerView(STATS, 100, false)],
+      ["the S3 view", containerView(STATS, false)],
       ["the dashboard", dashboard(SNAP, 100, "29.4.1", false)],
     ];
     for (const [name, blocks] of surfaces) {
@@ -162,8 +162,8 @@ describe("B04: the same information at every depth", () => {
     // So the control moves to what the view still supplies itself. It must be
     // a character the unicode arm has and the ASCII arm does not, or it cannot
     // tell the alphabet being chosen from the alphabet being empty.
-    expect(JSON.stringify(containerView(STATS, 100, true))).toContain("·");
-    expect(JSON.stringify(containerView(STATS, 100, false))).not.toContain("·");
+    expect(JSON.stringify(containerView(STATS, true))).toContain("·");
+    expect(JSON.stringify(containerView(STATS, false))).not.toContain("·");
     expect(JSON.stringify(dashboard(SNAP, 100, "29.4.1", true))).toContain("·");
   });
 

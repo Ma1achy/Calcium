@@ -1,0 +1,26 @@
+⌃C keeps one terminal family: five contexts resolve to FOUR outcomes
+
+  a tool is running     cancel the tool. The turn continues
+  the agent is thinking stop the turn. The partial reply STAYS
+  a question is open    nothing — its declared escape path answers,
+                        cancels or steps back; ⌃C does not duplicate it
+  the prompt has text   clear the line — the shell's meaning, kept
+  nothing is happening  NOTHING. It does not quit
+
+★ the last row is the important one
+
+  ⌃C twice in a row on an idle session quits in a shell, and that
+  habit will kill sessions here by accident. So it never quits, and
+  the footer says the way out:
+
+  ⌃C nothing to interrupt · /exit to leave
+
+  a destructive default with a keyboard shortcut is a thing people
+  do by muscle memory at the worst moment.
+
+and ⌃C during a STREAM is not the same as after it
+
+  ● The parser tracks quotes with a boolean, so a nes
+  ▲ interrupted · 312 of ~900 tokens
+  the partial text is KEPT. It is what the model said, and deleting
+  it loses the reason you interrupted.

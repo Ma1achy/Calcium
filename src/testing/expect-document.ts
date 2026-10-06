@@ -113,13 +113,36 @@ const KINDS_WITH_NOTHING_TO_CHECK: ReadonlyMap<BlockKind, Exemption> = new Map<
   ["code", { premise: "no-field", why: "syntax is its own palette, not the tone one" }],
   ["patch", { premise: "no-field", why: "the +/- marker carries the change axis (C04 I35)" }],
   ["tip", { premise: "no-field", why: "text only" }],
+  // C04 §3ar — a form declares no tone: its error is the error glyph in `error` tone by
+  // rendering, and the glyph is the carrier that survives one bit (C09 I119).
+  ["form", { premise: "no-field", why: "labels, values, hints and errors are text; an error takes its mark by rendering" }],
+  [
+    "choice",
+    {
+      premise: "by-rendering",
+      why:
+        "the two facts are on two channels and neither is colour (C09 I105, \u00a7018): `chosen` is " +
+        "the mark \u2014 `\u2713`/`\u2717`, `\u25cf`/`\u25cb` \u2014 and focus is a ground that falls back to inverse at one " +
+        "bit, so both survive with no colour at all",
+    },
+  ],
+  [
+    "control",
+    {
+      premise: "by-rendering",
+      why:
+        "the three states are two glyph substitutions and an attribute (C09 I106, \u00a7018): inside " +
+        "takes the heavy track and the painted handle, focus takes a ground that falls back to " +
+        "inverse, and the value is `info` at all three because it is data rather than a state",
+    },
+  ],
   ["raw", { premise: "no-field", why: "opaque by definition; the app owns what it renders" }],
   [
     "status",
     {
       premise: "by-rendering",
       why:
-        "`state` selects a tag, the glyph set's `warning` mark and an activity line, all of " +
+        "`state` selects a tag, the glyph set's `cross` mark and an activity line, all of " +
         "them text — ` ERROR ` and the mark for the two failing states, `loading` for the " +
         "third — so the three are told apart at one bit with no colour at all (C09 §3a)",
     },
@@ -158,7 +181,7 @@ function carriesATone(value: unknown): boolean {
 }
 
 /**
- * The four kinds that hold blocks — **and why two of them were exemptions**
+ * The five kinds that hold blocks — **and why two of them were exemptions**
  * (F925).
  *
  * `scroll` and `mosaic` sat in `KINDS_WITH_NOTHING_TO_CHECK`, each with a `why`
@@ -184,6 +207,7 @@ const CONTAINER_PREMISE: ReadonlyMap<BlockKind, string> = new Map<BlockKind, str
   ["panel", "a title, a footer and a live flag"],
   ["scroll", "a box and a residue row whose meaning is in its numbers"],
   ["mosaic", "pure geometry — a grid string, a height and two share arrays"],
+  ["split", "pure geometry — a height and a divider's column (C04 §3aq)"],
 ]);
 
 /** `carriesATone` over a container's **own** fields, its children excluded. */
@@ -245,6 +269,11 @@ const TRUECOLOUR: TerminalCapabilities = Object.freeze({
   imageProtocol: "none",
   keyboardProtocol: "none",
   altScreen: true,
+  renderMode: "rich",
+  notification: "none",
+  clipboard: "none",
+  editor: null,
+  notify: [],
 });
 
 const ONE_BIT: TerminalCapabilities = Object.freeze({ ...TRUECOLOUR, colourDepth: 1 });
@@ -567,6 +596,31 @@ export function expectDocument(
               }
             }
             break;
+          case "tape":
+            for (const m of block.members) {
+              if (bare(undefined, undefined, m.label)) {
+                offences.push(
+                  `tape "${block.id}" has a member with an empty label — ` +
+                    `a member has no glyph field of its own, and its state mark is derived`,
+                );
+              }
+            }
+            break;
+          case "tree": {
+            const walk = (nodes: typeof block.nodes): void => {
+              for (const n of nodes) {
+                if (bare(undefined, undefined, n.label)) {
+                  offences.push(
+                    `tree "${block.id}" has a node with an empty label — ` +
+                      `the name is the node's content, and its twisty is derived`,
+                  );
+                }
+                if (n.children !== undefined) walk(n.children);
+              }
+            };
+            walk(block.nodes);
+            break;
+          }
           case "table":
             for (const r of block.rows) {
               for (const [key, cell] of Object.entries(r.cells)) {
@@ -584,6 +638,7 @@ export function expectDocument(
           case "group":
           case "scroll":
           case "mosaic":
+          case "split":
             assertContainerPremise(block);
             for (const child of block.children) visit(child);
             break;

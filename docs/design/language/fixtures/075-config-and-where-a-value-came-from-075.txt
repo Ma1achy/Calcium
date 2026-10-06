@@ -1,0 +1,32 @@
+/config — and the third column is the one that matters
+
+┌ config ──────────────────── ~/.calcium/config.toml ────────────────────────┐
+│  key                    value              source
+│ ▸ model                  qwen3-coder-next   config
+│   endpoint               localhost:8000     env
+│   posture                auto               flag
+│   effort                 high               config
+│   ui.theme               ink                config
+│   ui.colour              blue               config
+│   ui.spinner             braille            default
+│   context.cap            50000              default
+│
+└ ⏎ edit   r reset to default   esc back   ──────────────────────────────────────┘
+
+four sources, and the tone is the ladder — the later it is applied, the
+louder it is, because a flag beating your config file is the thing you
+forget you did.
+
+  default   the framework's                 muted — nobody chose it
+  config    ~/.calcium/config.toml         meta — you chose it
+  env       CALCIUM_ENDPOINT             warn — your shell chose it
+  flag      --posture auto                error — this invocation chose it
+
+a config view without a source column is one you cannot debug — the
+commonest question is not what is it, it is WHY is it that.
+
+and it is per-directory as well as global
+  ~/.calcium/config.toml         the account's
+  ./.calcium/config.toml         this checkout's — and it wins
+  which is where /colour and /label write, so a project keeps its
+  own chrome without anyone editing a file.

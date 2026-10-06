@@ -25,7 +25,7 @@ The design problem is that a long-running block competes with the transcript for
 ## 2. `/run`
 
 ```
-▌ ── run · fmx_models.jobs.training:job · host-native ──────────────────────────
+▌ ── run · ml_models.jobs.training:job · host-native ──────────────────────────
 ▌
 ▌   ✓ importing target                    job resolved
 ▌   ✓ resources resolved                  1×GPU · 8Gi  (satisfied)
@@ -104,8 +104,8 @@ That is a deliberate divergence from S08 §4, and it is stated in both places.
 ▌   ◐ layers                              7 / 11 · installing wheels
 ▌
 ▌   #7 [4/8] RUN pip install --no-deps /opt/wheels/*.whl
-▌   #7 12.4  Processing /opt/wheels/fmx_models-0.3.2-py3-none-any.whl
-▌   #7 14.1  Successfully installed fmx_models-0.3.2
+▌   #7 12.4  Processing /opt/wheels/ml_models-0.3.2-py3-none-any.whl
+▌   #7 14.1  Successfully installed ml_models-0.3.2
 ▌
 ▌   ⌃c to stop
 ```

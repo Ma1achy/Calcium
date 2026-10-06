@@ -1,0 +1,88 @@
+WHERE TWO RULES MEET — the cases neither rule answers alone
+
+individual rules are well specified. The document is thin exactly where
+two of them meet, and that is where interaction models break.
+
+1 · A QUESTION ARRIVES WHILE A PANEL IS OPEN
+
+  a panel is DISMISSABLE and a question is NOT. Two layers, and one of
+  them is about to take the keyboard.
+
+  THE PANEL CLOSES FIRST, and its state is held with the prompt’s.
+  A panel is a thing you opened; a question is a thing that arrived. The
+  arriving one cannot silently sit under something you were reading, and
+  stacking two dismissable-versus-not layers makes esc ambiguous.
+
+  and the question still takes the activation guard described in INPUT
+  OWNERSHIP — so the ⏎ that would have taken a completion does not answer it.
+
+2 · A RESIZE WHILE INSIDE A PLOT, WITH A MODAL PENDING
+
+  three rules want the same moment: a resize keeps your SCOPE (§59), a
+  modal OWNS input (§102), and focus falls forward by id (§103).
+
+  THE LADDER DECIDES, because it always does. The modal owns the
+  keyboard, so the resize changes what is DRAWN and not who OWNS it — the
+  plot re-solves underneath, the camera is kept, and when the question
+  resolves you are back inside the plot exactly where you were.
+
+  ★ a resize is a RENDER event. It can never change the OWNER — which is
+  the same reason §59 says it cannot change the scope.
+
+3 · TWO QUESTIONS, AND THE FIRST IS BEING INSPECTED
+
+  §97 says an inspection SUSPENDS a question. The queue rule says a second
+  question WAITS. What does the second one do while the first is
+  suspended and therefore not on screen?
+
+  IT WAITS, and the inspection is not a resolution. The queue is of
+  UNRESOLVED questions, and suspended is unresolved — which is the
+  whole point of the word. Leaving the inspection returns to the first
+  question, not to the second.
+
+  EVERY QUESTION RESOLVES EXACTLY ONCE, and a suspension is not one.
+
+4 · A WATCHED RUN FINISHES WHILE ITS ENTRY IS EVICTED
+
+  the visible window evicts at a cap. A watch retains a stable EVENT ID
+  in the durable record, so it can outlive that event's current rendering.
+
+  ⏎ REHYDRATES THE WATCHED EVENT, preserving its identity.
+  Completion is a new durable event linked to that watched ID, so it
+  appears at the end without pretending to replace history. The watch
+  can open either fact; eviction changed only the window.
+
+5 · THE CONNECTION DROPS WHILE A QUESTION IS OPEN
+
+  the child that asked is gone. The question is still on screen and
+  still owns the keyboard.
+
+  IT RESOLVES ITSELF, VISIBLY — as EXPIRED, not as denied.
+
+  ○ the question expired ·  seams  disconnected after 41s
+
+  denied would be a lie about what happened, and leaving it open would
+  hold the keyboard for an owner that no longer exists. Expiry is the
+  third resolution, and it is why §97 says CANCELLATION AND EXPIRY
+  INCLUDED rather than just answered.
+
+6 · A SORTED TABLE REORDERS UNDER A HELD POINTER
+
+  a live table patches while you are pressing on a row. The row at
+  those coordinates on RELEASE is a different row.
+
+  THE GESTURE IS BOUND TO THE ELEMENT’S IDENTITY, not the coordinates.
+  Press ARMS the element it landed on; release COMMITS only if the
+  pointer is still over THAT ELEMENT. Otherwise nothing happens, and
+  nothing happening is correct — it is the pointer’s version of §97’s
+  rule about events assigned to one owner.
+
+★ the thread through all six
+
+  EVERY ONE IS ANSWERED BY A RULE THAT ALREADY EXISTS, applied to a
+  case it was not written for. None of them needed a new mechanism —
+  which is the test for whether the rules are the right ones.
+
+  and the one thing they share: A RESIZE, A PATCH AND AN ORDINARY CONTENT
+  ARRIVAL ARE RENDER EVENTS. They change what is drawn; they never change
+  the owner. An ownership-request event declares that change explicitly.

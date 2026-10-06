@@ -38,7 +38,7 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 
-const LEDGER = "examples/docker/FINDINGS.md";
+const LEDGER = "docs/archive/records/FINDINGS.md";
 
 /**
  * Where a citation may appear. Anything else is prose about the number.
@@ -383,7 +383,7 @@ export function checkFindings(io) {
   return violations;
 }
 
-const TRIAGE = "examples/docker/TRIAGE.md";
+const TRIAGE = "docs/archive/records/TRIAGE.md";
 
 /**
  * SP6 — every finding in the ledger is keyed in the triage, and the triage's
@@ -594,7 +594,7 @@ export function checkTriageInventory(io) {
  */
 export const TRIAGE_OPEN = Object.freeze([
   "F812", "F1100", "F1126", "F1127", "F1128", "F1129", "F1130", "F1138",
-  "F1141", "F1144", "F1145", "F1146", "F1147", "F1151", "F1208", "F1210", "F1211", "F1212", "F1214", "F1215", "F1216", "F1217", "F1232",
+  "F1141", "F1144", "F1145", "F1146", "F1147", "F1151", "F1208", "F1210", "F1211", "F1212", "F1214", "F1215", "F1216", "F1217", "F1232", "F1246", "F1258", "F1262", "F1265", "F1266", "F1267", "F1270", "F1273", "F1318", "F1276", "F1284", "F1313", "F1278", "F1344", "F1333", "F1351", "F1338", "F1323", "F1329", "F1348", "F1354", "F1356", "F1366", "F1379", "F1381", "F1388", "F1390", "F1294", "F1406", "F1408", "F1409", "F1392", "F1393", "F1394", "F1430", "F1432", "F1433", "F1437", "F1441", "F1444", "F1445", "F1447", "F1448", "F1449", "F1452", "F1463", "F1465", "F1466", "F1468", "F1471", "F1472", "F1477", "F1483", "F1500", "F1521", "F1522", "F1527",
 ]);
 
 /** The words a disposition may be written with. */

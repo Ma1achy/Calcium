@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import { createRefreshDriver, elapsedNeeded, STALL_MS } from "../../src/shell/refresh.js";
 import type { RefreshHost, ViewRefresh } from "../../src/shell/refresh.js";
+import type { RefreshHost as PublishedHost } from "../../src/index.js";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { SESSION_BLOCK_CAP } from "../../src/viewport/transcript/cap.js";
 import { block } from "../../src/data/viewmodel/index.js";
@@ -23,6 +24,7 @@ import type { Block, ViewDocument } from "../../src/data/viewmodel/index.js";
 import { producerContext } from "../support/producer-context.js";
 import { callHead } from "../../src/shell/documents.js";
 import { spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
+import { age } from "../../src/presentation/blocks/index.js";
 import { FULL_CAPS } from "../support/render.js";
 const SWEEP = STALL_MS / 4;
 
@@ -59,7 +61,6 @@ const keyOfHost = (host: { kind: string; id: string }): string => `${host.kind}:
 function harness() {
   const transcript = createTranscriptStore();
   const commits: string[] = [];
-  const views = new Map<string, Block[]>();
   let now = 0;
   /** The monotonic clock: advanced with `now` by `tick`, left behind by `skew` (F973). */
   let mono = 0;
@@ -97,31 +98,20 @@ function harness() {
     append: () => undefined,
     fault: (stage, cause) => void faults.push(`${stage}: ${String(cause)}`),
     stopping: () => false,
-    updateView: (id, blockId, next) => {
-      const content = views.get(id);
-      if (content === undefined) return false;
-      views.set(
-        id,
-        content.map((b) => (b.id === blockId ? next : b)),
-      );
-      return true;
-    },
-    // **This double reproduced the defect it was standing in for** (F22). It
-    // returned the panel's child, exactly as production did, so no row here
-    // could have seen that the view arm was rebuilding the panel and losing
-    // `gapBefore` — a fake narrower than the interface cannot fail on the
-    // difference, and this one was not narrower, it was wrong in the same way.
-    viewPanel: (id, blockId) => {
-      const found = views.get(id)?.find((b) => b.id === blockId);
-      return found !== undefined && found.kind === "panel" ? found : null;
-    },
+    // **`updateView` and `viewPanel` are gone with the host kind** (R-EXA-082,
+    // F1254). They were the layer arm of a two-armed seam, and `viewPanel` is
+    // worth a sentence on the way out: it was a double that **reproduced the
+    // defect it stood in for** (F22), returning the panel's child exactly as
+    // production did, so neither half of the suite could see the view arm
+    // rebuilding the panel and losing `gapBefore`. A fake that is wrong in the
+    // same way as the code cannot fail on the difference. One arm is left and
+    // it reads the real block.
   });
 
   return {
     driver,
     transcript,
     commits,
-    views,
     hidden,
     faults,
     /**
@@ -192,6 +182,13 @@ const titleOf = (h: ReturnType<typeof harness>, entry: string, id: string): stri
   const e = h.transcript.entries.find((x) => x.id === entry);
   const p = e?.doc.blocks.find((b) => b.id === id);
   return p !== undefined && p.kind === "panel" ? p.title : null;
+};
+
+/** The panel's stale figure (C04 I127), or `null` while it is fresh. */
+const staleOf = (h: ReturnType<typeof harness>, entry: string, id: string): number | null => {
+  const e = h.transcript.entries.find((x) => x.id === entry);
+  const p = e?.doc.blocks.find((b) => b.id === id);
+  return p !== undefined && p.kind === "panel" ? (p.staleForMs ?? null) : null;
 };
 
 describe("C23 §3b — part refresh", () => {
@@ -501,7 +498,7 @@ describe("C23 §3b — part refresh", () => {
     expect(settled, "the settled one stopped").toBe(1);
   });
 
-  it("T1.36 (I35): staleness shows in the title and never stops the refresh", async () => {
+  it("T1.36 (I35): staleness shows on the panel, the title stays the declared one, and the refresh never stops", async () => {
     let ok = true;
     let calls = 0;
     const h = harness();
@@ -522,19 +519,22 @@ describe("C23 §3b — part refresh", () => {
     ]);
 
     await h.tick();
-    expect(titleOf(h, id, "a"), "fresh data says nothing about age").toBe("activity");
+    expect(staleOf(h, id, "a"), "fresh data says nothing about age").toBeNull();
 
     ok = false;
     const callsAtFailure = calls;
     // Past twice the interval with nothing succeeding.
     await h.tick(60_000);
     await h.tick(60_000);
-    expect(titleOf(h, id, "a"), "the age is in the title").toMatch(/^activity · \d+s ago$/u);
+    expect(staleOf(h, id, "a"), "the age is on the panel").toBeGreaterThanOrEqual(60_000);
+    // **The title is the declarer's** (C04 I127): it read `activity · 120s ago`,
+    // and §047 puts the age at the border's inline end instead.
+    expect(titleOf(h, id, "a"), "and the title is untouched").toBe("activity");
     expect(calls, "and it never stopped trying").toBeGreaterThan(callsAtFailure);
 
     ok = true;
     await h.tick(300_000);
-    expect(titleOf(h, id, "a"), "success clears it").toBe("activity");
+    expect(staleOf(h, id, "a"), "success clears it").toBeNull();
   });
 
   it("T1.36b (I35): a part that has never succeeded is loading, not stale", async () => {
@@ -549,7 +549,7 @@ describe("C23 §3b — part refresh", () => {
     ]);
 
     for (let i = 0; i < 5; i += 1) await h.tick(60_000);
-    expect(titleOf(h, id, "a"), "no age, because there is no last-good").toBe("activity");
+    expect(staleOf(h, id, "a"), "no age, because there is no last-good").toBeNull();
   });
 
   it("T1.31 (I20): declared parts are staggered, and the first tick spends the stagger", async () => {
@@ -601,69 +601,54 @@ describe("C23 §3b — part refresh", () => {
     expect(order).toEqual(["a", "b", "c"]);
   });
 
-  it("T4.21b (C24 I12, F22): the view arm carries gapBefore, as the entry arm does", async () => {
-    // **T1.35b's property, on the arm that could not hold it.** That row asserts
-    // a refresh keeps the declared block's `gapBefore` and it drives a
-    // *transcript entry*, where `currentPanel` reads the real block. The view
-    // arm reconstructed the panel through `livePanel`, which sets no gap — so
-    // `existing?.padding?.t === 1` was structurally false here and only here,
-    // and C24 I12 says `b.live` behaves identically in both.
-    //
-    // **Neither half of the suite could see it**: this file's `viewPanel` double
-    // and `document-view.test.ts`'s both returned the panel's child, reproducing
-    // the production defect rather than standing in for the interface. A fake
-    // that is wrong in the same way as the code cannot fail on the difference.
+  // **T4.21 and T4.21b are struck with the view host** (R-EXA-082, F1254).
+  //
+  // T4.21 drove `{ kind: "view" }` directly and proved the public API's *one loop,
+  // two hosts, no second code path* — an invariant retired with the view, and
+  // named here without its number because SP9 reads comments as citations; there
+  // is one host kind, so the claim was a statement about a union with one member. T4.21b was its `gapBefore` half — T1.35b's
+  // property on the arm that could not hold it, because the view arm rebuilt the
+  // panel through `livePanel` and the entry arm reads the real block. The arm
+  // that could be wrong is the one that went; T1.35b is the row that holds the
+  // property and it drives an entry.
+  //
+  // **`release` stopping a host is not struck with them** — T2.20 below drives
+  // it, and I33's release-on-a-gone-host is T3.67's.
+
+  it("T4.21 (C23 I83, C24 I40, I32): a host is an entry and nothing wider, and `release` stops one entry's parts while a second is untouched", async () => {
+    // **The kind, at the type** (C23 I83, C24 I40). Read off the published
+    // `RefreshHost`, because I40 is the public surface's promise: a second member
+    // of the union turns this `false` and `make typecheck` fails on the line
+    // below. The runtime half cannot see a kind nobody declares, which is why
+    // the assertion is a type and the `expect` only keeps the binding used.
+    type OnlyEntry = PublishedHost["kind"] extends "entry" ? true : false;
+    const onlyEntry: OnlyEntry = true;
+    expect(onlyEntry).toBe(true);
+
+    // What survives of the view row: the loop releases the host it is told to
+    // and nothing else. Two entries, because *stopped* asserted over one host is
+    // indistinguishable from *stopped everything*.
+    let a = 0;
+    let b = 0;
     const h = harness();
-    const declared = { ...panel("p", "panel", raw("p-c", "…")), padding: { t: 1 } } as Block;
-    h.views.set("dash", [declared]);
+    const ida = h.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]), { streaming: true });
+    const idb = h.transcript.append(docWith([panel("b", "b", raw("b-c", "…"))]), { streaming: true });
+    const host: RefreshHost = { kind: "entry", id: ida };
 
-    h.driver.declare({ kind: "view", id: "dash" }, [part({ id: "p" })]);
-    await h.tick();
-
-    const after = h.views.get("dash")?.find((b) => b.id === "p");
-    // The control first: a refresh that did not happen satisfies the claim below
-    // by leaving the declared block in place, gap and all.
-    expect(
-      after?.kind === "panel" && after.children[0]?.kind === "raw" && after.children[0].text,
-      "the control: it really did refresh",
-    ).toBe("ok");
-    expect(after?.padding?.t, "and the rhythm survived the replacement").toBe(1);
-  });
-
-  it("T4.21 (C24 I12): a pushed view is driven by the same loop, and release stops it", async () => {
-    // **The host arm with no shell-level producer.** Nothing in the tree pushes
-    // an app-supplied view yet — that is C22 §13's undecided ruling, which C25
-    // narrowed and did not close — so this drives the seam directly rather than
-    // through a route that does not exist. What it proves is C24 I12's half that
-    // is provable today: one loop, two hosts, no second code path.
-    let calls = 0;
-    const h = harness();
-    h.views.set("dash", [panel("p", "panel", raw("p-c", "…"))]);
-    const host: RefreshHost = { kind: "view", id: "dash" };
-
-    h.driver.declare(host, [
-      part({
-        id: "p",
-        fetch: () => {
-          calls += 1;
-          return Promise.resolve("live");
-        },
-      }),
+    h.driver.declare(host, [part({ id: "a", fetch: () => { a += 1; return Promise.resolve("live"); } })]);
+    h.driver.declare({ kind: "entry", id: idb }, [
+      part({ id: "b", fetch: () => { b += 1; return Promise.resolve("live"); } }),
     ]);
 
     await h.tick();
-    const shownInView = h.views.get("dash")?.[0];
-    expect(
-      shownInView?.kind === "panel" && shownInView.children[0]?.kind === "raw"
-        ? shownInView.children[0].text
-        : null,
-      "the view's part was patched through C15's seam",
-    ).toBe("live");
+    expect(shown(h, ida, "a"), "the control: it really did refresh").toBe("live");
+    expect([a, b], "and both ran").toEqual([1, 1]);
 
     h.driver.release(host);
-    const at = calls;
+    const at = a;
     for (let i = 0; i < 3; i += 1) await h.tick(60_000);
-    expect(calls, "and the pop stopped it").toBe(at);
+    expect(a, "released").toBe(at);
+    expect(b, "and the other host kept going").toBeGreaterThan(1);
   });
 
   it("T2.20 (I32): dispose stops every host, whatever state it was in", async () => {
@@ -672,7 +657,12 @@ describe("C23 §3b — part refresh", () => {
     const id = h.transcript.append(docWith([panel("a", "a", raw("a-c", "…"))]), {
       streaming: true,
     });
-    h.views.set("v", [panel("p", "p", raw("p-c", "…"))]);
+    // **Two entries, where it was an entry and a view** (R-EXA-082, F1254).
+    // *Every host* has to mean more than one host or the row is T1.x under
+    // another name; the second kind is gone and a second entry is what is left.
+    const id2 = h.transcript.append(docWith([panel("p", "p", raw("p-c", "…"))]), {
+      streaming: true,
+    });
 
     const counting = (pid: string) =>
       part({
@@ -683,7 +673,7 @@ describe("C23 §3b — part refresh", () => {
         },
       });
     h.driver.declare({ kind: "entry", id }, [counting("a")]);
-    h.driver.declare({ kind: "view", id: "v" }, [counting("p")]);
+    h.driver.declare({ kind: "entry", id: id2 }, [counting("p")]);
 
     await h.tick();
     expect(calls, "the control: both ran").toBe(2);
@@ -1799,24 +1789,38 @@ describe("C23 I70 — a refused patch stops the part, not the host", () => {
   });
 
   it("T3.67 (I70, §8h H2): a host that has gone still takes the whole host down", async () => {
-    // **The control for the ruling**, and the view arm is where it can be
-    // constructed: C15 answers one boolean, so `false` means the layer is gone
-    // and there is no second reading of it. Both parts must stop — a fix that
-    // simply stopped releasing would pass every row above and fail this one.
+    // **The control for the ruling.** It was written on the view arm, where
+    // C15 answered one boolean and `false` meant the layer was gone with no
+    // second reading of it; the entry arm reaches the same state through C13
+    // dropping the entry (R-EXA-082, F1254), which is `clear()` here and an
+    // eviction in a session. Both parts must stop — a fix that simply stopped
+    // releasing would pass every row above and fail this one.
     const h = harness();
     let a = 0;
     let b = 0;
-    h.views.set("v", [panel("a", "a", raw("a-c", "…")), panel("b", "b", raw("b-c", "…"))]);
-    h.driver.declare({ kind: "view", id: "v" }, [
+    const id = h.transcript.append(
+      docWith([panel("a", "a", raw("a-c", "…")), panel("b", "b", raw("b-c", "…"))]),
+      { streaming: true },
+    );
+    h.driver.declare({ kind: "entry", id }, [
       part({ id: "a", intervalMs: 1_000, fetch: () => { a += 1; return Promise.resolve("x"); } }),
       part({ id: "b", intervalMs: 1_000, fetch: () => { b += 1; return Promise.resolve("y"); } }),
     ]);
     await h.tick(1_000);
     expect([a, b], "the control: both ran").toEqual([1, 1]);
 
-    h.views.delete("v");
+    h.transcript.clear();
     for (let i = 0; i < 4; i += 1) await h.tick(1_000);
-    expect([a, b], "the layer went and both parts went with it").toEqual([2, 2]);
+    // **Four due ticks and neither part ran** — the figure was `[2, 2]` on the
+    // view arm, where the layer's disappearance was noticed one tick late; C13
+    // drops the entry synchronously, so the release lands before the next fetch.
+    //
+    // **And it is a release rather than a pause**, which is the distinction the
+    // row is about: `visible` here reads `hidden`, `clear()` does not touch it,
+    // so the host is still *visible* and stopped anyway. A paused part would be
+    // waiting to resume; this one is gone.
+    expect(h.hidden.has(`entry:${id}`), "not paused — the host was never hidden").toBe(false);
+    expect([a, b], "the entry went and both parts went with it").toEqual([1, 1]);
     expect(h.faults, "a host that is gone is not a defect and is not reported").toEqual([]);
   });
 
@@ -1953,5 +1957,74 @@ describe("C23 I70 — a refused patch stops the part, not the host", () => {
       "farSide",
     );
     expect(asFarSide.ok === false && asFarSide.reason, "and only the far side is refused").toBe("settled");
+  });
+
+  it("T1.73 (I78): a part whose second fetch never settles goes stale — a fetch in flight is not skipped", async () => {
+    // **The case §047 draws**: the last good reading standing while nothing
+    // replaces it. The sweep skipped every source with a fetch in flight, so a
+    // hung fetch — the commonest stale reading there is — never said so.
+    let calls = 0;
+    const h = harness();
+    const id = h.transcript.append(docWith([panel("a", "workers", raw("a-c", "…"))]), { streaming: true });
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        intervalMs: 30_000,
+        staleAfterMs: 60_000,
+        fetch: () => {
+          calls += 1;
+          return calls === 1 ? Promise.resolve("build running") : new Promise<never>(() => undefined);
+        },
+      }),
+    ]);
+    await h.tick();
+    expect(shown(h, id, "a"), "the first reading landed").toBe("build running");
+    for (let i = 0; i < 4; i += 1) await h.tick(30_000);
+    expect(calls, "the second fetch is the one in flight, and it is the only one").toBe(2);
+    expect(staleOf(h, id, "a"), "and the reading says it is stale").not.toBeNull();
+    expect(shown(h, id, "a"), "with the last good content still standing").toBe("build running");
+  });
+
+  it("T1.74 (I78): a stale part's age advances with the clock, and writes only when the figure moves", async () => {
+    let calls = 0;
+    const h = harness();
+    const id = h.transcript.append(docWith([panel("a", "workers", raw("a-c", "…"))]), { streaming: true });
+    h.driver.declare({ kind: "entry", id }, [
+      part({
+        id: "a",
+        intervalMs: 30_000,
+        staleAfterMs: 60_000,
+        fetch: () => {
+          calls += 1;
+          return calls === 1 ? Promise.resolve("up") : new Promise<never>(() => undefined);
+        },
+      }),
+    ]);
+    await h.tick();
+    // Walk to one minute stale, then past it a second at a time: **the arming
+    // is what is measured** — `nextTimer` says the sweep was scheduled, which a
+    // row that only advanced the clock could not tell from a sweep that ran
+    // because something else woke it.
+    // **Bounded**: a build in which the part never turns stale must fail this
+    // row, not spin it — the first mutation pass hung here for 44 minutes on
+    // exactly that, with the wake re-arming at zero delay.
+    for (let i = 0; i < 20 && staleOf(h, id, "a") === null; i += 1) {
+      const next = h.nextTimer();
+      expect(next, "a fresh reading arms the moment it turns").not.toBeNull();
+      await h.tick(Math.max(1, (next as number) - h.at()));
+    }
+    expect(staleOf(h, id, "a"), "and it turned").not.toBeNull();
+    expect(age(staleOf(h, id, "a") as number)).toBe("1m");
+
+    const revAt = (): number => h.transcript.entries.find((e) => e.id === id)?.rev ?? -1;
+    const before = revAt();
+    for (let i = 0; i < 30; i += 1) await h.tick(1_000);
+    expect(age(staleOf(h, id, "a") as number), "thirty seconds on, the same minute").toBe("1m");
+    expect(revAt(), "and no write for a figure that did not move").toBe(before);
+
+    // One minute at onset, thirty seconds, then 150 more: four minutes.
+    for (let i = 0; i < 150; i += 1) await h.tick(1_000);
+    expect(age(staleOf(h, id, "a") as number), "the figure moves with the clock").toBe("4m");
+    expect(h.nextTimer(), "and a stale part keeps its sweep armed").not.toBeNull();
   });
 });

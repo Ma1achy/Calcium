@@ -150,9 +150,33 @@ export type Layout = Readonly<{
  * The frame's ink: `accent` under block-level focus, `muted` otherwise (C26 §7).
  *
  * One function for the lid, the two side rules and the bottom rule, so the four
- * cannot disagree about whether the block is focused. At 1-bit the difference is
+ * cannot disagree about whether the block is focused — and a matrix's ticks
+ * reach it too, through `line`. **What a matrix lacked was the flag and not the
+ * function** (C12 I142): `heatmapFormRows` builds its own layout and never
+ * reached `reserving`, so `focused` was never set and this answered `muted`
+ * for a focused block. Exporting it and pointing the matrix's own ink here was
+ * the first remedy and it was wrong — that ink paints the captions and the
+ * legend, which are the scale, and the enclosure is what lights up. At 1-bit the difference is
  * the mono class — bold where the frame was dim — a weight and not a colour (F34).
  */
+/**
+ * Whether focus is on this block, in the form a session writes (C12 I142, F802).
+ *
+ * **One predicate, because the flag had the same defect as the ink.**
+ * `reserving` set `Layout.focused` on the axed path and a matrix never reaches
+ * it — `heatmapFormRows` builds its own layout — so a matrix form had neither
+ * the flag nor the function. Fixing the ink alone changed nothing, which is
+ * what said there were two gaps and not one.
+ *
+ * `rowId === block.id` and never `null`: a plot's one element carries the
+ * block's own id (I85), and the null form is one the type admits and no session
+ * produces, so it paints nothing deliberately.
+ */
+export function focusedOn(id: string, ctx: RenderContext): boolean {
+  const focus = ctx.focus ?? null;
+  return focus !== null && focus.blockId === id && focus.rowId === id;
+}
+
 function frameTone(layout: Layout, ctx: RenderContext): Style {
   return tone(layout.focused === true ? "accent" : "muted", ctx.theme, ctx.capabilities);
 }

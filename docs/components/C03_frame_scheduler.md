@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Type** | Component |
-| **Package** | `@fmx/calcium` |
+| **Package** | `calcium-tui` |
 | **Layer** | L0 terminal |
 | **Depends on** | `TerminalCapabilities` (injected) · a read-only `acquired` view of C01 (injected) · C01's `writer`, bound (injected) · a render callback |
 | **Consumed by** | L4 shell · C13 C14 C15 C17 (anything that changes what should be on screen) |
@@ -165,7 +165,7 @@ The recovery is always the same and always safe. A full repaint is a larger burs
 
 ## 4a. Suspension — the screen held still on purpose
 
-**Ruled before the code that needs it** (entry 15's copy mode, `CALCIUM_SELECTION_DESIGN.md` §3). A reader taking the terminal's own selection needs the screen to stop moving under it, and every path to the terminal goes through this component — which is why suspension is here rather than at one of L4's fifteen `commit` call sites.
+**Ruled before the code that needs it** (entry 15's native selection, `CALCIUM_SELECTION_DESIGN.md` §3). A reader taking the terminal's own selection needs the screen to stop moving under it, and every path to the terminal goes through this component — which is why suspension is here rather than at one of L4's fifteen `commit` call sites.
 
 `suspend()` and `resume()` are **new members on a published L0 interface and are freeze-relevant**, and the row says so rather than leaving it to be found.
 

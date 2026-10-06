@@ -22,11 +22,17 @@ import {
   type KnownBlockKind,
   type DocumentStatus,
   type Glyph,
+  type RampAnimation,
   COLORMAP_NAMES,
+  GLYPH_REQUIRED_TONES,
   RAMP_ANIMATIONS,
   RAMP_FILLS,
   RAMP_KEYS,
+  RAMP_ONE_SHOTS,
   TONES,
+  CALL_HEAD_GLYPH,
+  CALL_STATE_TONE,
+  CALL_STATES,
   HAS_CALLOUT,
   HAS_HIDEABLE_SERIES,
   HAS_DETAIL_RUNGS,
@@ -41,18 +47,23 @@ import {
   MARKER3_MEMBERS,
   STYLE_ARMS,
   TEXT_SPAN_KEYS,
+  TRAIL_ANIMATION,
+  TRAIL_FORMS,
   TERMINAL_KEYS,
   TERMINAL_RUN_KEYS,
   type OHLC,
   type Plot,
   type PlotForm,
+  type Progress,
   type Result,
+  type TrailForm,
   type ViewDocument,
 } from "./types.js";
 import { parseAreas } from "./mosaic.js";
 import { ALIGN_ENTRIES } from "./measure.js";
 import { overlayFault } from "./overlay.js";
 import { parseStartDate } from "../dates.js";
+import { isBidiFormat } from "../text.js";
 import { isContainerKind } from "./tree.js";
 // **The entries, not the names.** `COLORMAP_SET` above answers *is this a map*;
 // H3 asks *does it have two halves*, which is `kind` and lives on the entry.
@@ -89,10 +100,11 @@ const STATUSES: ReadonlySet<string> = new Set<DocumentStatus>([
  */
 const GLYPH_MEMBERS = {
   ok: true, warn: true, error: true, info: true, pending: true,
-  working: true, running: true, queued: true, cancelled: true,
-  expand: true, collapse: true, live: true, bullet: true,
+  working: true, "work-unit": true, queued: true, cancelled: true,
+  expand: true, collapse: true, focus: true, bullet: true,
   quote: true, nested: true,
-  continuation: true, step: true,
+  continuation: true,
+  question: true, current: true,
 } satisfies Record<Glyph, true>;
 
 const GLYPHS: ReadonlySet<Glyph> = new Set(Object.keys(GLYPH_MEMBERS) as Glyph[]);
@@ -856,6 +868,25 @@ function requireArray(b: Record<string, unknown>, key: string, e: string[], at: 
 }
 
 /**
+ * `expanded` on a block, **a boolean when present** (C09 I124, C25 I11).
+ *
+ * The four shedding kinds and `patch` carry it, and a non-boolean would draw
+ * the expanded form from a value that says neither state — `"false"` is truthy
+ * to nothing here, since the kinds compare with `=== true`, so it would read as
+ * collapsed while declaring otherwise.
+ */
+function checkExpanded(b: Record<string, unknown>, e: string[], at: string): void {
+  if (b["expanded"] !== undefined && typeof b["expanded"] !== "boolean") {
+    e.push(`${at}: "expanded" must be a boolean when present (C09 I124) — got ${JSON.stringify(b["expanded"])}`);
+  }
+}
+
+/** A finite number — not clamped here, because clamping is the renderer's (C09 I28). */
+function requireNumber(b: Record<string, unknown>, key: string, e: string[], at: string): void {
+  requireField(b, key, (v) => typeof v === "number" && Number.isFinite(v), "a finite number", e, `${at}: "${key}"`);
+}
+
+/**
  * A numeric array's **elements** (C04 I46, §5a).
  *
  * **`requireArray` established the array and stopped**, so `Series.values` and
@@ -994,6 +1025,15 @@ function checkTerminalLine(line: Record<string, unknown>, e: string[], at: strin
       );
       return;
     }
+    // **Bidi format characters too** (ruling 71): this kind is exempt from the
+    // registry's neutraliser (C09 I56, I127), so an override here would reorder
+    // the frame around it exactly as an escape would repaint it.
+    if (isBidiFormat(unit)) {
+      e.push(
+        `${at}: "text" carries a bidi format character U+${unit.toString(16).toUpperCase().padStart(4, "0")} at ${String(i)} (C04 I110) — a terminal line is emitted without neutralising, so it would reorder the frame`,
+      );
+      return;
+    }
     if (unit >= 0xd800 && unit <= 0xdbff) {
       const next = text.charCodeAt(i + 1);
       if (Number.isNaN(next) || next < 0xdc00 || next > 0xdfff) {
@@ -1110,11 +1150,29 @@ function checkSpans(b: Record<string, unknown>, member: string, e: string[], at:
       e.push(`${where}: "value" and "ramp" on one span — a background from the map and a foreground from the ramp is two unmeasured colours on one cell (C04 I107)`);
       return;
     }
-    for (const key of Object.keys(span)) {
-      if (!TEXT_SPAN_KEYS.has(key)) {
-        e.push(`${where}: unknown member "${key}" — a span carries from, to, bold, italic, underline, tone, value, elide, ramp and nothing else (C04 I85)`);
+    // C04 I151 — a ground resolves with its own ink, so a second ink or a second background beside it is unmeasured.
+    if (span["ground"] !== undefined) {
+      if (attributesOnly) {
+        e.push(`${where}: "ground" is refused on this member — its palettes are spoken for (C04 I151, I91)`);
         return;
       }
+      if (span["ground"] !== "pick") {
+        e.push(`${where}: "ground" must be "pick" (C04 I151)`);
+        return;
+      }
+      for (const other of ["tone", "value", "ramp"]) {
+        if (span[other] !== undefined) {
+          e.push(`${where}: "ground" beside "${other}" — the ground's matched ink replaces the run's, so "${other}" is a colour nothing measured against it (C04 I151)`);
+          return;
+        }
+      }
+    }
+    for (const key of Object.keys(span)) {
+      if (!TEXT_SPAN_KEYS.has(key)) {
+        e.push(`${where}: unknown member "${key}" — a span carries from, to, bold, italic, underline, tone, value, elide, ramp, ground and nothing else (C04 I85)`);
+        return;
+      }
+      if (key === "ground") continue;
       if (key === "ramp") {
         if (attributesOnly) {
           e.push(`${where}: "ramp" is refused on this member — its palettes are spoken for (C04 I107, I91)`);
@@ -1162,6 +1220,13 @@ const TONE_SET: ReadonlySet<string> = new Set<string>(TONES);
 const RAMP_FILL_SET: ReadonlySet<string> = new Set<string>(RAMP_FILLS);
 const RAMP_ANIMATION_SET: ReadonlySet<string> = new Set<string>(RAMP_ANIMATIONS);
 
+/** `progress`'s three closed members and their unions (C04 I146, §3as) — each typed against the field it gates. */
+const PROGRESS_UNIONS: readonly (readonly [string, readonly string[]])[] = [
+  ["quantity", ["capacity", "progress", "count"] satisfies readonly NonNullable<Progress["quantity"]>[]],
+  ["granularity", ["continuous", "segmented"] satisfies readonly NonNullable<Progress["granularity"]>[]],
+  ["liveness", ["still", "active", "stalled"] satisfies readonly NonNullable<Progress["liveness"]>[]],
+];
+
 /**
  * A `Ramp` at the gate (C04 §3am.2, I106–I109). One error per fault, the first
  * fault only, each naming the rule it broke.
@@ -1178,7 +1243,7 @@ function checkRamp(value: unknown, e: string[], where: string, onSpan: boolean):
   }
   for (const key of Object.keys(value)) {
     if (!RAMP_KEYS.has(key)) {
-      e.push(`${where}: unknown member "${key}" — a ramp carries fill, from, to, colormap, bands, animate and nothing else (C04 I106)`);
+      e.push(`${where}: unknown member "${key}" — a ramp carries fill, from, to, colormap, bands, animate, since, overshoot and nothing else (C04 I106)`);
       return;
     }
   }
@@ -1243,9 +1308,55 @@ function checkRamp(value: unknown, e: string[], where: string, onSpan: boolean):
       }
     }
   }
+  // **The overshoot stop is a gradient's over a slot pair, off a span** (I148,
+  // §5c.1). A map's end is a map stop and a lift is a colour it does not hold;
+  // a palette names nothing; a fold has no end to lift and a quantiser would
+  // step the lift away; and on a span the floor is proven per slot (I107),
+  // which a lifted `to` is not.
+  const overshoot = value["overshoot"];
+  if (overshoot !== undefined) {
+    if (fill !== "gradient" || !hasPair) {
+      e.push(`${where}: "overshoot" rides on a "gradient" over a from/to pair alone — a colormap, a palette, a centred and a stepped fill have no end to lift (C04 I148)`);
+      return;
+    }
+    if (onSpan) {
+      e.push(`${where}: "overshoot" is refused on a span — the contrast floor is proven per slot and a lifted "to" is no slot (C04 I107, I148)`);
+      return;
+    }
+    if (!isRecord(overshoot) || Object.keys(overshoot).some((k) => k !== "lift" && k !== "share")) {
+      e.push(`${where}: "overshoot" is a record of "lift" and "share" and nothing else (C04 I148)`);
+      return;
+    }
+    const { lift, share } = overshoot;
+    if (typeof lift !== "number" || !Number.isFinite(lift) || lift <= 1 || lift > 2) {
+      e.push(`${where}: "overshoot.lift" must be finite in (1, 2] — 1 is no overshoot, 2 bounds a channel doubling (C04 I148)`);
+      return;
+    }
+    if (typeof share !== "number" || !Number.isFinite(share) || share <= 0 || share >= 1) {
+      e.push(`${where}: "overshoot.share" must be finite in (0, 1) — 0 is no stop, 1 leaves nothing to mix (C04 I148)`);
+      return;
+    }
+  }
   if (animate !== undefined && (typeof animate !== "string" || !RAMP_ANIMATION_SET.has(animate))) {
-    e.push(`${where}: "animate" must be one of ${RAMP_ANIMATIONS.join(", ")} — a one-shot is an event the render cannot time (C04 I109)`);
+    e.push(`${where}: "animate" must be one of ${RAMP_ANIMATIONS.join(", ")} (C04 I109, R-MOT-012)`);
     return;
+  }
+
+  // **`since` belongs to a one-shot and to nothing else** (I109). On a periodic
+  // effect it is a stamp nothing reads — a field that looks like it does
+  // something and does not, which is the shape a reader trusts and a check
+  // cannot see. Refused rather than ignored, so the mistake arrives at the call
+  // site instead of at a frame that quietly never moves.
+  const since = value["since"];
+  if (since !== undefined) {
+    if (typeof since !== "number" || !Number.isFinite(since) || since < 0) {
+      e.push(`${where}: "since" is the tick a one-shot began on — a finite tick at or after zero (C04 I109)`);
+      return;
+    }
+    if (animate === undefined || !RAMP_ONE_SHOTS.has(animate as RampAnimation)) {
+      e.push(`${where}: "since" is a one-shot's stamp and "${String(animate ?? "none")}" is periodic — ${[...RAMP_ONE_SHOTS].join(", ")} read it (C04 I109)`);
+      return;
+    }
   }
 }
 
@@ -1344,14 +1455,71 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     requireString(b, "text", e, at);
     requireString(b, "tone", e, at);
     requireGlyph(b["glyph"], e, at);
+    // I6 (ruling 77) — a notice has no column and no exemption.
+    requireToneGlyph(b["tone"], b["glyph"], e, at);
     checkColormapName(b, e, at);
     checkSpans(b, "text", e, at);
+    // **A misspelled trail is refused, not defaulted** (C04 I123, §5c). Falling
+    // back to `hotEdge` would leave the document saying one thing and the
+    // screen showing another, with nothing anywhere reporting the disagreement
+    // — the `matrixAnchor` class. `trail` with no `streaming` is legal and
+    // means nothing: a settled block has no head.
+    if (b["trail"] !== undefined && !TRAIL_FORMS.includes(b["trail"] as never)) {
+      e.push(
+        `${at} "trail" is outside its union (C04 I123) — one of ` +
+          `${TRAIL_FORMS.map((f) => `"${f}"`).join(", ")}`,
+      );
+    }
+    if (b["streaming"] !== undefined && typeof b["streaming"] !== "boolean") {
+      e.push(`${at} "streaming" must be a boolean (C04 I122)`);
+    }
+    // **`trailSince` belongs to a trail that animates once** (C04 I109, ruling
+    // 81): `Ramp.since`'s rule for the one ramp the document cannot address. On
+    // a still or periodic form it is a stamp nothing reads. Not tied to
+    // `streaming`: the settle strip drops `streaming` and keeps the rest, and a
+    // settled block's stamp is inert rather than wrong.
+    const trailSince = b["trailSince"];
+    if (trailSince !== undefined) {
+      const form = b["trail"] as TrailForm | undefined;
+      const effect = form === undefined ? undefined : TRAIL_ANIMATION[form];
+      if (typeof trailSince !== "number" || !Number.isFinite(trailSince) || trailSince < 0) {
+        e.push(`${at} "trailSince" is the tick a trail's one-shot began on — a finite tick at or after zero (C04 I109)`);
+      } else if (effect === undefined || !RAMP_ONE_SHOTS.has(effect)) {
+        const readers = TRAIL_FORMS.filter((f) => { const a = TRAIL_ANIMATION[f]; return a !== undefined && RAMP_ONE_SHOTS.has(a); });
+        e.push(
+          `${at} "trailSince" is a one-shot trail's stamp and trail "${String(form ?? "hotEdge")}" does not animate once — ` +
+            `${readers.map((f) => `"${f}"`).join(", ")} read it (C04 I109)`,
+        );
+      }
+    }
     // The one button a notice may carry (C04 §3, arc 6 §5) — a chip's `Action`,
     // refused by the same rule as a tip's.
     if (b["action"] !== undefined) checkAction(b["action"], `${at}.action`, e);
+    // **A call head's state, and the tone and glyph it names** (C04 I141).
+    // Refused here rather than thrown at render, where `state: "bogus"` used to
+    // reach `headMark`; and a disagreement is refused rather than corrected,
+    // the `trail` precedent above — a document saying `failed` in blue would
+    // otherwise render as something its own fields contradict.
+    if (b["state"] !== undefined) {
+      const state = b["state"];
+      if (!CALL_STATES.includes(state as never)) {
+        e.push(`${at} "state" is outside its union (C04 I141) — one of ${CALL_STATES.map((s) => `"${s}"`).join(", ")}`);
+      } else {
+        const st = state as keyof typeof CALL_STATE_TONE;
+        if (b["tone"] !== CALL_STATE_TONE[st]) {
+          e.push(`${at} "tone" must be "${CALL_STATE_TONE[st]}" for state "${st}" (C04 I141) — the state names its tone`);
+        }
+        // Absent only on a running head — an operation's, whose walking mark
+        // leads its text (C23 I76). The fields cannot tell it from a call.
+        if (b["glyph"] !== CALL_HEAD_GLYPH[st] && !(b["glyph"] === undefined && st === "running")) {
+          e.push(`${at} "glyph" must be "${CALL_HEAD_GLYPH[st]}" for state "${st}" (C04 I141) — the state names its mark`);
+        }
+      }
+    }
   },
   keyValue: (b, e, at) => {
     requireArray(b, "rows", e, at);
+    checkExpanded(b, e, at);
     if (!isArray(b["rows"])) return;
     for (const row of b["rows"]) {
       if (!isRecord(row) || !isRecord(row["bar"])) continue;
@@ -1393,6 +1561,37 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
   table: (b, e, at) => {
     requireArray(b, "columns", e, at);
     requireArray(b, "rows", e, at);
+    // I150 — the tape's rule (I124): a row's id, and one naming no row is valid.
+    if (b["current"] !== undefined && !isString(b["current"])) {
+      e.push(`${at}: "current" is a row's id, a string, never an index (C04 I150)`);
+    }
+    // I128 — a column's polarity is one of three words, or absent for neutral.
+    // I6 (ruling 44) — a declared vocabulary is a closed set a cell can be
+    // checked against, collected here for the cell walk below.
+    const closed = new Map<string, ReadonlySet<string>>();
+    if (isArray(b["columns"])) {
+      for (const column of b["columns"]) {
+        if (!isRecord(column)) continue;
+        if (column["polarity"] !== undefined && !["higher", "lower", "neutral"].includes(column["polarity"] as string)) {
+          e.push(`${at} column "${String(column["key"])}": "polarity" is "higher", "lower" or "neutral" (C04 I128)`);
+        }
+        const words = column["vocabulary"];
+        if (words === undefined) continue;
+        if (
+          !isArray(words) ||
+          words.length === 0 ||
+          new Set(words).size !== words.length ||
+          words.some((w) => !isString(w) || w.length === 0)
+        ) {
+          e.push(
+            `${at} column "${String(column["key"])}": "vocabulary" is a non-empty list of distinct, ` +
+              `non-empty words (C04 I6, ruling 44)`,
+          );
+          continue;
+        }
+        closed.set(String(column["key"]), new Set(words as readonly string[]));
+      }
+    }
     // The other half of I6's glyph rule. A `Cell` carries one too, and a table
     // is where the far side's own status strings most often arrive.
     if (isArray(b["rows"])) {
@@ -1414,6 +1613,19 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
         for (const [key, cell] of Object.entries(row["cells"])) {
           if (!isRecord(cell)) continue;
           requireGlyph(cell["glyph"], e, `${at} cell "${key}"`);
+          // I6, ruling 44 — the vocabulary is closed at the wire as at
+          // construction, or a far side's free text would take the exemption.
+          const words = closed.get(key);
+          // I6 (ruling 77) — the glyph a `warn` or `error` cell carries, held
+          // here as `block()` holds it; a word of a declared vocabulary is the
+          // exemption, and a cell outside the set is refused below either way.
+          if (words === undefined) requireToneGlyph(cell["tone"], cell["glyph"], e, `${at} cell "${key}"`);
+          if (words !== undefined && !words.has(cell["text"] as string)) {
+            e.push(
+              `${at} cell "${key}": ${JSON.stringify(cell["text"])} is not a word of column "${key}"'s ` +
+                `vocabulary (C04 I6, ruling 44) — the set is closed`,
+            );
+          }
           checkSpans(cell, "text", e, `${at} cell "${key}"`);
           // I46 — the second numeric array, and the one no round trip would
           // have surfaced: a sparkline drawn from a cell's own numbers.
@@ -1425,6 +1637,20 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
               `${at} cell "${key}": carries a "spark" and a "bar" (C04 I50c) — both fill ` +
                 `the planned width, so there is no rule for which wins`,
             );
+          }
+          // I128 — the same refusal `block()` makes, at the wire.
+          if (cell["trend"] !== undefined) {
+            const trend = cell["trend"];
+            if (!isRecord(trend) || !isFiniteNumber(trend["from"]) || !isFiniteNumber(trend["to"])) {
+              e.push(`${at} cell "${key}": "trend" is { from, to }, both finite numbers (C04 I128)`);
+            }
+            const second = ["glyph", "tone", "spark", "bar"].filter((k) => cell[k] !== undefined);
+            if (second.length > 0) {
+              e.push(
+                `${at} cell "${key}": a trend cell carries ${second.map((k) => `"${k}"`).join(", ")} (C04 I128) — ` +
+                  `its arrow and tone are derived`,
+              );
+            }
           }
           if (isRecord(cell["bar"])) {
             const spec = cell["bar"];
@@ -1471,22 +1697,25 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
           `nothing in it reports that something happened and not what`,
       );
     }
+    // **Absent is the fitted box** (C04 I66, C09 §3a-quater): `measure` sizes it
+    // at the width it is given. Present, it is a commitment and has to be one.
     const height = b["height"];
-    if (height === undefined) {
-      e.push(
-        `${absentMessage(`${at}: "height"`, "a positive integer")} (C04 I66) — the box is ` +
-          `bound by the number \`measure\` committed and cannot choose its own`,
-      );
-    } else if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
+    if (height !== undefined && (typeof height !== "number" || !Number.isInteger(height) || height < 1)) {
       e.push(
         `${at}: "height" must be a positive integer (C04 I66) — the box is bound by ` +
           `the number \`measure\` committed and cannot choose its own`,
       );
     }
   },
-  steps: (b, e, at) => requireArray(b, "steps", e, at),
+  steps: (b, e, at) => {
+    requireArray(b, "steps", e, at);
+    checkExpanded(b, e, at);
+  },
   logs: (b, e, at) => requireArray(b, "lines", e, at),
-  events: (b, e, at) => requireArray(b, "events", e, at),
+  events: (b, e, at) => {
+    requireArray(b, "events", e, at);
+    checkExpanded(b, e, at);
+  },
   plot: (b, e, at) => {
     // **Before every form rule** (C04 I118). A rule that reads a member's value
     // and finds it outside the union would otherwise report a second fault about
@@ -1700,6 +1929,22 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     // C04 I108 — the one block-level carrier, and the one place a colormap
     // backing is admitted: the bar's ink fills its cell and reads by area.
     if (b["ramp"] !== undefined) checkRamp(b["ramp"], e, `${at}.ramp`, false);
+    // **The four fields were not checked at all** (C04 I146, §3as). `quantity`
+    // is refused rather than defaulted on I123's precedent: `"progres"` never
+    // finishes (I145) and nothing would say why. `style` names no closed set —
+    // an unknown name is the default (roadmap 51) — so only its type is checked.
+    if (b["painted"] !== undefined && typeof b["painted"] !== "boolean") {
+      e.push(`${at}: "painted" must be a boolean (C04 I146)`);
+    }
+    for (const [field, union] of PROGRESS_UNIONS) {
+      const value = b[field];
+      if (value !== undefined && !union.includes(value as never)) {
+        e.push(`${at}: "${field}" is outside its union (C04 I146) — one of ${union.map((v) => `"${v}"`).join(", ")}`);
+      }
+    }
+    if (b["style"] !== undefined && !isString(b["style"])) {
+      e.push(`${at}: "style" must be a string — a bar style's name; an unknown one draws the default (C04 I146)`);
+    }
   },
   code: (b, e, at) => {
     requireString(b, "language", e, at);
@@ -1711,9 +1956,19 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
       e.push(`${at}: "spans" is refused on code — its syntax tokens are already a run stream over the text (C04 I88)`);
     }
   },
-  comparison: (b, e, at) => requireArray(b, "rows", e, at),
+  comparison: (b, e, at) => {
+    requireArray(b, "rows", e, at);
+    checkExpanded(b, e, at);
+  },
   patch: (b, e, at) => {
     requireString(b, "path", e, at);
+    checkExpanded(b, e, at);
+    // C25 I14 — the collapsed form's row budget. **At least 1**: the path header
+    // alone is a row, and a cap of zero is a budget nothing can be drawn inside.
+    const cap = b["cap"];
+    if (cap !== undefined && (typeof cap !== "number" || !Number.isInteger(cap) || cap < 1)) {
+      e.push(`${at}: "cap" must be a positive integer (C25 I14) — got ${JSON.stringify(cap)}`);
+    }
     requireString(b, "language", e, at);
     requireArray(b, "hunks", e, at);
     checkActions(b, e, at);
@@ -1747,6 +2002,103 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
     }
   },
   pills: (b, e, at) => requireArray(b, "chips", e, at),
+  // **`chosen` is not required and is not checked against the set** (C09 I105).
+  // A radio group with nothing chosen is the state a producer is in before the
+  // reader has picked, and a checkbox row with two things on is the ordinary
+  // case — exclusivity is what the marks say, not what the block promises.
+  choice: (b, e, at) => requireArray(b, "options", e, at),
+  control: (b, e, at) => {
+    requireString(b, "label", e, at);
+    requireString(b, "value", e, at);
+    requireNumber(b, "at", e, at);
+  },
+  // **`current` is not required and is not checked against the members**
+  // (C04 I124). A tape nobody is in is still a tape, and a `current` naming no
+  // member is the state a producer is in between rebuilding the row and
+  // choosing within it — refusing it would make a document invalid for a
+  // moment that is legitimate. **Its type is checked** (I144): an index where
+  // an id belongs names a different member the moment one is inserted.
+  //
+  // **The members are** (C04 I144). Every member is an element (I124), so its
+  // id is an address and two members `x` are two targets for one name — the
+  // tree's argument (I129) one kind over. A state outside the union reached the
+  // renderer as a crash until a guard there caught it; it is refused here now,
+  // the guard staying for a tape built without the gate.
+  tape: (b, e, at) => {
+    requireArray(b, "members", e, at);
+    const current = b["current"];
+    if (current !== undefined && !isString(current)) {
+      e.push(`${at}: "current" is a member's id, a string, never an index (C04 I124, I144)`);
+    }
+    const members = b["members"];
+    if (!isArray(members)) return;
+    const ids = new Map<string, number>();
+    members.forEach((raw, i) => {
+      const here = `${at} member [${String(i)}]`;
+      if (!isRecord(raw)) {
+        e.push(`${here} must be an object (C04 I144)`);
+        return;
+      }
+      const id = raw["id"];
+      if (!isString(id) || id === "") {
+        e.push(`${here}: "id" must be a non-empty string — every member is an element, addressed by it (C04 I144)`);
+      } else {
+        ids.set(id, (ids.get(id) ?? 0) + 1);
+      }
+      requireString(raw, "label", e, here);
+      if (raw["detail"] !== undefined && !isString(raw["detail"])) {
+        e.push(`${here}: "detail" must be a string (C04 I144)`);
+      }
+      const state = raw["state"];
+      if (state !== undefined && !CALL_STATES.includes(state as never)) {
+        e.push(`${here}: "state" is outside its union (C04 I141, I144) — one of ${CALL_STATES.map((s) => `"${s}"`).join(", ")}`);
+      }
+    });
+    for (const [id, count] of ids) {
+      if (count > 1) {
+        e.push(`${at}: member id "${id}" appears ${String(count)} times (C04 I144) — two members are two targets for one name`);
+      }
+    }
+  },
+  // **Node ids are unique at any depth, not per level** (C04 I129). Each visible
+  // node is an element and C26 I6 addresses one by id within the declaration,
+  // and `op: "expand"` names a node by it — so two nodes `x` in different
+  // subtrees are two targets for one name, which is I31's argument one axis
+  // down.
+  tree: (b, e, at) => {
+    requireArray(b, "nodes", e, at);
+    if (!isArray(b["nodes"])) return;
+    const ids = new Map<string, number>();
+    const walk = (nodes: readonly unknown[], where: string): void => {
+      nodes.forEach((raw, i) => {
+        const here = `${where}[${String(i)}]`;
+        if (!isRecord(raw)) {
+          e.push(`${at}: node ${here} must be an object`);
+          return;
+        }
+        requireString(raw, "id", e, `${at} node ${here}`);
+        requireString(raw, "label", e, `${at} node ${here}`);
+        const id = raw["id"];
+        if (isString(id)) ids.set(id, (ids.get(id) ?? 0) + 1);
+        const children = raw["children"];
+        if (children === undefined) return;
+        if (!isArray(children)) {
+          e.push(`${at} node ${here}: "children" must be an array`);
+          return;
+        }
+        walk(children, `${here}.children`);
+      });
+    };
+    walk(b["nodes"], "nodes");
+    for (const [id, count] of ids) {
+      if (count > 1) {
+        e.push(
+          `${at}: node id "${id}" appears ${String(count)} times (C04 I129) — ` +
+            `each visible node is an element and expand names one, so a duplicate has no correct target`,
+        );
+      }
+    }
+  },
   tip: (b, e, at) => {
     requireString(b, "text", e, at);
     checkActions(b, e, at);
@@ -1754,6 +2106,12 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
   panel: (b, e, at) => {
     requireString(b, "title", e, at);
     requireArray(b, "children", e, at);
+    // **A notice about nothing is refused** (I127): `NaN ago` and `-1s ago` are
+    // sentences with no reading behind them.
+    const stale = b["staleForMs"];
+    if (stale !== undefined && (typeof stale !== "number" || !Number.isFinite(stale) || stale < 0)) {
+      e.push(`${at}: "staleForMs" is a non-negative finite number of milliseconds`);
+    }
   },
   group: (b, e, at) => {
     requireArray(b, "children", e, at);
@@ -1809,6 +2167,13 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
       e.push(`${absentMessage(`${at}: "height"`, "a positive integer")} (C04 I73)`);
     } else if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
       e.push(`${at}: "height" must be a positive integer (C04 I73) — got ${JSON.stringify(height)}`);
+    }
+    // **A record of where the bytes came from, never instead of them** (C04
+    // I142, I143): `data` is required above whether or not a path is present,
+    // and a path that is present says something.
+    const path = b["path"];
+    if (path !== undefined && (typeof path !== "string" || path === "")) {
+      e.push(`${wrongTypeMessage(`${at}: "path"`, "a non-empty string", path)} (C04 I143)`);
     }
     const data = b["data"];
     if (typeof data === "string") {
@@ -1908,6 +2273,94 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
             `${String(lines)} ${member === "columns" ? "columns" : "rows"} deep (C04 I72) — ` +
             `one per grid line, not per child, because a spanning region takes the sum of ` +
             `what it spans`,
+        );
+      }
+    }
+  },
+  // C04 I132 — two panes, a height, and a divider where present.
+  split: (b, e, at) => {
+    requireArray(b, "children", e, at);
+    if (isArray(b["children"]) && b["children"].length !== 2) { // cells-ok — a child count
+      e.push(
+        `${at}: a "split" holds exactly two children (C04 I132) — got ` +
+          `${String(b["children"].length)}; a pane holds one block, and several stack in a column group`, // cells-ok — a child count
+      );
+    }
+    // **Absent and wrong said apart** (C04 I114): scroll's shape.
+    const height = b["height"];
+    if (height === undefined) {
+      e.push(`${absentMessage(`${at}: "height"`, "a positive integer")} (C04 I132) — the panes' rows`);
+    } else if (typeof height !== "number" || !Number.isInteger(height) || height < 1) {
+      e.push(`${at}: "height" must be a positive integer (C04 I132) — got ${JSON.stringify(height)}`);
+    }
+    const divider = b["divider"];
+    if (divider !== undefined && (typeof divider !== "number" || !Number.isInteger(divider) || divider < 1)) {
+      e.push(
+        `${at}: "divider" must be a positive integer when present (C04 I132) — got ` +
+          `${JSON.stringify(divider)}; it is the left pane's width in cells`,
+      );
+    }
+  },
+  // C04 I135 — at least one field, buttons, and ids unique across both.
+  form: (b, e, at) => {
+    requireArray(b, "fields", e, at);
+    const ids = new Map<string, number>();
+    const count = (id: unknown): void => {
+      if (isString(id)) ids.set(id, (ids.get(id) ?? 0) + 1);
+    };
+    const fields = b["fields"];
+    if (isArray(fields)) {
+      if (fields.length === 0) e.push(`${at}: a "form" holds at least one field (C04 I135)`); // cells-ok — a field count
+      fields.forEach((raw, i) => {
+        const here = `${at} field ${String(i)}`;
+        if (!isRecord(raw)) {
+          e.push(`${here}: must be an object`);
+          return;
+        }
+        requireString(raw, "id", e, here);
+        requireString(raw, "label", e, here);
+        for (const key of ["value", "hint", "error", "flag"]) {
+          if (raw[key] !== undefined && !isString(raw[key])) e.push(`${here}: "${key}" must be a string when present (C04 I135)`);
+        }
+        // C04 I140 — the registry's availability axis, word for word.
+        if (raw["availability"] !== undefined && !["enabled", "readonly", "disabled"].includes(raw["availability"] as string)) {
+          e.push(`${here}: "availability" is "enabled", "readonly" or "disabled" (C04 I140)`);
+        }
+        count(raw["id"]);
+      });
+    }
+    const buttons = b["buttons"];
+    if (buttons !== undefined && !isArray(buttons)) e.push(`${at}: "buttons" must be an array`);
+    if (isArray(buttons)) {
+      let defaults = 0;
+      buttons.forEach((raw, i) => {
+        const here = `${at} button ${String(i)}`;
+        if (!isRecord(raw)) {
+          e.push(`${here}: must be an object`);
+          return;
+        }
+        requireString(raw, "id", e, here);
+        requireString(raw, "label", e, here);
+        count(raw["id"]);
+        if (raw["default"] === true) defaults += 1;
+        if (raw["action"] !== undefined) checkAction(raw["action"], `${here}.action`, e);
+        if (raw["submit"] === true) {
+          const kind = isRecord(raw["action"]) ? raw["action"]["kind"] : undefined;
+          if (kind !== "fill" && kind !== "exec") {
+            e.push(
+              `${here}: "submit" needs a "fill" or "exec" action (C04 I135) — ` +
+                `a submit writes the values as the command's arguments, and only those kinds have a command`,
+            );
+          }
+        }
+      });
+      if (defaults > 1) e.push(`${at}: at most one button is "default" (C04 I135) — got ${String(defaults)}`);
+    }
+    for (const [id, n] of ids) {
+      if (n > 1) {
+        e.push(
+          `${at}: id "${id}" appears ${String(n)} times across fields and buttons (C04 I135) — ` +
+            `each is an element, and a duplicate has no correct target`,
         );
       }
     }
@@ -3172,6 +3625,24 @@ function requireGlyph(value: unknown, e: string[], at: string): void {
   e.push(
     `${at}: "glyph" must be one of ${[...GLYPHS].join(", ")} (C04 I6) — ` +
       `got ${JSON.stringify(value)}; a character has no ASCII fallback and no width guarantee`,
+  );
+}
+
+/**
+ * I6's first half, at the wire — a tone that says *something is wrong* carries
+ * a glyph, so colour is never the only carrier (D29, ruling 77).
+ *
+ * `block()` throws on exactly this, and until ruling 77 the wire did not look:
+ * a far side emitting `tui.view/1` could send a colour-only warning that the
+ * builder refuses, one document with two verdicts — and the far side is the
+ * producer the rule exists for. A glyph that is present but not a slot is
+ * `requireGlyph`'s refusal, not this one.
+ */
+function requireToneGlyph(tone: unknown, glyph: unknown, e: string[], at: string): void {
+  if (!(GLYPH_REQUIRED_TONES as ReadonlySet<unknown>).has(tone) || glyph !== undefined) return;
+  e.push(
+    `${at}: tone "${String(tone)}" requires a glyph (C04 I6, D29) — ` +
+      `colour alone does not survive 1-bit or a colour-blind reader`,
   );
 }
 

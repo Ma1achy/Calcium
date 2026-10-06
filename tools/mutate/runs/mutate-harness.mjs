@@ -265,6 +265,93 @@ const results = runPass({
       to: "      return null;",
       expect: "MH11d",
     },
+    {
+      // **F1472, restored.** A passing row's title is printed under a file that
+      // failed, so the substring finds it and the report says `caught`.
+      name: "the named row is looked for anywhere in the output",
+      file: FILE,
+      from: "                byNamedTest: named,",
+      to: "                byNamedTest: output.includes(m.expect),",
+      expect: "MH12",
+    },
+    {
+      // An id without its boundary or its position: T9.4 inside T9.4h, and a
+      // row a failing case merely cites.
+      name: "a row id is looked for anywhere on a FAIL line",
+      file: FILE,
+      from: "    ? lines.some((line) => rowsOn(line).some((ids) => ids.includes(expect)))",
+      to: "    ? lines.some((line) => line.includes(expect))",
+      expect: "MH12b",
+    },
+    {
+      name: "a `·` ends the head, so the second row of a pair is not named",
+      file: FILE,
+      from: '        if (token === "·" && ids.length > 0) continue;',
+      to: "",
+      expect: "MH12b",
+    },
+    {
+      name: "a `:` does not end the head, so the subject of a title's sentence is named",
+      file: FILE,
+      from: '        if (token.endsWith(":")) break;',
+      to: "",
+      expect: "MH12b",
+    },
+    {
+      name: "`caughtBy` names the component that qualifies a row",
+      file: FILE,
+      from: "    const rows = ids.length > 1 && QUALIFIER.test(ids[0]) ? ids.slice(1) : ids;",
+      to: "    const rows = ids;",
+      expect: "MH12b",
+    },
+    {
+      name: "`caughtBy` names the outermost describe rather than the row",
+      file: FILE,
+      from: "    const ids = rowsOn(line).filter((head) => head.length > 0).at(-1) ?? [];",
+      to: "    const ids = rowsOn(line).filter((head) => head.length > 0).at(0) ?? [];",
+      expect: "MH12b",
+    },
+    {
+      // A kill with no `FAIL` line reads as not-named, which is a guess in the
+      // other direction: `CAUGHT ELSEWHERE` with nobody to name.
+      name: "a run with no FAIL line is judged rather than reported unattributable",
+      file: FILE,
+      from: "  if (lines.length === 0) return null;",
+      to: "",
+      expect: "MH12c",
+    },
+    {
+      name: "the report folds an unattributable kill into CAUGHT ELSEWHERE",
+      file: FILE,
+      from: "          : r.byNamedTest === null",
+      to: "          : false",
+      expect: "MH12c",
+    },
+    {
+      // `output.includes(null)` searched for the string `null`, so a declared
+      // survivor that was killed read `caught` whenever a diff printed one.
+      name: "a declared survivor's `null` is looked for as text",
+      file: FILE,
+      from: '  if (typeof expect !== "string") return false;',
+      to: '  if (typeof expect !== "string") return output.includes(expect);',
+      expect: "MH12b",
+    },
+    {
+      // **The all-clear under a CAUGHT ELSEWHERE row**, which is what a reader
+      // of the last line alone saw.
+      name: "the all-clear ignores kills the named row did not make",
+      file: FILE,
+      from: " &&\n            elsewhere + unattributed === 0\n",
+      to: "\n",
+      expect: "MH13",
+    },
+    {
+      name: "an unattributable kill is counted as caught elsewhere",
+      file: FILE,
+      from: "  const unattributed = killedRows.filter((r) => r.byNamedTest === null).length;",
+      to: "  const unattributed = 0;",
+      expect: "MH13",
+    },
   ],
 });
 

@@ -16,7 +16,7 @@
  * two containers shared one directory listing.
  */
 
-import type { Candidate, CompletionContext, CompletionSource } from "@fmx/calcium";
+import type { Candidate, CompletionContext, CompletionSource } from "calcium-tui";
 import { parseNdjson, str, type Row } from "./ndjson.ts";
 
 /**
@@ -34,7 +34,7 @@ export type Run = (args: readonly string[]) => Promise<string>;
  *
  * **Read from the argument rather than from the verb**, which is what makes one
  * source serve nine of them: `logs`, `inspect`, `drift`, `diff`, `top`, `port`,
- * `config` and `container stats` all declare `container`, and `compare` declares
+ * `filediff` and `container stats` all declare `container`, and `compare` declares
  * `a` and `b`. A list of verbs here would go stale the day a tenth is added, and
  * would go stale silently — the menu would simply be empty.
  */
@@ -184,7 +184,7 @@ function directoryOf(prefix: string): string {
  * **Counted from the tool's own name**, because a verb may be several words
  * (C05 §2): `container stats web` has the container at token 2 and `logs web`
  * at token 1, and a fixed index is wrong for one of them. Flags are skipped so
- * `/config --raw web /e` still finds `web`.
+ * `/filediff --raw web /e` still finds `web`.
  */
 function firstArgument(ctx: CompletionContext): string | null {
   const words = ctx.tool === null ? 1 : ctx.tool.name.split(" ").length;

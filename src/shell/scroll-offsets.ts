@@ -16,6 +16,12 @@
  * settled, and a settled container keeps the offset it had *within a session*
  * and starts a new one at zero. There is nothing here to persist.
  *
+ * **The pull writes here, and it writes a position rather than a step** (C26
+ * I24, §7a). `nudge` is a reader's key and `set` is focus arriving somewhere
+ * the window does not reach; both resolve the held value the same way and
+ * normalise the result the same way, through one private method, because the
+ * follow box's tail is the part that is easy to get right in one of two copies.
+ *
  * **`TAIL` is a value this store holds and never interprets** (C04 I97). It is
  * `∞`, so the renderer's clamp at read resolves it to whatever the ceiling is
  * *this* frame — which is how a following box stays at the bottom as its
@@ -81,15 +87,58 @@ export class ScrollOffsets {
     delta: number,
     box?: Readonly<{ ceiling: number; follow?: boolean }>,
   ): void {
+    this.#place(entryId, blockId, this.resolved(entryId, blockId, box) + delta, box);
+  }
+
+  /**
+   * Where the renderer will read this container, before anything moves it
+   * (C26 I25, §7a).
+   *
+   * **`get`'s answer is not this one, and the difference is the follow box.**
+   * `get` reports the stored number and reads an untouched container as `0`,
+   * which is right for a cache key and wrong for a pull: an untouched follow box
+   * opens at its tail, so a pull computed against `0` would drag a streaming box
+   * to its top the first time focus entered it. `nudge`'s own argument, reached
+   * by both of its callers now rather than written once inside it.
+   */
+  resolved(
+    entryId: string,
+    blockId: string,
+    box?: Readonly<{ ceiling: number; follow?: boolean }>,
+  ): number {
+    const held = this.#byEntry.get(entryId)?.get(blockId);
+    if (box === undefined) return held ?? 0;
+    const current = held ?? (box.follow === true ? TAIL : 0);
+    return atTail(current, box.ceiling) ? box.ceiling : current;
+  }
+
+  /**
+   * Put one container at an offset — **the pull's write** (C26 I24, I25).
+   *
+   * The distance is the caller's, because the caller is what knows the unit: a
+   * box's is rows and a tape's is members (C04 I48). This is the same
+   * normalisation `nudge` performs, which is why they are one private method —
+   * a result at or past the ceiling is written back as `TAIL`, so a reader
+   * pulled to the bottom keeps following and one pulled up stops.
+   */
+  set(
+    entryId: string,
+    blockId: string,
+    at: number,
+    box?: Readonly<{ ceiling: number; follow?: boolean }>,
+  ): void {
+    this.#place(entryId, blockId, at, box);
+  }
+
+  #place(
+    entryId: string,
+    blockId: string,
+    at: number,
+    box?: Readonly<{ ceiling: number; follow?: boolean }>,
+  ): void {
     const held = this.#byEntry.get(entryId) ?? new Map<string, number>();
-    if (box === undefined) {
-      held.set(blockId, Math.max(0, (held.get(blockId) ?? 0) + delta));
-    } else {
-      const current = held.get(blockId) ?? (box.follow === true ? TAIL : 0);
-      const from = atTail(current, box.ceiling) ? box.ceiling : current;
-      const next = Math.max(0, from + delta);
-      held.set(blockId, atTail(next, box.ceiling) ? TAIL : next);
-    }
+    const next = Math.max(0, at);
+    held.set(blockId, box !== undefined && atTail(next, box.ceiling) ? TAIL : next);
     this.#byEntry.set(entryId, held);
   }
 

@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import { GLYPH_TOKENS, glyphCells, glyphFor } from "../../src/presentation/blocks/glyphs.js";
 import { cells } from "../../src/presentation/text.js";
-import { noticeDoc } from "../../src/shell/documents.js";
+import { cancelledDoc, noticeDoc } from "../../src/shell/documents.js";
 import { ASCII_CAPS, FULL_CAPS } from "../support/render.js";
 
 /** The block a single-block notice document carries, whatever its id. */
@@ -56,8 +56,10 @@ describe("the continuation mark", () => {
     // of it; this asserts membership, so that a token added to `Glyph` and
     // forgotten in `GLYPH_TABLE` fails here rather than at a call site.
     expect(GLYPH_TOKENS).toContain("continuation");
-    expect(glyphCells("continuation")).toBe(1);
-    expect(glyphFor("continuation", ASCII_CAPS), "`tree(1)`'s hook").toBe("`");
+    // The one two-cell slot (C09 I5, R-GLY-001): the registry's `` `- `` in
+    // ASCII, and `⎿` padded to it where it is drawn.
+    expect(glyphCells("continuation")).toBe(2);
+    expect(glyphFor("continuation", ASCII_CAPS), "the registry's branch").toBe("`-");
   });
 
   it("T2.96 (C09 §4): a muted notice takes the mark, and the condition is that a command line exists", () => {
@@ -71,14 +73,21 @@ describe("the continuation mark", () => {
     expect(slotOf(without), "nothing to hang from, so no mark").toBeUndefined();
   });
 
-  it("T2.97 (C04 I6): an obliged glyph is never displaced by the mark — the cancelled notice is the case", () => {
+  it("T2.97 (C04 I6): an obliged glyph is never displaced by the mark — the failed notice is the case", () => {
     // **The consumer that shares every other property and cannot take it.**
-    // `warn` and `error` are in `GLYPH_REQUIRED_TONES`, so C04 I6 has already
-    // spent the slot; the notice is otherwise identical to the queued one,
-    // which is what makes it the instructive negative rather than an obvious
-    // one.
-    const cancelled = noticeDoc("/ps", "cancelled before it ran", "warn", { origin: "user" });
-    expect(slotOf(cancelled), "I6 owns this slot").toBe("warn");
+    // A failed handoff, built as the route builds it: the typed command above,
+    // the entry's only block — the queued notice's shape — and `error` is in
+    // `GLYPH_REQUIRED_TONES`, so C04 I6 has already spent the slot.
+    const failed = noticeDoc("/tty vim", "vim exited 1", "error", { origin: "user" }, "error");
+    expect(slotOf(failed), "I6 owns this slot").toBe("error");
+
+    // **The case this row named until ruling 92** (C23 I96, F1479). The
+    // cancelled notice was `warn` and ▲; it is `muted` now, which obliges
+    // nothing — and it still does not take the mark, for a different reason:
+    // the `cancelled` state has a mark of its own, and the state's wins
+    // (C23 §8a A6.6 row 5).
+    const cancelled = cancelledDoc("/ps", "cancelled before it ran", { origin: "user" });
+    expect(slotOf(cancelled), "the state's mark, not the continuation").toBe("cancelled");
 
     const info = noticeDoc("/guide", "the app's own verb", "info", { origin: "user" });
     expect(slotOf(info), "and `info` keeps its own").toBe("info");

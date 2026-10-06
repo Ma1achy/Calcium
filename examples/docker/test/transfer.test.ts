@@ -5,14 +5,14 @@
 
 import { describe, expect, it } from "vitest";
 import { createTransferHandler } from "../src/transfer.ts";
-import type { LocalContext } from "@fmx/calcium";
+import type { LocalContext } from "calcium-tui";
 
-import { localContext } from "@fmx/calcium/testing";
+import { localContext } from "calcium-tui/testing";
 // **The cast is gone with the hand-built context.** It read
 // `as unknown as LocalContext`, which satisfied the type by erasure — the
 // double narrower than the interface it stands for, which is the shape that
 // cost four diagnoses in this tree. `localContext()` is the real record.
-const ctx: LocalContext = { ...localContext(), command: "/save x", ask: () => Promise.resolve("y") };
+const ctx: LocalContext = { ...localContext(), command: "/save x", ask: () => Promise.resolve({ key: "y", outcome: "answered" }) };
 
 function runnerFor(stdout = "") {
   const calls: string[][] = [];

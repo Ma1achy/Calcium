@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
-import { defaultTheme, diffPairs, floorFor, ratio } from "../../src/presentation/theme/index.js";
+import { defaultTheme, diffPairs, floorFor, inkOn, ratio} from "../../src/presentation/theme/index.js";
 import { hunkOf, patchOf, THE_ILLUSTRATION } from "../support/blocks.js";
 import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, MONO_CAPS, measurable, visible } from "../support/render.js";
 import { underlinedRuns } from "../support/underline.js";
@@ -77,6 +77,30 @@ describe("C25 integration", () => {
     }
   });
 
+  it("T4.13 (with C09, ascii, F1313): split at 120 under ASCII — every code point below U+0080, and the separator column reads `|`", () => {
+    // **T4.4's twin at the width where the separator exists.** T4.4 renders at
+    // 80, which is unified, so its sweep had nothing to find; the split drew a
+    // literal `│` at the ASCII rung and every row about ASCII passed (F1313).
+    const width = 120;
+    const at = (caps: TerminalCapabilities): readonly string[] => raw(width, caps).map(visible);
+    const full = at(FULL_CAPS);
+    const ascii = at(ASCII_CAPS);
+    expect(ascii).toHaveLength(full.length); // cells-ok — a row count
+
+    for (const row of ascii) {
+      for (const ch of row) expect(ch.codePointAt(0), JSON.stringify(row)).toBeLessThan(0x80);
+    }
+
+    // **The column, not a search** (§3b's table): the separator is the cell at
+    // `s = ⌊(w − 1) / 2⌋`, and a `|` elsewhere on a row cannot stand in for it.
+    // The rows are the ones whose separator the Unicode render draws — the
+    // control, without which a split that drew no separator at all would pass.
+    const s = Math.floor((width - 1) / 2);
+    const split = full.flatMap((row, i) => ([...row][s] === "│" ? [i] : []));
+    expect(split.length, "the illustration has split rows at 120").toBeGreaterThan(3);
+    for (const i of split) expect([...(ascii[i] as string)][s], JSON.stringify(ascii[i])).toBe("|");
+  });
+
   it("T4.6 (with C04, C24): a constructed patch validates and renders, both ways in", async () => {
     // **Both constructors, and they must agree.** This asserted through
     // `block()` alone while C24's `b` did not exist, with a comment saying
@@ -135,7 +159,13 @@ describe("C25 integration", () => {
     // joins this row rather than passing it by.
     for (const [variant, tokens] of Object.entries(defaultTheme)) {
       for (const [palette, slotName, surface, hex] of diffPairs(tokens)) {
-        const value = tokens.palettes[palette]?.slots[slotName] as string;
+        // **`inkOn`, not the flat slot** — R-THM-001 lets a theme compose a
+        // different ink for a given ground, and a floor is a claim about the
+        // pair that *lands*. Written the flat way this row went red on `nord`'s
+        // `syntax.keyword` at 4.31 while `loadTheme` passed, which is a test
+        // reimplementing a rule and keeping a clause the rule no longer has:
+        // nord composes `#be9ab7` on `diffAdd` and that is what the patch draws.
+        const value = inkOn(tokens, `${palette}.${slotName}`, surface);
         expect(ratio(value, hex), `${variant} ${palette}.${slotName} on ${surface}`).toBeGreaterThanOrEqual(
           floorFor(slotName),
         );
@@ -147,7 +177,7 @@ describe("C25 integration", () => {
     // A background that stopped where the text stopped would be ragged, and the row
     // is the unit a reader sees.
     const width = 80;
-    const changed = raw(width).filter((r) => visible(r).includes("prism.fmx.io/family"));
+    const changed = raw(width).filter((r) => visible(r).includes("prism.example.com/family"));
 
     expect(changed).toHaveLength(1);
     expect(cells(visible(changed[0] as string)), "padded to the full width").toBe(width);
@@ -157,14 +187,14 @@ describe("C25 integration", () => {
     // **The defect a frame showed and no assertion did.** One background per row
     // painted the empty left half green, which asserts that the side with no line
     // gained one. The background belongs to a side.
-    const unpaired = raw(120).find((r) => visible(r).includes("prism.fmx.io/family"));
+    const unpaired = raw(120).find((r) => visible(r).includes("prism.example.com/family"));
 
     expect(unpaired).toBeDefined();
     const [leftHalf] = (unpaired as string).split("│");
     expect(BACKGROUND.test(leftHalf as string), "the blank side is unpainted").toBe(false);
   });
 
-  it("T4.11: both variants render, and only the styling differs", () => {
+  it("T4.11 (with C10): both variants render, and only the styling differs", () => {
     const dark = raw(80, FULL_CAPS, DARK_THEME);
     const light = raw(80, FULL_CAPS, LIGHT_THEME);
 

@@ -232,3 +232,46 @@ fact about the far side will misattribute this app's own faults to it.**
 unhandled, one tick after any fetch failure on any part that did not override it. Two healthy
 frame-reads at two widths saw nothing. `docker rm -f` on the watched container, mid-capture,
 is what produced it. FINDINGS F29.
+
+---
+
+## §6 Five rows, not a dashboard — the re-founding (design check E14, §085, §086, §018)
+
+**§085**: *"five rows, not a dashboard. An identity/provenance row, a progress bar, a metric
+sparkline, a utilisation sparkline and a verb row — it PATCHES in place rather than
+appending."* **§086**: *a metric in a row is a sparkline inside a table cell.* **§018
+R-BLK-138**: a plot is framed by its axes, never by a box.
+
+The view at a1284cb0 was three framed live parts — `CPU`, `MEMORY · NETWORK · BLOCK`,
+`DETAILS` — around a plot that drew its own closed box, under a `kv` head. Four frames and a
+box for one container. Re-founded as **one live part holding a headerless table**:
+
+```
+┌ ⠋ worker · 2b7892498b21 ─────────────────────────────────────────────────┐
+│cpu    ▃▃▅▅▅▇▇▇▅▅▃▃▂▂▁▁▃▃▅▅▇▇█▇   64.1% · 14 ticks · 2s each           │
+│mem    ░░░░░░░░░░░░░ 1.4%         219.69MiB / 15.63GiB                   │
+│io                                net 75.7kB / 33.9kB · block 30.4MB / 6.9MB · 7 pids │
+│image                             registry.example.test/shop/worker:2.4.1 · Up 3 hours │
+│ports                             — · mounts —                           │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+**The one frame is the framework's and not the app's**: `b.live` returns a `panel` by
+construction (C24 §5 — *the frame is where a live part says what state it is in*, §047's
+`updated 4m ago`), and `LiveSpec.title` is required. §085's drawing has no frame because it
+is a *patch through the transport*, which is a different mechanism; a live part with no frame
+does not exist. So four frames become one, and the last one is reported rather than worked
+around.
+
+### The classification table
+
+| | the two rules | what happens where they meet | ruled |
+|---|---|---|---|
+| C1 | a `spark` cell is exactly its column (C11, C12 I13) × the ring's cap (F24's `capFor(width)`) | a ring of `width − 12` samples in a 24-cell column shows its last 24 and holds the rest for nobody | **the ring holds what the row draws**: `SPARK_CELLS`, and `capFor` goes. F24's resize hazard goes with it — the column does not move with the terminal |
+| C2 | the sparkline normalises over its window (C12 sparkline §2) × F27 (*a pinned floor*) | a container held at 100% wobbling 0.2% draws a full-height line, which is the defect F27 pinned `yMin` against | **the value cell carries the level**: the reading and the window's range, `64.1% · 12–98%`, so the shape is a shape and the number is the number. The pin had no carrier in a spark cell |
+| C3 | a spark or bar cell ignores its `text` (C11, `cells.ts`) × *the caption explains the axis* (walk B1) | the caption cannot ride in the figure's cell | **it rides in the same row's value cell**, which is the same block — B1's ruling (*the caption is inside the part's child*) holds by construction rather than by a group |
+| C4 | `renderError` replaces the part's whole child (R5, §5) × the history is the point (B5) | a failed tick would wipe the sparkline with everything else | **the error renders the table from the ring with the rest absent, and the framework's `b.status` under it** — the same shape B5 ruled, one block |
+| C5 | one live part (C24 §5) × the details are a second `docker ps` (B3) | the details had their own one-shot part — a second frame — because the stats result does not carry them | **one fetch reads both**, `stats` and `ps --filter id=`, and the image row ticks; B3's disagreement (*the header says running while the caption reports misses*) resolves, because the state is read on the tick that reports the miss |
+| C6 | absent is not zero (R14) × a row with no reading | `—` in the value cell, the absent mark in the figure | unchanged from walk A8 |
+| C7 | R12, one id per block × one part holding a table | the panel is the part's id and the table inside it needs its own — DASHBOARD_WALK's `running` / `running-rows` | **`stats`, `stats-rows`, `stats-error`**: three ids, distinct (D1) |
+| C8 | F22's gap branch × one block at view level | the branch that *wakes up the day a view holds more than one block* goes back to sleep | **stated**: D2 asserted four blocks so the branch was reachable; one block makes it unreachable from this app again, and F22's own disposition is unaffected |
