@@ -3310,8 +3310,8 @@ and neither is an `evict`.
 | 4 | that entry settles | 1 | `↓ 1 new message` |
 | 5 | a patch lands on a settled-above entry | 1 | unchanged |
 | 6 | a born-settled notice is appended | 2 | `↓ 2 new messages` |
-| 7 | the reader submits a command whose entry is born settled (`/help`) | 2 | **not counted** — *your own message: NO* (ruling c) |
-| 8 | that command's slow sibling settles later | 3 | a reply is counted |
+| 7 | the reader submits a command; its entry is appended, streaming | 2 | **not counted**, and nor is its settle — *your own message: NO* (ruling c) |
+| 8 | that entry settles later, a refresh's notice is appended settled in between | 3 | the refresh's notice is counted; the reader's own entry is not |
 | 9 | a click on the button, or `⌘↓`/`⌃End` | 0 | `scrollBy` to the tail: `followTail` is derived (C14 I5) and the count resets with it in the same frame |
 | 10 | the reader wheels back to the bottom | 0 | the same reset, by the viewport's own `followTail` |
 | 11 | `clear` | 0 | nothing to be new about |
@@ -3326,9 +3326,13 @@ and neither is an `evict`.
   (`heightsSum` is untouched, and appearance changes where geometry does not), and the row it covers is the one
   next to the prompt's upper rule — *directly above the prompt*, where the figure puts it. The covered row is one
   scroll away, and the button is drawn only where at least two region rows remain.
-- **c — Your own message is not counted.** Entries appended *inside the reader's own submit dispatch* are exempt;
-  their later settles are counted as the replies they are. The alternative — snapping a scrolled-up reader to
-  the tail on every submit — changes a scroll rule `R-BLK-435` states and was not taken.
+- **c — Your own message is not counted, at either arrival.** In this tree the reader's message and the reply to it are
+  one entry, so the exemption is by entry: one appended *inside the reader's own submit dispatch* is the reader's, and
+  neither its append nor its later settle counts — the design's *reply* is a separate entry the far side produces, and
+  the reader who just sent a command is not missing what it comes back with. A submit's dispatch is the synchronous
+  part of `pipeline.submit`, which is where the entry is created (C23); the set holds ids and drops one at its settle.
+  The alternative — snapping a scrolled-up reader to the tail on every submit — changes a scroll rule `R-BLK-435`
+  states and was not taken.
 - **d — The `⏎` is withheld, and the figure's other two states are owed.** The figure prints `⏎` *inside* the
   button, *because it is the button's own key*. `⏎` at the prompt sends (I51), and the button has no focus
   target — a rung in C16's ladder, so a change to A02 §2's table and not a drawing — so a `⏎` printed here would be a
@@ -3934,7 +3938,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T3.8b** (I153, was I9): the fallback emits no colour, and its box is drawn only at the capability record's rung — `+-|` at ASCII.
 - **T3.8e** (I153, §6u.1): the five rungs of the classification table — zero rows nothing, one row the size, two and three rows two lines, four rows and the box's width the box, four rows and less the lines — and at every size no line is wider than `columns` at the record's `ambiguousWidth` and no more lines than rows. *Fails on revert*: measuring at `narrow` fails the wide-ambiguity row, and dropping the four-row guard fails the three-row row.
 - **T4.124** (I156, §6u.3): through built sessions with the gate's number mocked below the widths drawn, eight scenes at 20, 40 and 59 columns — no row any chunk wrote is wider than the terminal. *Fails on revert*: drawing a rule one glyph wider (`glyph.repeat(width + 1)` in `rule`) fails every scene on `41 ≠ 40`. **Recorded as surviving: cutting `exact()` from the transcript's rows** — the renderers already fit their rows at 20, 40 and 59, so `exact()` there is a guard for a renderer that stops doing so, which no scene here has.
-- **T1.188** (I154, §6u.2 trace rows 1–12): the counter, driven by a fake transcript's changes and a fake `followTail`, steps through the trace and asserts the *whole* state after each row. *Fails on revert*: counting a `patch` fails row 5; counting while following fails row 12; not resetting on `followTail` fails row 10; counting inside the own-submit scope fails row 7; counting the streaming `append` fails row 3.
+- **T1.188** (I154, §6u.2 trace rows 1–12): the counter, driven by a fake transcript's changes and a fake `followTail`, steps through the trace and asserts the *whole* state after each row. *Fails on revert*: counting a `patch` fails row 5; counting while following fails row 12; not resetting on `followTail` fails row 10; counting an own entry at its append fails row 7, and at its settle fails row 8; counting the streaming `append` fails row 3.
 - **T1.189** (I155, §6u.2 rulings e, f): the button's spans at the three rungs — `bgElev` ground at colour, `[…]` at 1-bit, `v` for the arrow at ASCII — and the shed ladder at the widths where each word goes. *Fails on revert*: painting the row at 1-bit fails the bracket assertion.
 - **T4.123** (I154, I155, §6u.2): a built session at 80 × 24 with a long transcript, scrolled up with the wheel; an entry settles → the region's last row is the button and the row count is unchanged; a second arrival → `2 new messages`; a press on the button row reaches the tail and the row is gone; a scrolled-up transcript with nothing new draws none. *Fails on revert*: drawing the button at the tail fails the last step of the first arm; counting a patch fails the count.
 - **T6.158** (I154, I155): the mutations of T1.188 and T4.123 recorded, each by the row that kills it.
