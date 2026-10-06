@@ -762,7 +762,7 @@ const PLOT = (id = "p", values: readonly number[] = [10, 20, 30, 40, 50]): Recor
   id,
   form: "line",
   height: 5,
-  axes: true,
+  axes: true, plotFrame: "box",
   series: [{ label: "train", values }],
 });
 /**
@@ -966,7 +966,7 @@ const TWO = (id = "p"): Record<string, unknown> => ({
   id,
   form: "line",
   height: 5,
-  axes: true,
+  axes: true, plotFrame: "box",
   series: [
     { label: "train", values: [10, 20, 30, 40, 50] },
     { label: "val", values: [90, 80, 70, 60, 55] },

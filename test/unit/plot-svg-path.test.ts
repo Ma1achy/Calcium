@@ -1001,7 +1001,7 @@ describe("G12 — the last two of the eleven", () => {
     // **An index domain has no crossing**, which is the clause `zeroAt` carries:
     // sample 0 is its own left edge, and a rule there abuts the gutter.
     const indexed = vmBlock({
-      kind: "plot", id: "i", form: "line", height: 8, axes: true, axisCross: "zero",
+      kind: "plot", id: "i", form: "line", height: 8, axes: true, plotFrame: "box", axisCross: "zero",
       series: [{ values: [1, 2, 3, 4] }],
     } as unknown as Plot);
     expect(curveFigure(indexed).cross, "the member is still set").toBe(true);
@@ -1082,7 +1082,7 @@ describe("RM — the right margin is grown to fit what is drawn in it (C12 I113,
   };
 
   const line = (extra: Record<string, unknown>): Plot => vmBlock({
-    kind: "plot", id: "rr", form: "line", height: 8, axes: true, legend: false,
+    kind: "plot", id: "rr", form: "line", height: 8, axes: true, plotFrame: "box", legend: false,
     series: [{ label: "alpha", values: [50, 90, 10] }, { label: "beta", values: [10, 40, 99] }],
     ...extra,
   } as unknown as Plot);

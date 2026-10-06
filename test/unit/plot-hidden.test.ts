@@ -29,7 +29,7 @@ function kit(caps = FULL_CAPS, seriesVisibility?: Record<string, Record<number, 
 
 const two = (extra: Partial<Plot> = {}, second: Record<string, unknown> = {}): Plot =>
   block({
-    kind: "plot", id: "p", form: "line", height: 8, axes: true,
+    kind: "plot", id: "p", form: "line", height: 8, axes: true, plotFrame: "box",
     series: [
       { values: [10, 20, 30, 40, 50], label: "train" },
       { values: [90, 80, 70, 60, 55], label: "val", ...second },

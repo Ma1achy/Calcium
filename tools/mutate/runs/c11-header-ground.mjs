@@ -91,8 +91,9 @@ const results = runPass({
       // that would stop being true.
       name: "the header paints where no ground resolves",
       file: CELLS,
-      from: '  const dim = tone("muted", ctx.theme, ctx.capabilities, on);',
-      to: '  const dim = { ...tone("muted", ctx.theme, ctx.capabilities, on), background: { kind: "rgb", hex: "#222222" } };',
+      // Re-anchored for C11 I34: the labels' style is `head` now, muted and bold.
+      from: '  const head = { ...tone("muted", ctx.theme, ctx.capabilities, on), bold: true };',
+      to: '  const head = { ...tone("muted", ctx.theme, ctx.capabilities, on), bold: true, background: { kind: "rgb", hex: "#222222" } };',
       expect: "T2.161",
     },
   ],

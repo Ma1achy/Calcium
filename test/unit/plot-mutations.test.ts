@@ -777,7 +777,7 @@ describe("GROUP 6b: vertical is a transpose, and the vocabulary transposes with 
     const q = { min: 0, q1: 2, median: 4, q3: 6, max: 8 };
     const banded = (detail: Plot["plotDetail"], height: number): readonly string[] =>
       plain(block({
-        kind: "plot", id: "bl", form: "boxplot", height, axes: true,
+        kind: "plot", id: "bl", form: "boxplot", height, axes: true, plotFrame: "box",
         categories: ["A", "B", "C"], quartiles: [q, q, q], series: [],
         ...(detail === undefined ? {} : { plotDetail: detail }),
       }) as Plot, FULL_CAPS, 60); // cells-ok — a frame width
@@ -1757,8 +1757,10 @@ describe("GROUP 6m: four frame shapes over one geometry", () => {
     // style emitting one row fewer would still be a form drawing off its own
     // declared height.
     expect(new Set(frames.map((f) => f.split("\n").length)).size, "and one row count").toBe(1); // cells-ok — a set size
-    // The default is `box`.
-    expect(plain(mk()).join("\n")).toBe(frames[0]);
+    // **The default is `rule`** (I143, §018): the axes frame a figure, and the box
+    // is opt-in. It was `box` until the design check found no plot in the design
+    // drawing one.
+    expect(plain(mk()).join("\n")).toBe(frames[3]);
   });
 
   it("T1.83 (C12 I26): `corners` draws no ticks, because there is no edge to put one on", () => {

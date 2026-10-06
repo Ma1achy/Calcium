@@ -8,25 +8,25 @@ exports[`C10 §4k — the compositions, as frames > case 1 — focused + selecte
     charlie       ✓ running 
 
 -- which fact took the ground, run by run
-  dim/-:"Name        " dim/-:"State     "
+  bold+dim/-:"Name        " bold+dim/-:"State     "
   page/-:"  alpha         " bold/-:"✓ running "
   inverse+bold/-:"▸ " inverse/-:"bravo         " inverse+bold/-:"✗ failed  "
   page/-:"  charlie       " bold/-:"✓ running "
 
 -- without copy selection, run by run
-  dim/-:"Name        " dim/-:"State     "
+  bold+dim/-:"Name        " bold+dim/-:"State     "
   page/-:"  alpha         " bold/-:"✓ running "
   bold/-:"▸ " page/-:"bravo         " bold/-:"✗ failed  "
   page/-:"  charlie       " bold/-:"✓ running "
 
 -- without focus, run by run
-  dim/-:"Name        " dim/-:"State     "
+  bold+dim/-:"Name        " bold+dim/-:"State     "
   page/-:"  alpha         " bold/-:"✓ running "
   inverse/-:"  bravo         " inverse+bold/-:"✗ failed  "
   page/-:"  charlie       " bold/-:"✓ running "
 
 -- without failure, run by run
-  dim/-:"Name        " dim/-:"State     "
+  bold+dim/-:"Name        " bold+dim/-:"State     "
   page/-:"  alpha         " bold/-:"✓ running "
   inverse+bold/-:"▸ " inverse/-:"bravo         " inverse+bold/-:"✓ running "
   page/-:"  charlie       " bold/-:"✓ running "
@@ -429,7 +429,7 @@ exports[`C10 §4k — the compositions, as frames > case 6 — stale + running, 
 
 -- without liveness, run by run
   dim/-:"┌" bold/-:" ⠋ workers " dim/-:"──────────────────" bold/-:" updated 4m ago " dim/-:"─┐"
-  dim/-:"│✓ pytest(tests/unit) · 4s · 47 passed" dim/-:"│"
+  dim/-:"│✓ pytest(tests/unit) · 4.0s · 47 passed" dim/-:"│"
   dim/-:"└──────────────────────────────────────────────┘"
 
 -- the ruling (C10 §4k.2 row 6)
@@ -454,7 +454,7 @@ exports[`C10 §4k — the compositions, as frames > case 6 — stale + running, 
 
 -- without liveness, run by run
   page/dim:"┌" page/accent:" ⠋ workers " page/dim:"──────────────────" page/warn:" updated 4m ago " page/dim:"─┐"
-  page/dim:"│✓ pytest(tests/unit) · 4s · 47 passed" page/dim:"│"
+  page/dim:"│✓ pytest(tests/unit) · 4.0s · 47 passed" page/dim:"│"
   page/dim:"└──────────────────────────────────────────────┘"
 
 -- the ruling (C10 §4k.2 row 6)
@@ -479,7 +479,7 @@ exports[`C10 §4k — the compositions, as frames > case 6 — stale + running, 
 
 -- without liveness, run by run
   page/dim:"+" page/accent:" | workers " page/dim:"------------------" page/warn:" updated 4m ago " page/dim:"-+"
-  page/dim:"|+ pytest(tests/unit) : 4s : 47 passed" page/dim:"|"
+  page/dim:"|+ pytest(tests/unit) : 4.0s : 47 passed" page/dim:"|"
   page/dim:"+----------------------------------------------+"
 
 -- the ruling (C10 §4k.2 row 6)

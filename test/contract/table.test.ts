@@ -10,7 +10,7 @@ import { SCAN_BUDGET_MS } from "../support/budget.js";
 import { planColumns, tableDefinition } from "../../src/presentation/table/index.js";
 import { psColumns, psTable, TABLE_CORPUS } from "../support/blocks.js";
 import { DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS, measurable, registry as bareRegistry } from "../support/render.js";
-import { styledScreenFrom } from "../support/styled-screen.js";
+import { cellsOfLine, styledScreenFrom } from "../support/styled-screen.js";
 import { background, tone } from "../../src/presentation/blocks/paint.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import {
@@ -381,7 +381,30 @@ describe("C11 §3 — priority is declared, never inferred", () => {
 });
 
 describe("C11 I34 — the header's weight", () => {
-  it.todo(
-    "T2.17 (C11 I34, I24, §078): labels muted and bold, the sort indicator accent and bold, at three rungs — not deferred on a component: lands with the code commit of this round",
-  );
+  const rungs = [
+    ["FULL", FULL_CAPS],
+    ["MONO_UNICODE", MONO_UNICODE_CAPS],
+  ] as const;
+
+  it.each(rungs)("T2.17 (C11 I34, I24, §078): labels muted and bold, the sort indicator accent and bold, at %s", (_name, capabilities) => {
+    const kit = measurable({ definitions: [tableDefinition], capabilities });
+    const header = cellsOfLine(kit.renderToLines(psTable({ id: "ps-sorted", rows: 5, sort: { key: "age", direction: "desc" } }), 80)[0] ?? "");
+    const text = header.map((c) => c.ch).join("");
+    const at = text.indexOf("▾");
+    expect(at, "the indicator is drawn").toBeGreaterThan(0);
+    const mark = header[at]!.style;
+    const label = header[text.indexOf("uuid")]!.style;
+    expect(label.attrs, "the label is bold").toContain(1);
+    expect(mark.attrs, "the indicator is bold").toContain(1);
+    // At FULL both are colours and they differ; at one bit `accent` and
+    // `muted` resolve to weights and the difference is the attribute set.
+    expect(mark, "the indicator is not the label's style").not.toEqual(label);
+  });
+
+  it("T2.17 (C11 I34): the same table with no sort draws no indicator cell in its header, so the accent is the indicator's", () => {
+    const kit = measurable({ definitions: [tableDefinition], capabilities: FULL_CAPS });
+    const header = cellsOfLine(kit.renderToLines(psTable({ id: "ps-unsorted", rows: 5 }), 80)[0] ?? "");
+    const colours = new Set(header.filter((c) => c.ch.trim() !== "").map((c) => c.style.fg));
+    expect(colours.size, "one ink across the labels").toBe(1);
+  });
 });

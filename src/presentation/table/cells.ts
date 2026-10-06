@@ -303,7 +303,8 @@ function fitAt(text: string, width: number, ctx: RenderContext): string {
 }
 
 /**
- * The header row: labels, dim, with the sort indicator on the active column.
+ * The header row: labels `muted` and bold, with the sort indicator on the
+ * active column in `accent` and bold, as a span of its own (I34, §078).
  *
  * The indicator is appended inside the column's planned width (C11 §4), so a
  * label that no longer fits truncates rather than pushing the row wider than the
@@ -337,7 +338,13 @@ export function headerSpans(
   current?: CurrentLead,
 ): readonly Span[] {
   const g = glyphs(ctx.capabilities);
-  const dim = tone("muted", ctx.theme, ctx.capabilities, on);
+  // **Bold, both of them, and the mark in its own tone** (I34, §078
+  // `R-BLK-626`, §081 `R-BLK-637`). The figures draw the labels — padding and
+  // gaps included — `muted bold` on the ground and `▾` `accent bold`; drawn
+  // inside the label's span the mark read as one more letter of the word it
+  // marks.
+  const head = { ...tone("muted", ctx.theme, ctx.capabilities, on), bold: true };
+  const mark = { ...tone("accent", ctx.theme, ctx.capabilities, on), bold: true };
   const byKey = new Map<string, ColumnDef>(block.columns.map((c) => [c.key, c]));
 
   const spans: Span[] = [];
@@ -368,16 +375,34 @@ export function headerSpans(
     // and a header pushed there would sit past every value it names. Left is
     // the answer it has always had and the one §099's golden recorded.
     const align = aligns.get(planned.key);
+    const labelled = label + indicator;
     const text =
       align === "right"
         ? padStart(
-            truncate(label + indicator, planned.width, ctx.capabilities),
+            truncate(labelled, planned.width, ctx.capabilities),
             planned.width,
             ctx.capabilities.ambiguousWidth,
           )
-        : fitAt(label + indicator, planned.width, ctx);
+        : fitAt(labelled, planned.width, ctx);
 
-    spans.push({ text, style: dim });
+    // **Split only where the indicator was drawn whole.** A label that
+    // truncated took its indicator with it (§4), and a cut mark is not a mark,
+    // so the cell stays the label's. The split moves no cell: weight and tone
+    // are all that differ between the pieces.
+    const found = indicator === "" ? -1 : text.indexOf(labelled);
+    if (found < 0) {
+      spans.push({ text, style: head });
+    } else {
+      // Cut by the whole's position rather than by a length: the pieces are
+      // what is before it with the label, the indicator, and what is after.
+      const lead = text.slice(0, found);
+      const tail = text.slice(found).slice(labelled.length); // cells-ok — a string cut, not a width
+      spans.push(
+        { text: lead + label, style: head },
+        { text: indicator, style: mark },
+        ...(tail === "" ? [] : [{ text: tail, style: head }]),
+      );
+    }
   });
 
   return spans;

@@ -145,6 +145,10 @@ const ALL_WIDTHS = [2, 12, 24, 32, 40, 60, 80, 100, 120, 160, 200] as const;
  */
 const BAR_WIDTHS = [12, 24, 32, 40, 60, 80, 100, 120, 160, 200] as const;
 
+const PANEL_RAILS =
+  "C09 I139 / §049 / §096 (design check I1): every rail row of a panel carries the frame tone, where Ink drew the first body row's rails dim and the rest bare — a multi-line span painted once and then split";
+const PANEL_WIDTHS = [12, 24, 32, 40, 60, 80, 100, 120, 160, 200] as const;
+
 const RETIRED: ReadonlyMap<string, string> = new Map(
   (
     [
@@ -253,6 +257,15 @@ const RETIRED: ReadonlyMap<string, string> = new Map(
       ["t2143-progress-adv-zero-total", ALL_WIDTHS, BAR_PERCENT, ["full"]],
       ["t2143-progress-prog-1", [2], BAR_PERCENT, ["ascii", "mono"]],
       ["t2143-progress-adv-zero-total", [2], BAR_PERCENT, ["ascii", "mono"]],
+      // **Every panel whose body is taller than one row, at every width where a
+      // body is drawn** (C09 I139): measured by sweeping all three suites' panel
+      // captures before the run — `panel-1` and `p-title` at the ten widths from
+      // twelve, and the mixed sequence's panel at its three — and read after.
+      // Width 2 is absent: at two columns the rails are the whole row and the
+      // first row is the only one that differed.
+      ["t2143-panel-panel-1", PANEL_WIDTHS, PANEL_RAILS],
+      ["t2144-panel-p-title", PANEL_WIDTHS, PANEL_RAILS],
+      ["t2143-sequence", [24, 60, 100], PANEL_RAILS],
     ] as const
   ).flatMap(([key, widths, why, only]) =>
     widths.flatMap((width) =>
@@ -276,9 +289,7 @@ const RETIRED: ReadonlyMap<string, string> = new Map(
 function decode(bytes: string): readonly string[] {
   const parts = bytes.split("\n");
   return parts.slice(0, Math.max(0, parts.length - 1)); // cells-ok — rows, not columns
-}
-
-/** A capture's file name. **The width is in it**, or two widths collide. */
+}/** A capture's file name. **The width is in it**, or two widths collide. */
 export function oracleName(key: string, capsName: string, width: number): string {
   const safe = key.replace(/[^A-Za-z0-9._-]/gu, "_");
   return `${safe}-${capsName}-${String(width)}w.txt`;

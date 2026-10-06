@@ -139,3 +139,15 @@ export function styleAt(row: readonly StyledCell[], needle: string): CellStyle |
   const at = row.map((c) => c.ch).join("").indexOf(needle);
   return at === -1 ? null : row[at]!.style;
 }
+
+/**
+ * One rendered line as styled cells, each carrying the SGR channels in force
+ * (`styledScreenFrom` on a single row). The row is read from a reset state, so
+ * a style that was opened on an earlier row is not carried in — which is the
+ * whole point of reading one row alone (C09 I139).
+ */
+export function cellsOfLine(line: string): readonly StyledCell[] {
+  const plain = line.replace(/\u001b\[[0-9;]*m/gu, "");
+  const columns = [...plain].length; // cells-ok — one cell per code point in the frames read
+  return styledScreenFrom([line], { columns, rows: 1 })[0] ?? [];
+}

@@ -165,7 +165,12 @@ const MEASURED = {
   // that was a defect and not a decision. Folded into `axed` with the cursor as
   // a parameter; the four cells now agree, and the direction *is* the pass's
   // direction this time, which is why the figure is stated and not implied.
-  "line": { silent: "0/114", "numericLabels": "79/114", "identityLabels": "30/114", "border": "8/114", "interiorRules": "16/114", "legend": "10/114", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
+  // **`line.border` 8/114 → agree when the default frame became `rule`** (C12
+  // I143, 2026-10-06). Measured by this record before and after the change and
+  // not isolated per variant: the cell was eight at a83b1b30 and is none with the
+  // default read in one place (`DEFAULT_PLOT_FRAME`, which both arms' `frameOf`
+  // answers), so the direction is the change's and the per-variant cause is owed.
+  "line": { silent: "0/114", "numericLabels": "79/114", "identityLabels": "30/114", "border": "agree", "interiorRules": "16/114", "legend": "10/114", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "sparkline": { silent: "0/8", "numericLabels": "agree", "identityLabels": "2/8", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "scatter": { silent: "0/12", "numericLabels": "5/12", "identityLabels": "2/12", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
   "step": { silent: "0/6", "numericLabels": "1/6", "identityLabels": "2/6", "border": "agree", "interiorRules": "agree", "legend": "agree", "ramp": "agree", "keyReadings": "agree", "notice": "agree" },
@@ -672,10 +677,12 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // an arm's decision; each is named on its row above.
     // **57 with `sankey.identityLabels`** — the label drop and the reader's
     // `reversed`, named on the row (C12 §3ap).
-    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(57); // cells-ok — a cell count
+    // 57 → 56 and 272 → 273 with the default frame (C12 I143): `line.border` was
+    // the one open border cell and is agreed now; the total is unchanged.
+    expect(open, "cells where the arms disagree — the work the pass has to do").toBe(56); // cells-ok — a cell count
     // 269 → 266: the three cells named above moved from agree to open.
     // 266 → 272: `sankey`'s six agreeing cells.
-    expect(closed, "cells where they already agree — the work it must not undo").toBe(272); // cells-ok — a cell count
+    expect(closed, "cells where they already agree — the work it must not undo").toBe(273); // cells-ok — a cell count
     // 268 → 269, the other side of the same cell (F386): one disagreement
     // became one agreement, so the two counters move opposite by one and the
     // total is unchanged. That relation is what AD4 is for.
@@ -985,7 +992,10 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // needed its **sample** rather than its field: at 200 samples `sturges` and
     // `scott` produce the same bins, and the shared `bell` is 300 now, the
     // smallest measured size at which the three strategies disagree.
-    expect(t.distinct, "distinct terminal frames").toBe(239); // cells-ok — a frame count; 228 + `line/log`, `line/whiskers-placed`, `pie/all-zero` + six `sankey` + F350's two
+    // **238 once the default frame became `rule`** (C12 I143): `line/frame-rule`
+    // names the value the default now resolves to, so it draws `line/default`'s
+    // frame — the collision list below says so.
+    expect(t.distinct, "distinct terminal frames").toBe(238); // cells-ok — a frame count; 228 + `line/log`, `line/whiskers-placed`, `pie/all-zero` + six `sankey` + F350's two, less `line/frame-rule` (I143)
     // **134 -> 148**: the density family draws, so nineteen violin variants and
     // one ridgeline stop colliding in the single refusal group (F383).
     // **153, and the addition is a *collision*** — `plot3d`'s variants all
@@ -1025,7 +1035,14 @@ describe("AD — the two arms decide separately, and here is where", () => {
     // its **sample** rather than its field — at 200 samples `sturges` and
     // `scott` produce the same bins, which is a third category the finding
     // lumped with the other two.
+    //
+    // - **`line/frame-rule` is the frame default's** (C12 I143), the same shape
+    //   as `legend-right`: an explicit value that is not the resolved default
+    //   until the default is that value, and the collision with `default` is what
+    //   proves the default resolves to `"rule"`. `"box"` is the opt-in, and the
+    //   corpus holds its frame in `corners`'s and `grid`'s company.
     expect(t.groups, "terminal collisions past the empty document").toEqual([
+      ["line/frame-rule", "line/default"],
       ["line/legend-right", "line/multi-series"],
       ["slope/default", "slope/six-readings"],
     ]);

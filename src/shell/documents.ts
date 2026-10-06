@@ -15,7 +15,7 @@
 
 import { CALL_HEAD_GLYPH, CALL_STATE_TONE, block, document } from "../data/viewmodel/index.js";
 import { cancelledNotice, usageBlocks } from "../data/adapters/index.js";
-import { elapsed, glyphs, spinnerFrames } from "../presentation/blocks/index.js";
+import { elapsed, glyphs, settled, spinnerFrames } from "../presentation/blocks/index.js";
 import type { AskOptions, Choice } from "./local/registry.js";
 import { defaultStart } from "./choice-selection.js";
 import { defaulted } from "./builders/seq.js";
@@ -421,9 +421,13 @@ export function toolCallHeader(call: ToolCallSpec, caps: Caps, tick = 0): string
     // **`running`'s alone, not *unsettled*'s** (C23 I81): a queued call has not
     // started and R-BLK-214 draws it still, so its slot is empty (F1261).
     parts.push(since === "" ? spin(caps, tick) : `${spin(caps, tick)} ${since}`);
-  } else if (since !== "" && isSettled(call)) {
-    // Settled, the duration it took. Queued, nothing has started, so there is none.
-    parts.push(since);
+  } else if (call.elapsedMs !== undefined && call.elapsedMs > 0 && isSettled(call)) {
+    // Settled, the duration it took — `settled`'s figure and not the live
+    // counter's, so a 20 ms call reads `0.02s` rather than nothing (C09 I140).
+    // **A clock that did not move is no measurement**: a call refused at
+    // dispatch never ran, and `0.00s` beside `denied` would say it did. Queued,
+    // nothing has started, so there is none either.
+    parts.push(settled(call.elapsedMs));
   }
   const outcome =
     call.outcome !== undefined && call.outcome !== ""

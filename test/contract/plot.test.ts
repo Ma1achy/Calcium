@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
+import { frameOf } from "../../src/presentation/plot/figure.js";
 import { curveRows } from "../../src/presentation/plot/curve.js";
 import { seriesRange, FACING_DEFAULT } from "../../src/presentation/plot/scale.js";
 import { sparkline } from "../../src/presentation/plot/sparkline.js";
@@ -301,7 +302,40 @@ describe("C12 tier 2 — state", () => {
 });
 
 describe("C12 I143 — open axes by default", () => {
-  it.todo(
-    "T2.131 (C12 I143, I26, §018): a plot naming no frame draws rule, open at the right, and box is opt-in — not deferred on a component: lands with the code commit of this round",
-  );
+  const LINE = (extra: Partial<Plot>): Plot =>
+    block({
+      kind: "plot",
+      id: "open-axes",
+      form: "line",
+      height: 8,
+      axes: true,
+      legend: false,
+      series: [{ name: "a", values: [1, 3, 2, 5, 4, 6, 5, 7] }],
+      ...extra,
+    }) as Plot;
+  const draw = (b: Plot, capabilities: typeof FULL_CAPS, width: number): readonly string[] =>
+    measurable({ capabilities, definitions: [plotDefinition] }).renderToLines(b, width).map(visible);
+
+  it.each([40, 80])("T2.131 (C12 I143, I26, §018): a plot naming no frame draws rule, open at the right, at %d", (width) => {
+    for (const capabilities of [FULL_CAPS, ASCII_CAPS]) {
+      const bare = draw(LINE({}), capabilities, width);
+      const rule = draw(LINE({ plotFrame: "rule" }), capabilities, width);
+      expect(bare, "the default is the rule style, byte for byte").toEqual(rule);
+      expect(frameOf(LINE({})), "and the figure's border is the same answer, for the second arm").toBe("rule");
+      const joined = bare.join("\n");
+      for (const closing of ["┌", "┐", "┘", "+"]) {
+        if (capabilities === FULL_CAPS) expect(joined, closing).not.toContain(closing);
+      }
+      const bottom = bare.filter((l) => /[└+]/u.test(l)).pop() ?? "";
+      expect(bottom.trimEnd().endsWith(capabilities === FULL_CAPS ? "─" : "-"), `the bottom rule ends in the horizontal: ${bottom}`).toBe(true);
+    }
+  });
+
+  it("T2.131 (C12 I143): the control — box is opt-in, closes the figure and keeps the height", () => {
+    const bare = draw(LINE({}), FULL_CAPS, 60);
+    const box = draw(LINE({ plotFrame: "box" }), FULL_CAPS, 60);
+    expect(box.join("\n")).toContain("┌");
+    expect(box.join("\n")).toContain("┘");
+    expect(box.length, "geometry does not move (I26)").toBe(bare.length);
+  });
 });

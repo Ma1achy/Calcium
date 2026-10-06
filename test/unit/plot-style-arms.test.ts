@@ -498,7 +498,7 @@ describe("SA10 (C12 I43): every violin routine answers for the style, one way or
   const S = [{ values: D(40, 5) }, { values: D(45, 12) }, { values: D(38, 8) }];
   const draw = (extra: object): string =>
     kit().renderToLines(block({
-      kind: "plot", id: "sa10", form: "violin", axes: true,
+      kind: "plot", id: "sa10", form: "violin", axes: true, plotFrame: "box",
       categories: ["tight", "wide", "skewed"], series: S, ...extra,
     }), 72).map(plain).join("\n");
 

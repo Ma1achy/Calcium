@@ -63,7 +63,7 @@ import {
   type Layout,
 } from "./furniture.js";
 import { annotationRows } from "./annotate.js";
-import { legendSlots } from "./figure.js";
+import { DEFAULT_PLOT_FRAME, legendSlots } from "./figure.js";
 import { FACING_DEFAULT, facingOf, rowOf, seriesRange, type Facing, type Range } from "./scale.js";
 import { bandRows, ganttBars, stackBands, stackRange, waterfallBars } from "./stack.js";
 import { ROW_IS_AN_IDENTITY, markOf, partSeparator, refOf as slotOf, seriesRefOf } from "./marks.js";
@@ -1400,7 +1400,7 @@ function reserving(layout: Layout, block: Plot, width: number, ctx: LayoutContex
   // The frame's shape rides along, because every layout is built by one of two
   // functions and neither takes the block — threading it here is one place
   // rather than nine.
-  const styled = block.plotFrame === undefined ? layout : { ...layout, style: block.plotFrame };
+  const styled = { ...layout, style: block.plotFrame ?? DEFAULT_PLOT_FRAME };
   // **And so does the focus** (C26 §7, §3's element paragraph), for the same
   // reason: the frame's painters take a layout, and this is where a layout
   // meets the block and the context. The focus a session writes is the

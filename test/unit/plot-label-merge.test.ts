@@ -237,7 +237,7 @@ describe("T1.138 (C12 I119, F977): TL13's fixture — 図表 at 70 on the scatte
     // written for was the one row the filter never read (F977). Every row
     // but the caption, by position; the caption is 69, Ink trims its blank.
     const rows = kit().renderToLines(block({
-      kind: "plot", id: "p", form: "scatter", height: 9, axes: true, legend: false,
+      kind: "plot", id: "p", form: "scatter", height: 9, axes: true, plotFrame: "box", legend: false,
       series: [{ values: V, label: "a", pointLabels: at1("図表") }],
     } as never), 70).map(visible);
     const { row } = rowWith(rows, "図表");

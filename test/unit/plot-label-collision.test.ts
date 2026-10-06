@@ -26,7 +26,7 @@ const frame = (b: Parameters<typeof kit.renderToLines>[0], w: number): readonly 
 
 /** The finding's own figure: four categories, four series, at a dashboard's density. */
 const demo = block({
-  kind: "plot", id: "lc-demo", form: "bar", height: 8, axes: true,
+  kind: "plot", id: "lc-demo", form: "bar", height: 8, axes: true, plotFrame: "box",
   orientation: "vertical", layout: "grouped",
   categories: ["mon", "tue", "wed", "thu"],
   series: [
@@ -70,7 +70,7 @@ describe("LC1 (C12 I120): the composed row no longer reads one number that is ne
 
   it("and through the renderer: `4.1` survives whole and `4.17.4` is gone", () => {
     const b = block({
-      kind: "plot", id: "lc1", form: "bar", height: 4, axes: true,
+      kind: "plot", id: "lc1", form: "bar", height: 4, axes: true, plotFrame: "box",
       orientation: "vertical", layout: "grouped", legend: false,
       categories: ["a", "b"], yFormat: "number",
       series: [{ label: "s1", values: [4.1, 22] }, { label: "s2", values: [7.4, 1.0] }],
@@ -91,7 +91,7 @@ describe("LC1 (C12 I120): the composed row no longer reads one number that is ne
       .map((r, i) => r + barColumn(3.9, 0, 10, 3, 5, FULL_CAPS, true)[i]!);
     expect(bare, "the fixture responds").toContain("3.13.9");
     const b = block({
-      kind: "plot", id: "lc1-single", form: "bar", height: 5, axes: true,
+      kind: "plot", id: "lc1-single", form: "bar", height: 5, axes: true, plotFrame: "box",
       orientation: "vertical", legend: false,
       categories: ["a", "b", "c", "d"], yFormat: "number",
       series: [{ values: [3.1, 3.9, 9.9, 1.1] }],
@@ -132,7 +132,7 @@ describe("LC2 (C12 I120, §6p.2 step 3): a refusal reserves nothing", () => {
     // after where `1000` would have ended, so an edge moved by the refusal
     // takes it too.
     const b = block({
-      kind: "plot", id: "lc2-wide", form: "bar", height: 5, axes: true,
+      kind: "plot", id: "lc2-wide", form: "bar", height: 5, axes: true, plotFrame: "box",
       orientation: "vertical", legend: false,
       categories: ["a", "b", "c", "d"], yFormat: "number",
       series: [{ values: [1000, 0, 900, 100] }],
@@ -161,7 +161,7 @@ describe("LC3 (C12 I120, §6p.1 row 3): the claim carries its row", () => {
 
 describe("LC4 (C12 I120, §6p.1 row 6): the category names under the same figure obey it", () => {
   const cats = block({
-    kind: "plot", id: "lc4", form: "bar", height: 5, axes: true,
+    kind: "plot", id: "lc4", form: "bar", height: 5, axes: true, plotFrame: "box",
     orientation: "vertical", legend: false,
     categories: ["mon", "tue", "wed", "thu"], yFormat: "number",
     series: [{ values: [3, 5, 4, 6] }],
@@ -201,7 +201,7 @@ describe("LC7 (C12 I8, F374): the vertical arm says what it dropped, in the row 
   // `Monday` and one tick, under four bars, with nothing saying the other three
   // existed.
   const long = (extra: object = {}) => block({
-    kind: "plot", id: "lc7", form: "bar", height: 8, axes: true,
+    kind: "plot", id: "lc7", form: "bar", height: 8, axes: true, plotFrame: "box",
     orientation: "vertical", legend: false, yFormat: "number",
     categories: ["Monday", "Tuesday", "Wednesday", "Thursday"],
     series: [{ values: [3, 7, 5, 9] }], ...extra,

@@ -43,7 +43,7 @@ import type { Plot } from "../../data/viewmodel/index.js";
 import type { ColourRef, Style } from "../theme/index.js";
 import { SHARES_CELLS, markOf } from "./marks.js";
 import { seriesHidden } from "./visibility.js";
-import { identityOf, legendSlots, type FrameStyle } from "./figure.js";
+import { DEFAULT_PLOT_FRAME, identityOf, legendSlots, type FrameStyle } from "./figure.js";
 import type { RenderContext } from "../blocks/types.js";
 import type { TerminalCapabilities } from "../../terminal/capabilities.js";
 
@@ -79,7 +79,7 @@ export type Layout = Readonly<{
   areaRows: number;
   width: number;
   frame?: boolean;
-  /** Which of I26's four shapes the furniture takes. `"box"` when absent. */
+  /** Which of I26's four shapes the furniture takes. `DEFAULT_PLOT_FRAME` when absent (I143). */
   style?: FrameStyle;
   /**
    * The label cells the **right** gutter holds (I47). Absent or 0 is every
@@ -219,7 +219,7 @@ function leftGutterSpans(label: string, layout: Layout, ctx: RenderContext): rea
   // `"corners"` has no side edges either — the label still sits where it does in
   // every other style, so the column the data starts in never moves with the
   // style. That is what makes these four interchangeable at a glance.
-  const bare = (layout.style ?? "box") === "corners";
+  const bare = (layout.style ?? DEFAULT_PLOT_FRAME) === "corners";
   // **A tick belongs to the side that draws the label** (I47). This used to
   // read `label === ""`, which was correct and untested: every caller blanked
   // the label when `labelColumn` was 0, so *a label exists* and *this column
@@ -266,7 +266,7 @@ function rightGutterSpans(
   ctx: RenderContext,
 ): readonly Span[] {
   const column = layout.rightColumn ?? 0;
-  const bare = BARE_RIGHT_EDGE.has(layout.style ?? "box");
+  const bare = BARE_RIGHT_EDGE.has(layout.style ?? DEFAULT_PLOT_FRAME);
   const muted = tone("muted", ctx.theme, ctx.capabilities);
   const edgeTone = frameTone(layout, ctx);
   if (column === 0) {
@@ -505,7 +505,7 @@ function topGlyphs(style: FrameStyle, g: ReturnType<typeof glyphs>): EdgeGlyphs 
 export function frameTop(layout: Layout, ctx: RenderContext): string {
   const g = glyphs(ctx.capabilities);
   const muted = frameTone(layout, ctx);
-  const edge = topGlyphs(layout.style ?? "box", g);
+  const edge = topGlyphs(layout.style ?? DEFAULT_PLOT_FRAME, g);
   // **The row is still emitted when the style draws nothing in it**, because
   // `plotHeight` counted it and a style cannot change a block's height — that is
   // C12 I1, and a `"rule"` plot one row shorter than a `"box"` one would move
@@ -544,7 +544,7 @@ export function frameBottom(
 ): string {
   const g = glyphs(ctx.capabilities);
   const muted = frameTone(layout, ctx);
-  const style = layout.style ?? "box";
+  const style = layout.style ?? DEFAULT_PLOT_FRAME;
   // **`"corners"` draws no ticks**, which is I26's own clause: a tick is a mark
   // *on* an edge, and there is no edge here for it to sit on. Every other style
   // has one.
@@ -562,7 +562,9 @@ export function frameBottom(
     [
       { text: " ".repeat(Math.max(0, layout.gutter - 1)) },
       {
-        text: g.bottomLeft + run + (layout.frame === true ? g.bottomRight : ""),
+        // **`"rule"` stays open at its right end** (I143): the style has no
+        // right edge, so a corner there closed the figure it exists not to.
+        text: g.bottomLeft + run + (layout.frame !== true ? "" : style === "rule" ? g.horizontal : g.bottomRight),
         style: muted,
       },
     ],
@@ -585,7 +587,7 @@ export function gridRow(
   ctx: RenderContext,
   labelled = false,
 ): string {
-  if ((layout.style ?? "box") !== "grid") return " ".repeat(Math.max(0, layout.areaWidth));
+  if ((layout.style ?? DEFAULT_PLOT_FRAME) !== "grid") return " ".repeat(Math.max(0, layout.areaWidth));
   const g = glyphs(ctx.capabilities);
   const at = new Set(tickColumns);
   // **Both axes, and a labelled row is the whole horizontal half.** A gridline

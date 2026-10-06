@@ -361,13 +361,29 @@ export function spanCells(spans: readonly Span[], ambiguous: AmbiguousWidth = "n
  * The reset closes each styled run rather than the row, so an unstyled span
  * after a styled one is genuinely unstyled — a renderer that reset only at the
  * end would bleed the last colour across everything that followed it.
+ *
+ * **A span never styles across a row** (I139). A frame is read a row at a
+ * time — `composeRow`, Ink's grid, every row cache — so a style opened once
+ * before a `\n` styles that row and no other. The style is closed before each
+ * break and reopened after it. The panel's rail was the one span that reached
+ * here holding a break (539 of them over the suite, every one the rail), and
+ * this is what keeps the class at none.
  */
 export function paint(spans: readonly Span[]): string {
   let out = "";
   for (const span of spans) {
     if (span.text === "") continue;
     const opening = span.style === undefined ? "" : sgr(span.style);
-    out += opening === "" ? span.text : `${opening}${span.text}${SGR_RESET}`;
+    if (opening === "") {
+      out += span.text;
+    } else if (span.text.includes("\n")) {
+      out += span.text
+        .split("\n")
+        .map((piece) => (piece === "" ? "" : `${opening}${piece}${SGR_RESET}`))
+        .join("\n");
+    } else {
+      out += `${opening}${span.text}${SGR_RESET}`;
+    }
   }
   return out;
 }

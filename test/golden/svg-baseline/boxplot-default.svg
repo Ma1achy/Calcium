@@ -2,8 +2,6 @@
 <rect width="100%" height="100%" fill="#1a1a1a"/>
 <line x1="99.6" y1="12.8" x2="99.6" y2="288" stroke="#2c2c2c" stroke-width="1"/>
 <line x1="99.6" y1="288" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<line x1="614.4" y1="12.8" x2="614.4" y2="288" stroke="#2c2c2c" stroke-width="1"/>
-<line x1="99.6" y1="12.8" x2="614.4" y2="12.8" stroke="#2c2c2c" stroke-width="1"/>
 <text x="99.6" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#8c8c8c">0</text>
 <text x="228.3" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#8c8c8c">2</text>
 <text x="357" y="300" text-anchor="middle" font-size="12" font-family="monospace" fill="#8c8c8c">4</text>

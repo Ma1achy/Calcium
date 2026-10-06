@@ -654,7 +654,18 @@ describe("C12 tier 6 — fail-on-revert", () => {
 });
 
 describe("C12 T6.118", () => {
-  it.todo(
-    "T6.118 (C12 I143): the default set back to box, or rule closed with a corner → T2.131 fails — not deferred on a component: lands with the code commit of this round",
-  );
+  it("T6.118 (C12 I143): the default set back to box, or rule closed with a corner → T2.131 fails", () => {
+    const b = block({
+      kind: "plot",
+      id: "open-axes",
+      form: "line",
+      height: 8,
+      axes: true,
+      legend: false,
+      series: [{ name: "a", values: [1, 3, 2, 5, 4, 6, 5, 7] }],
+    }) as Plot;
+    const rows = measurable({ capabilities: FULL_CAPS, definitions: [plotDefinition] }).renderToLines(b, 40).map(visible);
+    expect(rows.join("\n"), "no lid corner").not.toContain("┌");
+    expect(rows.join("\n"), "no closing corner on the bottom rule").not.toContain("┘");
+  });
 });

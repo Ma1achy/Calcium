@@ -287,7 +287,7 @@ describe("C23 I101 — one code per settlement", () => {
     });
     expect(seen).toEqual([
       "denied: cancelled · muted · ps · denied · full ● as cancelled · 1-bit ⊘ as cancelled · ascii / as cancelled · ran false",
-      "expired: cancelled · muted · ps · 6s · expired · full ● as cancelled · 1-bit ⊘ as cancelled · ascii / as cancelled · ran false",
+      "expired: cancelled · muted · ps · 6.0s · expired · full ● as cancelled · 1-bit ⊘ as cancelled · ascii / as cancelled · ran false",
       "withdrawn: cancelled · muted · ps · cancelled · full ● as cancelled · 1-bit ⊘ as cancelled · ascii / as cancelled · ran false",
       "⌃c: cancelled · muted · ps · cancelled · full ● as cancelled · 1-bit ⊘ as cancelled · ascii / as cancelled · ran true",
       "exit 1: failed · error · tail(web.log) · exit 1 · full ● as failed · 1-bit ✗ as failed · ascii x as failed · ran false",

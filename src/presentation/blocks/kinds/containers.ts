@@ -226,9 +226,10 @@ export const panelDefinition: BlockDefinition<Panel> = {
     const childTheme = block.staleForMs === undefined ? undefined : recede(ctx.theme);
     const rendered = block.children.map((child) => ctx.renderChild(child, inner, childTheme));
     const total = sequenceHeight(block.children, inner, ctx.measureChild);
-    const side = paint([
-      { text: Array.from({ length: Math.max(1, total) }, () => g.vertical).join("\n"), style: dim },
-    ]);
+    // **One rail cell per row, each painted alone** (I139). The rail was one
+    // span of `│\n│…` painted and then split, so the opening SGR landed on the
+    // first row and rows 1…n drew in default ink.
+    const rail = Array.from({ length: Math.max(1, total) }, () => paint([{ text: g.vertical, style: dim }]));
 
     // **The rows arm** (C09 I73): the body's rows between the rails, each line
     // as Ink's grid would hold it — the rail's line at column 0, the body row
@@ -247,7 +248,6 @@ export const panelDefinition: BlockDefinition<Panel> = {
       // An empty body is one blank row, and the rail floor `Math.max(1, total)`
       // is what draws it: the height below is the rail's, so nothing is pushed
       // for it here — a push was, and the mutation pass showed it dead.
-      const rail = side.split("\n");
       const height = Math.max(rail.length, body.length); // cells-ok — a row count
       const lines: string[] = [top];
       for (let y = 0; y < height; y += 1) { // cells-ok — a row index

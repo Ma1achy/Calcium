@@ -22,9 +22,9 @@ import {
   measurable,
   visible,
 } from "../support/render.js";
-import { rowContaining, styleAt, styledScreenFrom } from "../support/styled-screen.js";
+import { cellsOfLine, rowContaining, styleAt, styledScreenFrom } from "../support/styled-screen.js";
 import { CONTENT_LINE_CAP, statusRowsFor } from "../../src/presentation/blocks/kinds/status.js";
-import { background, focusStyle, tone } from "../../src/presentation/blocks/paint.js";
+import { background, focusStyle, paint, tone } from "../../src/presentation/blocks/paint.js";
 import { CALL_STATE_TONE, block } from "../../src/data/viewmodel/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { cells, hasEmojiForm, TEXT_PRESENTATION } from "../../src/presentation/text.js";
@@ -1502,7 +1502,39 @@ describe("C09 I32 — a status asks for a tick only while it moves (ruling 106 c
 });
 
 describe("C09 I139 — a panel's rails", () => {
-  it.todo(
-    "T2.232 (C09 I139, §049): every rail cell of a panel carries the frame tone, and paint keeps a span's style on every row — not deferred on a component: lands with the code commit of this round",
-  );
+  const PANEL = block({
+    kind: "panel",
+    id: "rails",
+    title: "t",
+    children: [{ kind: "raw", id: "rails-raw", text: "one\ntwo\nthree\nfour" }],
+  });
+
+  it("T2.232 (C09 I139, §049): every rail cell of a panel carries the frame tone, the last body row included", () => {
+    for (const capabilities of [FULL_CAPS, MONO_UNICODE_CAPS]) {
+      const lines = measurable({ capabilities }).renderToLines(PANEL, 40);
+      const want = tone("dim", DARK_THEME, capabilities);
+      const body = lines.slice(1, -1);
+      expect(body.length, "four body rows").toBe(4);
+      body.forEach((line, y) => {
+        const row = cellsOfLine(line);
+        for (const cell of [row[0]!, row[row.length - 1]!]) {
+          expect(cell.ch, `rail of row ${String(y)}`).toBe("│");
+          // The control that the reader can tell a toned cell from a bare one.
+          expect(cell.style, `style of row ${String(y)}`).toEqual(cellsOfLine(sgr(want) + "│\u001b[0m")[0]!.style);
+        }
+      });
+    }
+  });
+
+  it("T2.232 (C09 I139): paint closes a span's style before each break and reopens it after, so no piece is bare", () => {
+    const style = tone("muted", DARK_THEME, FULL_CAPS);
+    const pieces = paint([{ text: "a\nb\nc", style }]).split("\n");
+    expect(pieces).toHaveLength(3);
+    for (const piece of pieces) {
+      expect(piece.startsWith(sgr(style)), piece).toBe(true);
+      expect(piece.endsWith("\u001b[0m"), piece).toBe(true);
+    }
+    // The control: a span with no break is one opening and one reset, as it was.
+    expect(paint([{ text: "ab", style }])).toBe(`${sgr(style)}ab\u001b[0m`);
+  });
 });

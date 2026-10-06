@@ -28,7 +28,7 @@ const wave = (n: number, k = 1): number[] =>
 
 function rows(extra: object, w = 60, caps = FULL_CAPS): readonly string[] {
   return kit(caps).renderToLines(block({
-    kind: "plot", id: "ya", form: "line", height: 8, axes: true, legend: false,
+    kind: "plot", id: "ya", form: "line", height: 8, axes: true, plotFrame: "box", legend: false,
     series: [{ values: wave(40), label: "alpha" }], ...extra,
   }), w);
 }
@@ -112,7 +112,7 @@ describe("YA4 (C12 I47, §3f): both columns are straight at `wide`", () => {
     const wide = { ...FULL_CAPS, ambiguousWidth: "wide" as const };
     const anyEdge = /[│┤├┣|+]/u;
     const frame = kit(wide).renderToLines(block({
-      kind: "plot", id: "ya", form: "bar", height: 3, axes: true, yAxis: "both",
+      kind: "plot", id: "ya", form: "bar", height: 3, axes: true, plotFrame: "box", yAxis: "both",
       categories: ["café", "ab", "cd"], series: [{ values: [30, 70, 45] }],
     }), 48).map(plain).filter((l) => /^\s*\S+\s[|+]/u.test(l));
     expect(frame.length).toBe(3);
@@ -189,7 +189,12 @@ describe("YA7 (C12 I47, I18, I26): the mirror takes the left gutter's shape, not
         { values: [2, 2, 2, 2], label: "three" },
       ],
     }), 48).map(plain).filter((r) => EDGE.test(r));
-    expect(frame.map((r) => gutters(r).right)).toEqual(["one", "two", "three"]);
+    // **Read off the row's end and not off the edge glyph** (C12 I143): a heatmap
+    // takes the default frame, `rule`, which has no right edge, so the names
+    // are not preceded by a tee any more — the claim is that they are on the
+    // right, at the rows the left names are on.
+    expect(frame.map((r) => r.trimEnd().split(/\s+/u).pop())).toEqual(["one", "two", "three"]);
+    expect(frame.map((r) => gutters(r).left)).toEqual(["one", "two", "three"]);
   });
 
   it("`rule` draws the right label and no edge beside it", () => {
@@ -366,10 +371,10 @@ describe("YC7 (C12 I47, I48, C04 I60): the refusals, at both gates", () => {
   });
 
   it("`false` on a matrix, whose row labels are its ordinate", () => {
-    const heat = { form: "heatmap", axes: true, yAxis: false as const };
+    const heat = { form: "heatmap", axes: true, plotFrame: "box", yAxis: false as const };
     expect(doc(heat).join()).toMatch(/a row label is the ordinate/u);
     expect(built(heat)).toMatch(/a row label is the ordinate/u);
-    expect(doc({ form: "heatmap", axes: true, yAxis: "both" as const })).toEqual([]);
+    expect(doc({ form: "heatmap", axes: true, plotFrame: "box", yAxis: "both" as const })).toEqual([]);
   });
 
   it("the union itself", () => {
@@ -499,7 +504,7 @@ describe("TL3 (C12 I55): a name at the line's end is the legend, and `last` is n
   ];
   const drawn = (extra: object): string[] =>
     kit().renderToLines(block({
-      kind: "plot", id: "tl3", form: "line", height: 8, axes: true,
+      kind: "plot", id: "tl3", form: "line", height: 8, axes: true, plotFrame: "box",
       yAxis: "both", series: twoSeries, ...extra,
     }), 60).map(plain);
   const hasSwatchFor = (rowsIn: readonly string[]): boolean =>
@@ -512,7 +517,7 @@ describe("TL3 (C12 I55): a name at the line's end is the legend, and `last` is n
   it("`name` and `both` suppress it, because the identity is already on the line", () => {
     for (const yCallout of ["name", "both"] as const) {
       const b0 = block({
-        kind: "plot", id: "tl3", form: "line", height: 8, axes: true,
+        kind: "plot", id: "tl3", form: "line", height: 8, axes: true, plotFrame: "box",
         yAxis: "both", series: twoSeries, yCallout,
       });
       // **The rule and the frame, because neither alone is the claim.** The
@@ -528,7 +533,7 @@ describe("TL3 (C12 I55): a name at the line's end is the legend, and `last` is n
 
   it("`last` is not suppressed at the rule, which is where the two arms part", () => {
     const b0 = block({
-      kind: "plot", id: "tl3", form: "line", height: 8, axes: true,
+      kind: "plot", id: "tl3", form: "line", height: 8, axes: true, plotFrame: "box",
       yAxis: "both", series: twoSeries, yCallout: "last",
     });
     expect(legendPlacement(b0 as Parameters<typeof legendPlacement>[0], FULL_CAPS)).toBe("right");
@@ -655,7 +660,7 @@ describe("YC10 (C12 I122): a callout draws with or without a right axis, and bot
 
   const plot = (ya: (typeof AXES)[number], yc: (typeof CALLS)[number]): Plot =>
     block({
-      kind: "plot", id: "yc10", form: "line", height: 6, axes: true, legend: false,
+      kind: "plot", id: "yc10", form: "line", height: 6, axes: true, plotFrame: "box", legend: false,
       yFormat: "number", series: [{ label: "alpha", values: [2, 6, 4, 10] }],
       ...(ya === undefined ? {} : { yAxis: ya }), yCallout: yc,
     }) as Plot;
@@ -715,7 +720,7 @@ describe("YC11 (C12 I122): a column grown for a callout alone carries no mirrore
   // the arms agreeing.
   const right = (extra: object): readonly string[] =>
     kit().renderToLines(block({
-      kind: "plot", id: "yc11", form: "line", height: 6, axes: true, legend: false,
+      kind: "plot", id: "yc11", form: "line", height: 6, axes: true, plotFrame: "box", legend: false,
       yFormat: "number", series: [{ label: "alpha", values: [2, 6, 4, 10] }], ...extra,
     }), 30).map(plain).map((r) => {
       const last = [...r].reduce((m, c, i) => (/[│┤├┣┐┘└]/u.test(c) ? i : m), -1); // cells-ok — a column index
@@ -760,7 +765,7 @@ describe("YC11 (C12 I122): a column grown for a callout alone carries no mirrore
     // (C12 I47: a callout is only ever written on the right).
     const NAME = "utilisation";
     const fixture = (extra: object): string[] => kit().renderToLines(block({
-      kind: "plot", id: "yc11l", form: "line", height: 6, axes: true, legend: false,
+      kind: "plot", id: "yc11l", form: "line", height: 6, axes: true, plotFrame: "box", legend: false,
       yFormat: "number", yAxis: "left",
       series: [{ label: NAME, values: [2, 6, 4, 9] }], ...extra,
     }), 30).map(plain);

@@ -22,7 +22,7 @@ const lines = (spec: object, w = 70, caps: object = FULL_CAPS): string[] =>
   kit(caps).renderToLines(block(spec as never), w).map((l) => l.replace(/\x1b\[[0-9;]*m/gu, ""));
 
 const LINE = {
-  kind: "plot", id: "t", form: "line", height: 8, axes: true, legend: false,
+  kind: "plot", id: "t", form: "line", height: 8, axes: true, plotFrame: "box", legend: false,
   series: [{ values: [10, 40, 25, 70, 55], label: "a" }],
 };
 

@@ -101,7 +101,7 @@ describe("§9c — the header, the body, and the row the body already has", () =
   it("T2.46 (C23 I58): the header is `name(args) · duration · outcome`; running, the spinner owns the duration slot, alone below one second", () => {
     const spin = spinnerFrames(FULL_CAPS);
     expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0" }, FULL_CAPS)).toBe(
-      "run_command(npm test) · 4s · exit 0",
+      "run_command(npm test) · 4.2s · exit 0",
     );
     expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 400 }, FULL_CAPS), "dispatched: the spinner alone, no figure").toBe(
       `run_command(npm test) · ${spin[0] ?? ""}`,
@@ -114,12 +114,12 @@ describe("§9c — the header, the body, and the row the body already has", () =
       `run_command(npm test) · ${spin[0] ?? ""} waiting`,
     );
     expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 4_200, settled: true }, FULL_CAPS), "settled with no count: the duration alone, tone carries success").toBe(
-      "run_command(npm test) · 4s",
+      "run_command(npm test) · 4.2s",
     );
     // F828: the separator is a GlyphSet slot resolved against the arm — `:` at ASCII (F834: not `-`, the spinner's frame).
     const ascii = spinnerFrames(ASCII_CAPS);
     expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 4_200, outcome: "exit 0" }, ASCII_CAPS)).toBe(
-      "run_command(npm test) : 4s : exit 0",
+      "run_command(npm test) : 4.2s : exit 0",
     );
     expect(toolCallHeader({ name: "run_command", args: "npm test", elapsedMs: 400 }, ASCII_CAPS)).toBe(`run_command(npm test) : ${ascii[0] ?? ""}`);
   });
@@ -178,7 +178,7 @@ describe("§9c — the header, the body, and the row the body already has", () =
       ]);
 
       const s = frame(settled, width, ascii);
-      expect(s, "settled: the mark says succeeded where tone cannot").toEqual([`${mark("succeeded")} run_command(npm test) ${sep} 4s ${sep} exit 0`, `  ${hook} 118 passed, 2 todo`]);
+      expect(s, "settled: the mark says succeeded where tone cannot").toEqual([`${mark("succeeded")} run_command(npm test) ${sep} 4.2s ${sep} exit 0`, `  ${hook} 118 passed, 2 todo`]);
 
       const f = frame(folded, width, ascii);
       expect(f, "+N more is the residue row (C04 I104)").toEqual([`${run} run_command(npm test) ${sep} ${spin}`, `${more} +392 more`]);

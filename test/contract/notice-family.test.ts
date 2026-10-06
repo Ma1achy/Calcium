@@ -67,8 +67,12 @@ const BEFORE: Record<string, readonly string[]> = {
   "confirm-question": [
     "\u001b[38;2;138;138;138m┌\u001b[38;2;232;168;124m Confirm \u001b[38;2;138;138;138m─────────────────────────────────────────────────────────────────────┐\u001b[39m",
     "\u001b[38;2;138;138;138m│\u001b[38;2;212;179;90m▲ remove 3 containers?\u001b[39m                                                        \u001b[38;2;138;138;138m│\u001b[39m",
-    "│                                                                              │",
-    "│{\"kind\":\"table\",\"id\":\"confirm-choices\",\"padding\":{\"t\":1},\"columns\":[{\"key\":\"m…│",
+    // **Rows 2 and 3 re-taken for C09 I139**: the rail was one multi-line span, so
+    // only the first body row's rails were toned and these two drew bare. The
+    // rails carry the frame tone on every row now; the text between them is
+    // exactly what 73882a4f drew.
+    "\u001b[38;2;138;138;138m│\u001b[39m                                                                              \u001b[38;2;138;138;138m│\u001b[39m",
+    "\u001b[38;2;138;138;138m│\u001b[39m{\"kind\":\"table\",\"id\":\"confirm-choices\",\"padding\":{\"t\":1},\"columns\":[{\"key\":\"m…\u001b[38;2;138;138;138m│\u001b[39m",
     "\u001b[38;2;138;138;138m└──────────────────────────────────────────────────────────────────────────────┘\u001b[39m",
   ],
   cleared: [

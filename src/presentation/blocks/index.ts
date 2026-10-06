@@ -14,7 +14,7 @@ export { ANIMATES, animationIntervalOf, tickIntervalOf } from "./animation.js";
 // C22 I131: the shell stamps one-shots through the same extent table the ticker reads.
 export { mapRamps } from "./ramp.js";
 // The floor the shell reserves for a contained failure (C22 I69, C04 I67).
-export { countdown, elapsed, statusRowsFor } from "./kinds/status.js";
+export { countdown, elapsed, settled, statusRowsFor } from "./kinds/status.js";
 export { age, barOf, interiorOf, panelInterior } from "./kinds/containers.js";
 export { tapeMemberCols, tapeStart } from "./kinds/tape.js";
 // The transcript's bar is drawn by the shell in the margin column (C14 I62) —

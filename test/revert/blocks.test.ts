@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { block } from "../../src/data/viewmodel/index.js";
 import { cells, truncate, wrapCells } from "../../src/presentation/text.js";
-import { FREE_WIDTH_SLOTS, glyphs } from "../../src/presentation/blocks/index.js";
+import { FREE_WIDTH_SLOTS, elapsed, glyphs, settled } from "../../src/presentation/blocks/index.js";
 import { sgr } from "../../src/terminal/escapes.js";
 import { checkModuleGraph } from "../../tools/enforce/module-graph.mjs";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
@@ -475,10 +475,25 @@ describe("C09 I133–I136 — tier 6 (review batch 4)", () => {
 });
 
 describe("C09 T6.194, T6.195", () => {
-  it.todo(
-    "T6.194 (C09 I139): paint writing a break inside its style and the rails one span → T2.232 fails on the last body row — not deferred on a component: lands with the code commit of this round",
-  );
-  it.todo(
-    "T6.195 (C09 I140): settled answering elapsed, or banding the unrounded figure → T1.153 fails — not deferred on a component: lands with the code commit of this round",
-  );
+  it("T6.194 (C09 I139): paint writing a break inside its style, or the rails one span split after painting → T2.232 fails on the last body row", () => {
+    // The pair of reverts is one property, and either is enough to leave a bare
+    // row, so the property is pinned directly: the last of four body rows.
+    const panel = block({
+      kind: "panel",
+      id: "rails",
+      title: "t",
+      children: [{ kind: "raw", id: "rails-raw", text: "a\nb\nc\nd" }],
+    });
+    const lines = measurable({ capabilities: FULL_CAPS }).renderToLines(panel, 30);
+    const last = lines[lines.length - 2] ?? "";
+    expect(last.startsWith("\u001b["), "the last body row opens with a style, not a bare rail").toBe(true);
+  });
+
+  it("T6.195 (C09 I140): settled answering elapsed, or banding the unrounded figure → T1.153 fails", () => {
+    expect(settled(20), "a 20 ms call draws a figure").toBe("0.02s");
+    expect(elapsed(20)).toBe("");
+    expect(settled(4200), "4.2 s keeps its tenth").toBe("4.2s");
+    expect(settled(96), "rounded before banded: not 0.10s").toBe("0.1s");
+    expect(settled(9960), "rounded before banded: not 10.0s").toBe("10s");
+  });
 });

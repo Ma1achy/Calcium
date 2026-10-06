@@ -21,7 +21,7 @@ const kit = (caps: object = FULL_CAPS) =>
 
 const draw = (extra: object, w = 70, caps: object = FULL_CAPS): string[] =>
   kit(caps).renderToLines(block({
-    kind: "plot", id: "p", form: "scatter", height: 9, axes: true, legend: false,
+    kind: "plot", id: "p", form: "scatter", height: 9, axes: true, plotFrame: "box", legend: false,
     series: [], ...extra,
   } as never), w).map((l) => l.replace(/\x1b\[[0-9;]*m/gu, ""));
 

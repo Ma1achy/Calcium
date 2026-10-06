@@ -34,7 +34,7 @@ describe("C26 §7 — a focused plot's frame, read from a session's screen", () 
           plot: () => ({
             schema: "tui.view/1",
             status: "ok",
-            blocks: [{ kind: "plot", id: "p", form: "line", height: 5, axes: true, camera: {}, series: [{ label: "train", values: [10, 20, 30, 40, 50] }] }],
+            blocks: [{ kind: "plot", id: "p", form: "line", height: 5, axes: true, plotFrame: "box", camera: {}, series: [{ label: "train", values: [10, 20, 30, 40, 50] }] }],
           }),
         },
       } as never,

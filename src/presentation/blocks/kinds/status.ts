@@ -202,6 +202,32 @@ export function elapsed(ms: number): string {
 }
 
 /**
+ * `0.02s`, `0.3s`, `4.2s`, `47s`, `2m 31s` — a settled duration, always drawn
+ * and as fine as its size (I140, §030 `R-BLK-224`, §081).
+ *
+ * **`elapsed`'s opposite on both of its choices, and that is why it is a second
+ * function.** The live counter hides everything under a second so a fast call
+ * does not flash a figure, and draws whole seconds so the once-a-second patch
+ * changes what is drawn (C23 I52). A settled figure is written once, so neither
+ * reason reaches it — and reusing the counter was how a 20 ms call settled with
+ * no duration at all and a 4.2 s one read `4s`.
+ *
+ * **The band is chosen on the rounded figure.** 99.6 ms rounds to a tenth and
+ * is `0.1s`; 9 960 ms rounds to ten seconds and is `10s`. Banding the raw value
+ * would draw `0.10s` and `10.0s`, a precision the band below does not have.
+ * Zero is `0.00s` — a measurement, not a blank.
+ */
+export function settled(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  const hundredths = Math.round(ms / 10);
+  if (hundredths < 10) return `${(hundredths / 100).toFixed(2)}s`;
+  const tenths = Math.round(ms / 100);
+  if (tenths < 100) return `${(tenths / 10).toFixed(1)}s`;
+  const s = Math.round(ms / SECOND);
+  return s <= 99 ? `${String(s)}s` : `${String(Math.floor(s / 60))}m ${String(s % 60)}s`;
+}
+
+/**
  * The trailing line, or none.
  *
  * `retrying` takes the countdown and the attempt; `loading` takes the elapsed

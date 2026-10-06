@@ -462,6 +462,16 @@ export type LegendSlot = Readonly<{
 export type FrameStyle = NonNullable<Plot["plotFrame"]>;
 
 /**
+ * The shape a plot that names none draws: **open axes** (I143, §018
+ * `R-BLK-138`). *Most plots have none, so the AXES are what frames a figure* —
+ * the closed box is `plotFrame: "box"`, opt-in like the other two. One
+ * constant, because `frameOf`, the layout `reserving` builds and the painters'
+ * own defaults all answer this, and three answers are how the two arms came to
+ * draw different borders before (F296).
+ */
+export const DEFAULT_PLOT_FRAME: FrameStyle = "rule";
+
+/**
  * The border a figure draws, **`"none"` included** (I67, §3ak.19).
  *
  * `axes: false` removes the border, and no value of `plotFrame` says that — C04
@@ -717,7 +727,7 @@ export function rampOf(block: Pick<Plot, "form" | "colormap">): ColormapName | n
  * decision in two places. This is that decision.
  */
 export function frameOf(block: Pick<Plot, "axes" | "plotFrame">): FigureFrame {
-  return block.axes === true ? block.plotFrame ?? "box" : "none";
+  return block.axes === true ? block.plotFrame ?? DEFAULT_PLOT_FRAME : "none";
 }
 
 /**

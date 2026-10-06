@@ -132,12 +132,12 @@ describe("C23 I54 — the pending entry is the running card", () => {
     await settled(h.pipeline);
     sub[Symbol.dispose]();
     expect(entry()?.streaming, "settled by `end`").toBe(false);
-    expect(atSettle, "what persistence writes already carries the final head — the duration, and no `exit 0` (C23 I59)").toBe("tail(web.log) · 4s");
-    expect(headerOf(entry()?.doc.blocks ?? [])?.text).toBe("tail(web.log) · 4s");
+    expect(atSettle, "what persistence writes already carries the final head — the duration, and no `exit 0` (C23 I59)").toBe("tail(web.log) · 4.0s");
+    expect(headerOf(entry()?.doc.blocks ?? [])?.text).toBe("tail(web.log) · 4.0s");
 
     // And a settled card keeps its final figure: the readout is gone.
     seconds(h, 3);
-    expect(headerOf(entry()?.doc.blocks ?? [])?.text).toBe("tail(web.log) · 4s");
+    expect(headerOf(entry()?.doc.blocks ?? [])?.text).toBe("tail(web.log) · 4.0s");
   });
 
   it("T4.40b (C23 I54): a stream that ends non-zero carries its code, and one that is truncated says so", async () => {
@@ -148,7 +148,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     seconds(h, 2);
     await gate.end({ exitCode: 1 });
     await settled(h.pipeline);
-    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe("tail(web.log) · 2s · exit 1");
+    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe("tail(web.log) · 2.0s · exit 1");
   });
 
   it("T4.41 (C23 I54, roadmap 33): a queued line is bare while it waits, gains no figure, and becomes the card — same id — when routed, with its clock starting there", async () => {
@@ -194,7 +194,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     await gate.end({ exitCode: 0 });
     await settled(h.pipeline);
     expect(headerOf(h.transcript.entries[1]?.doc.blocks ?? [])?.text, "never *queued behind* once it ran").toBe(
-      "tail(web.log) · 2s",
+      "tail(web.log) · 2.0s",
     );
   });
 
@@ -209,11 +209,11 @@ describe("C23 I54 — the pending entry is the running card", () => {
     await settled(h.pipeline);
     const entry = h.transcript.entries[0];
     expect(entry?.streaming, "cancel settles the entry (C23 I10)").toBe(false);
-    expect(headerOf(entry?.doc.blocks ?? [])?.text).toBe("tail(web.log) · 3s · cancelled");
+    expect(headerOf(entry?.doc.blocks ?? [])?.text).toBe("tail(web.log) · 3.0s · cancelled");
     expect(h.recorded.at(-1), "a cancellation is a settlement with its own code (C23 I29)").toEqual({ command: "/tail web.log", exitCode: 130 });
 
     seconds(h, 2);
-    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe("tail(web.log) · 3s · cancelled");
+    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe("tail(web.log) · 3.0s · cancelled");
   });
 
   it("T4.43 (C23 I54, I55): the invoke route shows the card while the transport runs and settles with the adapter's blocks under the card's header", async () => {
@@ -238,7 +238,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     // **Reversed 2026-09-05** (C23 I55): this read *no header survives a replacement*
     // and the card is now composed over the replacement — one header, block 0.
     // No count in the result and no failure: `verb · duration`, never `ok` (C23 I59).
-    expect(headerOf(entry?.doc.blocks ?? []), "and the header is composed over it").toEqual({ glyph: "work-unit", state: "succeeded", text: "ps(--quiet) · 2s" });
+    expect(headerOf(entry?.doc.blocks ?? []), "and the header is composed over it").toEqual({ glyph: "work-unit", state: "succeeded", text: "ps(--quiet) · 2.0s" });
     expect((entry?.doc.blocks ?? []).filter((blk) => blk.kind === "notice" && blk.state !== undefined), "exactly one").toHaveLength(1);
   });
 
@@ -349,7 +349,7 @@ describe("C23 I54 — the pending entry is the running card", () => {
     expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text, "running: the readout's two seconds").toBe(`ps · ${SPIN(2)} 2s`);
     held.release?.();
     await settled(h.pipeline);
-    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text, "settled: two seconds on `elapsed`; the wall clock's five are not the call's").toBe("ps · 2s");
+    expect(headerOf(h.transcript.entries[0]?.doc.blocks ?? [])?.text, "settled: two seconds on `elapsed`; the wall clock's five are not the call's").toBe("ps · 2.0s");
   });
 
   it("T4.47 (C23 I55): the invoke route, a throwing adapter and a local verb each settle to the card's header over the result's blocks, and the persisted document carries it", async () => {
@@ -370,11 +370,11 @@ describe("C23 I54 — the pending entry is the running card", () => {
     held.release?.();
     await settled(h.pipeline);
     const blocks = h.transcript.entries[0]?.doc.blocks ?? [];
-    expect(headerOf(blocks), "the header is block 0, with the duration; no count, so no outcome (C23 I59)").toEqual({ glyph: "work-unit", state: "succeeded", text: "ps · 2s" });
+    expect(headerOf(blocks), "the header is block 0, with the duration; no count, so no outcome (C23 I59)").toEqual({ glyph: "work-unit", state: "succeeded", text: "ps · 2.0s" });
     expect(blocks.slice(1).map((blk) => blk.id), "the result's own blocks follow it, in order").toEqual(["r1", "r2"]);
     expect(blocks.slice(1).some((blk) => blk.kind === "notice" && blk.state !== undefined), "one header, not two").toBe(false);
     expect(atSettle, "one settle change, and the document it wrote carries the header").toHaveLength(1);
-    expect(headerOf(atSettle[0] ?? [])?.text).toBe("ps · 2s");
+    expect(headerOf(atSettle[0] ?? [])?.text).toBe("ps · 2.0s");
 
     // A throwing adapter: `ps · failed` over the status box.
     const h2 = pipelineHarness({ invoke: () => Promise.reject(new Error("boom")) });
@@ -448,10 +448,10 @@ describe("C23 — the call grammar's head states", () => {
     expect(head(), "the frame is the second, not the sweep").toBe(`tail(web.log) · ${SPIN(2)} 2s`);
     await gate.end({ exitCode: 0 });
     await settled(h.pipeline);
-    expect(head(), "settled: the duration alone — no spinner, and no `exit 0` (I59)").toBe("tail(web.log) · 2s");
+    expect(head(), "settled: the duration alone — no spinner, and no `exit 0` (I59)").toBe("tail(web.log) · 2.0s");
     // A wake after settlement moves nothing: the readout is gone with the spinner.
     seconds(h, 3);
-    expect(head()).toBe("tail(web.log) · 2s");
+    expect(head()).toBe("tail(web.log) · 2.0s");
 
     // **The ASCII arm draws the set's ASCII pair, and `:` for the separator**
     // (F828) — through the composer the route calls, at the arm it would pass.
@@ -483,7 +483,7 @@ describe("C23 — the call grammar's head states", () => {
     seconds(plain, 3);
     held.release?.();
     await settled(plain.pipeline);
-    expect(headerOf(plain.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe("ps · 3s");
+    expect(headerOf(plain.transcript.entries[0]?.doc.blocks ?? [])?.text).toBe("ps · 3.0s");
 
     // A far side's non-zero code is the outcome, and it wins over a count. **Not
     // 2**: exit 2 is the usage route (`/verb --help`'s document, F92) and never
@@ -538,7 +538,7 @@ describe("C23 — the call grammar's head states", () => {
     );
     expect(every.length, "the control: heads were composed").toBeGreaterThanOrEqual(7);
     for (const text of every) expect(text, "no head carries `ok`").not.toMatch(/\bok\b/u);
-    expect(every, "the settled forms").toEqual(expect.arrayContaining(["ps · 3 rows", "ps · 3s", "ps · exit 3", "tail(web.log)", "ps(--quiet) · failed", "guide", "tail · failed"]));
+    expect(every, "the settled forms").toEqual(expect.arrayContaining(["ps · 3 rows", "ps · 3.0s", "ps · exit 3", "tail(web.log)", "ps(--quiet) · failed", "guide", "tail · failed"]));
   });
 
   it("T4.51 (C23 I60, §8f P10, P12; C04 §3c S4): a call needing approval reads `waiting` with no readout; approve pops the layer and the readout starts; deny settles the card reading `denied` with history 126 and no body; the head's `⏎` is `expand` aimed at the body's scroll", async () => {
@@ -568,7 +568,7 @@ describe("C23 — the call grammar's head states", () => {
     expect(head(), "and counts from there, not from the submit").toBe(`ps · ${SPIN(2)} 2s`);
     held.release?.();
     await settled();
-    expect(head()).toBe("ps · 2s");
+    expect(head()).toBe("ps · 2.0s");
     expect(h.recorded.map((r) => r.exitCode)).toEqual([0]);
 
     // **Deny.** The card settles reading `denied`, with no body, no invocation,
@@ -675,7 +675,7 @@ describe("C23 — the call grammar's head states", () => {
     expect(cards.map((g) => g.kind === "group" && heads(g.children)[0]), "dispatch order, the settled one still last").toEqual([
       `search(a) · ${SPIN(0)}`,
       `search(b) · ${SPIN(0)}`,
-      "search(c) · 3s · 12 matches",
+      "search(c) · 3.0s · 12 matches",
     ]);
     expect(cards.map((g) => g.kind === "group" && g.children.length), "running children are head only; the settled one has a body").toEqual([1, 1, 2]);
     const settledBody = cards[2]?.kind === "group" ? cards[2].children[1] : undefined;
@@ -690,7 +690,7 @@ describe("C23 — the call grammar's head states", () => {
       ],
       { settled: true },
     );
-    expect(heads(allDone.blocks)[0]).toBe("agent(review) · 8s · 82 matches");
+    expect(heads(allDone.blocks)[0]).toBe("agent(review) · 8.0s · 82 matches");
 
     // One failure: `k of N · m failed`; a non-zero exit is a failure; the message is never adopted.
     const oneFailed = parent(
@@ -701,20 +701,20 @@ describe("C23 — the call grammar's head states", () => {
       ],
       { settled: true },
     );
-    expect(heads(oneFailed.blocks)[0]).toBe("agent(review) · 8s · 2 of 3 · 1 failed");
+    expect(heads(oneFailed.blocks)[0]).toBe("agent(review) · 8.0s · 2 of 3 · 1 failed");
 
     // Ctrl-C with three running: every child `cancelled`, the parent `0 of 3 · 3 cancelled`.
     const cancelled = parent(
       ["a", "b", "c"].map((a) => child("search", a, { elapsedMs: 2_000, outcome: "cancelled", settled: true })),
       { settled: true },
     );
-    expect(heads(cancelled.blocks)[0]).toBe("agent(review) · 8s · 0 of 3 · 3 cancelled");
+    expect(heads(cancelled.blocks)[0]).toBe("agent(review) · 8.0s · 0 of 3 · 3 cancelled");
 
     // Mixed units with no failure: `k of N`, not a sum of unlike things.
     const mixed = parent(
       [child("search", "a", { outcome: "41 matches", settled: true }), child("ls", "src", { outcome: "9 files", settled: true }), child("ps", "", { outcome: "3 rows", settled: true })],
       { settled: true },
     );
-    expect(heads(mixed.blocks)[0]).toBe("agent(review) · 8s · 3 of 3");
+    expect(heads(mixed.blocks)[0]).toBe("agent(review) · 8.0s · 3 of 3");
   });
 });

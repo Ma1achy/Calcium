@@ -448,7 +448,7 @@ describe("C26 §7 — a block-level focus paints the cells the block already res
     return out;
   };
 
-  const PLOT = block({ kind: "plot", id: "p", form: "line", height: 5, axes: true, series: [{ label: "train", values: [10, 20, 30, 40, 50] }] } as never);
+  const PLOT = block({ kind: "plot", id: "p", form: "line", height: 5, axes: true, plotFrame: "box", series: [{ label: "train", values: [10, 20, 30, 40, 50] }] } as never);
   const plotAt = (focus: FocusState | null, depth: 24 | 1 = 24) =>
     renderToLines(registry, PLOT, 80, { theme, capabilities: capabilities({ colourDepth: depth }), focus });
 

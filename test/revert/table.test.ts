@@ -6,7 +6,8 @@
 import { describe, expect, it } from "vitest";
 import { planColumns, tableDefinition } from "../../src/presentation/table/index.js";
 import { psColumns, psTable } from "../support/blocks.js";
-import { measurable, registry as bareRegistry, visible } from "../support/render.js";
+import { FULL_CAPS, measurable, registry as bareRegistry, visible } from "../support/render.js";
+import { cellsOfLine } from "../support/styled-screen.js";
 import { cells } from "../../src/presentation/text.js";
 import { checkSourceScans } from "../../tools/enforce/source-scans.mjs";
 import type { ColumnDef, Table } from "../../src/data/viewmodel/index.js";
@@ -269,7 +270,13 @@ describe("C11 tier 6", () => {
 });
 
 describe("C11 T6.38", () => {
-  it.todo(
-    "T6.38 (C11 I34): the indicator inside the label's span, or the labels at regular weight → T2.17 fails — not deferred on a component: lands with the code commit of this round",
-  );
+  it("T6.38 (C11 I34): the indicator inside the label's span, or the labels at regular weight → T2.17 fails", () => {
+    const kit = measurable({ definitions: [tableDefinition], capabilities: FULL_CAPS });
+    const header = cellsOfLine(kit.renderToLines(psTable({ id: "ps-sorted", rows: 5, sort: { key: "age", direction: "desc" } }), 80)[0] ?? "");
+    const text = header.map((c) => c.ch).join("");
+    const mark = header[text.indexOf("▾")]!.style;
+    const label = header[text.indexOf("uuid")]!.style;
+    expect(mark.fg, "the indicator's own colour").not.toBe(label.fg);
+    expect(header.filter((c) => c.ch.trim() !== "").every((c) => c.style.attrs.includes(1)), "every drawn header cell is bold").toBe(true);
+  });
 });

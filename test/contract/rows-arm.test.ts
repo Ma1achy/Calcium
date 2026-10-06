@@ -151,9 +151,13 @@ describe("C09 I72 — the two arms agree", () => {
         // were captured first and the member deleted after. `frozen` rather
         // than `rows`: there is no thunk to call, and this capture is finished
         // rather than failing.
-        const expected = oracle.frozen(oracleName("t2143-sequence", capsName, width));
+        const sequenceKey = oracleName("t2143-sequence", capsName, width);
+        const expected = oracle.frozen(sequenceKey);
         const got = renderSequenceToLines(capped, sequence, width, { theme: ORACLE_THEME, capabilities });
-        expect(got, `sequence at ${String(width)}`).toEqual(expected);
+        // A retired capture is asserted to differ, as the corpus arm does (F1233).
+        const retiredBy = oracle.retired(sequenceKey);
+        if (retiredBy !== null) expect(got, `${sequenceKey} is retired by ${retiredBy}, and still matches`).not.toEqual(expected);
+        else expect(got, `sequence at ${String(width)}`).toEqual(expected);
         // The fixture responds: the cap's marker is in the frame, and the floor's
         // rows are, so the composition rules were exercised rather than absent.
         expect(got.some((line) => line.includes(" of 30 rows")), "the cap's marker").toBe(true);
