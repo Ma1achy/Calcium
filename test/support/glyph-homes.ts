@@ -26,7 +26,9 @@ export type RegistryGlyph = {
   canonical?: boolean;
 };
 
-const registry = JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as {
+/** The registry file the homes are read against — named so a test can say which file it is about. */
+export const REGISTRY_FILE = "docs/design/language/calcium-registry.json";
+const registry = JSON.parse(readFileSync(REGISTRY_FILE, "utf8")) as {
   glyphs: RegistryGlyph[];
   delimiters: RegistryGlyph[];
 };

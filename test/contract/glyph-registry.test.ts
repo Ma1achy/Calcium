@@ -19,7 +19,7 @@ import type { Block } from "../../src/data/viewmodel/index.js";
 // fitted to the frame count, or a composite of other sets — read through the
 // function the page is built with, never re-derived here.
 import { loadRegistry, spinnerAsciiFrames } from "../../docs/design/language/build-calcium.mjs";
-import { HOMES, canonicalRecords, records } from "../support/glyph-homes.js";
+import { HOMES, REGISTRY_FILE, canonicalRecords, records } from "../support/glyph-homes.js";
 import { SURFACES } from "../support/design-surfaces.js";
 
 /** Homes with no collision table of their own, and why — compared by equality. */
@@ -61,6 +61,8 @@ describe("C09 I123 — registry ↔ runtime glyphs", () => {
   it("T2.189 (I123, R-GLY-001–003): every current registry glyph's home, read through its resolver, gives the record's halves, reservation and domains; the tree-only tokens are listed by equality", async () => {
     // Every record has a home, and every home a record — both directions of the
     // mapping itself before any field is compared.
+    // The file the homes are read against is the one this suite's mutation runs mutate (`c09-spinner-still`), so the path is asserted here, in the test the runs execute.
+    expect(REGISTRY_FILE, "the registry the contract reads").toBe("docs/design/language/calcium-registry.json");
     expect(Object.keys(HOMES).sort(), "one home per current record").toEqual(records.map((g) => g.id).sort());
 
     for (const g of records) {
