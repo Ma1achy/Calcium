@@ -44,7 +44,7 @@ type Segments = ReturnType<Intl.Segmenter["segment"]>;
 export { stripControl } from "../data/text.js";
 
 import { stripControl } from "../data/text.js";
-import { SGR_RESET, sgrPattern } from "../terminal/escapes.js";
+import { SGR_RESET, sequencePattern, sgrPattern } from "../terminal/escapes.js";
 
 /** A tab stop, in cells. Fixed rather than configurable — see `expandTabs`. */
 export const TAB_STOP = 8;
@@ -1884,4 +1884,64 @@ export const TEXT_PRESENTATION = "\ufe0e";
 /** Whether `cp` has an emoji presentation form — see `EMOJI_VARIATION_BASES`. */
 export function hasEmojiForm(cp: number): boolean {
   return inRanges(cp, EMOJI_VARIATION_BASES);
+}
+
+/**
+ * The ASCII form of each prose mark (C22 I153, §6t, F1483).
+ *
+ * **The domain is SS47's `PROSE_MARKS` by equality** — the ten characters the
+ * substitution scan lets through *because they are prose* — and T1.187 fails a
+ * mark added to one set and not the other. The forms are the ones the prose
+ * means: a dash is a hyphen, a section sign `S`, a middle dot a hyphen (as
+ * `marks.ts`' own separator at this rung), a multiplication sign `x`, and an
+ * arrow, a comparison and a guillemet the ASCII character they point or
+ * compare with.
+ */
+export const PROSE_FOLD: Readonly<Record<string, string>> = Object.freeze({
+  "—": "-",
+  "§": "S",
+  "·": "-",
+  "×": "x",
+  "≤": "<",
+  "≥": ">",
+  "→": ">",
+  "«": "<",
+  "»": ">",
+  // Written as a code point: this is the *domain* of a fold, a character that is
+  // never drawn, and SS57 would ask a bare one for the selector it is folding away.
+  [String.fromCodePoint(0x26a0)]: "!",
+});
+
+const PROSE_MARK = new RegExp(`[${Object.keys(PROSE_FOLD).join("")}]`, "u");
+// **A mark's text-presentation selector goes with it** (C09 I45, SS57): the
+// warning sign is written with U+FE0E where it is drawn, and a selector left behind would be
+// the one non-ASCII character on the rung's row.
+const PROSE_MARKS_G = new RegExp(`[${Object.keys(PROSE_FOLD).join("")}][\\ufe0e\\ufe0f]?`, "gu");
+
+/**
+ * A painted row with its prose punctuation folded to ASCII, **each mark padded
+ * with spaces to the cells it measured** so no column moves (C22 I153).
+ *
+ * Text between escape sequences only: an SGR run and an `OSC 8` hyperlink —
+ * whose URI may carry a mark — pass byte for byte. A row holding no mark is
+ * returned as itself, which is every row of every frame at a rung that never
+ * calls this.
+ */
+export function foldProse(row: string, ambiguous: AmbiguousWidth = "narrow"): string {
+  if (!PROSE_MARK.test(row)) return row;
+  const seq = sequencePattern();
+  let out = "";
+  let at = 0;
+  for (let m = seq.exec(row); m !== null; m = seq.exec(row)) {
+    out += foldText(row.slice(at, m.index), ambiguous) + m[0];
+    at = seq.lastIndex;
+  }
+  return out + foldText(row.slice(at), ambiguous);
+}
+
+function foldText(text: string, ambiguous: AmbiguousWidth): string {
+  return text.replace(PROSE_MARKS_G, (drawn) => {
+    const form = PROSE_FOLD[drawn.charAt(0)] ?? drawn;
+    return form + " ".repeat(Math.max(0, cells(drawn, ambiguous) - 1));
+  });
 }

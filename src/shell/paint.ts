@@ -31,7 +31,7 @@
 
 import { renderSequenceToLines } from "../presentation/render-lines.js";
 import type { Motion, RenderScratch } from "../presentation/blocks/types.js";
-import { cells, fitStyled, hardWrapCells, sliceCells } from "../presentation/text.js";
+import { cells, fitStyled, foldProse, hardWrapCells, sliceCells } from "../presentation/text.js";
 import { neutraliseControl } from "../data/text.js";
 import {
   background,
@@ -1071,6 +1071,15 @@ export function paint(
     throw new FrameError(
       `frame is ${String(painted.length)} rows for a ${String(frame.size.rows)}-row terminal`,
     );
+  }
+  // **Prose meets the ASCII rung here, once** (C22 I153, §6t, F1483): every
+  // character the frame draws passes this return, so a framework message, a
+  // fault box and a producer's own text are folded by one mechanism rather than
+  // by a pair per literal. Padded to the cells each mark measured, so nothing
+  // moves; the source of a copy is the element's and is untouched.
+  if (deps.capabilities.unicode === "ascii") {
+    const ambiguous = deps.capabilities.ambiguousWidth ?? "narrow";
+    painted = painted.map((row) => foldProse(row, ambiguous));
   }
   return Object.freeze(painted);
 }

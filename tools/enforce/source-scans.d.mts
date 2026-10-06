@@ -49,6 +49,7 @@ export declare function checkSourceScans(
  * its premise so the premise can be re-checked).
  */
 export declare const MARK_EXEMPTIONS: Readonly<Record<string, string>>;
+export declare const PROSE_MARKS: ReadonlySet<string>;
 
 /**
  * SS52 — a literal NUL anywhere the repository's own tools read (F236).

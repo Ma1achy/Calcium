@@ -338,6 +338,15 @@ export const cursorTo = (row: number, col: number): string =>
  */
 export const sgrPattern = (): RegExp => /\x1b\[[0-9;]*m/g;
 
+/**
+ * Any CSI sequence or OSC string, as a fresh global regex (`sgrPattern`'s
+ * reason). **Not a parser**: it finds the extent of a sequence so a caller that
+ * edits the text between sequences can leave every one whole — C22 I153's
+ * `foldProse`, whose subject is a row carrying SGR runs and OSC 8 hyperlinks.
+ * An OSC ends at BEL or ST.
+ */
+export const sequencePattern = (): RegExp => /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g;
+
 export const SGR_RESET = "\x1b[0m";
 
 /**

@@ -1297,7 +1297,7 @@ export const SCANS = [
  * the two rules meet on one set and neither one's tests could see the other's
  * failure: a scan about substitution is green whatever the marks measure.
  */
-const PROSE_MARKS = new Set("—§·×≤≥→«»⚠");
+export const PROSE_MARKS = new Set("—§·×≤≥→«»⚠");
 
 /**
  * Every site allowed to carry a mark, and **why** — the shape `UNCONSUMED_MEMBERS`
