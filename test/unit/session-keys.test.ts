@@ -492,6 +492,7 @@ describe("C22 §3 step 11 — the effect table", () => {
       ],
       focusedEntryId: () => null,
       neighbourEntry: () => null,
+      drawnCols: () => (p: { element: NavElement }) => p.element.cols,
       cursorBlock: () => undefined,
       rerunEntry: () => undefined,
       onAction: () => undefined,
@@ -1084,6 +1085,7 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
         { blockId: "b", element: navElement("r2", 3) },
       ],
       neighbourEntry: () => null,
+      drawnCols: () => (p: { element: NavElement }) => p.element.cols,
       cursorBlock: () => undefined,
       rerunEntry: () => undefined,
       onAction: (action: Action) => void fired.push(action),
@@ -1229,6 +1231,7 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
         { blockId: "a", element: navElement("r3", 2, undefined, "db\t2\trunning") },
       ],
       neighbourEntry: () => null,
+      drawnCols: () => (p: { element: NavElement }) => p.element.cols,
       cursorBlock: () => undefined,
       rerunEntry: () => undefined,
       onAction: () => undefined,
@@ -1243,6 +1246,10 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
     } as unknown as Parameters<typeof createKeyEffects>[0]);
     return { effects, focus, kill };
   };
+
+  it.todo(
+    "C26 T1.168 (I30, I21, §8c.6, F1448): historyNext over a live entry whose first member is not drawn lands on the first drawn member — not deferred on a component: it lands in the next commit",
+  );
 
   it("T1.42 (§5c): y copies the element's source, into the one clipboard", () => {
     const { effects, kill } = copyEffects();
@@ -1417,6 +1424,7 @@ describe("the inside (C26 I26, I27, §102)", () => {
       focusedEntryId: () => "e1",
       focusedElements: () => elements,
       neighbourEntry: () => null,
+      drawnCols: () => (p: { element: NavElement }) => p.element.cols,
       orbitBlock: (d: number) => void moves.push(`orbit${String(d)}`),
       tiltBlock: (d: number) => void moves.push(`tilt${String(d)}`),
       cursorBlock: (d: number) => void moves.push(`cursor${String(d)}`),
