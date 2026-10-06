@@ -310,3 +310,41 @@ difference: `scroll` and `plot` answer block focus and the other thirty-four kin
 a focused block byte for byte as they draw an unfocused one. Raising `built` is not the
 work — a probe says a subject exists and not that it matches the design. Raising
 `framed` is.
+
+## The cell comparison — what the mark set could not see
+
+`design-cells.test.ts` (b5-fixcolour) reads the channels `figures.ts` says it cannot:
+tone, ground, weight, underline and position. **The design side is the registry's
+projection, not the plain-text fixture**: `sectionBlocks[].renderHtml` carries each
+figure as `<span class="c-muted bg-bgElev bold">`, so a cell's tokens are data
+(`tools/design/cells.ts`). **The frame side is the SGR the framework wrote**, folded to
+cells and named back into the same tokens through the registry's own `themeRules`, so
+a hex that drifted from the registry reads as an unnamed `#rrggbb` and not as a match.
+Sessions come from `buildSession` (`readStyledScreen`), blocks from `renderToLines`,
+and the examples from docker-tui's own `recordSession` under the demo world — no
+second harness.
+
+**A reading is one function applied to both grids** (`test/support/design-cells.ts`):
+*the style of the head's `●`*, *the grounds on the echo row*, *is the plot boxed*. A
+figure draws the design's specimen words and a frame the tree's, so a whole-grid diff
+would differ everywhere; a reading locates a role by structure. Ten readings across the
+design-check's I1–I10, two across E13/E14.
+
+**The debt is `design-cells-debt.json`, compared by equality, with both values per
+reading** — so a half fix (the rail toned, but `dim` where the figure says `muted`)
+moves the frame value and fails, rather than reading as the old defect. A design lane
+removes its lines as its fix lands. Owners: b5-dpres I1 I3 I8 I10; b5-dshell I2 I4–I7;
+b5-menu5 I9; b5-examples E13 E14.
+
+**Not supported, measured** (`UNSUPPORTED`): I11 (no figure draws a namespaced verb),
+I12 (a binding, not an appearance; the card has no figure), E15 (a media recipe).
+
+**What it cannot see.** A role no reading names. Words. Motion (a spinner slot is an
+empty span, drawn `✦`). Dim as the design draws it: the registry has `c-dim` as a
+*colour* and never SGR dim. And **a locator that misses on both sides reads `absent`
+twice and agrees** — DC3 asserts every reading finds its subject in the figure, which
+is the half that stops a vacuous agreement passing as a match.
+
+**The registry's projection and the page disagree in ten sections** (DC1,
+`PROJECTION_DIFFERS`): eight are unexpanded `{{…}}` templates, and §28, §32 and §93 are
+drift. Eleven figures are not in `sectionBlocks` at all (`GENERATED`).

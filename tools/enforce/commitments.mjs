@@ -1328,6 +1328,13 @@ export const TOPICS = {
  * something eventually does.
  */
 export const REFERENCE_EXCEPTIONS = {
+  // **The design-check's item ids** (`out/design-check-report.md`, 2026-10-03):
+  // `I1`..`I12` number the report's divergences, not any spec's invariants, and
+  // the debt list is keyed by them. Renaming them to dodge the scan would split
+  // the id the design lanes, the report and the debt share into two spellings.
+  "test/support/design-cells.ts": "the design-check report's item ids `I1`..`I12`, not spec invariants",
+  "test/golden/design-cells.test.ts": "the design-check report's item ids, in prose about the debt",
+  "test/golden/DESIGN_FIXTURES.md": "the design-check report's item ids, in the cell comparison's section",
   "test/unit/enforce-commitments.test.ts":
     "fabricated specs — `I99` and a synthetic `I20a` that resolve against nothing by design",
   "tools/enforce/commitments.mjs":

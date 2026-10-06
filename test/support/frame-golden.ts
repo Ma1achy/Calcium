@@ -122,6 +122,26 @@ export type FrameReading = Readonly<{
  * symmetry hides the transformation under test is not a fixture.
  */
 export async function readFrame(scene: Scene, arm: Arm): Promise<FrameReading> {
+  const { built, size, last } = await driven(scene, arm);
+  return Object.freeze({
+    text: renderText(built.screen().rows, size),
+    styles: renderStyles(styledScreenFrom(built.stdout.chunks, size)),
+    writes: renderWrites(last, built.stdout.chunks.length),
+  });
+}
+
+/**
+ * The same session's screen **as styled cells** rather than as three strings
+ * — what `tools/design/cells.ts` names into the registry's tokens to compare a
+ * frame against a design figure cell by cell (`design-cells.test.ts`).
+ */
+export async function readStyledScreen(scene: Scene, arm: Arm): Promise<ReturnType<typeof styledScreenFrom>> {
+  const { built, size } = await driven(scene, arm);
+  return styledScreenFrom(built.stdout.chunks, size);
+}
+
+/** Build a session and drive it — the one path both readings take. */
+async function driven(scene: Scene, arm: Arm) {
   const stdin = fakeStdin();
   const size = { columns: scene.columns, rows: scene.rows };
   const built = await buildSession(
@@ -147,11 +167,7 @@ export async function readFrame(scene: Scene, arm: Arm): Promise<FrameReading> {
   await settle();
 
   const last = built.stdout.chunks.slice(scene.drive.length === 0 ? 0 : before);
-  return Object.freeze({
-    text: renderText(built.screen().rows, size),
-    styles: renderStyles(styledScreenFrom(built.stdout.chunks, size)),
-    writes: renderWrites(last, built.stdout.chunks.length),
-  });
+  return { built, size, last };
 }
 
 /** The grid, ruled, so a column can be counted rather than estimated. */

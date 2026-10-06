@@ -1,0 +1,138 @@
+{
+  "I1": {
+    "owner": "b5-dpres",
+    "readings": {
+      "panel.rail": {
+        "design": "fg=muted bg=—",
+        "frame": "fg=default bg=— + fg=dim bg=—"
+      }
+    }
+  },
+  "I2": {
+    "owner": "b5-dshell",
+    "readings": {
+      "head.verb": {
+        "design": "fg=default bg=—",
+        "frame": "fg=ok bg=—"
+      }
+    }
+  },
+  "I3": {
+    "owner": "b5-dpres",
+    "readings": {
+      "head.duration": {
+        "design": "fg=muted bg=— · fractional",
+        "frame": "absent"
+      },
+      "head.separator": {
+        "design": "fg=muted bg=—",
+        "frame": "absent"
+      }
+    }
+  },
+  "I4": {
+    "owner": "b5-dshell",
+    "readings": {
+      "body.gutter": {
+        "design": "\" \"",
+        "frame": "\"│\""
+      }
+    }
+  },
+  "I5": {
+    "owner": "b5-dshell",
+    "readings": {
+      "echo.ground": {
+        "design": "bgElev",
+        "frame": "—"
+      },
+      "echo.mark": {
+        "design": "fg=default bg=bgElev",
+        "frame": "fg=default bg=—"
+      }
+    }
+  },
+  "I6": {
+    "owner": "b5-dshell",
+    "readings": {
+      "prompt.mark": {
+        "design": "fg=muted bg=—",
+        "frame": "fg=default bg=—"
+      }
+    }
+  },
+  "I7": {
+    "owner": "b5-dshell",
+    "readings": {
+      "rule.label": {
+        "design": "fg=dim bg=bgElev · 1 after",
+        "frame": "absent"
+      }
+    }
+  },
+  "I8": {
+    "owner": "b5-dpres",
+    "readings": {
+      "header.ground": {
+        "design": "fg=muted bg=bgElev bold",
+        "frame": "fg=muted bg=bgElev"
+      },
+      "header.sort": {
+        "design": "▾ fg=accent bg=bgElev bold",
+        "frame": "▾ fg=muted bg=bgElev"
+      }
+    }
+  },
+  "I9": {
+    "owner": "b5-menu5",
+    "readings": {
+      "menu.description": {
+        "design": "fg=muted bg=—",
+        "frame": "fg=default bg=bgElev"
+      },
+      "menu.prefix": {
+        "design": "fg=accent bg=— bold",
+        "frame": "fg=default bg=bgElev"
+      },
+      "menu.align": {
+        "design": "ragged",
+        "frame": "flush"
+      },
+      "menu.status": {
+        "design": "present",
+        "frame": "absent"
+      }
+    }
+  },
+  "I10": {
+    "owner": "b5-dpres",
+    "readings": {
+      "plot.frame": {
+        "design": "open",
+        "frame": "boxed"
+      }
+    }
+  },
+  "E13": {
+    "owner": "b5-examples",
+    "readings": {
+      "entry.lead": {
+        "design": "●",
+        "frame": "┌"
+      },
+      "entry.frame": {
+        "design": "open",
+        "frame": "boxed"
+      }
+    }
+  },
+  "E14": {
+    "owner": "b5-examples",
+    "readings": {
+      "entry.frame": {
+        "design": "open",
+        "frame": "boxed"
+      }
+    }
+  }
+}
