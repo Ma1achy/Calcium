@@ -40,7 +40,7 @@ const results = runPass({
   run,
   control: {
     file: FILE,
-    from: "      enqueue(line, result);",
+    from: "      enqueue(line, result, echo);",
     to: "      return;",
     why: "with nothing enqueued the guard silently swallows every second submission; a run where this survives cannot see a kill",
   },
@@ -92,8 +92,8 @@ const results = runPass({
     {
       name: "a queued submission's history is written when it is typed, not when it runs",
       file: FILE,
-      from: "    queue.push({ line, result, id });",
-      to: "    queue.push({ line, result, id });\n    deps.history.append(line, 0);",
+      from: "    queue.push(echo === undefined ? { line, result, id } : { line, result, id, echo });",
+      to: "    queue.push(echo === undefined ? { line, result, id } : { line, result, id, echo });\n    deps.history.append(line, 0);",
       expect: "T1.21b",
     },
     {

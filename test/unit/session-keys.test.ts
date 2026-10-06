@@ -391,6 +391,9 @@ describe("C22 §3 step 11 — the effect table", () => {
       // table does not index: a **paste**, in the same handler, which is why a
       // scan over key bindings cannot see it.
       "resolved",
+      // `resolved`'s sibling (C17 I37): where each chip stands in it, from the one
+      // loop, read at the same submission site and nowhere else.
+      "resolvedChips",
       "insertChip",
       // **A reader, and the one a projection asks** (C17 I27, §5d). It answers
       // which chip the caret is on and edits nothing; its caller is C22's

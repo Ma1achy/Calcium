@@ -83,8 +83,8 @@ const results = runPass({
       // Resolution at the wrong end: a sentinel reaching C23, C18 and C20's file.
       name: "`resolved` hands back the raw buffer",
       file: EDITOR,
-      from: "    for (const ch of this.#text) out += this.#chips.get(ch)?.chip.content ?? ch;",
-      to: "    for (const ch of this.#text) out += ch;",
+      from: "  get resolved(): string {\n    return this.#resolve().text;",
+      to: "  get resolved(): string {\n    return this.#text;",
       expect: "T2.43",
     },
     {

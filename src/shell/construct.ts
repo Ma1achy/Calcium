@@ -3953,7 +3953,9 @@ export async function constructGraph(
       if (line.startsWith(">")) return void submitPaletteLine(line);
       // C17 I37 — where each chip stands in `line`, read here and nowhere else
       // (C23 I104): the echo draws them as the prompt drew them (C22 I153).
-      pipeline?.submit(line, echoChipsOf(stores.editor.resolvedChips));
+      const chips = echoChipsOf(stores.editor.resolvedChips);
+      if (chips.length === 0) pipeline?.submit(line); // cells-ok — a chip count
+      else pipeline?.submit(line, chips);
     },
     keepField: () => void commitField(),
     focusTranscript,

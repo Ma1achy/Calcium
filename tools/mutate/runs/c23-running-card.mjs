@@ -53,16 +53,16 @@ const results = runPass({
       // `❯ /ps` over a table, §9c's settled state reached by no path.
       name: "the invoke route settles the adapted document without the card",
       file: EX,
-      from: "      settleWithDocument(pendingId, cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities));",
-      to: "      settleWithDocument(pendingId, doc);",
+      from: "      settleWithDocument(pendingId, withEcho(cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities), settle));",
+      to: "      settleWithDocument(pendingId, withEcho(doc, settle));",
       expect: "T4.47",
     },
     {
       // **T6.85, second arm.** The error arm settles `errorDoc` bare.
       name: "the invoke route's error arm settles the error document without the card",
       file: EX,
-      from: "      settleWithDocument(pendingId, cardOver(failed, call, deps.elapsed() - startedAt, deps.capabilities));",
-      to: "      settleWithDocument(pendingId, failed);",
+      from: "      settleWithDocument(pendingId, withEcho(cardOver(failed, call, deps.elapsed() - startedAt, deps.capabilities), settle));",
+      to: "      settleWithDocument(pendingId, withEcho(failed, settle));",
       expect: "T4.47",
     },
     {
@@ -96,7 +96,7 @@ const results = runPass({
       // The tree's state until 2026-09-05: a pending entry with no blocks.
       name: "step 3 appends compose({ blocks: [] }) — the old pending entry",
       file: EX,
-      from: '        toolCallDoc(displayed, call, { origin: "user", verb, transport: "subprocess", argv: [...result.argv] }, deps.capabilities),',
+      from: '        withEcho(toolCallDoc(displayed, call, { origin: "user", verb, transport: "subprocess", argv: [...result.argv] }, deps.capabilities), settle),',
       to: '        compose({ command: displayed, blocks: [], meta: { origin: "user", verb, transport: "subprocess", argv: [...result.argv] } }),',
       expect: "T4.40",
     },
@@ -200,8 +200,8 @@ const results = runPass({
       also: [
         {
           file: EX,
-          from: "      settleWithDocument(pendingId, cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities));",
-          to: "      settleWithDocument(pendingId, cardOver(doc, call, deps.clock() - startedAt, deps.capabilities));",
+          from: "      settleWithDocument(pendingId, withEcho(cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities), settle));",
+          to: "      settleWithDocument(pendingId, withEcho(cardOver(doc, call, deps.clock() - startedAt, deps.capabilities), settle));",
         },
       ],
       expect: "T4.68",

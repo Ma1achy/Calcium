@@ -101,8 +101,8 @@ const results = runPass({
       // The record kept and its code the document's default: a success.
       name: "T6.117: the cleared line's code put back to the default 0",
       file: EXECUTION,
-      from: '"cancelled before it ran", { origin: "user", exitCode: -1 });',
-      to: '"cancelled before it ran", { origin: "user" });',
+      from: '"cancelled before it ran", { origin: "user", exitCode: -1 }),',
+      to: '"cancelled before it ran", { origin: "user" }),',
       expect: "T4.101",
     },
   ],

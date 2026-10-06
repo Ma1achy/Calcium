@@ -113,7 +113,11 @@ describe("C22 §6s — three panels between two rules, on bgElev (I151)", () => 
       // `pick` across (§6s.2 row 2).
       for (let row = edge + 1; row < lower; row += 1) {
         const want = panel.current && row === edge + 1 ? PICK : ELEV;
-        expect(grounds(after.cells[row]), `${panel.name}: row ${String(row + 1)}`).toEqual(Array(REGION_WIDTH).fill(want));
+        const expected = Array<string>(REGION_WIDTH).fill(want);
+        // **The preview's header names the chip on `pick`** (§101, C22 I155): the
+        // name's eleven cells — ` #1 pasted ` — and the rest of the row is the panel's.
+        if (panel.name === "the chip preview" && row === edge + 1) expected.fill(PICK, 0, 11);
+        expect(grounds(after.cells[row]), `${panel.name}: row ${String(row + 1)}`).toEqual(expected);
       }
 
       // **NOTHING ABOVE MOVES** (§097, C22 I29): the rows over the panel's edge are

@@ -1438,12 +1438,15 @@ describe("C22 I33 — a command of several lines", () => {
       };
       await step();
       const before = s.stdout.output.length;
-      stdin.emit(`\u001b[200~${Array.from({ length: 6 }, (_, i) => `/help line-${String(i)}`).join("\n")}\u001b[201~`);
+      // Four lines: **under the chip threshold**, so the paste stays text and the
+      // echo draws its lines as rows (C22 I33). Five or more is a chip, whose echo
+      // is one row (I153, T4.123) and so cannot hold a line break to test.
+      stdin.emit(`\u001b[200~${Array.from({ length: 4 }, (_, i) => `/help line-${String(i)}`).join("\n")}\u001b[201~`);
       await step();
       stdin.emit("\r");
       for (let i = 0; i < 10; i += 1) await step();
       const out = s.stdout.output.slice(before);
-      expect(out, "the submission reached the frame").toContain("/help line-5");
+      expect(out, "the submission reached the frame").toContain("/help line-3");
       expect((out.match(/\n/gu) ?? []).length, "bare line feeds written into the frame").toBe(0);
       expect(s.screen().text.some((r) => r.trimStart().startsWith("/help line-3")), "each line on its own row").toBe(true);
     } finally {

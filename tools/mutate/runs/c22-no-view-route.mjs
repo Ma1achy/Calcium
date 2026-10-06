@@ -47,8 +47,8 @@ const results = runPass({
   run,
   control: {
     file: EXEC,
-    from: "    const line = settle?.line;\n    let id: string | null = null;",
-    to: "    const line = settle?.line;\n    let id: string | null = null;\n    if (true) return null;",
+    from: "    doc = withEcho(doc, settle);\n    let id: string | null = null;",
+    to: "    doc = withEcho(doc, settle);\n    let id: string | null = null;\n    if (true) return null;",
     why:
       "nothing a submission produces reaches the transcript: every row reading an entry " +
       "fails, and a run where this survives is not executing this file at all"
