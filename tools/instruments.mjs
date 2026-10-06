@@ -301,6 +301,7 @@ const NOT_INSTRUMENTS = {
   "tools/design/register-watch-jump.mjs": ONE_SHOT("already registered · R-KEY-009 present, nothing written"),
   "tools/design/supersede-bindings.mjs": ONE_SHOT("binding.transcript-bottom-base already exists"),
   "tools/design/supersede-branch-blocks.mjs": ONE_SHOT("already superseded · all 28 blocks have successors and no one-blank branch is projected, nothing written"),
+  "tools/design/supersede-key-010.mjs": ONE_SHOT("already superseded · R-KEY-011 present, nothing written"),
   "tools/design/supersede-rulings.mjs": ONE_SHOT("R-STR-003 is already superseded — this script has run"),
   "tools/design/supersede-thm-003.mjs": ONE_SHOT("R-THM-003 is already superseded — this script has run"),
   "tools/theme/floor-scope.mjs": ONE_SHOT("R-THM-004 already exists — this script has run"),
