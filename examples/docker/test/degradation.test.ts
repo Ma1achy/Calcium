@@ -140,7 +140,7 @@ describe("B04: the same information at every depth", () => {
     // alone — the dot is in the dashboard's panel title and summary, and the
     // view has its own. A per-surface check is a per-surface claim.
     const surfaces: readonly (readonly [string, unknown])[] = [
-      ["the S3 view", containerView(STATS, 100, false)],
+      ["the S3 view", containerView(STATS, false)],
       ["the dashboard", dashboard(SNAP, 100, "29.4.1", false)],
     ];
     for (const [name, blocks] of surfaces) {
@@ -162,8 +162,8 @@ describe("B04: the same information at every depth", () => {
     // So the control moves to what the view still supplies itself. It must be
     // a character the unicode arm has and the ASCII arm does not, or it cannot
     // tell the alphabet being chosen from the alphabet being empty.
-    expect(JSON.stringify(containerView(STATS, 100, true))).toContain("·");
-    expect(JSON.stringify(containerView(STATS, 100, false))).not.toContain("·");
+    expect(JSON.stringify(containerView(STATS, true))).toContain("·");
+    expect(JSON.stringify(containerView(STATS, false))).not.toContain("·");
     expect(JSON.stringify(dashboard(SNAP, 100, "29.4.1", true))).toContain("·");
   });
 

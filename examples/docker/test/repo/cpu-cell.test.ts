@@ -15,9 +15,9 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { cells } from "calcium-tui";
-import type { Block, Panel, Table } from "calcium-tui";
+import type { Table } from "calcium-tui";
 import { parseNdjson } from "../../src/ndjson.ts";
-import { BAR_CELLS, COLUMNS, GLYPH_SLOT, isLive, join, livePanelBody, percent } from "../../src/dashboard.ts";
+import { BAR_CELLS, COLUMNS, GLYPH_SLOT, isLive, join, runningRows, percent } from "../../src/dashboard.ts";
 import type { Joined, Snapshot } from "../../src/dashboard.ts";
 import { measurable } from "../../../../test/support/render.ts";
 import { tableDefinition } from "../../../../src/presentation/table/index.ts";
@@ -31,26 +31,8 @@ const SNAP: Snapshot = {
   skipped: 0,
 };
 
-/** The `table` inside a panel or group body — `dashboard.test.ts`'s own walk. */
-function find(from: Block, kind: string): Block | undefined {
-  if (from.kind === kind) return from;
-  if (from.kind === "panel" || from.kind === "group") {
-    for (const child of (from as Panel).children) {
-      const inner = find(child, kind);
-      if (inner !== undefined) return inner;
-    }
-  }
-  return undefined;
-}
-
-function tableIn(block: Block): Table {
-  const table = find(block, "table");
-  if (table === undefined) throw new Error(`no table inside a ${block.kind}`);
-  return table as Table;
-}
-
 /**
- * The CPU column, rendered — every row of the live panel at a given width.
+ * The CPU column, rendered — every running row at a given width.
  *
  * **`table` is not a C09 default** (C11 registers it), so the kit is handed the
  * definition. A kit without it renders the block as `raw` and still produces
@@ -58,7 +40,7 @@ function tableIn(block: Block): Table {
  */
 function cpuCells(rows: readonly Joined[], width: number): readonly string[] {
   const kit = measurable({ definitions: [tableDefinition as never] });
-  const table = tableIn(livePanelBody(rows));
+  const table = runningRows(rows).find((bl) => bl.kind === "table") as Table;
   const lines = kit.renderToLines(table, width);
   // eslint-disable-next-line no-control-regex
   const visible = lines.map((l) => l.replace(/\[[0-9;]*m/gu, ""));

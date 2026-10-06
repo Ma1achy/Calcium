@@ -16,18 +16,12 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { Block, Group, KeyValue, Notice, Plot } from "calcium-tui";
+import type { Block, Group, Panel, Table } from "calcium-tui";
 import { parseNdjson } from "../src/ndjson.ts";
 import type { Row } from "../src/ndjson.ts";
-import { axisCaption, capFor, createRing, createRingSet, TICK_MS } from "../src/history.ts";
-import {
-  containerView,
-  cpuBlock,
-  cpuErrorBlock,
-  cpuFold,
-  detailsBlock,
-  ioBlock,
-} from "../src/container.ts";
+import { axisCaption, createRing, TICK_MS } from "../src/history.ts";
+import { containerView, cpuFold, seedRing, SPARK_CELLS, statsBlock, statsErrorBlock } from "../src/container.ts";
+import type { Reading } from "../src/container.ts";
 
 const read = (name: string): string =>
   readFileSync(new URL(`./corpus/${name}`, import.meta.url), "utf8");
@@ -37,10 +31,6 @@ const PS: Row[] = parseNdjson(read("ps-all-real.ndjson")).rows;
 
 /** A container with real ports, so the verbatim rule has a subject (walk B3). */
 const WITH_PORTS = PS.find((r) => String(r["Ports"] ?? "").includes("->")) as Row;
-
-const kv = (bl: Block): KeyValue => bl as KeyValue;
-const valueOf = (bl: Block, label: string): string =>
-  kv(bl).rows.find((r) => r.label === label)?.value ?? "";
 
 // ── The ring ────────────────────────────────────────────────────────────────
 
@@ -113,17 +103,6 @@ describe("gap 1: the ring keeps the history b.live does not", () => {
     expect(axisCaption(ring)).not.toContain("returned nothing");
   });
 
-  it("H5 (F24): the cap is width-derived, and it is fixed when the view opens", () => {
-    // The buffer's length *is* the window — `form: "line"` does no windowing —
-    // so a cap that ignored the width would draw one density at 120 and the same
-    // one at 80. Two widths, two caps, asserted as different rather than as a
-    // formula, because a formula here is the code restated.
-    expect(capFor(120)).toBeGreaterThan(capFor(80));
-    expect(capFor(80)).toBeGreaterThan(0);
-    // A terminal narrow enough to make the plot meaningless still gets a trend.
-    expect(capFor(20)).toBeGreaterThanOrEqual(24);
-  });
-
   it("H6 (walk A2): a tick in flight is already counted", () => {
     const ring = createRing(10);
     ring.began();
@@ -154,13 +133,13 @@ describe("the CPU fold, driven directly", () => {
     // Nothing calls the fold at all on this path; the assertion is the absence.
     expect(ring.ticks, "no version, so no fold, so no attempt").toBe(0);
     expect(ring.missed).toBe(0);
-    expect(fold(STATS[0] as Row), "and a resolving poll still folds").toBe(ring);
+    expect(fold({ stats: STATS[0] as Row, details: null }).ring, "and a resolving poll still folds").toBe(ring);
     expect(ring.ticks).toBe(1);
   });
 
   it("T2 (walk A3): the sample lands in the fold, so a render failure cannot lose it", () => {
     const ring = createRing(10);
-    cpuFold(ring)(STATS[0] as Row);
+    cpuFold(ring)({ stats: STATS[0] as Row, details: null });
     // `render` runs after this and may throw. The ring is already true, and the
     // next good tick draws the sample whose render failed. **Structural now
     // rather than a discipline**: a fold runs once per source version and a
@@ -176,7 +155,7 @@ describe("the CPU fold, driven directly", () => {
     // **This is the miss that survives the migration** — the poll resolved, so
     // there is a version and the fold runs. It is also the common one.
     const stopped: Row = { ...(STATS[0] as Row), CPUPerc: "--" };
-    cpuFold(ring)(stopped);
+    cpuFold(ring)({ stats: stopped, details: null });
     expect(ring.ticks).toBe(1);
     expect(ring.missed).toBe(1);
     // A position, not a reading (C12 I4) — the plot draws the gap where the
@@ -188,31 +167,29 @@ describe("the CPU fold, driven directly", () => {
 
 // ── The blocks ──────────────────────────────────────────────────────────────
 
-describe("S3's blocks", () => {
-  it("B1 (walk B1): the caption rides inside the part's child, never beside it", () => {
-    // **C22 I46 windows a view at block boundaries.** A caption authored as a
-    // document-level sibling can be separated from the plot it explains — a
-    // frame that reads as complete while missing the only thing that says what
-    // the horizontal axis measures. One block closes it.
+/** A row of the stats table, by key. */
+const rowOf = (bl: Block, key: string) => (bl as Table).rows.find((r) => r.id === key)!;
+const cellOf = (bl: Block, key: string, col: string) => rowOf(bl, key).cells[col]!;
+const READING: Reading = { stats: STATS[0] as Row, details: WITH_PORTS };
+
+describe("S3's rows (S3_WALK §6)", () => {
+  it("B1 (walk B1, §6 C3): the caption rides in the CPU row, beside the figure it explains", () => {
+    // **C22 I46 windows a view at block boundaries**, so a caption authored as a
+    // separate block can be separated from the figure. A spark cell draws no
+    // text, so the caption is the same row's value — one block, by construction.
     const ring = createRing(10);
     ring.began();
     ring.took(42);
-
-    const body = cpuBlock(ring) as Group;
-    expect(body.kind).toBe("group");
-    const kinds = body.children.map((c) => c.kind);
-    expect(kinds).toEqual(["plot", "notice"]);
-    // And the caption is the axis, not decoration: it is the only place the
-    // horizontal unit is stated at all.
-    expect((body.children[1] as Notice).text).toBe(axisCaption(ring));
+    const table = statsBlock(ring, READING);
+    expect(table.kind).toBe("table");
+    expect(cellOf(table, "cpu", "figure").spark).toEqual([42]);
+    expect(cellOf(table, "cpu", "value").text).toContain(axisCaption(ring));
   });
 
-  it("B5: a failed tick keeps the history and says how many were lost", () => {
-    // **The frame-read found this and both walk artefacts missed it.**
+  it("B5 (§6 C4): a failed tick keeps the history and says how many were lost", () => {
     // `renderError` replaces a part's whole child, so the framework's default
-    // wiped the plot *and* the caption — and the caption is the only thing built
-    // to report a stall. The mechanism was unreachable in exactly the case it
-    // existed for.
+    // wiped the history *and* the caption — the one thing built to report a
+    // stall. The override draws the rows from the ring and the box beneath.
     const ring = createRing(10);
     for (const v of [10, 20]) {
       ring.began();
@@ -221,23 +198,13 @@ describe("S3's blocks", () => {
     ring.began();
     ring.took(null);
 
-    const body = cpuErrorBlock(ring, { message: "No such container" }, 16_000, 2) as Group;
-    const kinds = body.children.map((c) => c.kind);
-    // **A `status`, where it was a `notice`** (F406). Before `b.status` existed
-    // an override's only vocabulary was a red line of text, so this app wrote the
-    // countdown into a string by hand — `— retrying in 16s` — while the framework
-    // drew a bordered box with a painted tag on the parts that took the default.
-    // The same failure read two ways in one frame, decided by which panel it was
-    // in.
-    expect(kinds).toEqual(["plot", "notice", "status"]);
-    // The history survives the failure that made it worth looking at.
-    expect((body.children[0] as Plot).series[0]?.values).toEqual([10, 20, null]);
-    // And the caption now has something to report.
-    expect((body.children[1] as Notice).text).toContain("1 returned nothing");
-    // **The countdown is the framework's, not this file's.** `retryInMs` and
-    // `attempt` are relayed rather than formatted here, so the box says what
-    // every other failing part says.
-    expect(body.children[2]).toMatchObject({
+    const body = statsErrorBlock(ring, { message: "No such container" }, 16_000, 2) as Group;
+    expect(body.children.map((c) => c.kind)).toEqual(["table", "status"]);
+    const table = body.children[0] as Table;
+    expect(cellOf(table, "cpu", "figure").spark, "the history survives").toEqual([10, 20, null]);
+    expect(cellOf(table, "cpu", "value").text).toContain("1 returned nothing");
+    // **The countdown is the framework's, not this file's** (F406).
+    expect(body.children[1]).toMatchObject({
       kind: "status",
       state: "retrying",
       message: "No such container",
@@ -246,187 +213,115 @@ describe("S3's blocks", () => {
     });
   });
 
-  it("B2: the plot draws every sample the ring holds and no more", () => {
+  it("B2 (§6 C1): the spark draws every sample the ring holds, and the ring holds what the column draws", () => {
     const ring = createRing(4);
     for (const v of [1, 2, 3, 4, 5, 6]) {
       ring.began();
       ring.took(v);
     }
-    const plot = (cpuBlock(ring) as Group).children[0] as Plot;
-    expect(plot.series[0]?.values).toEqual([3, 4, 5, 6]);
+    const spark = cellOf(statsBlock(ring, READING), "cpu", "figure").spark;
+    expect(spark).toEqual([3, 4, 5, 6]);
     // A copy, not the ring's own array — a series the next tick mutates under
     // the renderer is a block whose content changes after it was measured.
-    expect(plot.series[0]?.values).not.toBe(ring.values);
+    expect(spark).not.toBe(ring.values);
+    // The view's ring is the spark column's width, read off the column the
+    // table declares rather than off the constant alone.
+    expect(seedRing(STATS[0] as Row).cap, "the ring a view opens with").toBe(SPARK_CELLS);
+    const view = containerView(STATS[0] as Row);
+    const figure = ((view[0] as Panel).children[0] as Table).columns.find((c) => c.key === "figure");
+    expect(figure?.minWidth).toBe(SPARK_CELLS);
+  });
+
+  it("B6 (§6 C2, F27): the level is said in numbers, because a sparkline normalises its window", () => {
+    // A container held near 100% wobbling by a fraction draws a full-height
+    // spark — the mountain range `yMin: 0` was pinned against on the plot. The
+    // value carries the reading and the window's range, so the shape is not
+    // read as a level.
+    const ring = createRing(10);
+    for (const v of [99.8, 100, 99.9]) {
+      ring.began();
+      ring.took(v);
+    }
+    const value = cellOf(statsBlock(ring, READING), "cpu", "value").text;
+    expect(value).toContain("99.9%");
+    expect(value).toContain("99.8–100.0%");
   });
 
   it("B3: MemUsage and Ports render verbatim — nothing converts or condenses", () => {
-    const io = ioBlock(STATS[0] as Row);
-    const usage = String((STATS[0] as Row)["MemUsage"]);
-    expect(valueOf(io, "MEM")).toContain(usage);
-
-    const details = detailsBlock(WITH_PORTS);
+    const table = statsBlock(createRing(4), READING);
+    expect(cellOf(table, "mem", "value").text).toBe(String((STATS[0] as Row)["MemUsage"]));
     // `0.0.0.0` versus `127.0.0.1` is whether the port faces the network, so the
     // bind address survives. Only runs of whitespace are collapsed.
-    expect(valueOf(details, "PORTS")).toContain("0.0.0.0:");
-    expect(valueOf(details, "PORTS")).toContain("->");
+    expect(cellOf(table, "ports", "value").text).toContain("0.0.0.0:");
+    expect(cellOf(table, "ports", "value").text).toContain("->");
   });
 
   it("B4 (walk A8): no measurements renders as absent, never as zeros", () => {
-    const io = ioBlock(null);
-    expect((io as Notice).kind).toBe("notice");
-    expect((io as Notice).text).toContain("not running");
-    expect((io as Notice).text).not.toContain("0");
+    const table = statsBlock(createRing(4), { stats: null, details: null });
+    const io = cellOf(table, "io", "value").text;
+    expect(io).toContain("not running");
+    expect(io).not.toMatch(/\d/u);
+    expect(cellOf(table, "mem", "figure").bar?.value, "a bar of nothing, not of zero").toBeNull();
   });
 });
 
 // ── The document ────────────────────────────────────────────────────────────
 
 describe("S3's document", () => {
-  const blocks = containerView(STATS[0] as Row, 120);
+  const blocks = containerView(STATS[0] as Row);
+  const part = blocks[0] as Panel;
+  const tableIn = (bs: readonly Block[]): Table => (bs[0] as Panel).children[0] as Table;
 
-  it("D1 (C04 I14): every block id at view level is distinct", () => {
+  it("D1 (C04 I14, §6 C7): every block id is distinct, the part's and the table's inside it", () => {
     // `ViewPatch` addresses by id and the refresh driver patches by part id, so
-    // a duplicate has no correct target. The panel and the block inside it are
-    // the easiest pair in the world to name the same thing — DASHBOARD_WALK hit
-    // exactly this with `running` and `running-rows`.
-    const ids = blocks.map((bl) => bl.id);
-    expect(new Set(ids).size).toBe(ids.length);
+    // a duplicate has no correct target.
+    expect(part.id).toBe("stats");
+    expect(tableIn(blocks).id).not.toBe(part.id);
   });
 
-  it("D2 (F22): four blocks at view level, which is what makes the gap branch reachable", () => {
-    // `put` carries `gapBefore` from the block currently in place, and on the
-    // view arm `currentPanel` reconstructs one via `livePanel`, which sets none.
-    // The branch has been structurally dead for the whole life of the code and
-    // wakes up the day a view holds more than one block. This is that day.
-    expect(blocks).toHaveLength(4);
-    expect(blocks.filter((bl) => bl.kind === "panel")).toHaveLength(3);
+  it("D2 (§6, E14): one framed part and no other frame — the three panels and the plot's box are gone", () => {
+    // The design's §085, *five rows, not a dashboard*. The one frame is the
+    // framework's: `b.live` is a panel by construction. Restoring a second part
+    // or a plot fails here.
+    expect(blocks).toHaveLength(1);
+    expect(part.kind).toBe("panel");
+    const kinds = new Set<string>();
+    const walk = (bl: Block): void => {
+      kinds.add(bl.kind);
+      if (bl.kind === "panel" || bl.kind === "group") bl.children.forEach(walk);
+    };
+    part.children.forEach(walk);
+    expect([...kinds]).toEqual(["table"]);
+    expect(tableIn(blocks).rows.map((r) => r.id)).toEqual(["cpu", "mem", "io", "image", "ports"]);
   });
 
   it("D3 (walk A1): two drill-ins hold independent rings", () => {
     // **At module scope the second view would open holding the first
-    // container's samples and draw them as its own** — silently, with every
-    // assertion about the plot passing. The ring's lifetime is the invocation's.
-    const first = containerView(STATS[0] as Row, 120);
-    const second = containerView(STATS[1] as Row, 120);
-
-    const captionOf = (bs: readonly Block[]): string => {
-      const panel = bs.find((bl) => bl.id === "cpu") as { children: readonly Block[] };
-      const body = panel.children[0] as Group;
-      return (body.children[1] as Notice).text;
-    };
-
-    // Both are one tick old — seeded by the verb's own result and nothing else.
+    // container's samples and draw them as its own.**
+    const first = containerView(STATS[0] as Row);
+    const second = containerView(STATS[1] as Row);
+    const captionOf = (bs: readonly Block[]): string => cellOf(tableIn(bs), "cpu", "value").text;
     expect(captionOf(first)).toContain("1 ticks");
     expect(captionOf(second)).toContain("1 ticks");
-    expect(captionOf(first)).toBe(captionOf(second));
   });
 
-  it("D6 (F27): the CPU plot's floor is pinned and its ceiling is not", () => {
-    // **Read off the document rather than off `cpuBlock`**, because the helper
-    // having the field says nothing about the composition using it.
-    //
-    // `yMin: 0` because absent a pin the range is the data's, and a container
-    // held at 100% drew a 0.2% wobble as a full-height mountain range. No
-    // `yMax` because `CPUPerc` is per-core-normalised — DASHBOARD_WALK A4 —
-    // so 780% is ordinary on eight cores, and C04 I29 clamps to the edge: a
-    // ceiling would render a busy container identically to a saturated one.
-    const panel = containerView(STATS[0] as Row, 120).find((bl) => bl.id === "cpu") as {
-      children: readonly Block[];
-    };
-    const plot = (panel.children[0] as Group).children[0] as Plot;
-
-    expect(plot.yMin).toBe(0);
-    expect(plot.yMax, "a ceiling would flatten 100% and 780% together").toBeUndefined();
-  });
-
-  it("D5: the header's ID is the container's id, not the argument it was opened by", () => {
-    // **Found by reading the frame, and green through the fix — so nothing
-    // covered it.** `docker stats` reports `Container` as whatever it was
-    // handed, so a view opened by name has `Container: "dtui-busy"` and `ID:
-    // "0e624f2f5f90"`. Read the wrong way round, the details part filtered
-    // `docker ps` on `id=dtui-busy`, matched nothing, and rendered "the
-    // container has gone" — the app's own bug phrased as a fact about docker.
+  it("D5: the title's id is the container's id, not the argument it was opened by", () => {
+    // `docker stats` reports `Container` as whatever it was handed, so a view
+    // opened by name has `Container: "dtui-busy"`. Read the wrong way round, the
+    // details read filtered `docker ps` on `id=dtui-busy`, matched nothing, and
+    // rendered "the container has gone" — the app's own bug phrased as a fact.
     const byName: Row = { ...(STATS[0] as Row), Container: "dtui-busy" };
-    const head = containerView(byName, 120)[0] as Block;
-    expect(valueOf(head, "ID")).toBe(String(byName["ID"]));
-    expect(valueOf(head, "ID")).not.toBe("dtui-busy");
+    const title = (containerView(byName)[0] as Panel).title;
+    // The name half may be the argument — it is what the reader typed — and
+    // the id half must be the container's.
+    expect(title.split(" · ").at(-1)).toBe(String(byName["ID"]));
   });
 
-  it("D4 (F24): the width the view opened at sizes its window", () => {
-    const wide = containerView(STATS[0] as Row, 200);
-    const narrow = containerView(STATS[0] as Row, 60);
-    // Read off the blocks rather than off `capFor`, because a cap the document
-    // never applies is a cap that does nothing — the two are only the same
-    // number if `containerView` actually passes the width through.
-    const seriesCapOf = (bs: readonly Block[], width: number): boolean => {
-      const panel = bs.find((bl) => bl.id === "cpu") as { children: readonly Block[] };
-      const plot = (panel.children[0] as Group).children[0] as Plot;
-      return (plot.series[0]?.values.length ?? 0) <= capFor(width);
-    };
-    expect(seriesCapOf(wide, 200)).toBe(true);
-    expect(seriesCapOf(narrow, 60)).toBe(true);
-    expect(capFor(200)).not.toBe(capFor(60));
-  });
-});
-
-describe("the ring set — one row per container, rectangular by construction", () => {
-  const reading = (pairs: readonly (readonly [string, number | null])[]) => new Map(pairs);
-
-  it("R1 (C12 §6a B2): every known container is ticked, present or not", () => {
-    // **A container missing from a snapshot is a gap in its row, not an absent
-    // row.** Dropping it would shorten one row against the others, and a shorter
-    // row is stretched to the common width by `columnsOf` — so column k would
-    // mean a different instant per row while every count still agreed.
-    const set = createRingSet(10);
-    set.tick(reading([["a", 1], ["b", 2]]));
-    set.tick(reading([["a", 3]])); // b vanished
-    set.tick(reading([["a", 5], ["b", 6]]));
-
-    expect(set.ids).toEqual(["a", "b"]);
-    expect(set.ring("a")?.values).toEqual([1, 3, 5]);
-    expect(set.ring("b")?.values, "the gap is where the container was not").toEqual([2, null, 6]);
-    expect(set.ring("b")?.missed, "and it is counted as well as placed").toBe(1);
-  });
-
-  it("R2 (C12 §6a B2): a container first seen at tick N is back-filled with N gaps", () => {
-    // **Back-filled before the tick, not after.** A ring created empty three
-    // ticks in is three samples short of every other row for the rest of the
-    // session — and that renders, at the wrong density, against a shared axis.
-    const set = createRingSet(10);
-    set.tick(reading([["a", 1]]));
-    set.tick(reading([["a", 2]]));
-    set.tick(reading([["a", 3], ["late", 9]]));
-
-    expect(set.ring("late")?.values).toEqual([null, null, 9]);
-    // The property the matrix rests on, asserted as a property rather than by
-    // reading the two rows above: every row is the same length, always.
-    const lengths = new Set(set.ids.map((id) => set.ring(id)?.values.length));
-    expect(lengths, "one length across every row").toEqual(new Set([3]));
-    expect(set.ticks).toBe(3);
-  });
-
-  it("R3: a stopped container keeps its row until the view closes", () => {
-    // A row that disappears renumbers the ordinate under the reader. What a
-    // stopped container looks like on a machine's heatmap is a row of absences,
-    // and that is the honest picture rather than a missing one.
-    const set = createRingSet(10);
-    set.tick(reading([["gone", 4]]));
-    for (let i = 0; i < 3; i += 1) set.tick(reading([]));
-
-    expect(set.ids).toEqual(["gone"]);
-    expect(set.ring("gone")?.values).toEqual([4, null, null, null]);
-    expect(set.ring("gone")?.ticks, "it is still being ticked").toBe(4);
-  });
-
-  it("R4: the cap applies per row, so the matrix stays rectangular as it slides", () => {
-    // The window slides under every row at once, because every row takes exactly
-    // one sample per tick. Without that the cap would trim rows at different
-    // moments and the rectangle would come apart at the oldest end.
-    const set = createRingSet(3);
-    for (let i = 0; i < 5; i += 1) set.tick(reading([["a", i], ["b", i * 10]]));
-
-    expect(set.ring("a")?.values).toEqual([2, 3, 4]);
-    expect(set.ring("b")?.values).toEqual([20, 30, 40]);
-    expect(set.ticks, "the tick count is the session's, not the window's").toBe(5);
+  it("D6 (§6 C5): the record is waited for, not reported absent, before the first tick", () => {
+    // The loading render is the document's first frame; the details have not
+    // been read yet, and *the container has gone* there would be a lie.
+    const image = cellOf(tableIn(blocks), "image", "value").text;
+    expect(image).toContain("reading the container's record");
+    expect(image).not.toContain("gone");
   });
 });

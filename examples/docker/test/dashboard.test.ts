@@ -16,7 +16,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { cells } from "calcium-tui";
-import type { Block, Panel, Table } from "calcium-tui";
+import type { Block, Table } from "calcium-tui";
 import { parseNdjson } from "../src/ndjson.ts";
 import {
   COLUMNS,
@@ -24,9 +24,8 @@ import {
   dashboard,
   isLive,
   join,
-  LIVE_TITLE,
   summaryLine,
-  livePanelBody,
+  runningRows,
   percent,
   totals,
 } from "../src/dashboard.ts";
@@ -53,10 +52,6 @@ const find = (from: Block | readonly Block[], kind: string): Block | undefined =
   return undefined;
 };
 
-/** The outer panel, by kind — the dashboard's blocks are not a fixed sequence. */
-const panelIn = (blocks: readonly Block[]): Panel =>
-  blocks.find((bl) => bl.kind === "panel") as Panel;
-
 const tableIn = (from: Block | readonly Block[]): Table => find(from, "table") as Table;
 const textOf = (row: { cells: Record<string, { text?: string } | undefined> }, key: string): string =>
   row.cells[key]?.text ?? "";
@@ -72,7 +67,7 @@ describe("walk A: the classification table", () => {
       1,
     );
 
-    const line = summaryLine(live);
+    const line = summaryLine(join(SNAP), live, "29.4.1");
     // Not one number over a mixed set: a paused container inside a count labelled
     // RUNNING is the summary that is never wrong enough to notice.
     expect(line).toContain(`${String(live.length - 1)} running`);
@@ -127,7 +122,7 @@ describe("walk A: the classification table", () => {
   });
 
   it("A5 (R5.2): MemUsage renders verbatim — nothing converts units", () => {
-    const table = tableIn(livePanelBody(join(SNAP).filter(isLive)));
+    const table = tableIn(runningRows(join(SNAP).filter(isLive)));
     const usage = table.rows.map((r) => textOf(r, "usage")).filter((t) => t !== "—");
     expect(usage.length).toBeGreaterThan(0);
     for (const u of usage) {
@@ -168,21 +163,21 @@ describe("walk A: the classification table", () => {
     // longer answers "was the tail collapsed" — the collapse notice is the one
     // that says `more`. A test that stopped at the first notice would have
     // passed on the summary and asserted nothing about the tail.
-    const moreIn = (body: Block): string => {
+    const moreIn = (body: readonly Block[]): string => {
       const notices: string[] = [];
       const walk = (bl: Block): void => {
         if (bl.kind === "notice" && "text" in bl) notices.push(bl.text);
         if (bl.kind === "panel" || bl.kind === "group") bl.children.forEach(walk);
       };
-      walk(body);
+      body.forEach(walk);
       return notices.find((t) => t.includes("more")) ?? "";
     };
 
-    const atBoundary = livePanelBody(make(SHOWN + 1));
+    const atBoundary = runningRows(make(SHOWN + 1));
     expect(tableIn(atBoundary).rows).toHaveLength(SHOWN + 1);
     expect(moreIn(atBoundary)).toBe("");
 
-    const over = livePanelBody(make(SHOWN + 2));
+    const over = runningRows(make(SHOWN + 2));
     expect(tableIn(over).rows).toHaveLength(SHOWN);
     expect(moreIn(over)).toContain("2 more");
   });
@@ -204,7 +199,7 @@ describe("walk A: the classification table", () => {
     });
     // The busy one sorts last by name, so a name-ordered take would drop it.
     const live = [c("a", 1), c("b", 1), c("c", 1), c("d", 1), c("e", 1), c("f", 1), c("z", 99)];
-    const rows = tableIn(livePanelBody(live)).rows;
+    const rows = tableIn(runningRows(live)).rows;
     const names = rows.map((r) => textOf(r, "name"));
 
     expect(names).toContain("z");
@@ -220,16 +215,13 @@ describe("walk A: the classification table", () => {
     expect(names).not.toEqual(daemon);
   });
 
-  it("A9: zero running renders the panel and its message, never no panel", () => {
+  it("A9 (§E E6): zero running renders the table and its message, never nothing", () => {
     const none: Snapshot = { containers: SNAP.containers.filter(() => false), stats: [], skipped: 0 };
     const blocks = dashboard(none, 120, "29.4.1");
-    // **Found by kind, not by position.** This said `blocks[0]` and meant *the
-    // panel*; the banner arriving above it turned a claim about identity into a
-    // claim about order, and the row failed for a reason it was not about.
-    const panel = panelIn(blocks);
-    expect(panel.kind).toBe("panel");
-    // A panel that vanishes reads as a failure to fetch, and this is the one
-    // case where the fetch succeeded perfectly.
+    // A block that vanishes reads as a failure to fetch, and this is the one
+    // case where the fetch succeeded perfectly. Found by kind, not by position:
+    // the banner arriving above it once turned a claim about identity into one
+    // about order.
     const table = tableIn(blocks);
     expect(table.rows).toHaveLength(0);
     expect(table.emptyMessage).toContain("stopped");
@@ -237,34 +229,6 @@ describe("walk A: the classification table", () => {
 });
 
 describe("walk C: the nesting boundaries", () => {
-  it("C1 (F16): everything that varies is in the body, because the title cannot vary", () => {
-    // The driver re-renders a part's *child* and re-titles only to append its own
-    // staleness suffix — `titleOf` returns the string captured at declaration. So
-    // a count or a total in the title freezes at the first fetch and stays there
-    // while every row beneath it ticks.
-    //
-    // Asserted as an absence *and* a presence, because the absence alone would
-    // pass on a title that said nothing at all.
-    expect(LIVE_TITLE).not.toMatch(/[0-9]/);
-    const live = join(SNAP).filter(isLive);
-    const body = livePanelBody(live);
-    const summary = find(body, "notice");
-    const text = summary && "text" in summary ? summary.text : "";
-    expect(text).toContain("running");
-    expect(text).toContain("CPU ");
-  });
-
-  it("C2: the live title leaves room for the stale notice the framework draws beside it", () => {
-    // C04 I127 and C23 I78: a stale part says `updated 4m ago` at the top
-    // border's inline end, in the same row as this title, and the title yields
-    // first when the row is short. The app cannot see the notice, so it leaves
-    // room for the widest one under an hour — `updated 59m ago` — plus the
-    // border's furniture: two corners, a space each side of both, and one
-    // horizontal before the corner and at least one between.
-    const notice = cells("updated 59m ago");
-    expect(cells(LIVE_TITLE) + notice + 8).toBeLessThanOrEqual(40);
-  });
-
   it("C3: the NAME cell fits the longest name AND the glyph beside it", () => {
     // **The boundary §C's own table missed**, and the frame caught it: the state
     // mark rides inside this cell (`● reverent_proskuriakova`) while the column
@@ -298,15 +262,40 @@ describe("walk C: the nesting boundaries", () => {
   // which is what this file's own header asks for.
 });
 
-describe("the live declaration", () => {
-  it("the running panel is a b.live part, on the interval the walk states", () => {
+describe("a verb that settles (DASHBOARD_WALK §E)", () => {
+  it("E0 (§080, §085): no frame and no live part anywhere in the entry", () => {
+    // **The three pieces of chrome §080 deletes**: the outer panel, the framed
+    // live part inside it, and the heatmap inside that. A `b.live` is a panel by
+    // construction, so *no panel at any depth* is also *nothing ticks*.
+    // Restoring the outer panel or the live part fails here.
+    const kinds = new Set<string>();
+    const walk = (bl: Block): void => {
+      kinds.add(bl.kind);
+      if (bl.kind === "panel" || bl.kind === "group") bl.children.forEach(walk);
+    };
+    dashboard(SNAP, 120, "29.4.1").forEach(walk);
+    expect(kinds.has("panel"), "a framed panel").toBe(false);
+    expect(kinds.has("plot"), "the history heatmap (E1)").toBe(false);
+  });
+
+  it("E2: the table is one of the document's own blocks, so the call head can count it", () => {
+    // `outcomeOf` counts the rows of a document-level table; inside a group the
+    // head of `/dashboard` reads no count. The frame is identical either way —
+    // only the head differs — so this is the row that can tell.
     const blocks = dashboard(SNAP, 120, "29.4.1");
-    const live = find(blocks, "panel");
-    expect(live).toBeDefined();
-    // A `b.live` part is a panel whose declaration is held beside the document,
-    // so what is assertable here is the panel and its title; the interval is
-    // asserted through the module constant the declaration is built from.
-    expect(SHOWN).toBeGreaterThan(0);
+    expect(blocks.some((bl) => bl.kind === "table")).toBe(true);
+  });
+
+  it("E5 (A6, F16 moot): the summary names the total, the counts, both sums and the engine", () => {
+    // The engine and the total were the deleted panel's title. Asserted as
+    // presences, because an absence would pass on a summary that said nothing.
+    const blocks = dashboard(SNAP, 120, "29.4.1");
+    const summary = blocks.find((bl) => bl.kind === "notice");
+    const text = summary !== undefined && "text" in summary ? summary.text : "";
+    expect(text).toContain(`${String(SNAP.containers.length)} containers`);
+    expect(text).toContain("running");
+    expect(text).toContain("CPU ");
+    expect(text).toContain("engine 29.4.1");
   });
 
   it("the stopped containers are pills, and every one of them is toned", () => {
@@ -316,11 +305,5 @@ describe("the live declaration", () => {
     if (pills === undefined || pills.kind !== "pills") return;
     expect(pills.chips.length).toBe(join(SNAP).filter((c) => !isLive(c)).length);
     for (const chip of pills.chips) expect(chip.tone).toBeDefined();
-  });
-
-  it("the outer panel names the engine and the total, both of them real", () => {
-    const panel = panelIn(dashboard(SNAP, 120, "29.4.1"));
-    expect(panel.title).toContain("29.4.1");
-    expect(panel.title).toContain(String(SNAP.containers.length));
   });
 });

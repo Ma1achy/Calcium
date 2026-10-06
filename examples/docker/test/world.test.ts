@@ -84,8 +84,12 @@ describe("the demo world draws an invented host", () => {
 
   it("W4: the clock the chrome draws is the recording's, not the host's", async () => {
     const { plain } = await text(PS, 6);
-    // 09:41 UTC on the ruling's date, plus the seconds the script ran.
-    expect(plain).toMatch(/09:41:1\d/u);
+    // 09:41 UTC on the ruling's date, plus the seconds the script ran. **Read
+    // off the frames the submission drew** (4 s and after): this said `09:41:1x`,
+    // which a live greeting ticking every two seconds redrew up to the hold's
+    // end — the greeting settles now (DASHBOARD_WALK §E), so the last frame is
+    // the one `/ps` drew, and the clock in it is the recording's either way.
+    expect(plain).toMatch(/09:41:(?:0[4-9]|1\d)/u);
   });
 });
 
@@ -105,12 +109,15 @@ describe("the surfaces the stills are made of", () => {
     expect(plain).toMatch(/"GET \/api\/orders HTTP\/1\.1" 200/u);
   });
 
-  it("W6: a stopped container's history row carries its name, not its id (dashboard.ts nameOf)", async () => {
-    // Reverting `nameOf(all, id)` to `nameOf(live, id)` labels `migrate` by its
-    // short id — the first frame the demo world drew showed `d345037c112a`.
+  it("W6 (DASHBOARD_WALK §E): the greeting is rows — a summary, the table, the stopped — and no frame", async () => {
+    // Read off the frame, because the document-level rows cannot see what the
+    // shell wraps around an entry. Restoring the outer panel or the live part
+    // draws a corner here. The heatmap's `migrate ┤` row is gone with it (§E E1);
+    // the stopped container is named once, as a pill.
     const { plain } = await text([], 6);
-    expect(plain).toMatch(/migrate ┤/u);
-    expect(plain).not.toMatch(/[0-9a-f]{12} ┤/u);
+    expect(plain).toContain("7 containers · 6 running");
+    expect(plain).toContain("migrate");
+    expect(plain).not.toMatch(/[┌┐└┘]/u);
   });
 
   it("W7: /filediff on proxy diffs the bind-mounted config against its image", async () => {

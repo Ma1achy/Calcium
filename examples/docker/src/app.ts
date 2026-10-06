@@ -184,10 +184,11 @@ export function appConfig(deps: AppDeps) {
      * drifts from the command's. `/dashboard` stays registered because it is how
      * the frame is re-read without restarting, and it costs one line.
      *
-     * **It keeps refreshing after the first command**, which is C23 I9 and not an
-     * oversight — a frozen entry keeps receiving patches, because a `--watch`
-     * scrolled out of view is still running. S1's drawing said it froze; the
-     * drawing was wrong about Calcium's own rules (FINDINGS F17a).
+     * **It settles, and does not refresh** (DASHBOARD_WALK §E, the design's
+     * §085: *the dashboard is a verb; it emits one as an entry*). It held a live
+     * part until the design check; C23 I9's *a frozen entry keeps receiving
+     * patches* (FINDINGS F17a) is still true of the entries that have one, and
+     * this one no longer does.
      */
     greeting: async (ctx) => {
       // **The one producer that is both.** As a local handler the dashboard's
