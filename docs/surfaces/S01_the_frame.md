@@ -208,18 +208,16 @@ The health indicator has four states and is the header's only variable element:
 
 ## 6. The too-small fallback
 
-Below 60 × 16 the frame is replaced entirely:
+Below 60 × 16 the frame is replaced entirely, by §047's figure — a box, the size it has and the size it needs (C22 I153, §6u.1):
 
 ```
-Terminal too small
-
-Minimum   60 x 16
-Current   44 x 12
-
-Resize to continue.
+┌─────────────┐
+│ ▲ 44×12     │
+│ needs 60×16 │
+└─────────────┘
 ```
 
-**Rendered with no layout engine, no block registry, no theme** (C22 I8, C02 §Size). Plain text, no colour, no box drawing, positioned top-left. It must work in a terminal too small for the layout engine to produce a sane result, so it does not use one — and it uses `x` rather than `×` so it works with no Unicode either.
+**Rendered with no layout engine, no block registry and no theme** (C22 I9, C02 §Size). No colour, positioned top-left, and it must work in a terminal too small for the layout engine to produce a sane result, so it does not use one. **It does take the capability record**, which both callers hold: the marks resolve at the record's rung — `▲`, `×` and the box at Unicode, `!`, `x` and `+-|` at ASCII and at `ambiguousWidth: "wide"` (C09 I48) — which is how it still works with no Unicode. Where four rows or the box's width are not there the two lines stand alone, and below two rows the size does. *This replaces the earlier plain `Terminal too small / Minimum / Current / Resize to continue` text, which the design's figure does not carry.*
 
 Session state survives. This is a render mode, not an error state: the frame returns on resize with the transcript, history and input buffer intact.
 
