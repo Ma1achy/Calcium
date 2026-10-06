@@ -1854,7 +1854,7 @@ Named against the invariants; the tiers are the six.
   camera, then `↓` from the prompt: the lid read from the screen's bytes is `muted` before and `accent`
   after. Every earlier row about a focused plot built its own `FocusState`, and the one the session
   writes was a different shape for three weeks while all of them were green.
-- **T1.x** (I4, I5, I6) — the four predicates, per kind, as a **generic conformance sweep**
+- **T2.16** (I4, I5, I6) — the four predicates, per kind, as a **generic conformance sweep**
   over every kind declaring `elements`. The shape is C09's window conformance: it walks every
   fixture rather than asserting one, because a single-element row passes against a wrong
   implementation. **Two fabrications confirm it is live**, as F134's did.
