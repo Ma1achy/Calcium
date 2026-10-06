@@ -263,6 +263,8 @@ const NOT_INSTRUMENTS = {
   // guessed. It measures nothing; it is measured against.
   "tools/capture-foreign.cursor-control.mjs": "a control script for capture-foreign's cursor translation — it writes known escapes and reads nothing",
   "examples/docker/tools/_fixture.py": "the fixtures' own four-line harness",
+  "tools/check-fast.sh": "the local loop: it runs the checks, and checks nothing itself",
+  "tools/flow-probe.py": "a headless PTY driver for flow tests: it reports a screen, and asserts nothing",
   "examples/docker/tools/registry.mjs": "the shared registry, covered by probes_test.mjs",
   "examples/docker/tools/__pycache__": "not a file",
   // **An instrument, and untestable as written — the reason is the debt rather
