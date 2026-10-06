@@ -49,6 +49,7 @@ import { glyphs, scrollbarColumn, scrollbarSet } from "../presentation/blocks/in
 import { composite, type LayerView } from "./composite.js";
 import type { ChromeCache, ChromeRole } from "./chrome-cache.js";
 import { exact, FrameError } from "./frame-error.js";
+import { chordText } from "../interaction/router/keymap.js";
 import { gutterMatchesPrompt, heightsSum, promptTop, type Composed } from "./frame.js";
 import type { Label } from "./types.js";
 import type { Block } from "../data/viewmodel/index.js";
@@ -116,6 +117,11 @@ export type PaintDeps = Readonly<{
    * that paints a frame with no viewport behind it.
    */
   transcriptBar?: () => Readonly<{ topRow: number; totalRows: number; focused: boolean }>;
+  /**
+   * How many entries settled while the transcript was scrolled away (C22 I154,
+   * §067). Absent draws no button, which is a harness with no counter behind it.
+   */
+  newBelow?: () => number;
   /** C17's cursor as a cell in the prompt's own layout (C17 §2). */
   promptCursor: () => Cell;
   /** The session's render scratch (C12 I107), for a 3D plot inside a layer. */
@@ -1191,7 +1197,61 @@ function transcript(frame: Composed, deps: PaintDeps, width: number): readonly s
   for (let i = 0; i < frame.region.height - blank; i += 1) {
     out.push(exact(rows[i] ?? "", width));
   }
+  // **The button takes the region's last row and the region keeps its height**
+  // (C22 I155, §6u.2 ruling b): geometry does not move with the count, and the
+  // row it covers is one scroll away. The bar goes on after, so its column stays.
+  const unseen = frame.region.height >= NEW_BELOW_MIN_ROWS ? (deps.newBelow?.() ?? 0) : 0;
+  const button = unseen > 0 ? newBelowRow(unseen, width, deps) : null;
+  if (button !== null) out[out.length - 1] = button;
   return withTranscriptBar(out, frame, deps, width);
+}
+
+/** The region rows below which the button is not drawn: two must remain (§6u.2 ruling b). */
+export const NEW_BELOW_MIN_ROWS = 3;
+/** The button's left edge, in the content margin the figure's `   ↓` implies (§067). */
+export const NEW_BELOW_INDENT = 2;
+
+/**
+ * The button's text, padded or bracketed, or `null` where not even `↓ N` fits
+ * (§067, C22 I155). **One answer for the paint and the pointer**: the press goes
+ * where the button is drawn, so both read the extent from here.
+ *
+ * **Counts messages, not rows** (`R-BLK-492`), and says `1 new message` because
+ * *1 messages is sloppy*. **Sheds the words and never the number** (§6u.2
+ * ruling f): `↓ N new messages`, then `↓ N new`, then `↓ N`. The arrow is spelled
+ * by `chordText` — the one resolver of a key's glyph and its ASCII name — and the
+ * `⏎` the figure prints is withheld with the focus target it belongs to (ruling d).
+ * At 1-bit the brackets take the two cells the ground's padding takes, as a
+ * chip's and a button's do (I147, C09 I102).
+ */
+export function newBelowText(n: number, width: number, caps: TerminalCapabilities): string | null {
+  const arrow = chordText({ name: "down" }, caps.unicode !== "ascii");
+  // The last column is the bar's, and the button's two cells of padding are inside it.
+  const room = width - 1 - NEW_BELOW_INDENT; // cells-ok — a width less its margin and indent
+  const count = String(n);
+  const noun = n === 1 ? "message" : "messages";
+  for (const words of [`${arrow} ${count} new ${noun}`, `${arrow} ${count} new`, `${arrow} ${count}`]) {
+    const text = caps.colourDepth === 1 ? `[${words}]` : ` ${words} `;
+    if (cells(text, caps.ambiguousWidth) <= room) return text;
+  }
+  return null;
+}
+
+/**
+ * The button as a row: **at rest `bgElev`, like every other button**
+ * (`R-BLK-490`), the prompt rule label's own pattern (I111); at 1-bit there is
+ * no ground and `newBelowText`'s brackets carry it.
+ */
+function newBelowRow(n: number, width: number, deps: PaintDeps): string | null {
+  const text = newBelowText(n, width, deps.capabilities);
+  if (text === null) return null;
+  const lead = { text: " ".repeat(NEW_BELOW_INDENT) };
+  if (deps.capabilities.colourDepth === 1) return exact(paintSpans([lead, { text }]), width);
+  const ground = withBackground(
+    tone("default", deps.theme, deps.capabilities, "bgElev"),
+    background("surface.bgElev", deps.theme, deps.capabilities),
+  );
+  return exact(paintSpans([lead, { text, style: ground }]), width);
 }
 
 /**

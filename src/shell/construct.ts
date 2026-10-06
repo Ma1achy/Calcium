@@ -25,7 +25,7 @@
  */
 
 import { createAdapterRegistry } from "../data/adapters/index.js";
-import { blankRowsAbove, commandRows } from "./paint.js";
+import { blankRowsAbove, commandRows, NEW_BELOW_INDENT, NEW_BELOW_MIN_ROWS, newBelowText } from "./paint.js";
 import { childBorderLegend, guardRefusal, keyHint } from "./chrome.js";
 import { compose, noticeDoc, settledDoc } from "./documents.js";
 import {
@@ -81,6 +81,7 @@ import { barTarget, pullIntoView } from "./pull.js";
 import { neutraliseControl } from "../data/text.js";
 import { cells } from "../presentation/text.js";
 import { ScrollOffsets } from "./scroll-offsets.js";
+import { createNewBelow, type NewBelow } from "./new-below.js";
 import { waitingEntries } from "./semantic-selection.js";
 import { createOverlayManager, takesPointer, type Layer, type Placed } from "../viewport/overlay/index.js";
 import type { LayerView } from "./composite.js";
@@ -582,6 +583,8 @@ export type Graph = Readonly<{
   toggleSeries: (n: number) => void;
   /** Is the prompt answering keys under the top layer (I51, C19 I20)? */
   promptUnderMenu: () => boolean;
+  /** C22 I154 — entries that settled while the transcript was scrolled away. */
+  newBelow: NewBelow;
   /** Past the blink threshold since the last key (C22 I64). */
   cursorIdle: () => boolean;
   /**
@@ -1119,6 +1122,10 @@ export async function constructGraph(
       chromeRows: chromeRowsOf,
     };
     const viewport = createViewport(transcript, viewportOptions);
+    // **The new-messages count, over the live viewport** (C22 I154): the held one
+    // exists only while copy mode freezes the screen, and an arrival is the
+    // record's either way.
+    const newBelow = createNewBelow({ transcript, viewport });
 
     /**
      * The held view and the viewport over it, while semantic copy mode is up
@@ -1432,6 +1439,7 @@ export async function constructGraph(
 
     return {
       transcript,
+      newBelow,
       /**
        * The viewport the frame reads — the held one while copy mode is up
        * (C14 I31, I32).
@@ -4568,6 +4576,29 @@ export async function constructGraph(
         stores.cursorPositions.set(over.id, under.block.id, sample);
         scheduler.commit("input");
       };
+    }
+    // **A press on the new-messages button goes to the tail** (C22 I155, §067:
+    // *clicking it does the same thing, because every consumed gesture lands on
+    // a state a key reaches* — `transcript.bottom`, and `scrollBy` is how the
+    // viewport spells it). Before the element lookup: the button covers the
+    // region's last row and the entry under it is not what the pointer reached.
+    if (e.button === "button0" && !e.motion && !e.meta && !e.ctrl && !e.shift) {
+      const region = deps.frame.region();
+      const label =
+        stores.newBelow.count() > 0 && region.height >= NEW_BELOW_MIN_ROWS
+          ? newBelowText(stores.newBelow.count(), region.left + region.width + 1, detection.capabilities)
+          : null;
+      if (
+        label !== null &&
+        e.row === region.top + region.height - 1 &&
+        e.col >= NEW_BELOW_INDENT &&
+        e.col < NEW_BELOW_INDENT + cells(label, detection.capabilities.ambiguousWidth)
+      ) {
+        return () => {
+          stores.viewport.scrollToBottom();
+          scheduler.commit("input");
+        };
+      }
     }
     // **A press on the transcript's bar jumps, and focuses nothing** (C14 I63,
     // I64, `R-BLK-363`). The bar is the margin column — the one past the

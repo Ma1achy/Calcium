@@ -1484,6 +1484,8 @@ class Session implements TuiInstance {
       layerView: (id) => graph.layerView(id),
       // C14 I62 — the transcript's bar, from C14's scroll; the thumb is
       // `accent` while focus is in the transcript (`R-BLK-160`).
+      // C22 I154, I155 — the new-messages button's count (§067).
+      newBelow: () => graph.newBelow.count(),
       transcriptBar: () => {
         const { topRow, totalRows } = graph.viewport.scroll;
         return { topRow, totalRows, focused: graph.focus.current.at === "liveBlock" };
