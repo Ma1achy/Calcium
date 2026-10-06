@@ -249,6 +249,15 @@ export type KeyDeps = Readonly<{
    * nearest on screen when the two panes scroll apart (C26 I28).
    */
   paneOffset: (split: string, side: number) => number;
+  /**
+   * The columns each element of `entryId` is drawn in, or `null` where it is
+   * not drawn (C26 I30, I31, §8c.6). An element's `cols`, except a tape
+   * member's, which are `tapeMemberCols` at the held start and the anchor the
+   * frame drew — **the pointer's columns**, so `↓` and a press cannot disagree
+   * about which member is on screen. A function per step, so a tape is laid
+   * out once however many of its members the step asks about.
+   */
+  drawnCols: (entryId: EntryId) => (placed: PlacedNavElement) => DrawnCols | null;
   /** Move a split's divider by `delta` cells in the focused entry (C22 I117). */
   moveDivider: (split: string, delta: number) => void;
   /**
@@ -397,6 +406,44 @@ const oneRow = (a: PlacedNavElement, b: PlacedNavElement): boolean =>
   a.element.rows.from < b.element.rows.to &&
   b.element.rows.from < a.element.rows.to;
 
+/** Columns, half-open, in the entry's coordinates. */
+export type DrawnCols = Readonly<{ from: number; to: number }>;
+
+/**
+ * Where a vertical step lands in the row it enters (C26 I30, §8c.6; F1448,
+ * F1449): the index of the element of that row **drawn nearest `column`**.
+ *
+ * `landing` is the row's first element in element order, which is where the
+ * step used to land. The row is the run after it that shares its row (I30's
+ * test), and the answer is the first of those whose drawn columns end past
+ * `column`, or the run's last drawn one where none does — I28's *the element
+ * nearest the focused row on screen*, one axis over, and the same
+ * `find(...) ?? at(-1)` shape `crossPane` takes.
+ *
+ * **Drawn columns, from `drawn`**: an element `drawn` answers `null` for is
+ * not a candidate, which is what keeps a slid tape's off-screen members out.
+ * Where nothing in the run is drawn the step lands where it always did.
+ */
+export const enterRow = (
+  elements: readonly PlacedNavElement[],
+  landing: number,
+  column: number,
+  drawn: (placed: PlacedNavElement) => DrawnCols | null,
+): number => {
+  const head = elements[landing];
+  if (head === undefined) return landing;
+  let last = -1;
+  for (let j = landing; j < elements.length; j += 1) {
+    const q = elements[j];
+    if (q === undefined || (j > landing && !oneRow(head, q))) break;
+    const cols = drawn(q);
+    if (cols === null) continue;
+    if (cols.to > column) return j;
+    last = j;
+  }
+  return last === -1 ? landing : last;
+};
+
 /** The address of a placed element. One expression, so no call site spells it. */
 const addressOf = (p: PlacedNavElement): ElementAddress =>
   Object.freeze({ blockId: p.blockId, elementId: p.element.id });
@@ -530,6 +577,24 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     const elements = deps.focusedElements();
     const at = resolveFocus(current.element, elements);
     return at === null ? null : { at, elements };
+  };
+
+  /**
+   * The element a vertical step lands on in the row `elements[at]` heads
+   * (C26 I30, §8c.6): the one drawn nearest the column `from` is drawn at, or
+   * column 0 where the step comes from outside the entry — the prompt's `↓`.
+   * `from`'s own columns are asked of the same `drawnCols`, so a tape member
+   * is placed where it is drawn and not across the whole row.
+   */
+  const landOn = (
+    entry: EntryId,
+    elements: readonly PlacedNavElement[],
+    at: number,
+    from: PlacedNavElement | undefined,
+  ): PlacedNavElement | undefined => {
+    const drawn = deps.drawnCols(entry);
+    const column = from === undefined ? 0 : (drawn(from) ?? from.element.cols).from;
+    return elements[enterRow(elements, at, column, drawn)];
   };
 
   /** `←`/`→` across a split's divider (C26 I28, C04 §3aq E3). */
@@ -1148,9 +1213,12 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // A block with nothing focusable is not entered: `activeTarget` would say
       // `liveBlock`, every key would resolve against a target with no bindings,
       // and they would all be dropped.
-      const first = elements[0];
       const live = deps.liveEntryId();
-      if (first === undefined || live === null) return;
+      if (elements[0] === undefined || live === null) return;
+      // **The first row's element drawn at column 0** (C26 I30, §8c.6): the
+      // first element, unless it is a member the tape's window has slid past.
+      const first = landOn(live, elements, 0, undefined);
+      if (first === undefined) return;
       deps.focus.enterLiveBlock(live, addressOf(first));
     },
 
@@ -1218,15 +1286,17 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       // **The next element this step can reach**, which is the next in reading
       // order unless a split pane is in the way (C26 I28) — **and not on the
       // focused row** (C26 I30, D10): `↓` leaves a row of elements rather than
-      // walking it, and the first element past the row is the first of the
-      // row it enters.
+      // walking it, and the first element past the row heads the row it
+      // enters — where it lands is the element of that row drawn nearest the
+      // column it left (§8c.6).
       const here = elements[i];
-      const next = elements.slice(i + 1).find((q) => !passedOver(here, q) && (here === undefined || !oneRow(here, q)));
+      const at = elements.findIndex((q, k) => k > i && !passedOver(here, q) && (here === undefined || !oneRow(here, q)));
       // **The resolved entry, not the stored one** (C26 I22): after an eviction
       // the two differ, and writing the stored one back would leave the store
       // pointing at nothing while the frame highlights the live entry.
       const entry = deps.focusedEntryId();
       if (entry === null) return;
+      const next = at === -1 ? undefined : landOn(entry, elements, at, here);
       // **A motion that stops still collapses** (C26 I16, §5c table row g). At
       // the tail there is no next element and there used to be no store call,
       // so a selection stood through `↓` — while C17's `move` drops its anchor
@@ -1284,8 +1354,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
             break;
           }
         }
-        // **The first element of the row it enters**, which is where `↓` lands
-        // on it too (§8c.3 row 5): back along the run that shares the row. The
+        // **The first element of the row it enters**, which `landOn` walks
+        // forward from as it does for `↓` (§8c.6): back along the run. The
         // run is contiguous, so a block beside this one whose rows overlap is
         // not reached from here.
         for (let k = reach - 1; reach > 0 && k >= 0; k -= 1) {
@@ -1328,9 +1398,11 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         if (entry !== null && first !== undefined) deps.focus.focusRow(entry, addressOf(first));
         return;
       }
-      const previous = elements[reach];
       const entry = deps.focusedEntryId();
       if (entry === null) return;
+      // **The element of that row drawn nearest the column it left** (C26 I30,
+      // §8c.6), from the row's first — the run walked back above.
+      const previous = landOn(entry, elements, reach, elements[i]);
       deps.focus.focusRow(entry, previous === undefined ? null : addressOf(previous));
     },
     // --- C17 -----------------------------------------------------------

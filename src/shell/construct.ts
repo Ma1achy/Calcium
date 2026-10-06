@@ -127,7 +127,7 @@ import { createRouter, type RouterDeps } from "../interaction/router/router.js";
 import { CONFIRM_LAYER_ID, createConfirmHost, type ConfirmHost } from "./confirm.js";
 import { openChipInEditor } from "./chip-editor.js";
 import { createDecoder } from "../interaction/router/decode.js";
-import { createKeyEffects } from "./keys.js";
+import { createKeyEffects, enterRow, type DrawnCols } from "./keys.js";
 import type {
   Binding,
   ElementAddress,
@@ -2742,7 +2742,10 @@ export async function constructGraph(
     for (i += direction; i >= 0 && i < entries.length; i += direction) {
       const candidate = entries[i];
       if (candidate === undefined) continue;
-      const first = elementsOf(candidate.id)[0];
+      const elements = elementsOf(candidate.id);
+      // **The first row's element drawn at column 0** (C26 I30, I21, §8c.6):
+      // the first element, unless it is a member a tape's window has slid past.
+      const first = elements[0] === undefined ? undefined : elements[enterRow(elements, 0, 0, drawnColsIn(candidate))];
       if (first !== undefined) return { entryId: candidate.id, first };
     }
     return null;
@@ -3512,6 +3515,45 @@ export async function constructGraph(
     };
   };
 
+  /**
+   * The columns each placed element of `entry` is drawn in, or `null` where it
+   * is not drawn (C26 I30, I31, §8c.6) — **one function for the press and the
+   * key**, so `↓` cannot enter a member a press would miss.
+   *
+   * An element's `cols`, except a tape member's (C04 I124; review batch 4
+   * M14.2). Every member's element spans the row, because a column that moved
+   * with the held start would be geometry moving without `rev` — so the drawn
+   * columns are asked of `tapeMemberCols`, at the held start **and the anchor
+   * the frame drew**, offset by the element's origin. A member the window does
+   * not draw has an empty run, and answers `null`. Each tape is asked once per
+   * function returned.
+   */
+  const drawnColsIn = (entry: TranscriptEntry): ((p: PlacedElement) => DrawnCols | null) => {
+    const tapeCols = new Map<string, readonly DrawnCols[] | null>();
+    return (p) => {
+      const block = blockIn(entry, p.blockId);
+      if (block === null || block.kind !== "tape") return p.element.cols;
+      if (!tapeCols.has(block.id)) {
+        const drawnAt = widthIn(entry, block.id);
+        tapeCols.set(
+          block.id,
+          drawnAt === null
+            ? null
+            : tapeMemberCols(
+                block,
+                drawnAt.inner,
+                detection.capabilities,
+                stores.scrollOffsets.get(entry.id, block.id),
+                focusedMemberOf(entry.id, block.id),
+              ),
+        );
+      }
+      const member = tapeCols.get(block.id)?.[block.members.findIndex((m) => m.id === p.element.id)];
+      if (member === undefined || member.from >= member.to) return null;
+      return { from: p.element.cols.from + member.from, to: p.element.cols.from + member.to };
+    };
+  };
+
   const elementAt = (
     hit: Readonly<{ id: EntryId; rowOffset: number }>,
     col: number,
@@ -3524,8 +3566,8 @@ export async function constructGraph(
 
     const placed = elementsOf(hit.id);
     let best: Readonly<{ blockId: string; element: NavElement; block: Block; row: number; pane?: PaneRef }> | null = null;
-    /** Each tape's drawn member columns, asked once per press (C26 I31). */
-    const tapeCols = new Map<string, readonly Readonly<{ from: number; to: number }>[] | null>();
+    /** The drawn columns, each tape asked once per press (C26 I31). */
+    const drawnCols = drawnColsIn(entry);
     for (const p of placed) {
       const block = blockIn(entry, p.blockId);
       if (block === null) continue;
@@ -3550,34 +3592,10 @@ export async function constructGraph(
         row = blockRow + Math.min(Math.max(0, Math.trunc(held)), Math.max(0, content - block.height));
       }
       if (row < p.element.rows.from || row >= p.element.rows.to) continue;
-      let cols = p.element.cols;
-      // **A tape's member at the cells it is drawn in** (C26 I31, C04 I124;
-      // review batch 4 M14.2). Every member's element spans the row, because
-      // a column that moved with the held start would be geometry moving
-      // without `rev` — so the drawn columns are asked of `tapeMemberCols`, at
-      // the held start **and the anchor the frame drew**, offset by the
-      // element's origin. A residue mark or a gap is nobody's.
-      if (block.kind === "tape") {
-        if (!tapeCols.has(block.id)) {
-          const drawnAt = widthIn(entry, block.id);
-          tapeCols.set(
-            block.id,
-            drawnAt === null
-              ? null
-              : tapeMemberCols(
-                  block,
-                  drawnAt.inner,
-                  detection.capabilities,
-                  stores.scrollOffsets.get(hit.id, block.id),
-                  focusedMemberOf(hit.id, block.id),
-                ),
-          );
-        }
-        const member = tapeCols.get(block.id)?.[block.members.findIndex((m) => m.id === p.element.id)];
-        if (member === undefined) continue;
-        cols = { from: p.element.cols.from + member.from, to: p.element.cols.from + member.to };
-      }
-      if (col < cols.from || col >= cols.to) continue;
+      // **A tape's member at the cells it is drawn in** (C26 I31): a residue
+      // mark or a gap is nobody's, and a member not drawn is not pressed.
+      const cols = drawnCols(p);
+      if (cols === null || col < cols.from || col >= cols.to) continue;
       if (best === null || LEVEL_DEPTH[p.element.level] > LEVEL_DEPTH[best.element.level]) {
         // `row` is the pointer's row inside the element — the legend's inverse
         // needs it (C12 I117) as the crosshair's needs the column.
@@ -4002,6 +4020,11 @@ export async function constructGraph(
       return entryId === null ? 0 : paneOffsetIn(entryId, split, side);
     },
     moveDivider,
+    // **The pointer's columns** (C26 I30, I31, §8c.6): what `elementAt` asks.
+    drawnCols: (entryId) => {
+      const entry = stores.transcript.entries.find((e) => e.id === entryId);
+      return entry === undefined ? (p) => p.element.cols : drawnColsIn(entry);
+    },
     neighbourEntry: neighbourOf,
     cursorBlock: moveCursor,
     toggleSeries: toggleSeriesBlock,

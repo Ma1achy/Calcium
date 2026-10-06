@@ -28,19 +28,23 @@ const MANIFEST: NonNullable<TuiConfig["manifest"]> = {
   tools: [{ name: "strip", local: true, summary: "a tape of eight and a row below it", args: [], flags: [] }],
 };
 
+/** The tape's `current`, which `drive` sets before the session starts. */
+let currentNow = "BRAVO";
+
 const handlers: NonNullable<TuiConfig["localHandlers"]> = {
   strip: (() => ({
     schema: "tui.view/1",
     command: "strip",
     status: "ok",
     blocks: [
-      { kind: "tape", id: "strip", members: NAMES.map((n) => ({ id: n, label: `${n}-stage`, state: "succeeded" })), current: "BRAVO" },
+      { kind: "tape", id: "strip", members: NAMES.map((n) => ({ id: n, label: `${n}-stage`, state: "succeeded" })), current: currentNow },
       { kind: "pills", id: "below", chips: [{ label: "below" }] },
     ],
   })) as never,
 };
 
-const drive = async () => {
+const drive = async (current = "BRAVO") => {
+  currentNow = current;
   const stdin = fakeStdin();
   const session = await buildSession(
     { manifest: MANIFEST, localHandlers: handlers, stdin: stdin as unknown as NodeJS.ReadStream },
@@ -134,11 +138,44 @@ describe("C26 I31 — a tape under the keys and the pointer", () => {
     await stop();
   });
 
-  it.todo(
-    "C26 T4.38 (I30, I31, I24, §8c.6, F1448): → past a tape's window, ↓ out, ↑ back in — the drawn members are unchanged, the current's lead is drawn, and → reaches the second drawn member — not deferred on a component: it lands with the column rule in the next commit",
-  );
+  it("C26 T4.38 (I30, I31, I24, §8c.6, F1448): ↑ back into a tape the window has slid enters on a member it shows", async () => {
+    const { type, tape, drawn, stop } = await drive();
+    await type("/strip\r");
+    await type(DOWN); // the card's head (C09 I47)
+    await type(DOWN); // the tape's first member
+    for (let i = 1; i < NAMES.length; i += 1) await type(RIGHT);
+    await type(DOWN); // out, onto the row below
+    // **The fixture responds**: the window came back to the current by the
+    // minimum, so the head is off screen and member 0 is not a member it shows.
+    const before = drawn();
+    expect(tape().row, "the current is drawn").toContain("› BRAVO");
+    expect(before, "and member 0 is not").not.toContain("ALPHA");
 
-  it.todo(
-    "C26 T4.39 (I30, I21, §8c.6, F1448): ↓ from the prompt into a live entry headed by a tape slid off its head lands on the first drawn member, and the drawn members are unchanged — not deferred on a component: it lands with the column rule in the next commit",
-  );
+    await type(`${ESC}[A`); // ↑ back in
+    // **Entering moves no window** (C26 I24): focus is on a member the window
+    // shows. On member 0 the window followed focus back to the head.
+    expect(drawn(), "the same members are drawn").toEqual(before);
+    expect(tape().row, "and the current's lead with them").toContain("› BRAVO");
+    // **Which member focus is on**, read the way a reader would: `←` from the
+    // first drawn member brings the one before it in. From any later member it
+    // would step inside the window and ALPHA would stay off.
+    await type(LEFT);
+    expect(drawn(), "focus was on the first drawn member").toContain("ALPHA");
+    await stop();
+  });
+
+  it("C26 T4.39 (I30, §8c.6, F1448): ↓ from a card's head into a tape slid off its head enters on the first drawn member", async () => {
+    const { type, tape, drawn, stop } = await drive("GOLF");
+    await type("/strip\r");
+    const before = drawn();
+    expect(tape().row, "the current is drawn").toContain("› GOLF");
+    expect(before, "and the tape's head is not").not.toContain("ALPHA");
+    await type(DOWN); // the card's head, which spans the row
+    await type(DOWN); // into the tape, from column 0
+    expect(drawn(), "the window did not move").toEqual(before);
+    await type(LEFT);
+    const first = NAMES.indexOf(before[0] ?? "");
+    expect(drawn(), "and focus is on the first drawn member").toContain(NAMES[first - 1]);
+    await stop();
+  });
 });

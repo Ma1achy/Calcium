@@ -116,7 +116,55 @@ describe("C26 §8c — a row of elements", () => {
     expect(go("up"), "↑ from m2 leaves").toBe("prompt");
   });
 
-  it.todo(
-    "C26 T1.167 (I30, §8c.6): ↓ from a mosaic's second cell lands on the cell below and ↑ returns; from a three-cell row's middle cell ↓ lands on the cell under its left edge; a full-width row between two grid rows resets the column — not deferred on a component: it lands with the column rule in the next commit",
-  );
+  it("C26 T1.167 (I30, §8c.6, F1449): ↓ and ↑ enter a row on the element drawn nearest the column they left", async () => {
+    // **Every row shape the column rule meets** (§8c.6's table): a mosaic's
+    // grid, a row of three over a row of two whose cells do not line up, and a
+    // full-width row between two grid rows. Each row is entered from a cell
+    // that is not its first, so the old rule — *the first element of the row
+    // it enters* — answers differently at every step below.
+    const pills = (id: string, labels: readonly string[]): unknown => ({
+      kind: "pills",
+      id,
+      chips: labels.map((label) => ({ label, action: { kind: "fill", label: "x", command: `/${label}` } })),
+    });
+    const notice = (id: string): unknown => ({
+      kind: "notice", id, tone: "info", text: id, action: { kind: "fill", label: "x", command: `/${id}` },
+    });
+    const { graph } = await buildGraph();
+    graph.transcript.append({
+      ...DOC,
+      blocks: [
+        { kind: "mosaic", id: "m", height: 4, areas: "ab/cd", children: ["a", "b", "c", "d"].map(notice) },
+        pills("three", ["aaaa", "bbbb", "cccc"]),
+        pills("two", ["xxxxxxx", "y"]),
+        DOC.blocks[1],
+        pills("after", ["p", "q"]),
+      ],
+    } as never);
+    const go = (name: string): string => {
+      graph.router.dispatch(press(name));
+      return where(graph);
+    };
+
+    expect(go("down"), "the grid is entered at its first cell").toBe("m/a");
+    expect(go("right")).toBe("m/b");
+    // **The cell below, not the next row's first** (F1449).
+    expect(go("down"), "↓ from the second column keeps it").toBe("m/d");
+    expect(go("up"), "and ↑ returns to it").toBe("m/b");
+    expect(go("down")).toBe("m/d");
+
+    // Past every cell's end — the grid's second column starts at half the
+    // width, right of the whole chip row — the row's last.
+    expect(go("down"), "↓ from the grid's second column lands on the row's last").toBe("three/chip-2");
+    expect(go("down"), "and again, from a cell right of the shorter row").toBe("two/chip-1");
+    // Three over two, cells that do not line up: the first of the row whose
+    // drawn columns end past the focused one's start.
+    expect(go("up"), "↑ from the second cell of two").toBe("three/chip-1");
+    expect(go("down"), "the middle cell lands on the cell under its left edge").toBe("two/chip-0");
+
+    // **No goal column**: a full-width row between two grid rows resets it.
+    expect(go("down"), "a table row spans the width").toBe("t/a");
+    go("down");
+    expect(go("down"), "and the next grid row is entered from column 0").toBe("after/chip-0");
+  });
 });

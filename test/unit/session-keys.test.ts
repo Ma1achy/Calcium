@@ -1197,7 +1197,7 @@ describe("C26 §8b.6/§8b.7 — focus is an address, through the key effects", (
 
 describe("C26 §5c — the transcript's selection and semantic copy", () => {
   /** A live block whose elements carry source text no rendering would produce. */
-  const copyEffects = () => {
+  const copyEffects = (over: Record<string, unknown> = {}) => {
     const focus = createFocusStore();
     const kill: string[] = [];
     const effects = createKeyEffects({
@@ -1243,13 +1243,31 @@ describe("C26 §5c — the transcript's selection and semantic copy", () => {
         fn();
         return { [Symbol.dispose]: () => undefined };
       },
+      ...over,
     } as unknown as Parameters<typeof createKeyEffects>[0]);
     return { effects, focus, kill };
   };
 
-  it.todo(
-    "C26 T1.168 (I30, I21, §8c.6, F1448): historyNext over a live entry whose first member is not drawn lands on the first drawn member — not deferred on a component: it lands in the next commit",
-  );
+  it("C26 T1.168 (I30, I21, §8c.6, F1448): historyNext enters on the first drawn member of a tape the window has slid", () => {
+    // Three members of one row, as a tape's elements are: every element spans
+    // the row, so the columns that say which is drawn come from `drawnCols`.
+    const members = ["m0", "m1", "m2"].map((id) => ({ blockId: "t", element: navElement(id, 0) }));
+    const landed = (undrawn: readonly string[]): unknown => {
+      const { effects, focus } = copyEffects({
+        liveElements: () => members,
+        drawnCols: () => (p: { element: NavElement }) =>
+          undrawn.includes(p.element.id) ? null : { from: 0, to: 10 },
+      });
+      effects.table["historyNext"]?.();
+      return focus.current;
+    };
+    expect(landed(["m0"]), "member 0 is slid off, so the entry lands on m1").toMatchObject({
+      element: { blockId: "t", elementId: "m1" },
+    });
+    expect(landed([]), "the control: with every member drawn it lands on member 0").toMatchObject({
+      element: { blockId: "t", elementId: "m0" },
+    });
+  });
 
   it("T1.42 (§5c): y copies the element's source, into the one clipboard", () => {
     const { effects, kill } = copyEffects();
