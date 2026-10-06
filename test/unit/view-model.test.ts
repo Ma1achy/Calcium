@@ -907,3 +907,9 @@ describe("C04 required fields report absence and wrong type differently", () => 
     expect(KNOWN_KIND_COUNT, "and the framework declares 28").toBe(28);
   });
 });
+
+describe("C04 I151 — a pills row of buttons, owed at the spec commit", () => {
+  it.todo(
+    "T2.156 (C04 I151, C09 I139): buttons is refused when not a boolean, naming the field, and accepted as true, false or absent; measure over buttons chips is the first-fit packing of label plus four at 20, 40 and 80 columns — not deferred on a component: the same round's code commit replaces it",
+  );
+});

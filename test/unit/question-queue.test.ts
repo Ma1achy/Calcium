@@ -394,3 +394,12 @@ describe("C23 §7g — the reply, the queue, the three resolutions", () => {
     });
   });
 });
+
+describe("C23 §7h — the question's form, owed at the spec commit", () => {
+  it.todo(
+    "T1.108 (C23 I104, C04 I151, §028): a question pushed through the real confirm host has no panel in its content; its first block is a notice with the question glyph, warn tone and one default span, its last a pills block with buttons whose chips are the labels in order and carry no action; an inspection's content is a panel — not deferred on a component: the same round's code commit replaces it",
+  );
+  it.todo(
+    "T1.109 (C23 I104, I94, I36): focusedBox names the chip of the default, which is neither first nor last, moves with the arrows, is null in a reply and the same chip after esc, is the inspection's box in an inspection, and is null once settled — not deferred on a component: the same round's code commit replaces it",
+  );
+});

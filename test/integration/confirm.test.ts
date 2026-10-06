@@ -1243,3 +1243,15 @@ describe("C23 §7g — a question's life in a built session", () => {
     expect(ok.calls).not.toContain("invoke");
   });
 });
+
+describe("C23 §7h — the question's form in a built session, owed at the spec commit", () => {
+  it.todo(
+    "T4.108 (C23 I104, §028, C09 I139): at 80 columns and 24 bits the lead is in warn and the question in default, the answers are one row with the default washed pick and the rest bgElev, and the arrow moves the wash while the content stays equal — not deferred on a component: the same round's code commit replaces it",
+  );
+  it.todo(
+    "T4.109 (C23 I104, C09 I139, R-BLK-573): at ASCII the lead is a question mark and every chip is bracketed, at 1-bit only the focused chip is bracketed and inverse, and at 60 columns four choices are all on screen wrapped whole — not deferred on a component: the same round's code commit replaces it",
+  );
+  it.todo(
+    "T4.110 (C23 I104, I82, I91, I73, I75): the refusal and the count sit on the question's row in that order and a two-line question wraps within the rest, a reply draws the lead and no answers and esc restores them on the same chip, and the inspection draws a panel with the count in its title — not deferred on a component: the same round's code commit replaces it",
+  );
+});

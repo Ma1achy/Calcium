@@ -137,7 +137,8 @@ type Hunk     = Readonly<{ header: string;             // @@ -18,7 +18,9 @@
                            collapsedBefore?: number }>; // unchanged lines elided above
 type Pills    = Readonly<{ kind: "pills"; id: string;
                            chips: readonly Readonly<{ label: string; tone?: Tone;
-                             action?: Action; active?: boolean }>[] }> & Gap;
+                             action?: Action; active?: boolean }>[];
+                           buttons?: boolean }> & Gap;               // each chip a button (I151, C09 I139)
 type Tip      = Readonly<{ kind: "tip"; id: string; text: string;
                            actions?: readonly Action[] }> & Gap;
 type Panel    = Readonly<{ kind: "panel"; id: string; title: string;
@@ -242,7 +243,7 @@ type BarSpec = Readonly<{
 | `code` | language, text, `wrap`; `lineRange` (view state, §3d) | lines when truncating; `Σ ceil(len / w)` when wrapping — over the lines in `lineRange` when a window set one |
 | `comparison` | field / a / b rows | rows + header |
 | `patch` | path, language, hunks, optional `layout` | 1 header + `Σ` over hunks of (1 hunk header + lines + 1 per collapsed region) |
-| `pills` | chips with actions | rows of a **first-fit packing** at `w`, gap `2` — a chip is never split, so this is not `ceil(totalWidth / w)` (F928) |
+| `pills` | chips with actions | rows of a **first-fit packing** at `w`, gap `2` — a chip is never split, so this is not `ceil(totalWidth / w)` (F928); with `buttons`, each chip is `label + 4` cells (I151) |
 | `tip` | text with fill actions | `ceil(len / w)` |
 | `panel` | title, footer, children | children measured at `w - 2`, + 2 |
 | `group` | direction, children | `column` → `Σ` children at `w`; `row` → `max` of children at the split width |
@@ -4284,6 +4285,7 @@ nothing at 4-bit and 1-bit — the step of two draws `from` or `to` and has no c
 - **I148** — *(§5c.1, §026, `R-BLK-191`, I106, I107, C10 I36; review batch 4 M13.4, D5)* **A gradient ramp over a slot pair may carry `overshoot: { lift, share }`: over the last `share` of the axis `to` is lifted, channel by channel and clamped at 255, from ×1 up to ×`lift` at `t = 1`, and `from` mixes to `to` over the rest.** `lift` is finite in `(1, 2]` and `share` in `(0, 1)`; the member is refused on a colormap, a palette, a centred or stepped fill, and on a span. C10 draws the lifted hex at 24-bit, quantises it at 8-bit and ignores it below. It is how `hotEdge` draws the design's own profile (C09 I133). → T2.152, T1.82, T6.112
 - **I149** — *(R-BLK-214, F1260, C23 I94, → I141)* **`CallState` has a sixth member, `waiting` — *blocked on you*.** Its tone is `warn` and its glyph is `work-unit`; I141's agreement check covers it like the other five. An approval's call head carries it while its question is open (C23 I94). R-BLK-214 draws the dot blinking; the blink is not built (C23 §7g ruling 8), and the word and the tone carry the state at every motion level. **Where tone cannot carry it — 1 bit and ASCII — its shape is `warn`, `▲`/`!`** (C09's `CALL_STATE_GLYPH`, §030's *each state takes its own mark*): `work-unit` there is `running`'s, and a waiting head drawn as a running one says the tool is working when it is waiting on the reader. Found implementing the spec; the six shape marks are distinct, as the five were. → T2.154
 - **I150** — *(§097, `R-BLK-775`, ruling 89, F1474, → C11 I33, C19 I29, I124)* **A table's `current` is a row id or absent, and nothing `measure` or the plan reads follows it.** A non-string is refused naming the field; a string naming no row is valid and draws no mark. Its presence reserves the `current` mark's cells in the first column on every row (C11 I33), so which row it names moves no label and no height: `measure(block, width)` is the same number with the field absent, naming any row, or naming none. → T2.155, C11 T1.43
+- **I151** — *(§028, §073 `R-BLK-573`, C09 I139, C23 I104, → I20)* **A `pills` block's `buttons` flag draws its chips as buttons and prices their chrome into the packing, and it is the one field that makes a row of chips a row of answers.** `buttons?: boolean`, absent is a chip. `measure` is a function of `(block, width)` as every kind's is (C09 I2), so the chrome is the **maximum of the three rungs** — four cells, C09 I102's `BUTTON_CELLS` — and not the rung's: a packing that varied with the terminal would be `measure` reading a capability. A button wraps whole to the next row and is never shed (I20), because a shed answer is one a reader cannot be asked to choose. **Which chip is focused is not in the data**: it arrives in `RenderContext` as every focus does (C09 I45), so the block is the same block whichever answer the reader is on. → T2.156, C09 T1.153, C23 T1.108
 
 
 ## 7. Commitments
@@ -4575,6 +4577,7 @@ The generic suite. **These run against every registered block kind, including ap
 - **T2.153** (I109, §5c; ruling 81): accepted — `trailSince: 0` and `trailSince: 12` on a notice with `trail: "ripple"`, streaming and not. Refused — `trailSince` on a notice with no `trail`, with `trail: "hotEdge"` and with `trail: "weight"`, the message naming the forms that read it; `trailSince` of `-1`, `NaN` and `"3"`.
 - **T2.154** (I149, I141): `CALL_STATE_TONE.waiting` is `warn` and `CALL_HEAD_GLYPH.waiting` is `work-unit`; `headMark("waiting")` at 1 bit and in ASCII is `warn` and differs from every other state's; a notice claiming `state: "waiting"` in another tone is refused naming the field.
 - **T2.155** (I150): refused — `current: 3` on a table, naming the field; accepted — `current: "r1"` naming a row and `current: "gone"` naming none; and `measure` over one table at 40 and 80 columns is one number with `current` absent, naming each row in turn, and naming none.
+- **T2.156** (I151, C09 I139): `buttons` is refused on a non-boolean naming the field and accepted as `true`, `false` or absent; and `measure` over one `pills` block with `buttons: true` is the number a first-fit packing of `label + 4` gives at widths 20, 40 and 80, with the same chips and no `buttons` giving the unpadded packing — so the field moves the geometry by the chrome and by nothing else.
 
 ### Tier 3 — edge cases
 
