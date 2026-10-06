@@ -318,11 +318,8 @@ describe("C22 I150 — the completion footer at rest and after Tab", () => {
     // **The difference is the claim** (ruling 96). The menu's rows are the same
     // text in both states — ruling 89 marks the current at rest and after `⇥`
     // alike — so the footer is the one thing on screen that tells them apart.
-    // **Its candidates, and the status row is the exception** (C19 I33): it
-    // names the same keys the footer does, so it differs in step with it.
-    expect(s.menu().slice(0, -1), "the menu's candidates read the same after ⇥").toEqual(restMenu.slice(0, -1));
-    expect(restMenu.at(-1), "the status row at rest names the rest keys").toMatch(/3 of 3 +⏎ run +⇥ complete +esc close/u);
-    expect(s.menu().at(-1), "and after ⇥ the selection's").toMatch(/3 of 3 +↑↓ move +⏎ accept +esc close/u);
+    // Three candidates fit, so there is no status row to differ (C19 I33).
+    expect(s.menu(), "the menu reads the same after ⇥").toEqual(restMenu);
     expect(selected, "and the footer does not").not.toBe(rest);
 
     await s.press(DOWN);

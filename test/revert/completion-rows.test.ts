@@ -19,6 +19,7 @@ describe("C19 T6.31, T6.32, T6.33", () => {
 
   it("T6.32 (C19 I33): the rest keys spelled as the specimen, the count dropped for `+ N more`, or a key shed before the count → T1.74 and T4.13 fail", () => {
     const last = menuBlocks(ROWS, 0, 3, { keys: REST }).at(-1);
+    expect(menuBlocks(ROWS, 0, 0, { keys: REST }).at(-1)?.kind, "uncut: no status row").toBe("table");
     expect(last?.kind === "raw" ? last.text : "").toBe("  2 of 5   ⏎ run   ⇥ complete   esc close");
   });
 

@@ -57,8 +57,8 @@ const MUTATIONS = [
   {
     name: "T6.32: the count dropped for the old indicator",
     file: MENU,
-    from: "  return Object.freeze([top, body, statusRow(shown, shown + Math.max(0, remainder), facts.keys ?? [], facts.width)]);",
-    to: "  return remainder <= 0 ? Object.freeze([top, body]) : Object.freeze([top, body, { kind: \"raw\", id: `${MENU_ID}-more`, text: `+ ${String(remainder)} more` } satisfies Block]);",
+    from: "  return Object.freeze([top, body, statusRow(shown, shown + remainder, facts.keys ?? [], facts.width)]);",
+    to: "  return Object.freeze([top, body, { kind: \"raw\", id: `${MENU_ID}-more`, text: `+ ${String(remainder)} more` } satisfies Block]);",
     expect: "T1.74",
   },
   {
@@ -69,10 +69,10 @@ const MUTATIONS = [
     expect: "T1.74",
   },
   {
-    name: "T6.32: the chrome count back to one row when nothing is cut",
+    name: "T6.32: the status row drawn for a menu that shows everything",
     file: MENU,
-    from: "const MENU_CHROME = 2;",
-    to: "const MENU_CHROME = 1;",
+    from: "  if (remainder <= 0) return Object.freeze([top, body]);\n  const shown",
+    to: "  const shown",
     expect: "T1.74",
   },
   {

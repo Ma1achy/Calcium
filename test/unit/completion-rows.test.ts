@@ -80,24 +80,26 @@ describe("C19 I33 — the status row", () => {
     ]);
     expect(JSON.stringify(menuBlocks(six, 0, 4, { keys: REST })), "no residue row").not.toContain("more");
 
-    const whole = status(menuBlocks(six, 0, 0, { keys: REST }));
-    expect(whole.text, "drawn when nothing was cut, so the menu does not grow a row at the cut").toMatch(/^ {2}6 of 6 /u);
+    // **Not for a menu showing all it holds** (§097, C19 T5.3): a row always
+    // present spends a candidate at the minimum region to say `3 of 3`.
+    const whole = menuBlocks(six, 0, 0, { keys: REST });
+    expect(whole.map((b) => b.kind), "the edge and the table, no status row").toEqual(["rule", "table"]);
   });
 
   it("T1.74 (C19 I33): at a narrow width whole keys shed from the end and the count stays; an empty set draws nothing", () => {
     const some = [{ value: "/a" }, { value: "/b" }];
-    const at = (width: number) => status(menuBlocks(some, 0, 0, { keys: REST, width })).text;
-    expect(at(41), "all three fit").toBe("  2 of 2   ⏎ run   ⇥ complete   esc close");
-    expect(at(30), "the last is shed, whole").toBe("  2 of 2   ⏎ run   ⇥ complete");
-    expect(at(16), "then the next").toBe("  2 of 2   ⏎ run");
-    expect(at(3), "never the count").toBe("  2 of 2");
+    const at = (width: number) => status(menuBlocks(some, 0, 1, { keys: REST, width })).text;
+    expect(at(41), "all three fit").toBe("  2 of 3   ⏎ run   ⇥ complete   esc close");
+    expect(at(30), "the last is shed, whole").toBe("  2 of 3   ⏎ run   ⇥ complete");
+    expect(at(16), "then the next").toBe("  2 of 3   ⏎ run");
+    expect(at(3), "never the count").toBe("  2 of 3");
     expect(menuBlocks([], 0, 0, { keys: REST }), "nothing to show, nothing drawn").toHaveLength(0);
   });
 
-  it("T1.74 (C19 I33, I23): the chrome is two rows at every height", () => {
+  it("T1.74 (C19 I33, I23): the chrome is one row when everything is shown and two when something was cut", () => {
     const placed = (height: number, truncated: boolean) =>
       ({ height, truncated }) as unknown as Parameters<typeof menuRowsShown>[0];
-    expect(menuRowsShown(placed(6, false))).toBe(4);
+    expect(menuRowsShown(placed(6, false))).toBe(5);
     expect(menuRowsShown(placed(6, true))).toBe(4);
   });
 });

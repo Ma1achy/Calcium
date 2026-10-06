@@ -321,10 +321,9 @@ describe("C19 §6 — the menu", () => {
       const rows = rowsAt(detailed, width);
       // One row per candidate, under an edge (C19 I23); the edge below is
       // the prompt's rule since ruling 90, which this row does not draw.
-      expect(rows, `${String(width)}: one row per candidate, under the top edge and over the status row`).toHaveLength(4);
+      expect(rows, `${String(width)}: one row per candidate, plus the top edge`).toHaveLength(3);
       expect(rows[0], `${String(width)}: the first row is an edge`).toMatch(/^[─-]/);
       expect(rows[2], `${String(width)}: the last candidate row is not an edge`).not.toMatch(/^[─-]/);
-      expect(rows[3], `${String(width)}: the status row closes the menu (I33)`).toMatch(/^\s+2 of 2\b/u);
       for (const [i, candidate] of detailed.entries()) {
         expect(rows[i + 1], `${String(width)}: ${candidate.value} is legible`).toContain(
           candidate.value,
@@ -350,7 +349,7 @@ describe("C19 §6 — the menu", () => {
     // candidate, and nothing in the hint cell.
     for (const width of [menuWidth(plain), 60, 100]) {
       const rows = rowsAt(plain, width);
-      expect(rows, `${String(width)}: the edge, one row a candidate and the status row`).toHaveLength(2 + plain.length);
+      expect(rows, `${String(width)}: the edge and one row a candidate`).toHaveLength(1 + plain.length);
       for (const [i, candidate] of plain.entries()) {
         expect(rows[i + 1]?.replace(/^\s*[›*]?\s*/u, "").trimEnd(), `${String(width)}: ${candidate.value}, and no hint`).toBe(
           candidate.value,

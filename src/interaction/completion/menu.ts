@@ -264,15 +264,18 @@ export function menuBlocks(
   // I8). C15 reports *that* it truncated through `Placed.truncated`; it holds no
   // candidates and cannot say how many were lost.
   //
-  // **The indicator is the status row's count, and the row is always drawn**
-  // (I33, §029). It was a `+ N more` row drawn only when something was cut;
-  // §029 draws `3 of 14` with the keys beside it and no residue row, so the
-  // count says how many are missing and the menu does not grow a row the
-  // moment truncation starts. **ASCII text, because it is authored where the
+  // **The indicator is the status row's count, drawn when something was cut**
+  // (I33, §029, §097). It was a `+ N more` row drawn only then; §029 draws
+  // `3 of 14` with the keys beside it and no residue row, so the count says
+  // how many are missing. **Not for a menu showing all it holds**: every
+  // picture with a count is a cut menu and §097's two-candidate menu draws
+  // none, and a row always present left two candidates where three fitted at
+  // 60 x 16 (C19 T5.3). **ASCII text, because it is authored where the
   // capability is not** (C09 I22, F122): the chords arrive spelled for the
   // rung by the shell.
+  if (remainder <= 0) return Object.freeze([top, body]);
   const shown = candidates.length; // graphemes-ok: a candidate count, not text
-  return Object.freeze([top, body, statusRow(shown, shown + Math.max(0, remainder), facts.keys ?? [], facts.width)]);
+  return Object.freeze([top, body, statusRow(shown, shown + remainder, facts.keys ?? [], facts.width)]);
 }
 
 /** The value cell: the label, its tone, and the match mark over it (I30, I32). */
@@ -429,17 +432,14 @@ export function remainderOf(placed: Placed | null, total: number, shown: number)
 /**
  * The rows of a placement that hold candidates (I23).
  *
- * The top rule costs one, and the status row costs one, **at every height**
- * (I33): it used to be an indicator drawn only when something was cut, and
- * the count charged it only then. The bottom edge costs nothing: it is the
- * prompt's rule (ruling 90). Subtracting both here rather than at the call
- * site keeps the menu's own chrome a fact of this file, where the blocks are
- * built.
+ * The top rule costs one, and the status row costs one whenever it is drawn
+ * (I33) — which is whenever anything was cut, which is the case this is
+ * called in. The bottom edge costs nothing: it is the prompt's rule (ruling
+ * 90). Subtracting both here rather than at the call site keeps the menu's own
+ * chrome a fact of this file, where the blocks are built.
  */
 export function menuRowsShown(placed: Placed | null): number {
   if (placed === null) return 0;
-  return Math.max(0, placed.height - MENU_CHROME);
+  const chrome = placed.truncated ? 2 : 1;
+  return Math.max(0, placed.height - chrome);
 }
-
-/** The menu's rows that are not candidates: the top rule and the status row (I23, I33). */
-const MENU_CHROME = 2;

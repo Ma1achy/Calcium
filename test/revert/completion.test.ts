@@ -152,7 +152,8 @@ describe("T6.8 (I8): drawing the menu instead of going through C15", () => {
     const serialised = JSON.stringify(blocks);
     expect(serialised).not.toContain("\\u001b");
     expect(blocks.every((b) => typeof b === "object" && "kind" in b)).toBe(true);
-    // The indicator is C19's, because only C19 knows the remainder.
-    expect(serialised).toContain("2 more");
+    // The indicator is C19's, because only C19 knows the remainder: the status
+    // row's count, one shown of three (C19 I33).
+    expect(serialised).toContain("1 of 3");
   });
 });

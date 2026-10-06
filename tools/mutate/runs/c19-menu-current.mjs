@@ -59,20 +59,17 @@ const MUTATIONS = [
     // **T6.26, the untruncated arm**: the menu's own bottom rule back.
     name: "T6.26: a bottom rule under the candidates",
     file: MENU,
-    // Re-anchored (C19 I33): the status row is always the last block, so the
-    // rule goes under it; the mutation is unchanged.
-    from: "  return Object.freeze([top, body, statusRow(shown, shown + Math.max(0, remainder), facts.keys ?? [], facts.width)]);",
-    to: "  return Object.freeze([top, body, statusRow(shown, shown + Math.max(0, remainder), facts.keys ?? [], facts.width), { ...top, id: `${MENU_ID}-edge` }]);",
+    from: "  if (remainder <= 0) return Object.freeze([top, body]);",
+    to: "  if (remainder <= 0) return Object.freeze([top, body, { ...top, id: `${MENU_ID}-edge` }]);",
     expect: "T3.25",
   },
   {
-    // **T6.26, the truncated arm**: the rule back under the status row, only
-    // when something was cut. Re-anchored (C19 I33): the two arms are one
-    // return now, so the arm is a condition on the remainder.
-    name: "T6.26: a bottom rule under the status row of a cut menu",
+    // **T6.26, the truncated arm**: the rule back under the status row.
+    // Re-anchored (C19 I33): the indicator is the status row.
+    name: "T6.26: a bottom rule under the status row",
     file: MENU,
-    from: "  return Object.freeze([top, body, statusRow(shown, shown + Math.max(0, remainder), facts.keys ?? [], facts.width)]);",
-    to: "  return Object.freeze([top, body, statusRow(shown, shown + Math.max(0, remainder), facts.keys ?? [], facts.width), ...(remainder > 0 ? [{ ...top, id: `${MENU_ID}-edge` }] : [])]);",
+    from: "  return Object.freeze([top, body, statusRow(shown, shown + remainder, facts.keys ?? [], facts.width)]);",
+    to: "  return Object.freeze([top, body, statusRow(shown, shown + remainder, facts.keys ?? [], facts.width), { ...top, id: `${MENU_ID}-edge` }]);",
     // Not the session's C19 T4.12 (titled T4.34 then, F1489), which the first draft named and which stays
     // green: the rule lands one row past the box and the frame cuts it, so no
     // stacked rule reaches the screen. The pass scored it caught because the id
@@ -84,9 +81,9 @@ const MUTATIONS = [
     // candidate fewer than the box holds, and the remainder counts it.
     name: "menuRowsShown still charges the bottom edge",
     file: MENU,
-    // Re-anchored (C19 I33): the chrome is one constant, two rows at every height.
-    from: "  return Math.max(0, placed.height - MENU_CHROME);",
-    to: "  return Math.max(0, placed.height - MENU_CHROME - 1);",
+    // Re-anchored (C19 I33): the indicator is the status row.
+    from: "  const chrome = placed.truncated ? 2 : 1;",
+    to: "  const chrome = placed.truncated ? 3 : 2;",
     // Survived the first draft: a window one row short fits inside the box it
     // was sized for, and T4.9 asked only that nothing be cut (C19 T6.27).
     expect: "T6.27",
