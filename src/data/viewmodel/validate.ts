@@ -1150,11 +1150,29 @@ function checkSpans(b: Record<string, unknown>, member: string, e: string[], at:
       e.push(`${where}: "value" and "ramp" on one span — a background from the map and a foreground from the ramp is two unmeasured colours on one cell (C04 I107)`);
       return;
     }
-    for (const key of Object.keys(span)) {
-      if (!TEXT_SPAN_KEYS.has(key)) {
-        e.push(`${where}: unknown member "${key}" — a span carries from, to, bold, italic, underline, tone, value, elide, ramp and nothing else (C04 I85)`);
+    // C04 I151 — a ground resolves with its own ink, so a second ink or a second background beside it is unmeasured.
+    if (span["ground"] !== undefined) {
+      if (attributesOnly) {
+        e.push(`${where}: "ground" is refused on this member — its palettes are spoken for (C04 I151, I91)`);
         return;
       }
+      if (span["ground"] !== "pick") {
+        e.push(`${where}: "ground" must be "pick" (C04 I151)`);
+        return;
+      }
+      for (const other of ["tone", "value", "ramp"]) {
+        if (span[other] !== undefined) {
+          e.push(`${where}: "ground" beside "${other}" — the ground's matched ink replaces the run's, so "${other}" is a colour nothing measured against it (C04 I151)`);
+          return;
+        }
+      }
+    }
+    for (const key of Object.keys(span)) {
+      if (!TEXT_SPAN_KEYS.has(key)) {
+        e.push(`${where}: unknown member "${key}" — a span carries from, to, bold, italic, underline, tone, value, elide, ramp, ground and nothing else (C04 I85)`);
+        return;
+      }
+      if (key === "ground") continue;
       if (key === "ramp") {
         if (attributesOnly) {
           e.push(`${where}: "ramp" is refused on this member — its palettes are spoken for (C04 I107, I91)`);

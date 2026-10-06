@@ -38,6 +38,9 @@ export type Motion =
  */
 export type { Chip, ChipInsert, ChipKind, ChipLook, ChipParts } from "./layout.js";
 
+/** A chip and where its content stands in `resolved`, in code units, `[from, to)` (I37). */
+export type ResolvedChip = Readonly<{ from: number; to: number; chip: Chip }>;
+
 /**
  * A line held whole — text, caret and region (I28, §101, C23 I28).
  *
@@ -108,6 +111,13 @@ export interface LineEditor {
    * transport cannot take.
    */
   readonly resolved: string;
+  /**
+   * Where each chip stands in `resolved` (I37, ruling 104 c): one entry per
+   * sentinel the table resolves, in buffer order, `resolved.slice(from, to)`
+   * being the chip's content. From the loop that computes `resolved`, so the
+   * two cannot disagree about where a chip is. Read at the submission site.
+   */
+  readonly resolvedChips: readonly ResolvedChip[];
   /**
    * What a cluster draws as, for the walk. `undefined` for ordinary text; given
    * a `limit` a chip's label does not fit, the label elided to it (I32).
@@ -338,9 +348,30 @@ class Editor implements LineEditor {
   }
 
   get resolved(): string {
-    let out = "";
-    for (const ch of this.#text) out += this.#chips.get(ch)?.chip.content ?? ch;
-    return out;
+    return this.#resolve().text;
+  }
+
+  get resolvedChips(): readonly ResolvedChip[] {
+    return this.#resolve().chips;
+  }
+
+  /**
+   * **One loop for both answers** (I37): a range computed by a second walk over
+   * `#text` agrees with `resolved` until a chip's content holds a surrogate pair.
+   */
+  #resolve(): Readonly<{ text: string; chips: readonly ResolvedChip[] }> {
+    let text = "";
+    const chips: ResolvedChip[] = [];
+    for (const ch of this.#text) {
+      const chip = this.#chips.get(ch)?.chip;
+      if (chip === undefined) {
+        text += ch;
+        continue;
+      }
+      chips.push({ from: text.length, to: text.length + chip.content.length, chip }); // graphemes-ok: code-unit offsets into `resolved`, the unit C04 I84 states
+      text += chip.content;
+    }
+    return { text, chips };
   }
 
   /**

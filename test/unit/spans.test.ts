@@ -12,15 +12,16 @@ import type { Block, Ramp, TextSpan, ViewDocument } from "../../src/data/viewmod
 import { stripControl } from "../../src/data/text.js";
 import { atomsOf, runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../src/presentation/runs.js";
 import { clusterEnds, truncateParts, wrapCells, wrapCellsParts } from "../../src/presentation/text.js";
-import { runStyle, withSpan } from "../../src/presentation/blocks/paint.js";
-import { resolve, resolveTone, type Style } from "../../src/presentation/theme/index.js";
+import { paintRuns, runStyle, withSpan } from "../../src/presentation/blocks/paint.js";
+import { resolve, resolveBackground, resolveTone, type Style } from "../../src/presentation/theme/index.js";
 import { COLORMAPS, continuousColour, nearestAnsi256, sample } from "../../src/presentation/theme/colormap.js";
 import { mixHex, rampStyle, stepOf } from "../../src/presentation/theme/ramp.js";
 import { animateT, extentT, rampCadenceMs } from "../../src/presentation/blocks/ramp.js";
 import { spinnerIntervalMs } from "../../src/presentation/blocks/glyphs.js";
 import { readFileSync } from "node:fs";
 import { doc } from "../support/blocks.js";
-import { DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
+import { DARK_THEME, FULL_CAPS, measurable, MONO_UNICODE_CAPS, visible } from "../support/render.js";
+import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { caps, DEPTHS, store, TONES } from "../support/theme.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
 
@@ -542,7 +543,33 @@ function channelsOf(hex: string): readonly [number, number, number] {
 }
 
 describe("C09 I139 — a grounded run (F1522)", () => {
-  it.todo(
-    "T1.153 (C09 I139): a run with ground pick paints pickInk on pick at 24-bit and no background at 1 bit, its bold kept — not deferred on a component: lands with lane b5-chips' code commit",
-  );
+  it("T1.153 (C09 I139, C04 I151): a run with ground pick paints pickInk on pick at 24-bit and no background at 1 bit, its bold kept", () => {
+    const text = "a #1 pasted · 6L";
+    const spans: readonly TextSpan[] = [{ from: 2, to: 11, ground: "pick", bold: true }];
+    const runs = runsOf(text, spans);
+    expect(runs.map((r) => r.text), "plain, grounded, plain").toEqual(["a ", "#1 pasted", " · 6L"]);
+
+    const full = paintRuns(runs, {}, { theme: DARK_THEME, capabilities: FULL_CAPS });
+    const pick = resolveBackground("surface.pick", DARK_THEME, FULL_CAPS).background;
+    const ink = resolve("surface.pickInk", DARK_THEME, FULL_CAPS).colour;
+    expect(pick, "the fixture resolves a pick ground at 24-bit").toBeDefined();
+    expect(full.map((sp) => sp.text)).toEqual(["a ", "#1 pasted", " · 6L"]);
+    expect(full[1]?.style?.background, "the name stands on pick").toEqual(pick);
+    expect(full[1]?.style?.colour, "in pickInk").toEqual(ink);
+    expect(full[1]?.style?.bold, "and bold").toBe(true);
+    for (const i of [0, 2]) expect(full[i]?.style?.background, `span ${String(i)} takes no ground`).toBeUndefined();
+
+    // **1 bit: no ground resolves**, so the run paints as its neighbours do,
+    // its weight kept (C09 I139's second clause).
+    const mono = paintRuns(runs, {}, { theme: DARK_THEME, capabilities: MONO_UNICODE_CAPS });
+    for (const sp of mono) expect(sp.style?.background, `${sp.text} at 1 bit`).toBeUndefined();
+    expect(mono.find((sp) => sp.text.includes("#1"))?.style?.bold, "the name is still bold").toBe(true);
+
+    // The text is the same at both rungs, rendered through the block library.
+    const raw = block({ kind: "raw", id: "h", text, spans });
+    const at = (capabilities: TerminalCapabilities): readonly string[] =>
+      measurable({ capabilities }).renderToLines(raw, 40).map((l) => visible(l).trimEnd());
+    expect(at(MONO_UNICODE_CAPS)).toEqual(at(FULL_CAPS));
+    expect(at(FULL_CAPS)).toEqual([text]);
+  });
 });

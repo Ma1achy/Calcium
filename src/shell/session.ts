@@ -33,7 +33,8 @@ import { drawFallback, tooSmall } from "./fallback.js";
 import { isUsable } from "../terminal/capabilities.js";
 import { usageText } from "./usage.js";
 import { compose, promptCap, type Composed } from "./frame.js";
-import { commandRows, type PaintDeps } from "./paint.js";
+import { commandRows, paintEchoRows, type PaintDeps } from "./paint.js";
+import { ECHO_BLOCK, echoChipIndex, echoRows } from "./echo.js";
 import { transmitFrame, transmits, type SentImages } from "./transmit-image.js";
 import { composeFrame } from "./render-frame.js";
 import { createProfiler, DEFAULT_TIER, isRecording, isSpanning } from "./profiling/recorder.js";
@@ -2362,7 +2363,7 @@ function visibleRows(
     // C22 I33 — the command that produced the entry, above it, as chrome. Its
     // rows are part of the entry's height (C14 I20), which is why the slice
     // below is taken over `chrome ++ blocks` rather than over the blocks alone.
-    const chrome = commandRows(entry.doc.command, width, graph.capabilities);
+    const chrome = commandRows(entry.doc.command, width, graph.capabilities, entry.doc.meta.echo);
 
     // **Cached on all five axes, and the last two are the ones a height cache
     // does not need** (I58, §6c). `focusFor` changes the rendering without
@@ -2610,7 +2611,20 @@ function visibleRows(
 
     // The pieces are already the window's rows (`windowEntry` took `[from, to)`),
     // so only the chrome is sliced here.
-    const keptChrome = chrome.slice(Math.min(ve.skipRows, chrome.length));
+    //
+    // **The echo's chips, painted as the prompt paints them** (C22 I153, I154):
+    // the well at rest, the box's focus treatment on the focused one. Over the
+    // rows `commandRows` drew, so the cells are the ones C14 measured.
+    const echoed = entry.doc.meta.echo === undefined
+      ? chrome
+      : paintEchoRows(
+          chrome,
+          echoRows(entry.doc.command, entry.doc.meta.echo, width, graph.capabilities)?.chips ?? [],
+          focus?.blockId === ECHO_BLOCK ? echoChipIndex(focus.rowId) : null,
+          graph.theme.current,
+          graph.capabilities,
+        );
+    const keptChrome = echoed.slice(Math.min(ve.skipRows, echoed.length));
     // **The selection's ground, after the cache was written** (C14 I39, I40).
     // The slot above already holds `lines`; this washes a copy, so nothing
     // selection-dependent can be served to a later unselected read — which is

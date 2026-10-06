@@ -2379,7 +2379,117 @@ function srcFiles(dir: string, out: string[] = []): string[] {
 }
 
 describe("C23 I104 — a submission carries its chips (ruling 104 c)", () => {
-  it.todo(
-    "T1.108 (C23 I104): every document written for a submission whose command is the line carries its echo, and an adapter command or a dollar-underscore line carries none — not deferred on a component: lands with lane b5-chips' code commit",
-  );
+  /** A line whose last `content.length` code units are one chip (C04 I152). */
+  const chipped = (before: string, content: string) => {
+    const line = `${before}${content}`;
+    return { line, echo: [{ from: before.length, to: line.length, ordinal: 1, kind: "paste" as const, name: "pasted", lines: 1 }] };
+  };
+  const echoOf = (h: ReturnType<typeof harness>, id?: string): unknown =>
+    (id === undefined ? h.transcript.entries.at(-1) : h.transcript.entries.find((e) => e.id === id))?.doc.meta.echo;
+
+  it("T1.108 (C23 I104, I15): every document written for a submission whose command is the line carries its echo, and an adapter command or a dollar-underscore line carries none", async () => {
+    // **The app route, streamed, typed with two spaces** — so the line as typed
+    // and the argv form are different strings, and *displays as typed* is
+    // something this row can see (I15 amended).
+    {
+      const { line, echo } = chipped("/tail  ", "a.log");
+      const h = harness({ stream: () => (async function* () { await new Promise<never>(() => undefined); })() });
+      h.pipeline.submit(line, echo);
+      await settled();
+      const pending = h.transcript.entries.at(-1);
+      expect(pending?.streaming, "the pending entry").toBe(true);
+      expect(pending?.doc.command, "displayed as typed").toBe(line);
+      expect(pending?.doc.meta.echo, "and carrying the chips").toEqual(echo);
+    }
+    {
+      const { line, echo } = chipped("/tail  ", "a.log");
+      const h = harness({
+        stream: () =>
+          (async function* () {
+            yield { kind: "data", value: { a: 1 } } as RawPatch;
+            // The stream route settles on its `end` (C23 I8), keeping the card.
+            yield { kind: "end", result: result({ exitCode: 0 }) } as RawPatch;
+          })(),
+      });
+      h.pipeline.submit(line, echo);
+      await settled(h.pipeline);
+      const entry = h.transcript.entries.at(-1);
+      expect(entry?.streaming, "settled").toBe(false);
+      expect(entry?.doc.command).toBe(line);
+      expect(entry?.doc.meta.echo, "the settle keeps them").toEqual(echo);
+    }
+
+    // **The shell route**: the pending append and the settle into it.
+    {
+      const { line, echo } = chipped("cat ", "x\ny");
+      let exit: (() => void) | undefined;
+      const h = harness({
+        spawnShell: () => ({
+          stdout: (async function* () { yield "out"; })(),
+          stderr: (async function* () { /* nothing */ })(),
+          exited: new Promise((r) => { exit = () => r({ code: 0, signal: null }); }),
+          overflowed: false,
+        }),
+      });
+      h.pipeline.submit(line, echo);
+      // The route fetches its emulator on first use (C23 I71), so the append is a
+      // module load away: bounded by the clock, not by a turn count.
+      const deadline = Date.now() + 5000;
+      while (h.transcript.entries.length === 0 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 5));
+      expect(h.transcript.entries.at(-1)?.streaming, "pending").toBe(true);
+      expect(echoOf(h), "the pending append carries them").toEqual(echo);
+      exit?.();
+      await settled(h.pipeline);
+      expect(h.transcript.entries.at(-1)?.streaming, "settled").toBe(false);
+      expect(echoOf(h), "and so does the settle, spread rather than rebuilt").toEqual(echo);
+    }
+
+    // **A queued line, then ⌃c**: the cancelled document carries them.
+    {
+      const { line, echo } = chipped("/tail ", "q.log");
+      const h = harness({ invoke: () => new Promise<never>(() => undefined) });
+      h.pipeline.submit("/ps");
+      await new Promise((r) => setTimeout(r, 0));
+      h.pipeline.submit(line, echo);
+      await settled(h.pipeline);
+      const queued = h.transcript.entries.at(-1)?.id;
+      expect(echoOf(h, queued), "the queued notice states the line").toEqual(echo);
+      h.pipeline.cancel();
+      await settled(h.pipeline);
+      expect(JSON.stringify(h.transcript.entries.find((e) => e.id === queued)?.doc)).toMatch(/cancelled before it ran/u);
+      expect(echoOf(h, queued), "and the cancelled document keeps them").toEqual(echo);
+    }
+
+    // **An adapter stating its own command** (C07 I16): the settled document carries none.
+    {
+      const { line, echo } = chipped("/promote ", "fam:x");
+      const h = harness();
+      h.pipeline.submit(line, echo);
+      await settled(h.pipeline);
+      const entry = h.transcript.entries.at(-1);
+      expect(entry?.doc.command, "the adapter's").toBe("adapted");
+      expect(entry?.doc.meta.echo, "and no chips").toBeUndefined();
+    }
+
+    // **`$_` beside a chip**: the argv form, and no chips — the ranges index a
+    // line the display is not (C22 §6t.5).
+    {
+      const { line, echo } = chipped("/tail $_ ", "a.log");
+      const h = harness({ stream: () => (async function* () { await new Promise<never>(() => undefined); })() });
+      h.session.execution.setLastUuid("u1");
+      h.pipeline.submit(line, echo);
+      await settled();
+      const entry = h.transcript.entries.at(-1);
+      expect(entry?.doc.command, "the argv form").toBe("/tail u1 a.log");
+      expect(entry?.doc.meta.echo).toBeUndefined();
+    }
+
+    // **The control: the same lines with no chips**, and no document carries any.
+    for (const line of ["/tail  a.log", "cat x\ny", "/promote fam:x"]) {
+      const h = harness();
+      h.pipeline.submit(line);
+      await settled(h.pipeline);
+      for (const e of h.transcript.entries) expect(e.doc.meta.echo, line).toBeUndefined();
+    }
+  });
 });

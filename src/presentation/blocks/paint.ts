@@ -85,8 +85,19 @@ export type RunContext = Readonly<{
  * 4-bit frame is byte-identical with and without the value (C10 I31). The gate
  * refused a `value` on a block with no map, so the `colormap === undefined`
  * arm is a total function's and not a branch anything reaches.
+ *
+ * **A `ground` replaces the style with a pair** (C09 I139, C04 I151): `pickInk`
+ * on `pick`, resolved together as C11's current row resolves them (C10 I51), the
+ * span's attributes on top. Where `pick` does not resolve — 1 bit, a theme
+ * declaring none — the run paints as its neighbours would, its attributes kept.
+ * The gate refused a `tone`, `value` or `ramp` beside it.
  */
 export function runStyle(run: Run, style: Style, ctx: RunContext): Style {
+  if (run.ground !== undefined) {
+    const ground = resolveBackground("surface.pick", ctx.theme, ctx.capabilities);
+    if (ground.background === undefined) return withSpan(style, run.attrs);
+    return withSpan(withBackground(resolve("surface.pickInk", ctx.theme, ctx.capabilities), ground), run.attrs);
+  }
   const base = run.tone === undefined ? style : resolveTone(run.tone, ctx.theme, ctx.capabilities, ctx.on);
   const merged = withSpan(base, run.attrs);
   if (run.value === undefined || ctx.colormap === undefined) return merged;

@@ -12,12 +12,13 @@ import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
 import { compose, heightsSum, type Composed } from "../../src/shell/frame.js";
-import { commandRows, cursorFor, paint, placedLayers, type PaintDeps } from "../../src/shell/paint.js";
+import { commandRows, cursorFor, paint, paintEchoRows, placedLayers, type PaintDeps } from "../../src/shell/paint.js";
+import { echoRows } from "../../src/shell/echo.js";
 import { PROMPT_GUTTER } from "../../src/shell/config.js";
 import { exact, FrameError } from "../../src/shell/frame-error.js";
-import { displayCells } from "../../src/presentation/text.js";
+import { displayCells, sliceCells } from "../../src/presentation/text.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, MONO_UNICODE_CAPS } from "../support/render.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { patchDefinition } from "../../src/presentation/patch/definition.js";
 import { chipLabel, chipSpans, createEditor, selectionSpans } from "../../src/interaction/editor/index.js";
@@ -35,7 +36,7 @@ import type { Key, OwnerRung } from "../../src/interaction/router/types.js";
 import { chordText, createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
 import type { Binding } from "../../src/interaction/router/types.js";
 import type { OwnerHints } from "../../src/shell/types.js";
-import { tone } from "../../src/presentation/blocks/paint.js";
+import { background, tone, withBackground } from "../../src/presentation/blocks/paint.js";
 import type { Block, Pills } from "../../src/data/viewmodel/index.js";
 
 /** C09's measurer, for the footer's height (C22 I82). */
@@ -1471,7 +1472,37 @@ describe("C22 I33 — the echo neutralised (F1401)", () => {
 });
 
 describe("C22 I153 — the echo draws its chips (ruling 104 c, F1521)", () => {
-  it.todo(
-    "T1.187 (C22 I153): an echo holding a chip is the prompt row, one wrap unit, grounded bgDeep; without an echo the rows are unchanged — not deferred on a component: lands with lane b5-chips' code commit",
-  );
+  it("T1.187 (C22 I153, §6t.2 rows 1–7): an echo holding a chip is the prompt row, one wrap unit, grounded bgDeep; without an echo the rows are unchanged", () => {
+    const paste = Array.from({ length: 6 }, (_, i) => `alpha ${String(i)}`).join("\n");
+    const command = `echo hi ${paste}`;
+    const chip = { from: 8, to: command.length, ordinal: 1, kind: "paste" as const, name: "pasted", lines: 6 };
+    const echo = [chip];
+
+    // §6t.1's measured case: one row, as the prompt showed it.
+    expect(commandRows(command, 80, FULL_CAPS, echo)).toEqual(["❯ echo hi  #1 pasted · 6L "]);
+    expect(commandRows(command, 80, MONO_UNICODE_CAPS, echo), "1 bit: the bracketed rung").toEqual(["❯ echo hi [#1 pasted · 6L]"]);
+
+    // **The control: no echo, and an echo that does not describe the command**,
+    // each the six rows `hardWrapCells` draws.
+    const six = commandRows(command, 80, FULL_CAPS);
+    expect(six).toHaveLength(6);
+    expect(six[1]).toBe(`${" ".repeat(PROMPT_GUTTER.cont)}alpha 1`);
+    expect(commandRows(command, 80, FULL_CAPS, [{ ...chip, to: command.length + 1 }]), "a range past the command").toEqual(six);
+
+    // **One wrap unit**: at 24 columns the label does not fit beside `echo hi `
+    // and moves whole to the second row.
+    expect(commandRows(command, 24, FULL_CAPS, echo)).toEqual(["❯ echo hi ", `${" ".repeat(PROMPT_GUTTER.cont)} #1 pasted · 6L `]);
+
+    // **The cells**: the chip's span covers the label exactly, and painted, it
+    // is the only run on the row carrying a background — `bgDeep`'s.
+    const drawn = echoRows(command, echo, 80, FULL_CAPS);
+    const row = drawn?.rows[0] ?? "";
+    const span = drawn?.chips[0];
+    expect(span).toEqual({ row: 0, from: 10, to: 26 });
+    expect(sliceCells(row, span?.from ?? 0, span?.to ?? 0)).toBe(" #1 pasted · 6L ");
+    const [painted] = paintEchoRows(drawn?.rows ?? [], drawn?.chips ?? [], null, DARK_THEME, FULL_CAPS);
+    const well = withBackground(tone("meta", DARK_THEME, FULL_CAPS, "bgDeep"), background("surface.bgDeep", DARK_THEME, FULL_CAPS));
+    expect(well.background, "the fixture resolves a bgDeep ground").toBeDefined();
+    expect(painted).toBe(`❯ echo hi ${sgr(well)} #1 pasted · 6L ${SGR_RESET}`);
+  });
 });

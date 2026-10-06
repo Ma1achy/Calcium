@@ -17,7 +17,7 @@ import type { Adapter, AdapterRegistry, ProducerContext } from "../data/adapters
 import type { ManifestDocument, ManifestStore } from "../data/manifest/index.js";
 import type { Exit, ProcessRunner, PtyFactory } from "../data/process/types.js";
 import type { TransportRouter } from "../data/transport/index.js";
-import type { Action, Block, ViewDocument } from "../data/viewmodel/index.js";
+import type { Action, Block, EchoChip, ViewDocument } from "../data/viewmodel/index.js";
 import type { EntryId } from "../viewport/transcript/index.js";
 import type { OwnerRung } from "../interaction/router/types.js";
 
@@ -403,7 +403,12 @@ export interface FileSystem {
  * design. Four built, four sealed, and they are not the same four.)
  */
 export interface Pipeline {
-  submit(line: string): void;
+  /**
+   * `chips` is the line's, as ranges into it (C23 I104, C04 I152): the prompt's
+   * submission passes the editor's and a re-run the entry's own. No other
+   * caller passes any.
+   */
+  submit(line: string, chips?: readonly EchoChip[]): void;
   /**
    * A `local` verb's entry appended **without submitting** (C23 I79, C16 I57):
    * no clear, no history, no queue. The help action's route.

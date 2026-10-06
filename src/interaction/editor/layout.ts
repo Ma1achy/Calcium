@@ -34,6 +34,8 @@ import { graphemes } from "./graphemes.js";
 // one, which is the one direction this collision could have gone well.
 import { cells as widthOf, truncate } from "../../presentation/text.js";
 import { neutraliseControl } from "../../data/text.js";
+// One union for the editor and for the record a submission leaves (C04 I152).
+import type { ChipKind } from "../../data/viewmodel/index.js";
 
 export type Gutter = Readonly<{ first: number; cont: number }>;
 
@@ -92,7 +94,7 @@ export type ClusterText = (cluster: string, limit?: number) => string | undefine
  * `target` is what the preview opens when that is not the content, and C17
  * never reads it.
  */
-export type ChipKind = "paste" | "file" | "image";
+export type { ChipKind };
 
 /** A pasted or attached block, standing in the buffer as one grapheme (roadmap 30, I25). */
 /**

@@ -36,6 +36,7 @@ import { neutraliseControl } from "../data/text.js";
 import {
   background,
   based,
+  focusShapeStyle,
   paint as paintSpans,
   isBand,
   selectionStyle,
@@ -51,7 +52,8 @@ import type { ChromeCache, ChromeRole } from "./chrome-cache.js";
 import { exact, FrameError } from "./frame-error.js";
 import { gutterMatchesPrompt, heightsSum, promptTop, type Composed } from "./frame.js";
 import type { Label } from "./types.js";
-import type { Block } from "../data/viewmodel/index.js";
+import type { Block, EchoChip } from "../data/viewmodel/index.js";
+import { echoRows, type EchoCaps } from "./echo.js";
 import type { Placed } from "../viewport/overlay/index.js";
 import type { Cell, CellSpan } from "../interaction/editor/index.js";
 import type { BlockRegistry } from "../presentation/blocks/index.js";
@@ -384,9 +386,18 @@ export function commandRows(
   // resolved at module scope and both forms must be `PROMPT_GUTTER.first`
   // cells — otherwise the height C14 virtualises against and the row the
   // composer draws disagree about the same entry.
-  caps: Pick<TerminalCapabilities, "unicode">,
+  caps: EchoCaps,
+  /**
+   * The line's chips (C04 I152). **Where they describe `command`, the echo is
+   * the prompt's walk** (I153): a chip is one wrap unit drawn as its label,
+   * and its content's line breaks never reach the frame. Absent, or a range
+   * that does not lie in `command`, and the rows below are unchanged.
+   */
+  echo?: readonly EchoChip[],
 ): readonly string[] {
   if (command === "") return [];
+  const walked = echoRows(command, echo, width, caps);
+  if (walked !== null) return walked.rows;
   const body = Math.max(1, width - PROMPT_GUTTER.first);
   // **Line by line, and no row holds a break** (C22 I33, amended). A paste or a
   // resolved chip puts `\n` in the command, `hardWrapCells` measures it as
@@ -546,9 +557,9 @@ type StyledRange = Readonly<{ from: number; to: number; style: Style }>;
  * are known: a copy selection outranks a structural surface, so a chip under a
  * selection is washed and not double-painted.
  */
-function styled(row: string, ranges: readonly StyledRange[], deps: PaintDeps): string {
+function styled(row: string, ranges: readonly StyledRange[], caps: Pick<TerminalCapabilities, "ambiguousWidth">): string {
   if (ranges.length === 0) return row;
-  const width = cells(row, deps.capabilities.ambiguousWidth);
+  const width = cells(row, caps.ambiguousWidth);
   const order = [...ranges].sort((a, b) => a.from - b.from);
   let out = "";
   let at = 0;
@@ -560,6 +571,49 @@ function styled(row: string, ranges: readonly StyledRange[], deps: PaintDeps): s
     at = range.to;
   }
   return out + sliceCells(row, at, width);
+}
+
+/**
+ * A chip is a well (`R-BLK-628`) in the meta tone (`R-BLK-116`), resolved
+ * against the ground it lands on (C10 I48) rather than measured flat. The
+ * prompt's and the echo's (C22 I153), so the two cannot draw one chip two ways.
+ */
+function chipWell(theme: ResolvedTheme, capabilities: TerminalCapabilities): Style {
+  return withBackground(
+    tone("meta", theme, capabilities, "bgDeep"),
+    background("surface.bgDeep", theme, capabilities),
+  );
+}
+
+/**
+ * The echo's rows with each chip painted as the prompt paints it (C22 I153,
+ * I154; §6t.2 rows 7, 8).
+ *
+ * At rest a chip is the prompt's well; **focused, it takes the box shape's
+ * treatment** (C09 I137) — `meta` over `focusGround`, whole-shape inversion
+ * where no ground resolves — and the resting ground does not outlive focus.
+ * At 1 bit the well resolves to nothing and the bracketed label carries it
+ * (C17 I25). `focused` is the index into the echo's chips, or `null`.
+ *
+ * Rows without a chip come back as they went in, so an echo holding none is
+ * byte for byte what `commandRows` drew.
+ */
+export function paintEchoRows(
+  rows: readonly string[],
+  chips: readonly CellSpan[],
+  focused: number | null,
+  theme: ResolvedTheme,
+  capabilities: TerminalCapabilities,
+): readonly string[] {
+  if (chips.length === 0) return rows; // cells-ok — a chip count
+  const well = chipWell(theme, capabilities);
+  const focus = { ...tone("meta", theme, capabilities, "focusGround"), ...focusShapeStyle(theme, capabilities) };
+  return rows.map((row, at) => {
+    const ranges = chips.flatMap((span, i) =>
+      span.row === at ? [{ from: span.from, to: span.to, style: i === focused ? focus : well }] : [],
+    );
+    return ranges.length === 0 ? row : styled(row, ranges, capabilities); // cells-ok — a range count
+  });
 }
 
 /**
@@ -818,14 +872,7 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
     const at = span.row - window.first + window.offset;
     (chips.get(at) ?? chips.set(at, []).get(at) ?? []).push(span);
   }
-  // A chip is a well (`R-BLK-628`) in the meta tone (`R-BLK-116`), resolved
-  // against the ground it lands on (C10 I48) rather than measured flat.
-  const chipStyle = chips.size === 0
-    ? undefined
-    : withBackground(
-        tone("meta", deps.theme, deps.capabilities, "bgDeep"),
-        background("surface.bgDeep", deps.theme, deps.capabilities),
-      );
+  const chipStyle = chips.size === 0 ? undefined : chipWell(deps.theme, deps.capabilities);
 
   const out: string[] = [];
   for (let i = 0; i < cap; i += 1) {
@@ -850,7 +897,7 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
       ...(onRow === undefined || chipStyle === undefined ? [] : chipRanges(onRow, span, chipStyle)),
       ...(span === undefined ? [] : [{ from: span.from, to: span.to, style: selectionStyle(deps.theme, deps.capabilities) }]),
     ];
-    out.push(styled(squared, ranges, deps));
+    out.push(styled(squared, ranges, deps.capabilities));
   }
 
   // **The spinner is appearance and never geometry** (I38, C19 §7). It goes on

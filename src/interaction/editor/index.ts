@@ -5,7 +5,7 @@
  * rendering, no geometry held, no clock read.
  */
 
-export { createEditor, type HeldLine, type LineEditor, type LineState, type Motion } from "./editor.js";
+export { createEditor, type HeldLine, type LineEditor, type LineState, type Motion, type ResolvedChip } from "./editor.js";
 export type { Cell, CellSpan, Gutter } from "./layout.js";
 // Entry 23 — the wash. L4 reads `editor.selection` and maps it through the
 // same walk `layout` returns rows from (I18).
@@ -17,4 +17,7 @@ export { cursorCell, layout } from "./layout.js";
 // the label they cover is composed here, so the design's form is not every
 // application's to spell (I25).
 export { chipLabel, chipSpans, chipText } from "./layout.js";
+// C22 I153 — the echo of a line that held chips is the prompt's walk, rows and
+// chip cells from one call (ruling 104 c).
+export { walk } from "./layout.js";
 export type { Chip, ChipKind, ChipLook } from "./layout.js";

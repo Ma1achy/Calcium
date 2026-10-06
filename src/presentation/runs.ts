@@ -35,7 +35,16 @@ export type SpanAttrs = Readonly<{ bold?: boolean; italic?: boolean; underline?:
  * has. `value` is the one member the wrapper reads — a valued run is an atom
  * (C09 §5) — which is why it rides on the run and not only on the style.
  */
-export type Run = Readonly<{ text: string; attrs?: SpanAttrs; tone?: Tone; value?: number; elide?: true; ramp?: RunRamp }>;
+export type Run = Readonly<{
+  text: string;
+  attrs?: SpanAttrs;
+  tone?: Tone;
+  value?: number;
+  elide?: true;
+  ramp?: RunRamp;
+  /** A ground with its own ink (C04 I151), resolved by `runStyle` as a pair (C09 I139). Appearance only. */
+  ground?: "pick";
+}>;
 
 /**
  * A run's place in its ramped span (C09 I51): `at` is the grapheme index of the
@@ -92,6 +101,7 @@ function runOf(text: string, span: TextSpan, ordinal: number): Run {
     ...(span.value === undefined ? {} : { value: span.value }),
     // A boundary the fitter reads and the painter never does (C04 I105).
     ...(span.elide === true ? { elide: true as const } : {}),
+    ...(span.ground === undefined ? {} : { ground: span.ground }),
     // The extent is the span's drawn text, counted in clusters (C09 I51).
     ...(span.ramp === undefined ? {} : { ramp: { ramp: span.ramp, at: 0, of: graphemes(text).length, ordinal } }), // cells-ok — a cluster count
   };

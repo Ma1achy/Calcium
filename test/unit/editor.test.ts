@@ -1123,7 +1123,34 @@ describe("C17 I36 — the reader's own bidi characters, drawn visible and kept a
 });
 
 describe("C17 I37 — resolvedChips (ruling 104 c)", () => {
-  it.todo(
-    "T1.63 (C17 I37): resolvedChips ranges index resolved, past a surrogate pair, in buffer order, and come back with undo — not deferred on a component: lands with lane b5-chips' code commit",
-  );
+  it("T1.63 (C17 I37): resolvedChips ranges index resolved, past a surrogate pair, in buffer order, and come back with undo", () => {
+    const e = createEditor();
+    // Escapes, never literals (A03 SS69): U+1F600 is a surrogate pair.
+    const first = "\u{1F600}\nb";
+    e.insert("echo ");
+    e.insertChip({ kind: "paste", name: "pasted", lines: 2, content: first });
+    e.insert(" x ");
+    e.insertChip({ kind: "paste", name: "pasted", lines: 1, content: "z" });
+
+    const chips = e.resolvedChips;
+    expect(e.resolved).toBe(`echo ${first} x z`);
+    expect(chips.map((c) => [c.from, c.to, c.chip.ordinal]), "two ranges in buffer order").toEqual([
+      [5, 5 + first.length, 1],
+      // **Counted past the pair**: two code units for the emoji, one for `\n`, one
+      // for `b` — a range advanced by the sentinel's one unit would say 9.
+      [5 + first.length + 3, 5 + first.length + 4, 2],
+    ]);
+    for (const c of chips) expect(e.resolved.slice(c.from, c.to), `chip #${String(c.chip.ordinal)}`).toBe(c.chip.content);
+
+    // A buffer with no chip answers none.
+    const plain = createEditor();
+    plain.insert("echo hi");
+    expect(plain.resolvedChips).toEqual([]);
+
+    // Deleted and brought back by undo: present again, because the table keeps it (I34).
+    e.deleteBackward();
+    expect(e.resolvedChips.length, "the second chip deleted").toBe(1);
+    e.undo();
+    expect(e.resolvedChips.map((c) => c.chip.content), "and restored").toEqual([first, "z"]);
+  });
 });

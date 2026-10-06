@@ -27,7 +27,7 @@ import { parse } from "../interaction/parser/index.js";
 import type { Builtin, ParseResult } from "../interaction/parser/index.js";
 import type { RawPatch } from "../data/transport/index.js";
 import type { Exit } from "../data/process/types.js";
-import type { Block, ViewDocument } from "../data/viewmodel/index.js";
+import type { Block, EchoChip, ViewDocument } from "../data/viewmodel/index.js";
 import { approvalPrompt, blockId, callHead, callStatus, cancelledCard, cancelledDoc, cardOver, completeLocal, compose, DENY_KEY, errorDoc, noticeDoc, refusalNotice, toolCallDoc, usageDoc } from "./documents.js";
 import { createActionDispatcher } from "./actions.js";
 import { createRefreshDriver, STALL_BLOCK } from "./refresh.js";
@@ -173,6 +173,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     line: string;
     result: Exclude<ParseResult, { kind: "empty" }>;
     id: EntryId;
+    /** The line's chips, carried as the line is (I104, §6t.3 row 4). */
+    echo?: readonly EchoChip[];
   }>;
   const queue: Queued[] = [];
 
@@ -355,7 +357,16 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * A green suite shows neither. Left alone on purpose — the duplication is
    * apparent rather than real.
    */
-  type Settle = Readonly<{ line: string; into: EntryId | null }>;
+  type Settle = Readonly<{
+    line: string;
+    into: EntryId | null;
+    /**
+     * The line's chips, as ranges into `line` (I104, C04 I152). **Spread with
+     * `into`, never rebuilt** — a route settling into its own pending entry
+     * writes `{ ...settle, into }`, so the chips reach the settle (C22 §6t.3 row 2).
+     */
+    echo?: readonly EchoChip[];
+  }>;
 
   /**
    * A slot reserved before its document existed (C22 I99).
@@ -365,10 +376,21 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * terminal path. A lineless arm inside `Settle` would be a second way for a
    * submission to enter no history, which is the defect I29 exists to forbid.
    */
-  type IntoSlot = Readonly<{ line?: undefined; into: EntryId }>;
+  type IntoSlot = Readonly<{ line?: undefined; into: EntryId; echo?: undefined }>;
 
   /** A submission routed as it was typed — the ordinary case. */
-  const now = (line: string): Settle => ({ line, into: null });
+  const now = (line: string, echo?: readonly EchoChip[]): Settle =>
+    echo === undefined ? { line, into: null } : { line, into: null, echo };
+
+  /**
+   * **I104 — a document written for a submission carries its chips where its
+   * `command` is the line.** A document stating another command — an adapter's
+   * own (C07 I16), an app line's argv form — is written without, because the
+   * ranges index the line and nothing else. One function, so every route asks
+   * the same question.
+   */
+  const withEcho = (doc: ViewDocument, settle: Settle | IntoSlot | undefined): ViewDocument =>
+    settle?.echo === undefined || doc.command !== settle.line ? doc : { ...doc, meta: { ...doc.meta, echo: settle.echo } };
 
   /**
    * The one place a document reaches the transcript, and the one place the
@@ -403,6 +425,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     opts?: Parameters<typeof deps.transcript.append>[1],
   ): string | null => {
     const line = settle?.line;
+    doc = withEcho(doc, settle);
     let id: string | null = null;
     try {
       // **The two cases of one destination.** A submission that waited already
@@ -479,7 +502,9 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
   // reason was always about *no part takes effect now* and never about
   // discarding the line.
 
-  const submit = (line: string): void => {
+  const submit = (line: string, chips?: readonly EchoChip[]): void => {
+    // I104 — only a line that held a chip carries a record of one.
+    const echo = chips === undefined || chips.length === 0 ? undefined : chips; // cells-ok — an array count
     // **C23 I12 first, before anything else is read.** A submission after shutdown
     // begins must not append, and the check has to precede the guard so a
     // refusal during teardown does not take one it will never release.
@@ -514,11 +539,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // Everything queues, strictly. The rule that would let a `local` handler
       // jump is the **who is writing** axis, and it is inferred from two cases:
       // the roadmap entry carries it as the open question it is.
-      enqueue(line, result);
+      enqueue(line, result, echo);
       return;
     }
 
-    route(now(line), result);
+    route(now(line, echo), result);
   };
 
   /**
@@ -533,7 +558,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
    * append would record a line that has not run. History is written by the route
    * that drains it, through the funnel, exactly as an unqueued submission's is.
    */
-  const enqueue = (line: string, result: Exclude<ParseResult, { kind: "empty" }>): void => {
+  const enqueue = (line: string, result: Exclude<ParseResult, { kind: "empty" }>, echo?: readonly EchoChip[]): void => {
     // **Contained, because C23 I2 admits no escaping failure and this append is
     // outside the funnel's catch** (§5). Found by T1.46 rather than by reading:
     // `/help` takes the guard, so with a throwing transcript the second and
@@ -547,14 +572,14 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     let id: EntryId;
     try {
       id = deps.transcript.append(
-        noticeDoc(line, `queued behind ${guard.verb ?? "a command"}`, "muted", { origin: "user" }),
+        withEcho(noticeDoc(line, `queued behind ${guard.verb ?? "a command"}`, "muted", { origin: "user" }), now(line, echo)),
         { streaming: true },
       );
     } catch (cause) {
       contain("enqueue", cause);
       return;
     }
-    queue.push({ line, result, id });
+    queue.push(echo === undefined ? { line, result, id } : { line, result, id, echo });
     deps.scheduler.commit("input");
   };
 
@@ -580,7 +605,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       while (guard.route === null) {
         const next = queue.shift();
         if (next === undefined) return;
-        route({ line: next.line, into: next.id }, next.result);
+        route({ ...now(next.line, next.echo), into: next.id }, next.result);
       }
     } finally {
       draining = false;
@@ -610,7 +635,10 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // step earlier. 0 would record a success, 130 an interrupt of something
       // that was never running. It was recorded nowhere, so `↑` could not
       // recall a line the reader typed.
-      const doc = cancelledDoc(item.line, "cancelled before it ran", { origin: "user", exitCode: -1 });
+      const doc = withEcho(
+        cancelledDoc(item.line, "cancelled before it ran", { origin: "user", exitCode: -1 }),
+        now(item.line, item.echo),
+      );
       deps.transcript.settle(item.id, doc);
       recordHistory(item.line, doc);
     }
@@ -730,12 +758,15 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     const pendingId =
       settle.into === null
         ? deps.transcript.append(
-            compose({
-              command: line,
-              status: "ok",
-              blocks: [snapshot()],
-              meta: { origin: "user", transport: "subprocess", argv: [command] },
-            }),
+            withEcho(
+              compose({
+                command: line,
+                status: "ok",
+                blocks: [snapshot()],
+                meta: { origin: "user", transport: "subprocess", argv: [command] },
+              }),
+              settle,
+            ),
             { streaming: true },
           )
         : settle.into;
@@ -986,7 +1017,8 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // forwards). This route appends before it spawns, so `into` is never
         // null by the time it settles — passing the caller's `settle` would
         // append a second entry beside the one the reader has been watching.
-        { line, into: pendingId },
+        // Spread rather than rebuilt, so the line's chips reach it (I104).
+        { ...settle, into: pendingId },
       );
     } catch (cause) {
       accepting = false;
@@ -995,7 +1027,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       emulator.dispose();
       appendAndCommit(
         errorDoc(line, { message: String(cause), stage: "spawn" }, { origin: "user" }),
-        { line, into: pendingId },
+        { ...settle, into: pendingId },
       );
     } finally {
       cancelInFlight = null;
@@ -1276,7 +1308,11 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
      * `argv`, so the displayed line is that argv wearing the prefix the user
      * typed, which is exactly D24's one-token mapping.
      */
-    const displayed = `/${result.argv.join(" ")}`;
+    //
+    // **A line holding a chip and no `$_` displays as typed** (I15 amended,
+    // I104): the chips' ranges index the line, and the joined argv is another
+    // string. With `$_` as well, the argv form and no chips (C22 §6t.5).
+    const displayed = settle.echo !== undefined && !line.includes("$_") ? line : `/${result.argv.join(" ")}`;
 
     // **Step 3 is the pending entry, for every verb** (C22 §13a, R-EXA-082). A branch
     // stood here that pushed a layer in the entry's slot for a verb declaring `view`, one
@@ -1336,7 +1372,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
     let pendingId: EntryId;
     if (settle.into === null) {
       pendingId = deps.transcript.append(
-        toolCallDoc(displayed, call, { origin: "user", verb, transport: "subprocess", argv: [...result.argv] }, deps.capabilities),
+        withEcho(toolCallDoc(displayed, call, { origin: "user", verb, transport: "subprocess", argv: [...result.argv] }, deps.capabilities), settle),
         { streaming: true },
       );
     } else {
@@ -1455,7 +1491,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
         // card is the entry, so the failure is settled into it, as the invoke
         // arm's throw is.
         const refused = errorDoc(line, { message: String(cause), stage: "pipeline" }, { origin: "user", verb });
-        settleWithDocument(pendingId, cardOver(refused, call, deps.elapsed() - startedAt, deps.capabilities));
+        settleWithDocument(pendingId, withEcho(cardOver(refused, call, deps.elapsed() - startedAt, deps.capabilities), settle));
         recordHistory(line, refused); // I29 — a refusal is a settlement.
         deps.scheduler.commit("completion");
         guard.release();
@@ -1595,7 +1631,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       // this the settle replaced the card wholesale and `❯ /ps` over a table
       // was what a finished listing read — §9c's settled state on this route
       // was reached by no path.
-      settleWithDocument(pendingId, cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities));
+      settleWithDocument(pendingId, withEcho(cardOver(doc, call, deps.elapsed() - startedAt, deps.capabilities), settle));
       recordHistory(line, doc); // I29 — the app route's settlement.
 
       // C23 I7 — declared, never inferred. A verb declaring none leaves `$_`
@@ -1616,7 +1652,7 @@ export function createExecutionPipeline(deps: PipelineDeps): Pipeline {
       );
       // I55, §8g row 11 — the status box is the body and the verdict is the
       // header's: two statements of one fact, and the header is the one 1-bit keeps.
-      settleWithDocument(pendingId, cardOver(failed, call, deps.elapsed() - startedAt, deps.capabilities));
+      settleWithDocument(pendingId, withEcho(cardOver(failed, call, deps.elapsed() - startedAt, deps.capabilities), settle));
       recordHistory(line, failed); // I29 — a failure is a settlement.
       deps.scheduler.commit("completion");
     } finally {

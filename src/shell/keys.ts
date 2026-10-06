@@ -47,6 +47,7 @@ import type { EntryId } from "../viewport/transcript/index.js";
 import type { Manifest } from "../data/manifest/index.js";
 import type { OverlayManager } from "../viewport/overlay/index.js";
 import type { FocusStore } from "../interaction/router/focus.js";
+import { ECHO_BLOCK } from "./echo.js";
 
 /** The prompt's own extent, for anchoring (C19 §6, C20 §5). */
 export type PromptAnchor = Readonly<{ row: number; rows: number }>;
@@ -1563,7 +1564,9 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
      * why it is not `extendRow` twice.
      */
     selectAllElements: () => {
-      const elements = deps.focusedElements();
+      // **The document's elements, not the echo's** (C22 I154, C26 I33): the
+      // head's copy already holds the chips' content, so `⌃a y` would copy it twice.
+      const elements = deps.focusedElements().filter((e) => e.blockId !== ECHO_BLOCK);
       if (deps.focus.current.at !== "liveBlock") return;
       const first = elements[0];
       const last = elements.at(-1);

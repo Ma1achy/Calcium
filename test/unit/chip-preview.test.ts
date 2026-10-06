@@ -11,7 +11,10 @@ import { describe, expect, it } from "vitest";
 import { NO_EDITOR, openChipInEditor } from "../../src/shell/chip-editor.js";
 import { buildGraph, buildSession, fakeFs, FRAME } from "../support/session.js";
 import { fakeStdin } from "../support/fake-terminal.js";
-import { ASCII_CAPS } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, measurable } from "../support/render.js";
+import type { Block, Raw } from "../../src/data/viewmodel/index.js";
+import { resolveBackground } from "../../src/presentation/theme/index.js";
+import { sgr } from "../../src/terminal/escapes.js";
 
 /** Written as a code point rather than a literal, so no control byte is in the file. */
 const ESC = String.fromCharCode(27);
@@ -177,7 +180,8 @@ describe("C22 §6q — the chip preview's box and keys (ruling 53), owed at the 
     expect(parts(), "a 47-line chip overflows the bounded box").toEqual({
       kinds: KINDS,
       edge: "",
-      header: "#1 pasted · 47L",
+      // The painted label less its trailing space: the name's ground carries its own (C22 I155).
+      header: " #1 pasted · 47L",
       height: 8,
       keys: "⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor",
     });
@@ -360,7 +364,44 @@ describe("C22 §6s — the preview's key row names the other chips (I143)", () =
 });
 
 describe("C22 I155 — the header grounds the name in pick (F1522)", () => {
-  it.todo(
-    "T1.188 (C22 I155): the header names the chip on pick, bold, and the size muted beside it; at 1 bit the brackets and no ground — not deferred on a component: lands with lane b5-chips' code commit",
-  );
+  /** The preview's header block, after a six-line paste, on a session at `colourDepth`. */
+  const headerAt = async (colourDepth: 1 | 8): Promise<Block | undefined> => {
+    const { graph, stdin } = await buildGraph({ capabilities: { colourDepth } });
+    graph.lifecycle.acquire();
+    stdin.emit(`${ESC}[200~${pasteOf(6, "alpha")}${ESC}[201~`);
+    await settle();
+    return graph.overlays.stack.find((l) => l.id === "chip-preview")?.content[1];
+  };
+  /** The SGR parameters opening the run that begins with `text`, or `null`. */
+  const paramsBefore = (line: string, text: string): string | null => {
+    const at = line.indexOf(text);
+    const open = line.lastIndexOf(`${ESC}[`, at);
+    return at < 0 || open < 0 ? null : line.slice(open + 2, line.indexOf("m", open));
+  };
+
+  it("T1.188 (C22 I155, §6t ruling 6): the header names the chip on pick, bold, and the size muted beside it; at 1 bit the brackets and no ground", async () => {
+    const header = await headerAt(8);
+    expect(header?.kind).toBe("raw");
+    const raw = header as Raw;
+    expect(raw.text).toBe(" #1 pasted · 6L");
+    expect(raw.spans).toEqual([
+      { from: 0, to: 11, ground: "pick", bold: true },
+      { from: 11, to: 15, tone: "muted" },
+    ]);
+
+    // **Rendered**: the name's cells carry pick's background and the size's do not.
+    const caps = { ...FULL_CAPS, colourDepth: 8 as const };
+    const [line] = measurable({ capabilities: caps }).renderToLines(raw, 40);
+    const pick = sgr(resolveBackground("surface.pick", DARK_THEME, caps));
+    const ground = pick.slice(2, -1);
+    expect(ground, "the fixture resolves a pick ground at 256 colours").toMatch(/^48;5;\d+$/u);
+    expect(paramsBefore(line ?? "", " #1 pasted "), "the name").toContain(ground);
+    expect(paramsBefore(line ?? "", "· 6L"), "the size").not.toMatch(/48;/u);
+
+    // **1 bit**: the bracketed rung, and nothing to ground.
+    const mono = (await headerAt(1)) as Raw | undefined;
+    expect(mono?.text).toBe("[#1 pasted · 6L]");
+    expect(mono?.spans?.some((sp) => sp.ground !== undefined), "no ground at 1 bit").toBe(false);
+    expect(mono?.spans?.[0]?.bold, "the name is bold").toBe(true);
+  });
 });

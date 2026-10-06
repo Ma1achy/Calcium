@@ -53,6 +53,30 @@ export type DocumentMeta = Readonly<{
    * which names a mechanism that did not produce it.
    */
   origin: "user" | "action" | "agent" | "refresh" | "defect";
+  /**
+   * The submitted line's chips, as ranges into `command` (I152, ruling 104 c).
+   * Shell-owned, as `origin` is: `ProducedMeta` refuses it, so a producer cannot
+   * draw a chip into an echo. Absent where the line held none. C22 I153 draws it.
+   */
+  echo?: readonly EchoChip[];
+}>;
+
+/** What a chip stands for — C17's union, declared here so the record and the editor cannot drift (I152). */
+export type ChipKind = "paste" | "file" | "image";
+
+/**
+ * One chip of a submitted line (I152): `[from, to)` in code units of `command`,
+ * sorted and disjoint, covering exactly the chip's content — which is
+ * `command.slice(from, to)` and is not carried twice — with the parts C17
+ * composes a label from.
+ */
+export type EchoChip = Readonly<{
+  from: number;
+  to: number;
+  ordinal: number;
+  kind: ChipKind;
+  name: string;
+  lines?: number;
 }>;
 
 /**
@@ -377,10 +401,17 @@ export type TextSpan = Readonly<{
    * pair is bounded by two colours whose floors C10 I26 proves, a sample is not.
    */
   ramp?: Ramp;
+  /**
+   * A ground on the run (I151, §101, F1522): `pick` paints its cells on
+   * `surface.pick` with `surface.pickInk` as the ink, the pair resolved together
+   * (C09 I139). Refused beside `tone`, `value` and `ramp`, and on a hunk line.
+   * One member of one value, because one consumer: the chip preview's header.
+   */
+  ground?: "pick";
 }>;
 
-/** The members of a span, for a gate that cannot silently take a tenth (I85) — the eighth, `elide`, arrived with I105 and the ninth, `ramp`, with I107. */
-export const TEXT_SPAN_KEYS: ReadonlySet<string> = new Set(["from", "to", "bold", "italic", "underline", "tone", "value", "elide", "ramp"]);
+/** The members of a span, for a gate that cannot silently take an eleventh (I85) — the eighth, `elide`, arrived with I105, the ninth, `ramp`, with I107, and the tenth, `ground`, with I151. */
+export const TEXT_SPAN_KEYS: ReadonlySet<string> = new Set(["from", "to", "bold", "italic", "underline", "tone", "value", "elide", "ramp", "ground"]);
 
 // --- ramps ----------------------------------------------------------------
 

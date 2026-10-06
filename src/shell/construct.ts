@@ -26,6 +26,7 @@
 
 import { createAdapterRegistry } from "../data/adapters/index.js";
 import { blankRowsAbove, commandRows } from "./paint.js";
+import { chipLookFor, echoChipsOf, echoElements } from "./echo.js";
 import { childBorderLegend, guardRefusal, keyHint } from "./chrome.js";
 import { compose, noticeDoc, settledDoc } from "./documents.js";
 import {
@@ -48,7 +49,7 @@ import { blockWidthInEntry, elementsOfEntry, ENTRY_GAP, measureEntry } from "./e
 import { createManifestStore, parseManifest, withThemeNames } from "../data/manifest/index.js";
 import type { ManifestError } from "../data/manifest/index.js";
 import { NO_SPAN, block as makeBlock, descendants, splitColumns, splitPaneKey, splitPanes } from "../data/viewmodel/index.js";
-import type { Action, Block, Form, Plot, Result, Split } from "../data/viewmodel/index.js";
+import type { Action, Block, EchoChip, Form, Plot, Result, Split } from "../data/viewmodel/index.js";
 import { createProcessRunner } from "../data/process/runner.js";
 import {
   createTransport,
@@ -806,17 +807,10 @@ export async function constructGraph(
    * too (I113, §6l.12): the header and the chip in the prompt spelling one chip
    * two ways is what a second derivation would buy.
    */
-  const chipGlyphs = glyphs(detection.capabilities);
-  const chipLook: ChipLook = {
-    separator: chipGlyphs.separator,
-    painted: detection.capabilities.colourDepth > 1,
-    // **The tier the separator came from, read off the set rather than
-    // restated** (C17 I32, C02 I9): `glyphs()` hands the ASCII set at the wide
-    // rung as well as at `unicode: "ascii"`, so the elision's marker is `~`
-    // wherever the separator is `:` and never a two-cell `…` the walk measures
-    // as one.
-    unicode: chipGlyphs === glyphs({ unicode: "ascii", ambiguousWidth: "narrow" }) ? "ascii" : detection.capabilities.unicode,
-  };
+  //
+  // **One derivation for the prompt, the preview and the echo** (C22 I153):
+  // `chipLookFor` is the echo's too, so a submitted chip is spelled as typed.
+  const chipLook: ChipLook = chipLookFor(detection.capabilities);
 
   // --- 3. registries: blocks, adapters, manifest, completion sources --------
   // **Manifest before completion sources**, within the step: the default
@@ -1042,8 +1036,10 @@ export async function constructGraph(
    * three is a viewport describing a document the frame is not showing — or a
    * click landing one command line below where it was made.
    */
-  const chromeRowsOf = (entry: Readonly<{ doc: Readonly<{ command: string }> }>, width: number): number =>
-    commandRows(entry.doc.command, width, detection.capabilities).length;
+  const chromeRowsOf = (
+    entry: Readonly<{ doc: Readonly<{ command: string; meta?: Readonly<{ echo?: readonly EchoChip[] }> }> }>,
+    width: number,
+  ): number => commandRows(entry.doc.command, width, detection.capabilities, entry.doc.meta?.echo).length;
 
   const stores = await (async () => {
     // Before the viewport, whose measurer reads it (C22 I100).
@@ -2305,7 +2301,14 @@ export async function constructGraph(
     // in, and their rows follow the header measured at the full width. The
     // entry's recorded command rides along so a head's `copy` is the invocation
     // (C22 I90).
-    return elementsOfEntry(built.blocks, entry.doc.blocks, deps.frame.region().width, entry.doc.command);
+    //
+    // **The echo's chips lead** (C26 I33, C22 I154): one `cell` element per
+    // chip the echo draws, above the blocks, so `⇧⇥` and `↓` land on the first
+    // and the general peek stands beside it with the content.
+    const width = deps.frame.region().width;
+    const echo = echoElements(entry.doc.command, entry.doc.meta.echo, width, detection.capabilities);
+    const own = elementsOfEntry(built.blocks, entry.doc.blocks, width, entry.doc.command);
+    return echo.length === 0 ? own : Object.freeze([...echo, ...own]); // cells-ok — an element count
   };
   /** The live entry's — what `↓` from the prompt enters (C16 I22). */
   const liveElements = (): readonly PlacedElement[] =>
@@ -2521,22 +2524,27 @@ export async function constructGraph(
     return parts.join("  ");
   };
   /**
-   * The header: the chip as C17 composes it, the name bold and the size
-   * `muted` (§6s ruling 2). **Without the painted rung's two spaces**, which
-   * belong to a ground a `raw` span cannot paint (C04 I89) — kept, the name
-   * would stand a cell in from the box and the key row under it. The bracketed
-   * rung keeps its brackets: they are the carrier there.
+   * The header: the chip as C17 composes it, **the name on `pick`**, bold, and
+   * the size `muted` beside it on the panel's ground (§101, C22 I155, F1522).
+   * The painted label less its trailing space — ` #1 pasted · 6L` — so the
+   * name's ground carries its own space either side, the leading one the
+   * label's and the trailing one the separator's. A chip with no size grounds
+   * its whole label. The bracketed rung keeps its brackets and takes no ground:
+   * they are the carrier there, and `pick` resolves to nothing at 1 bit.
    */
   const previewHeader = (chip: Chip): Block => {
     const label = chipLabel(chip, chipLook);
-    const text = chipLook.painted ? label.slice(1, -1) : label;
-    const size = chip.lines === undefined ? "" : ` ${chipLook.separator} ${String(chip.lines)}L`;
+    const text = chipLook.painted ? label.slice(0, -1) : label;
+    // The painted rung's name keeps the space before the size inside its ground.
+    const lead = chipLook.painted ? "" : " ";
+    const size = chip.lines === undefined ? "" : `${lead}${chipLook.separator} ${String(chip.lines)}L`;
     const at = size === "" ? -1 : text.lastIndexOf(size);
+    const name = chipLook.painted ? { ground: "pick" as const, bold: true } : { bold: true };
     const spans =
       at <= 0
-        ? [{ from: 0, to: text.length, bold: true }]
+        ? [{ from: 0, to: text.length, ...name }]
         : [
-            { from: 0, to: at, bold: true },
+            { from: 0, to: at, ...name },
             { from: at, to: at + size.length, tone: "muted" as const },
           ];
     return makeBlock({ kind: "raw", id: "chip-preview-header", text, spans });
@@ -3908,7 +3916,8 @@ export async function constructGraph(
     if (id === null) return;
     const entry = stores.transcript.entries.find((e) => e.id === id);
     if (entry === undefined || entry.doc.command === "") return;
-    pipeline?.submit(entry.doc.command);
+    // The entry's chips go with its command (C23 I104, C22 §6t.3 row 9).
+    pipeline?.submit(entry.doc.command, entry.doc.meta.echo);
   };
 
   const keys = createKeyEffects({
@@ -3942,7 +3951,9 @@ export async function constructGraph(
       // what C18 would be handed — a chip whose content begins `>` is P8.
       const line = stores.editor.resolved;
       if (line.startsWith(">")) return void submitPaletteLine(line);
-      pipeline?.submit(line);
+      // C17 I37 — where each chip stands in `line`, read here and nowhere else
+      // (C23 I104): the echo draws them as the prompt drew them (C22 I153).
+      pipeline?.submit(line, echoChipsOf(stores.editor.resolvedChips));
     },
     keepField: () => void commitField(),
     focusTranscript,

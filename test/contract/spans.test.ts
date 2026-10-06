@@ -185,7 +185,8 @@ describe("C04 §3am.1 — `elide`", () => {
   const ARG: TextSpan = { from: TEXT.indexOf("(") + 1, to: TEXT.indexOf(")"), elide: true };
 
   it("T2.114 (C04 I105, I107): the eighth and ninth members are admitted, inert on a wrapped token, and the boundary the fitter shortens first on a fitted one", () => {
-    expect(TEXT_SPAN_KEYS.size).toBe(9);
+    // Ten since C04 I151 admitted `ground` (T2.156 is its row).
+    expect(TEXT_SPAN_KEYS.size).toBe(10);
     expect(TEXT_SPAN_KEYS.has("elide")).toBe(true);
     expect(TEXT_SPAN_KEYS.has("ramp")).toBe(true);
     const marked = block({ kind: "notice", id: "n", tone: "info", glyph: "info", text: TEXT, spans: [ARG] });
@@ -411,7 +412,45 @@ describe("C10 §4h — the categorical cycle, one copy", () => {
 });
 
 describe("C04 I151 — a ground on a span (F1522)", () => {
-  it.todo(
-    "T2.156 (C04 I151): ground pick is accepted with bold and refused beside tone, value and ramp, on a hunk line, and as any other value; measure ignores it — not deferred on a component: lands with lane b5-chips' code commit",
-  );
+  const errorsOf = (value: unknown): string => {
+    const outcome = validateBlock(value as Block);
+    return outcome.ok ? "" : outcome.error.join(" ");
+  };
+  const raw = (span: Record<string, unknown>, extra: Record<string, unknown> = {}): unknown => ({
+    kind: "raw",
+    id: "h",
+    text: "#1 pasted · 6L",
+    spans: [{ from: 0, to: 9, ...span }],
+    ...extra,
+  });
+
+  it("T2.156 (C04 I151): ground pick is accepted with bold and refused beside tone, value and ramp, on a hunk line, and as any other value; measure ignores it", () => {
+    expect(TEXT_SPAN_KEYS.has("ground"), "the tenth member").toBe(true);
+    expect(errorsOf(raw({ ground: "pick", bold: true })), "accepted with bold").toBe("");
+
+    expect(errorsOf(raw({ ground: "bgDeep" }))).toMatch(/"ground" must be "pick" \(C04 I151\)/u);
+    expect(errorsOf(raw({ ground: "pick", tone: "accent" }))).toMatch(/"ground" beside "tone"/u);
+    expect(errorsOf(raw({ ground: "pick", value: 0.5 }, { colormap: "viridis" }))).toMatch(/"ground" beside "value"/u);
+    // **The control for the `value` arm**: the same span without the ground is
+    // accepted, so the refusal above is the ground's and not the map's.
+    expect(errorsOf(raw({ value: 0.5 }, { colormap: "viridis" })), "a valued span on a mapped block").toBe("");
+    expect(errorsOf(raw({ ground: "pick", ramp: { fill: "gradient", from: "accent", to: "ok" } }))).toMatch(/"ground" beside "ramp"/u);
+
+    const hunk = {
+      kind: "patch",
+      id: "p",
+      path: "a.ts",
+      language: "ts",
+      hunks: [{ oldStart: 1, newStart: 1, lines: [{ op: "context", text: "abc", spans: [{ from: 0, to: 1, ground: "pick" }] }] }],
+    };
+    expect(errorsOf(hunk)).toMatch(/"ground" is refused on this member/u);
+
+    // **Appearance only** (C04 I83): the same number with the ground and without it.
+    const kit = measurable();
+    const grounded = block(raw({ ground: "pick", bold: true }) as Block);
+    const plain = block(raw({ bold: true }) as Block);
+    for (const width of [20, 80, 6]) {
+      expect(kit.measure(grounded, width), `measure at ${String(width)}`).toBe(kit.measure(plain, width));
+    }
+  });
 });
