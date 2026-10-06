@@ -419,7 +419,7 @@ Six tiers. Every cell of the §6 transition table is covered. `ProcessRunner` is
 
 Real subprocesses.
 
-- **T5.1**: a real binary emitting a large document → parsed, rendered, within the latency budget.
+- **T5.1**: a real binary emitting a large document → parsed, rendered, within the latency budget. **The budget is written in references** (`test/support/paired.ts`): a fixed workload run in the test process immediately before and after, so the spawn → parse → render is measured in what the machine was giving out at the time rather than in milliseconds a loaded host does not have (RULING-a, F1447).
 - **T5.2**: a real streaming binary at 1,000 lines/s for sixty seconds → no memory growth beyond the block cap, no dropped `end`.
 - **T5.3**: Ctrl-C during a real long-running verb → child dies within the ladder's bounds and partial output is retained.
 - **T5.4**: killing the far side externally mid-invocation → `end` with signal, guard released, session survives.
