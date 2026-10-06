@@ -58,6 +58,16 @@ export type PipelineScript = Readonly<{
   /** C23 I60's test consumer: which calls need a decision, and what the layer says. */
   approval?: PipelineDeps["approval"];
   /**
+   * **A stand-in `ask` for the route, over the real host** (C23 I94, F1527).
+   *
+   * The real host resolves every withdrawal and expiry with the default's key,
+   * and an approval's default is `deny`, so no real `ask` can show the route's
+   * `outcome` clause deciding anything alone. This is the seam that can: the
+   * route asks through it, and everything else — the answer handler, the
+   * layers — is still the real host's.
+   */
+  ask?: ConfirmHost["ask"];
+  /**
    * The PTY arm (C21 I18, C23 I63). `hasPty` is separate from `spawnPty` on
    * purpose: the route reads the flag and never the method's absence, so a row
    * can set the flag true with a factory that throws and reach T3.63.
@@ -315,7 +325,10 @@ export function pipelineHarness(script: PipelineScript = {}): PipelineHarness {
      * answer, so a handler that asks and ignores the reply would pass — and the
      * one test that matters is whether declining stops the command.
      */
-    confirm: harnessConfirm,
+    confirm:
+      script.ask === undefined
+        ? harnessConfirm
+        : Object.assign(Object.create(harnessConfirm) as ConfirmHost, { ask: script.ask }),
     ...(script.approval === undefined ? {} : { approval: script.approval }),
     theme,
     // `append` is real, because C23 I29 records every settled submission

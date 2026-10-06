@@ -1244,6 +1244,31 @@ describe("C23 §7g — a question's life in a built session", () => {
   });
 });
 
-describe("C23 I94 — the outcome decides, owed at the spec commit", () => {
-  it.todo("T4.110 (C23 I94): a withdrawal resolved on y runs nothing — not deferred on a component: the row lands with the code commit that follows this spec commit (lane b5-shell)");
+describe("C23 I94 — the outcome decides, and the key does not", () => {
+  it("T4.110 (C23 I94, F1527): a withdrawal resolved on y runs nothing; the same key answered runs the tool", async () => {
+    const { pipelineHarness, settled: drained } = await import("../support/execution.js");
+    /**
+     * One `/ps` under an approval, its question resolved by a stand-in `ask`.
+     * A real `ask` resolves every withdrawal with the default's key, and the
+     * default is `deny`, so only a stand-in reaches the `outcome` clause alone.
+     */
+    const run = async (outcome: "answered" | "cancelled") => {
+      const h = pipelineHarness({ approval: () => ({}), ask: () => Promise.resolve({ key: "y", outcome }) });
+      h.pipeline.submit("/ps");
+      await drained(h.pipeline);
+      await drained(h.pipeline);
+      const first = h.transcript.entries[0]?.doc.blocks[0];
+      return {
+        ran: h.calls.includes("invoke"),
+        state: first?.kind === "notice" ? first.state : undefined,
+        recorded: h.recorded,
+      };
+    };
+    const withdrawn = await run("cancelled");
+    expect(withdrawn.ran, "a withdrawal on `y` runs nothing").toBe(false);
+    expect(withdrawn.state).toBe("cancelled");
+    expect(withdrawn.recorded).toEqual([{ command: "/ps", exitCode: 130 }]);
+    // The control: the same key, answered, is the one path that runs the tool.
+    expect((await run("answered")).ran, "an answer of `y` runs it").toBe(true);
+  });
 });

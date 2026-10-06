@@ -94,9 +94,12 @@ describe("the demo world draws an invented host", () => {
 });
 
 describe("the surfaces the stills are made of", () => {
-  it("W5: /logs draws lines as they arrive — the fixture degrades the stream as C06's reader would", async () => {
-    // Without the `degraded` patch, C07 drops every `malformed` line and the
-    // card runs empty for the whole shot — which the first version did.
+  it("W5: /logs draws lines as they arrive, from the first — the fixture's lines go through C06's reader", async () => {
+    // Without a `degraded` patch, C07 drops every `malformed` line and the
+    // card runs empty for the whole shot — which the first version did. And
+    // with one placed by hand after the ninth line, as the second version did,
+    // C07's one-line lookbehind dropped the nine before it (F1432): nginx's
+    // first startup line is the one this row reads.
     const { plain } = await text(
       [
         [4.0, "/logs web"],
@@ -107,6 +110,7 @@ describe("the surfaces the stills are made of", () => {
       30,
     );
     expect(plain).toMatch(/"GET \/api\/orders HTTP\/1\.1" 200/u);
+    expect(plain).toMatch(/docker-entrypoint\.d\/ is not empty/u);
   });
 
   it("W6 (DASHBOARD_WALK §E): the greeting is rows — a summary, the table, the stopped — and no frame", async () => {

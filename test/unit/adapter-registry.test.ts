@@ -605,9 +605,14 @@ describe("§6 — streaming", () => {
     // ten-line floor. Which line trips it is C06's arithmetic, so the test reads
     // it off the patches rather than predicting it — predicting it once already
     // asserted the wrong line and passed for the wrong reason.
+    //
+    // **A value between the noise and the trip** (C07 I12, F1432): the run held
+    // is every `malformed` line since the last `data`, so noise adjacent to the
+    // trip is the remainder's head, and only a value makes it noise.
     const lines = [
       ...Array.from({ length: 10 }, (_, i) => JSON.stringify({ n: i })),
       "noise, dropped",
+      JSON.stringify({ n: 10 }),
       "the tripping line",
       "after one",
       "after two",
@@ -818,6 +823,36 @@ describe("§7a (I23) — the notice names the layer that actually failed", () =>
   });
 });
 
-describe("C07 I12 — the remainder is the run, owed at the spec commit", () => {
-  it.todo("T3.22 (C07 I12): a stream of text from its first line reaches the document whole — not deferred on a component: the row lands with the code commit that follows this spec commit (lane b5-shell)");
+describe("C07 I12 — the remainder is the run", () => {
+  /** The `raw` block's text after every patch a real reader emits for `lines`. */
+  const remainderOf = (lines: readonly string[]): { text: string; degradedAt: number } => {
+    const reader = createNdjsonReader();
+    const registry = createAdapterRegistry();
+    const patches = lines.flatMap((line) => reader.push(`${line}\n`));
+    let text = "";
+    patches.forEach((patch, seq) => {
+      const view = registry.adaptPatch(patch, { ...CTX, seq });
+      if ((view?.op === "append" || view?.op === "replace") && view.block.kind === "raw") text = view.block.text;
+    });
+    return { text, degradedAt: patches.findIndex((p) => p.kind === "degraded") };
+  };
+
+  it("T3.22 (C07 I12, F1432): a stream of text from its first line reaches the document whole, and a run before a value is noise", () => {
+    // **Driven through C06's reader**, because when degradation trips is its
+    // rule: the floor is ten lines, so the notice is the eleventh patch, after
+    // nine lines the one-patch lookbehind dropped.
+    const text = Array.from({ length: 12 }, (_, i) => `nginx line ${String(i + 1)}`);
+    const whole = remainderOf(text);
+    expect(whole.degradedAt, "C06 trips after the tenth line, so the run is ten long").toBe(10);
+    expect(whole.text.split("\n")).toEqual(text);
+
+    // **The run ends at a value.** Two text lines among good ones are noise; the
+    // run after the last value is the remainder's head, whatever its length.
+    const values = (n: number, from: number) => Array.from({ length: n }, (_, i) => JSON.stringify({ n: from + i }));
+    const after = Array.from({ length: 6 }, (_, i) => `after ${String(i + 1)}`);
+    const mixed = remainderOf([...values(20, 0), "noise one", "noise two", ...values(1, 20), ...after]);
+    expect(mixed.degradedAt, "the fixture degrades").toBeGreaterThan(0);
+    expect(mixed.text).not.toContain("noise");
+    expect(mixed.text.split("\n")).toEqual(after);
+  });
 });

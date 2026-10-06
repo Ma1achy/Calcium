@@ -51,6 +51,7 @@
 
 import { createHash } from "node:crypto";
 import { createFixtureTransport, createRouter } from "calcium-tui";
+import { createNdjsonReader } from "calcium-tui/fixtures";
 import type { Fixture, RawPatch, RawResult, TransportRouter, VerbTransport } from "calcium-tui";
 import type { Runner } from "./mutation.ts";
 import type { Spawner } from "./progress.ts";
@@ -870,25 +871,20 @@ export function createDemoWorld(clock: () => number): DemoWorld {
   };
 
   /**
-   * `docker logs` as C06's subprocess transport would deliver it: nginx's lines
-   * are not JSON, so each is `malformed`, and the NDJSON reader declares the
-   * stream `degraded` once ten lines have failed (`DEGRADE_FLOOR`, ratio over
-   * 0.1 — `src/data/transport/ndjson.ts`). **The copy is the risk here**: that
-   * rule is interior to C06, so it is restated rather than imported, and a
-   * change there leaves this answering as the old reader did.
+   * `docker logs` as C06's subprocess transport delivers it: **the lines go
+   * through C06's own reader** (C08 I19), so what arrives — `malformed` per
+   * line, and `degraded` where C06's ratio trips — is the transport's answer
+   * and not a restatement of it.
    *
-   * It matters to the picture because C07 drops `malformed` lines until
-   * `degraded` arrives (`adapters/stream.ts`). The first version of this
-   * fixture sent no `degraded`, and `/logs web` drew a card with nothing in it
-   * for as long as it ran — every line delivered, every line dropped.
+   * The restatement was here, and it hid a defect two components away (F1432):
+   * it placed `degraded` after the ninth line as C06's floor does, and C07,
+   * holding one line of lookbehind, then dropped the nine before it — so the
+   * real `/logs` lost its first nine lines while this world drew them all.
    */
   const logFixture = (c: Container): Fixture => {
     const argv = ["logs", c.name];
-    const patches: RawPatch[] = logLines(c).flatMap((line, i): RawPatch[] =>
-      i === 9
-        ? [{ kind: "malformed", line }, { kind: "degraded", reason: "10 of 10 lines did not parse as JSON" }]
-        : [{ kind: "malformed", line }],
-    );
+    const reader = createNdjsonReader();
+    const patches: RawPatch[] = logLines(c).flatMap((line) => reader.push(`${line}\n`));
     return {
       id: `demo:logs ${c.name}`,
       verb: "logs",

@@ -598,6 +598,74 @@ describe("C14 §6f — the drag in a real session", () => {
   });
 });
 
-describe("C14 I65 — a copy carries the heads the selection took, owed at the spec commit", () => {
-  it.todo("T4.48 (C14 I65): a drag from the first entry's body copies no first head, from its head copies all three — not deferred on a component: the row lands with the code commit that follows this spec commit (lane b5-shell)");
+describe("C14 I65 — a copy carries the heads the selection took", () => {
+  it("T4.48 (C14 I65, F1409): a drag pressed on the first entry's body copies no first head, one pressed on its head copies all three", async () => {
+    vi.useFakeTimers();
+    const copyText = vi.spyOn(Object.getPrototypeOf(createEditor()) as LineEditor, "copyText");
+    try {
+      /**
+       * One drag in a fresh session over three two-line entries, pressed on the
+       * row `at` picks and released on the third entry's last line, then `y`.
+       * One session per copy: the kill buffer is shared (`copiedFromBoxed`).
+       */
+      const drag = async (at: (rows: readonly string[]) => number): Promise<{ copies: readonly string[]; rows: readonly string[] }> => {
+        const stdin = fakeStdin();
+        let n = 0;
+        const { screen, clock } = await buildSession({
+          manifest: MANIFEST,
+          localHandlers: {
+            say: () =>
+              ({
+                schema: "tui.view/1",
+                command: "say",
+                status: "ok",
+                blocks: [{ kind: "raw", id: "t", text: `e${String(n)}-line-0\ne${String(n++)}-line-1` }],
+              }) as never,
+          },
+          stdin: stdin as never,
+        });
+        const step = async (ms: number): Promise<void> => {
+          clock.advance(ms);
+          await vi.advanceTimersByTimeAsync(ms);
+          await settle();
+        };
+        await step(0);
+        for (let i = 0; i < 3; i += 1) {
+          stdin.emit("/say\r");
+          await step(0);
+        }
+        const rows = screen().rows;
+        const from = at(rows) + 1;
+        const to = rows.findIndex((r) => r.includes("e2-line-1")) + 1;
+        expect(from > 0 && to > from, "the fixture drew both ends").toBe(true);
+        stdin.emit("\u001bV");
+        await step(0);
+        stdin.emit(press(6, from));
+        await step(0);
+        stdin.emit(moveTo(6, to));
+        await step(0);
+        stdin.emit(release(6, to));
+        await step(0);
+        copyText.mockClear();
+        stdin.emit("y");
+        await step(0);
+        return { copies: copyText.mock.calls.map(([text]) => text), rows };
+      };
+      const entry = (k: number): string => `e${String(k)}-line-0\ne${String(k)}-line-1`;
+
+      // **Pressed on the body**: the first head was never taken, so it is not
+      // in the copy, and the two heads the drag crossed are (R-SEL-003).
+      const body = await drag((rows) => rows.findIndex((r) => r.includes("e0-line-0")));
+      expect(body.copies).toEqual([[entry(0), `say\n${entry(1)}`, `say\n${entry(2)}`].join("\n\n")]);
+
+      // **Pressed on the head**: the row above the first body line is the
+      // card's head, and taking it puts the command at the top.
+      const head = await drag((rows) => rows.findIndex((r) => r.includes("e0-line-0")) - 1);
+      expect(head.rows[head.rows.findIndex((r) => r.includes("e0-line-0")) - 1], "the row pressed is the head").toMatch(/say/u);
+      expect(head.copies).toEqual([[`say\n${entry(0)}`, `say\n${entry(1)}`, `say\n${entry(2)}`].join("\n\n")]);
+    } finally {
+      copyText.mockRestore();
+      vi.useRealTimers();
+    }
+  });
 });

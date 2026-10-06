@@ -10,7 +10,12 @@ import { buildSession } from "../support/session.js";
 import { fakeStdin, MODES } from "../support/fake-terminal.js";
 
 const ESC = "\u001b";
+/** U+202E as the prompt draws it (C17 I36, C09 `controlForm`): its code point, bracketed. */
+const DRAWN_RLO = "<U+202E>";
 const ENV = { TERM: "xterm-256color", LANG: "en_GB.UTF-8", CALCIUM_RENDER_MODE: "linear" };
+
+/** Every answer `asking` was handed, in order, for a row that reads the owner's side. */
+const heard: { key: string; text?: string }[] = [];
 
 /** A verb that asks §6m.3's question and says what it was told. */
 const asking = async (_argv: readonly string[], ctx: { ask: (o: unknown) => Promise<{ key: string; text?: string }> }) => {
@@ -24,6 +29,7 @@ const asking = async (_argv: readonly string[], ctx: { ask: (o: unknown) => Prom
       { key: "r", label: "reply…", reply: true },
     ],
   });
+  heard.push(a);
   return { schema: "tui.view/1", status: "ok", blocks: [{ kind: "tip", id: "chose", text: `chose ${a.text ?? a.key}` }] };
 };
 
@@ -199,6 +205,37 @@ describe("C22 §6m — a linear session", () => {
     }
   });
 
+  it("T4.109 (C23 I90, C17 I36, F1471): a reply holding U+202E and a chip is announced as drawn, and the owner is handed both", async () => {
+    // **The construction's own `drawn`**, which C23 T1.100's world replaces with
+    // its own: the subject is the line the linear stream writes on `answered`.
+    const s = await linear();
+    try {
+      heard.length = 0;
+      await s.type("/branch\r");
+      await s.step(150);
+      // Past C16 I44's guard, then `3`, the reply.
+      await s.step(1_000);
+      await s.type("3");
+      await s.type("x\u202Ey");
+      const pasted = Array.from({ length: 6 }, (_, i) => `alpha ${String(i)}`).join("\n");
+      s.stdin.emit(`${ESC}[200~${pasted}${ESC}[201~`);
+      await s.step(50);
+      const mark = s.stdout.output.length;
+      await s.type("\r");
+      await s.step(50);
+      const answer = s.lines(s.since(mark)).find((l) => l.startsWith("answer: "));
+      expect(answer, "the answered event").toBeDefined();
+      expect(answer, "no raw bidi control reaches the stream").not.toContain("\u202E");
+      // U+202E as its drawn form, and the chip as its label — at linear's look,
+      // which has no frame — never its sentinel.
+      expect(answer).toBe(`answer: x${DRAWN_RLO}y #1 pasted · 6L`);
+      // …and the owner is handed the character and the paste, not the forms.
+      expect(heard).toEqual([{ key: "r", text: `x\u202Ey${pasted}`, outcome: "answered" }]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("T4.104 (C22 I125, C02 I15): /capabilities shows the route first", async () => {
     const s = await linear();
     try {
@@ -228,8 +265,4 @@ describe("C22 §6m — a linear session", () => {
       vi.useRealTimers();
     }
   });
-});
-
-describe("C23 I90 — the answered line as drawn, owed at the spec commit", () => {
-  it.todo("T4.109 (C23 I90): a reply holding U+202E and a chip is announced as drawn — not deferred on a component: the row lands with the code commit that follows this spec commit (lane b5-shell)");
 });

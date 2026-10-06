@@ -10,10 +10,10 @@
 //
 // A mutation that fails nothing indicts the tests or the prose, not the code.
 //
-// **Not mutated, and why**: C23 I90's `drawn` taking the raw character. No row
-// reaches the real `drawn` — C23 T1.100's world supplies its own — so the
-// survivor is known before the run, and a known survivor is a comment rather
-// than a row (a finding recorded with review batch 4's bidi lane).
+// **C23 I90's `drawn` is mutated now** (F1471): C23 T1.100's world supplies its
+// own, so no row reached the real one and this header kept it out of the run as
+// a known survivor. T4.109 reaches it through a built session on the linear
+// route, and the two rows at the bottom are that change.
 //
 // **Anchors checked for uniqueness before the pass** (F219).
 import { execSync } from "node:child_process";
@@ -24,7 +24,8 @@ const ROOT = process.cwd();
 const LAYOUT = "src/interaction/editor/layout.ts";
 const PAINT = "src/shell/paint.ts";
 const FILES =
-  "test/unit/editor.test.ts test/unit/session-paint.test.ts test/integration/typed-bidi.test.ts test/integration/trust-writer.test.ts";
+  "test/unit/editor.test.ts test/unit/session-paint.test.ts test/integration/typed-bidi.test.ts test/integration/trust-writer.test.ts " +
+  "test/integration/linear.test.ts";
 
 const { read, write } = fsIo(ROOT);
 const run = () => {
@@ -116,6 +117,25 @@ const results = runPass({
       from: ".flatMap((line) => hardWrapCells(neutraliseControl(line), body));",
       to: ".flatMap((line) => hardWrapCells(line, body).map(neutraliseControl));",
       expect: "T1.179",
+    },
+    // ---- C23 I90 — the answered line as drawn (T6.128, F1471) ------------------
+    {
+      // **The construction's own `drawn`**, which C23 T1.100's world replaces;
+      // T4.109 reaches it through a built session on the linear route. Left out
+      // of this run until a row could see it, rather than recorded as a
+      // survivor the run had arranged.
+      name: "T6.128: the answered line reads a bidi control as itself",
+      file: "src/shell/construct.ts",
+      from: "      for (const ch of stores.editor.text) out += stores.editor.drawAs(ch) ?? neutraliseControl(ch);",
+      to: "      for (const ch of stores.editor.text) out += stores.editor.drawAs(ch) ?? ch;",
+      expect: "T4.109",
+    },
+    {
+      name: "T6.128: the answered line reads a chip as its sentinel",
+      file: "src/shell/construct.ts",
+      from: "      for (const ch of stores.editor.text) out += stores.editor.drawAs(ch) ?? neutraliseControl(ch);",
+      to: "      for (const ch of stores.editor.text) out += neutraliseControl(ch);",
+      expect: "T4.109",
     },
   ],
 });

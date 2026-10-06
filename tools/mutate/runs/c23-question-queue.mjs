@@ -183,6 +183,17 @@ const results = runPass({
       expect: "T4.92",
     },
     {
+      // **T6.126, aimed at the clause again** (F1527). The run above moved off
+      // it because no real `ask` resolves a withdrawal on a key other than
+      // `deny`'s; the harness's stand-in `ask` is the seam that can, and T4.110
+      // resolves `{ key: "y", outcome: "cancelled" }` through it.
+      name: "the approval branch decides on the key alone",
+      file: EX,
+      from: '      if (answer.outcome !== "answered" || answer.key === DENY_KEY) {',
+      to: '      if (answer.key === DENY_KEY) {',
+      expect: "T4.110",
+    },
+    {
       // C04 I149.
       name: "a call awaiting its approval reads running",
       file: DOCUMENTS,

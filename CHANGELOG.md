@@ -321,3 +321,11 @@ tagged, `## Unreleased` becomes its heading and a fresh one opens above it.
 - **A form field stores what a chip stands for** (588da957, C22 I148, F1395). A field wrote the
   editor's text, so a yanked chip reached form data as a private-use character. A value holding
   a line break is refused with its reason: `⏎` keeps the field open, and a blur writes nothing.
+- **`createNdjsonReader` is exported** from `calcium-tui/fixtures` (lane b5-shell, C08 I19,
+  F1432). It is the subprocess transport's own reader, so a fixture describing a stream of text
+  feeds its lines through it rather than placing `degraded` by hand.
+- **A stream that is text from its first line keeps its first nine lines** (lane b5-shell, C07
+  I12, F1432). The degraded remainder begins at the first unparseable line after the last value,
+  where it began at the line that tripped degradation, the tenth.
+- **A namespaced verb's running card reads `container stats(worker)`** (lane b5-shell, C23 I54,
+  F1430), where it repeated the verb's second word inside the parentheses.

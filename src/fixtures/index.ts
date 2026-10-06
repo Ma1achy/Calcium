@@ -47,5 +47,13 @@ export {
   type WorldDriver,
 } from "../data/fixtures/index.js";
 
+/**
+ * **C06's reader itself, not a copy** (C08 I19, F1432). A fixture describing what
+ * a far side writes feeds its lines through this and replays what it emits, so
+ * when degradation trips stays C06's rule: the docker example once placed
+ * `degraded` by hand after the ninth line, and the copy hid C07 dropping them.
+ */
+export { createNdjsonReader } from "../data/transport/index.js";
+
 /** C06 declares it, C08 owns every rule about it (A02 §1). */
 export type { Fixture } from "../data/transport/types.js";

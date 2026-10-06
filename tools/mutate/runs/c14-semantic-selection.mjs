@@ -20,7 +20,8 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const CMD =
   "npx vitest run test/unit/semantic-selection.test.ts test/unit/router-focus.test.ts " +
-  "test/unit/router-dispatch.test.ts test/unit/session-keys.test.ts test/unit/router-keymap.test.ts";
+  "test/unit/router-dispatch.test.ts test/unit/session-keys.test.ts test/unit/router-keymap.test.ts " +
+  "test/integration/copy-drag.test.ts";
 const MODEL = "src/shell/semantic-selection.ts";
 const TYPES = "src/interaction/router/types.ts";
 const ROUTER = "src/interaction/router/router.ts";
@@ -94,6 +95,16 @@ const MUTATIONS = [
     from: '  { target: "semanticSelection", ...fromRegistry("confirm"), action: "copyAndLeaveSemanticSelection" },\n',
     to: "",
     expect: "T1.47",
+  },
+  {
+    // **T6.43, C14 I65 (F1409)** — the symmetric reading the finding asked
+    // about: every entry the selection touches copied whole, which supplies the
+    // first entry's head that the selection never took.
+    name: "a touched entry is copied whole",
+    file: MODEL,
+    from: "    .map((e) => copySequence(e.blocks.filter((b) => selected.has(keyOf(e.id, b.id)))))",
+    to: "    .map((e) => copySequence(e.blocks.some((b) => selected.has(keyOf(e.id, b.id))) ? e.blocks : []))",
+    expect: "T4.48",
   },
 ];
 
