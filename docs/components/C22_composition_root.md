@@ -1823,7 +1823,7 @@ Two rules meet. *The four regions sum to `rows`* — S01 §3, `heightsSum`, and 
 ### 6k.1 — measured before ruling
 
 - **24 rows, three-line footer, one-line header, two-line prompt: the region is 18.** §16 accepts that trade by drawing it; at a one-row prompt it is 19.
-- **12 rows: the design says nothing, and nothing here needs to.** The size gate composes no frame below `MIN_ROWS` (16, §4); the fallback says `Needs 60x16`. *What is on screen when it reports* is the fallback, for every budget.
+- **12 rows: the design says nothing, and nothing here needs to.** The size gate composes no frame below `MIN_ROWS` (16, §4); the fallback says `needs 60×16` (I153). *What is on screen when it reports* is the fallback, for every budget.
 - **An empty footer today is one blank row.** `makeDefaultChrome`'s footer returns `[]` and `paint.ts`'s `region()` pads to the count it is given, so the default session already spends a transcript row on nothing. Unchanged by this ruling; a budget of zero is not offered (6k.4 E).
 - **A region whose height changes between frames is not a new class for C14.** The prompt already does it on every keystroke and I34 pushes the height from each frame. What would be new is a *second* thing pushing it, and that is what 6k.3 is about.
 - **Two consumers can see the footer's geometry and neither reads the constant.** `chromeClick` (`construct.ts`) classifies any row no entry occupies as chrome, and `overlayRegion` (I28) is the region's own height — so a wider footer is chrome to the mouse and out of reach of a layer with no edit to either.
@@ -2129,7 +2129,7 @@ from a wrong one is F1225's finding on the axis next door.
 | 3 | the transcript's blocks | C14 measures and renders at the width it is handed | rule 8 | **the region's width**, which is the terminal's less the margin. This is rule 8's subject, and `C04_CHILDGAP_WALK.md` A8 ruled it the region's rather than a block's `padding.r` because a mosaic divides its cells before a child's padding is applied (A9) |
 | 4 | the prompt's body | §6e's window, `width − PROMPT_GUTTER.first` | rule 8 | **the region's width.** A typed line is content, and the gutter is a left inset that says nothing about the right edge; the body is `region.width − PROMPT_GUTTER.first` |
 | 5 | an overlay's box | I28 — the layer's region is the transcript region's | rule 8 | **the region's width**, and the consequence is a rounding: `place.ts` centres at `⌊(region.width − width) / 2⌋` and clamps to `region.width`, so a centred layer moves by nought or one column and a layer declaring no width becomes one cell narrower. Correct for the same reason row 3 is — an overlay's content is content |
-| 6 | the size gate's fallback | §4's too-small render draws at `size.columns` | rule 8 | **the terminal's width.** The fallback is not the frame: it is three centred lines drawn when no region exists, and a margin on it would narrow the one surface whose whole job is to say the terminal is too narrow |
+| 6 | the size gate's fallback | §4's too-small render draws at `size.columns` | rule 8 | **the terminal's width.** The fallback is not the frame: it is the box of I153 drawn when no region exists, and a margin on it would narrow the one surface whose whole job is to say the terminal is too narrow |
 | 7 | the image transmission seam | I98 — each group declares the width its blocks render at | rule 8 | **falls out of row 3 at no cost.** The seam already takes the run's width rather than the terminal's, so a narrowed region reaches it through the layout it is handed; this is the cell that would have been a defect had the margin been a block's `padding.r`, since the seam reads the group's width and not a child's edges |
 | 8 | `heightsSum` | the frame's rows are `size.rows` | the margin is horizontal | **untouched.** The margin takes a column and no rows, so every height assertion in §6l.2 holds unchanged — which is what makes this landing's moved frames all wrap-point moves and one truncation |
 
@@ -3188,6 +3188,50 @@ ground, which holds at rest, and a trace for the preview and the search, which c
 - **The residue row stays** (C04 I49). §101 draws none; the scroll kind draws one whenever it
   overflows, and the bar alone does not say how many rows are hidden.
 
+## 6u. The forms the golden lane found — walked by hand (lane b5-forms; §047, §046, §067, §023, §101)
+
+The golden lane read the session at three rungs against the design's figures and found five forms
+the tree draws differently. Each is its own sub-section, spec-first; an item that cannot finish
+stays open without blocking the rest.
+
+### 6u.1 — §047: the frame too small to draw (I153)
+
+**Measured at b6ce58a2.** Of §047's five forms, the empty block and the stale panel are already the
+figure (C09 I85; `stale-reading.test.ts` draws `┌ workers ── updated 4m ago ─┐`), the interrupted
+stream is `steps`' and the refused figure is C12's. **One differs: the too-small frame.** The figure
+draws a box with `▲ 34×8` over `needs 60×16`; `fallback.ts` drew three bare lines, `Terminal too
+small`, `34x8`, `Needs 60x16`, with no mark and no box, and spelled the multiplication with an ASCII
+`x` at every rung.
+
+*What the old text was protecting.* Comments in `fallback.ts` give two reasons — it must be
+legible at 20 × 4, and it runs where the capability record "may say nothing is supported". The
+second is not true: both callers hold the graph, and `graph.capabilities` exists before the gate is
+read (§4 step 2 precedes step 4). The first is a width and height rule, which a rung ladder keeps.
+
+**Classification table (structural: which rule draws, at rest).**
+
+| rows | columns | draws |
+|---|---|---|
+| 0 | any | nothing (no write at all) |
+| 1 | any | `▲ 34×8`, fitted |
+| 2–3 | any | `▲ 34×8` and `needs 60×16`, each fitted |
+| ≥ 4 | below the box's width | the same two lines, fitted |
+| ≥ 4 | ≥ the box's width | the box: top rule, the two lines, bottom rule |
+
+The box's width is the wider line plus two, plus the two edges, **measured at the record's
+`ambiguousWidth`** — `▲` and `×` are `East_Asian_Width=Ambiguous`, and a box one cell too wide
+wraps on exactly the terminals that need a fallback. At ASCII the marks are `!` and `x` and the box
+is `+-|`. **Where two rules meet**: the box rung and the ambiguous reading meet at the width
+threshold (a terminal whose width fits the box narrow and not wide draws the lines), and the row
+clamp and the box meet at four rows (a three-row terminal draws two lines, never a box cut by the
+terminal). **No colour and no block registry**, as before: a tone needs a theme and the registry is
+what the fallback exists not to touch (I9, T3.8).
+
+**Ruled (b5-forms).** The design's own words — *a frame too small to draw — and it says WHICH
+constraint* — are normative for appearance, and *"Terminal too small"* is the tree's own sentence,
+which the figure does not carry: the `▲` and `needs` say it. The words go; the sentence's job (what
+is wrong) is the mark's, and the figure's second line states what is needed.
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -3341,7 +3385,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I7** — History flushes on every path, faults included. A fault before the lifecycle exists flushes nothing and does not violate this: nothing can be appended before input is accepted, which is four steps later. The day anything appends earlier, I7 and I5 conflict for real (§8a).
 - **I7a** — `createTui` runs step 1 — validation — and returns; steps 2 to 12 run inside `start()`. §9's `created` state, T1.9's "nothing acquired" and a manifest given as a path all require it, and validation is the one step that can be eager because it needs nothing constructed.
 - **I8** — A failed size gate does not abort construction; session state survives until a resize. **Both halves of it were unbuilt and each failed silently** (F67). The fallback was drawn through `config.stdout`, which C01 redirects into its `debug` sink at *construction* rather than at acquire (C01 I3, I9), so nothing was drawn: 0 bytes on both channels with the process alive. And the `onResize` this registers could never fire, because C01 dropped every `SIGWINCH` outside `acquired` and gate 4 deliberately does not acquire (→ C01 I12b). **The deferral deferred for ever**, which is the claim this invariant makes read back as a measurement. Both are one class: a correct reason attached to a wider condition than it justifies — *the terminal was never acquired, so write to the primary screen directly* conflates not-acquired with not-redirected, and *the dimensions belong to the child* is true of suspended and of nothing else. The fallback now draws through `lifecycle.writer`, as the mid-session call site always did.
-- **I9** — The too-small render uses no layout engine, and it takes its writer rather than reaching for one: at launch it draws to the primary screen because the terminal is never acquired, and mid-session it draws through the scheduler or the next frame overwrites it (§8b).
+- **I9** — The too-small render uses no layout engine, and it takes its writer rather than reaching for one: at launch it draws to the primary screen because the terminal is never acquired, and mid-session it draws through the scheduler or the next frame overwrites it (§8b). What it draws is I153's.
 - **I10** — Clock and filesystem enter the graph only here.
 - **I11** — Session state has exactly one writer per field, and the two fields with no writer say so. `cluster` and `version` are set at construction and never written after; a field absent from §5's table would read identically to a field nobody writes, and only one of those is a claim.
 - **I12** — `cwd` reaches C21 as a function, never a captured value.
@@ -3528,6 +3572,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I150** — *(ruling 96, ruling 99, F1486, I51, I133, I145, C19 I20, C19 I29, `binding.004`)* **The completion substate's owner line names what each key does in the state the frame shows.** While the menu holds no selection the prompt's keys resolve first (C19 I20), so `⏎` submits and `↑` walks history, and the line is `complete · ⏎ run · ⇥ complete · esc close`: `⏎` is the chord the session keymap binds to the prompt's `submit`, named for what it does to the line at rest (ruling 99, §029), `⇥` is the chord the session keymap binds to the prompt's `complete` (the registry's `binding.004`, *complete in the prompt*), and `esc` is the panel's `dismiss`, which the prompt does not bind. Once `⇥` has made a selection the menu owns its keys and the line is `complete · ↑↓ move · ⏎ accept · esc close`. `↓` at rest is the prompt's and selects nothing (C19 §6a). **The line reads the router's answer, not the menu's state**: `OwnerHints.promptUnderMenu` is `promptUnderMenu()`, the top layer's `promptLive` (I145), so the footer, the cursor and the dispatch read one predicate and a footer cannot name a key that goes somewhere else. **It is the one visible difference between rest and a selection**: ruling 89 marks the current candidate in both (C19 I29), and the two frames were otherwise identical. Absent is *the menu owns its keys*, which is every line drawn with no session behind it. → T1.182, T4.120, T6.152
 - **I151** — *(§097, `R-BLK-569`, `R-BLK-628`, `R-BLK-775`, F1501; §6s ruling 1)* **A panel's rows between its edges take `surface.bgElev`.** The compositor paints `surface.bgElev` behind every line of a `kind: "panel"` layer except the lines of its leading `rule` blocks — the upper edge; the lower edge is the prompt's rule (I81) and is not in the layer — through `based`, so a span that sets its own background keeps its cells (the menu's `pick` row), and the padding to the box's width is grounded (I29). The exemption is by content line, so a row-scrolled panel keeps it (§6s.2 row 7). Where no ground resolves — 1 bit, a theme whose `bgElev` inherits — the rows are byte for byte what they were. A `peek` and an `overlay` take none. → T1.184, T4.121, T6.153, T6.154
 - **I152** — *(§6m.2, ruling 103 b, F1517, C23 I101, C23 §8a A6.9)* **A completion line says `exit N` only of a child's own ending.** Where the settled head's word is one the shell writes — `denied`, `expired`, `cancelled`, `truncated`, `failed` — the verdict names it and appends no code, because the code beside it is the shell's: 126 for a denial and an expiry, 130 for a cancel, 1 for a malformed patch and a throw (C23 I101). A `cancelled` head's word is the verdict's first part — `/ps — denied`, `/ps — expired`, `/ps — cancelled` — and a `failed` head's follows its state, `failed, truncated`. A head whose word is `exit N` keeps it, so a child that ended 130 on its own still reads `failed, exit 130`. C20 records every one of these codes as before (C23 I29). *As it stood:* ~~`exit N` for any non-zero code on a document that is not the shell's own~~ — a denial read `/ps — failed, exit 126` and a cancel `cancelled, exit 130` (F1517). → T1.186, T6.157
+- **I153** — *(§6u.1, §047)* **The too-small render is the design's frame, at the terminal's rung.** `▲ <columns>×<rows>` over `needs 60×16` in a box where four rows and the box's width allow, the same two lines fitted where they do not, the size alone at one row and nothing at zero. The marks resolve at the capability record's rung (`!`, `x`, `+-|` at ASCII); every line is measured at its `ambiguousWidth` and is never wider than the terminal nor taller than its rows. No colour, and no call into the block registry (I9). → T3.8b, T3.8e, T3.8f, T3.15c
 
 ## 11. Commitments
 
@@ -3775,6 +3820,9 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T3.6**: missing config → `config init` dispatched; the shell opens afterwards.
 - **T3.7** (I8): terminal 44 × 12 at launch → fallback drawn, graph constructed; resizing to 100 × 30 continues to a normal frame with state intact.
 - **T3.8** (I9): the fallback renders with no call into the block registry or layout — asserted by a spy.
+- **T3.8b** (I153, was I9): the fallback emits no colour, and its box is drawn only at the capability record's rung — `+-|` at ASCII.
+- **T3.8e** (I153, §6u.1): the five rungs of the classification table — zero rows nothing, one row the size, two and three rows two lines, four rows and the box's width the box, four rows and less the lines — and at every size no line is wider than `columns` at the record's `ambiguousWidth` and no more lines than rows. *Fails on revert*: measuring at `narrow` fails the wide-ambiguity row, and dropping the four-row guard fails the three-row row.
+- **T3.8f** (I153, §047): the figure's two lines, exactly — `▲ 34×8`, `needs 60×16` at Unicode and `! 34x8`, `needs 60x16` at ASCII.
 - **T3.9**: shrinking below minimum mid-session → fallback replaces the frame; scrollback and history survive.
 - **T3.40** (I99, F158, F1024): a greeting whose producer resolves **after** a submission has settled → the greeting is still the transcript's first entry and the result sits below it. Read off the frame by row index, because *above* is the finding's own word and an assertion about `entries.length` would be green for the defect too. The control is T3.9b: without it a row asserting an order proves nothing about whether either thing drew.
 - **T3.41** (I41, C25 I22, F1187): a view over a 2,000-line patch reports one `patch-view-plan` miss `absent` on open and none over `pageDown`, `pageUp`, `nextHunk` and `G`; patching the entry so the block is a new object reports one miss `rev` and the window shows the new lines; a region resize to the other layout reports one miss `width` and the window is the other layout's — a hunk opening with a run of one removed and two added lines shows eight lines under a ten-row region unified and nine split, the run costing three rows against two; and at every step the layer's content is a window `windowPatch` builds of the live block at the live width from some start row of its plan. Not deferred on a component: the code commit replaces this row.
