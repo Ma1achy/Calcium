@@ -208,6 +208,8 @@ describe("C09 I123 — registry ↔ runtime glyphs", () => {
     }
   });
 
+  it.todo("T2.232 (I123, R-GLY-003, F1465): the §006 census is the registry's canonical set, one row per canonical record");
+
   it("T2.190 (C09 I98, question 39, R-MOT-010): no spinner set's ASCII rung is one repeated character, in the tree or in the registry; downsampling is let through", () => {
     // **Within a set, the ASCII rung must move** (question 39, ruled (a)). A set
     // whose ASCII frames are all one character is a still mark in a slot that
