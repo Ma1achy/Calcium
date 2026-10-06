@@ -222,16 +222,14 @@ it, pinned, into `.cache/` (§3), so a container rebuild does not change which C
 | `make golden` | Golden frames, four widths × two themes × two unicode modes | minutes |
 | `make e2e` | Tier 5, PTY harness | minutes |
 | `make audit` | `npm audit --audit-level=high`, dependency-manifest check | < 10 s |
-| `make hooks` | Points `core.hooksPath` at `.githooks`; run by `make install` | — |
+| `make check-fast` | Typecheck, tests related to the changed files, flow tests for the touched area | < 2 min |
 | `make all` | Everything above | — |
 | `make conformance` | `prism-tui` only — the boundary contract (A01 §6) | — |
 | `make record` | `prism-tui`, `docker-tui` — fixture recording and `--diff` | — |
 
 **The one named build has two halves, and the second is what a consumer imports** (F1193). `tsc -p tsconfig.build.json` emits one file per source module into `dist/` with its declarations and maps — the tree every tier-5 child, probe and tool reads by relative path, and the tree the bundle is built from. `tools/bundle.mjs` then runs esbuild over the six entries C24 §2 names, code-split into one chunk graph (`splitting`), every package external, ESM, unminified, with linked source maps and no embedded sources, into `dist/bundle/`; `exports` points every entry's `default` there and every `types` at `dist/*.d.ts`. The loader's unit is the file and it was two thirds of a cold import — 207 of 310 sampled ms over 1,130 modules, 820 of them ours — so one chunk per entry is a third of the import and a quarter of the heap after it, six of six pairs with and without the compile cache. What the bundle must keep is C24 I38's list: one instance of every module across every entry, the same names as the file entry, the emulator and the Mermaid renderer still off the runtime's graph, and a sampled frame still named (C28 I65). Minification is not done — the compile cache holds the compiled form, and a minified stack is a card nobody can read.
 
-**A `pre-commit` hook runs `make enforce` too, and running it three times is the point.** CI catches it, the pre-MR habit catches it, and the hook catches it before either — because the two gates above it are discipline and discipline is what fails on the commit where someone is concentrating on something else. That is not hypothetical here: a commit landed on a red `make enforce` during C16's build, because the only gate was an `&&` chain in a typed command and the chain ran past the failure.
-
-A layer violation committed is a layer violation that has had time to be depended upon, and five seconds is cheaper than the revert. `--no-verify` still works deliberately: a hook that cannot be bypassed gets uninstalled, and one that can be bypassed gets bypassed visibly, in a flag someone has to type.
+**There is no pre-commit hook.** `make check-fast` is the local loop and CI runs everything else on push, so a violation is caught within minutes of the push instead of at every commit.
 
 `make enforce` is the target that makes A03 real. Seventy-one assertions specified and never executed are an honour system; a five-second target that fails an MR is a rule.
 

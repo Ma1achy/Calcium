@@ -39,7 +39,6 @@ import { describe, expect, it } from "vitest";
  * A file arriving here or leaving is a decision; this row makes it one.
  */
 const EXECUTABLE = Object.freeze([
-  ".githooks/pre-commit",
   "examples/docker/bin/docker-json",
   "examples/docker/bin/docker-tui.js",
   "examples/minimal/bin/svc",

@@ -9,10 +9,9 @@
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -o pipefail -c
 
-.PHONY: install hooks quantised check design design-check released chromium design-browser enforce catalogue instruments roadmap regime test golden e2e audit proof all clean
+.PHONY: install check-fast quantised check design design-check released chromium design-browser enforce catalogue instruments roadmap regime test golden e2e audit proof all clean
 
 install:            ## npm ci, no install scripts, then the one named build (A04 §3)
-	git config core.hooksPath .githooks
 	npm ci --ignore-scripts
 	npm rebuild node-pty --ignore-scripts=false
 	@node -e "require('node-pty')" \
@@ -35,8 +34,8 @@ install:            ## npm ci, no install scripts, then the one named build (A04
 	@# the asymmetry reads as known rather than as an oversight.
 	cd examples/docker && npm install --ignore-scripts --no-audit --no-fund
 
-hooks:              ## point git at .githooks — pre-commit runs `make enforce` (A04 §5)
-	git config core.hooksPath .githooks
+check-fast:         ## typecheck, tests related to the changed files, flow tests for the touched area (BASE=<ref> to diff against a ref)
+	bash tools/check-fast.sh
 
 themes:             ## C10 §4b — the ten themes, projected from the design registry (R-THM-001)
 	node tools/theme/from-registry.mjs
