@@ -3277,6 +3277,10 @@ instead (C22 I99), and the document is the stamped one.
   the text between chips.
 - **History recalls the content** (trace row 11). C20 records strings, so `↑` over a line that
   held a 200-line chip puts 200 lines in the prompt.
+- **The card's head draws the resolved argv**, so a chip's content is in the head flattened onto
+  one row — `note(look at alpha 0 …5 beta 36 …)` — elided by the head's fitter (C09 I46). The head
+  is *what ran* (I90) and this section rules on the echo alone; whether a head's args draw the
+  chip's label is §099/§030's question and is owed.
 - **The header's leading space** is the ground's padding, so the name stands one cell in from the
   preview's box; §101 draws the box's content one cell further in to match. The box's column is
   §6s's and unchanged here.
@@ -4254,7 +4258,7 @@ PTY harness.
 - **T6.157** (I152): the verdict reading `outcomeOf` alone again → **T1.186** fails on each of the five shell words, and not on the two `exit N` rows.
 - **T1.187** (I153, §6t.2 rows 1–7): `commandRows` over `echo hi ` and a six-line paste with `meta.echo`'s one chip over the paste, at 80 columns and full capabilities → one row, `❯ echo hi  #1 pasted · 6L `; at 1 bit → `❯ echo hi [#1 pasted · 6L]`; the same command with no echo → the six rows it draws without one; an echo whose range runs past the command → those six rows; at 24 columns the chip moves whole to the second row; `echoRows`' chip cells cover the label exactly and, painted, carry `bgDeep`'s background and nothing else on the row does.
 - **T1.188** (I155, §6t ruling 6): the header for a six-line paste chip at 256 colours → text ` #1 pasted · 6L`, the span `[0, 11)` with `ground: "pick"` and `bold`, `[11, 15)` `muted`; rendered, the name's cells carry `pick`'s background and the size's do not; at 1 bit → `[#1 pasted · 6L]` with no `ground`.
-- **T4.123** (I153, I154, C23 I104, C26 I33, §6t.3 rows 1, 5): through a built session at 100 × 30, `echo hi ` and a six-line paste, `⏎` → the echo is one row reading `❯ echo hi  #1 pasted · 6L `, no row reads `alpha 1`, and the chip's cells carry `bgDeep`. `⇧⇥` → the chip's cells carry `focusGround`, and a peek is up holding `alpha 0` through `alpha 5`; `y` → the kill buffer is the six lines. The control is a two-line paste, which is text: its echo holds `alpha 1` and `⇧⇥` opens no peek.
+- **T4.123** (I153, I154, C23 I104, C26 I33, §6t.3 rows 1, 5): through a built session at 100 × 30 whose manifest has a local verb `note` taking words, `/note ` and a six-line paste, `⏎` → the echo is one row reading `❯ /note  #1 pasted · 6L `, the card's head is the next row, no row is a line of the content on its own, and the label's cells carry `bgDeep`. `⇧⇥` → the label's cells carry `focusGround`, and a peek is up holding `alpha 0` through `alpha 5`; `y` → the six lines are copied. The control is a two-line paste, which is text: its echo draws `alpha 1` as a row and `⇧⇥` opens no peek. *Amended at the code commit*: the row was written over `echo hi `, a shell line, and a running child attaches the keys (C16 I49), so `⇧⇥` is the child's; and *no row reads `alpha 1`* cannot discriminate, because the card's head draws the resolved argv — `note(alpha 0 alpha 1 …)` — on one row (6t.5).
 - **T6.158** (I153): `commandRows` ignoring `echo` → **T1.187** fails on the row count.
 - **T6.159** (I154): the echo's elements left out of `elementsOf` → **T4.123** fails: no peek opens.
 - **T6.160** (I155): the header's `ground` dropped → **T1.188** fails.
