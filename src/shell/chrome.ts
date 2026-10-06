@@ -215,13 +215,44 @@ const mark = (m: Mark, caps: TerminalCapabilities): string =>
  */
 const hint = (keys: readonly Binding["key"][], does: string, caps: TerminalCapabilities): string => {
   const unicode = caps.unicode !== "ascii";
-  return `${keys.map((k) => chordText(k, unicode)).join(unicode ? "" : "/")} ${does}`;
+  if (!unicode) return `${keys.map((k) => chordText(k, false)).join("/")} ${does}`;
+  return `${sharedModifiers(keys)} ${does}`;
+};
+
+const ARROW_NAMES: ReadonlySet<string> = new Set(["up", "down", "left", "right"]);
+
+/**
+ * **A run of arrows under one modifier set names the modifiers once** (§016, §101):
+ * the design writes `⇧↑↓ select` and `⌥⇧↑↓`, never `⇧↑⇧↓`, and a reader takes the
+ * collapsed form as one chord family. Only arrows collapse, and only when every
+ * member carries the *same* non-empty modifiers: a pair of unlike chords does not
+ * share a family the way a direction pair does, and a collapse that guessed would
+ * misname a chord. Anything else joins with nothing, as `chordText`'s pair rule
+ * has always said. Decided on the keys, not on their spelling, so the glyphs stay
+ * `chordText`'s.
+ */
+const sharedModifiers = (keys: readonly Binding["key"][]): string => {
+  const first = keys[0];
+  const same =
+    first !== undefined &&
+    keys.length > 1 &&
+    (first.ctrl === true || first.meta === true || first.shift === true || first.super === true) &&
+    keys.every(
+      (k) =>
+        ARROW_NAMES.has(k.name) &&
+        (k.ctrl === true) === (first.ctrl === true) &&
+        (k.meta === true) === (first.meta === true) &&
+        (k.shift === true) === (first.shift === true) &&
+        (k.super === true) === (first.super === true),
+    );
+  if (!same) return keys.map((k) => chordText(k)).join("");
+  return chordText(first) + keys.slice(1).map((k) => chordText({ name: k.name })).join("");
 };
 
 /**
  * `hint`, for a row outside the owner line that names keys — the chip
  * preview's (C22 I143) — so a chord is spelled one way wherever it is named:
- * `⌥⇧↑⌥⇧↓ scroll`, as the owner line writes `⇧↑⇧↓ extend`.
+ * `⌥⇧↑↓ scroll`, as the owner line writes `⇧↑↓ extend`.
  */
 export const keyHint = hint;
 

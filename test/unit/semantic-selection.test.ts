@@ -217,18 +217,18 @@ describe("C14 I55 — the copy rung's footer", () => {
   it("T1.50 (C14 I55, R-SEL-005, R-SEL-009): the copy rung's owner line reads by mode, esc clears before it leaves, and the count is three chips", () => {
     // **The control: nothing selected** — `esc out`, and no count at all
     // rather than a zero, which is what absent `copy` also reads as.
-    // `⇧↑⇧↓`, not `↑↓` (C22 I133): the bare arrows move the caret, and the chip
+    // `⇧↑↓`, not `↑↓` (C22 I133): the bare arrows move the caret, and the chip
     // is the keymap's `extendSemanticSelection*` rows since the line stopped
     // spelling its own keys.
     // **Amended (C14 I59, I60)**: `⏎ copy` is the copy that leaves, and
     // `⌃V rect` names the way into the rectangle — last, the first to shed.
-    const idle = ["copy", "⇧↑⇧↓ extend", "⏎ copy", "esc out", "the screen is frozen", "⌃V rect"];
+    const idle = ["copy", "⇧↑↓ extend", "⏎ copy", "esc out", "the screen is frozen", "⌃V rect"];
     expect(labels(sem(null))).toEqual(idle);
     expect(labels(undefined), "no copy state is semantic mode with nothing selected").toEqual(idle);
 
     // Over a selection the first esc clears, and the count follows it in order.
     expect(labels(sem({ chars: 418, rows: 9, entries: 2 }))).toEqual([
-      "copy", "⇧↑⇧↓ extend", "⏎ copy", "esc clear", "418 chars · 9 rows · 2 entries", "the screen is frozen", "⌃V rect",
+      "copy", "⇧↑↓ extend", "⏎ copy", "esc clear", "418 chars · 9 rows · 2 entries", "the screen is frozen", "⌃V rect",
     ]);
     const one = labels(sem({ chars: 1, rows: 1, entries: 1 }));
     expect(one[4], "one of each is singular").toBe("1 char · 1 row · 1 entry");
@@ -333,26 +333,26 @@ describe("C14 §6e — the footer's classification table", () => {
 
     const rows: readonly (readonly [string, SemanticMode, CopyState, readonly string[]])[] = [
       ["blocks, none", base, state(base, null),
-        ["copy", "⇧↑⇧↓ extend", "⏎ copy", "esc out", "the screen is frozen", "⌃V rect"]],
+        ["copy", "⇧↑↓ extend", "⏎ copy", "esc out", "the screen is frozen", "⌃V rect"]],
       ["blocks, some", some, state(some, COUNT),
-        ["copy", "⇧↑⇧↓ extend", "⏎ copy", "esc clear", count, "the screen is frozen", "⌃V rect"]],
+        ["copy", "⇧↑↓ extend", "⏎ copy", "esc clear", count, "the screen is frozen", "⌃V rect"]],
       // **The row M10 item 5 named**: a selection that copies nothing is a
       // selection, and the press over it clears. No count, and `esc clear`.
       ["blocks, only a rule", ruleOnly, state(ruleOnly, null),
-        ["copy", "⇧↑⇧↓ extend", "⏎ copy", "esc clear", "the screen is frozen", "⌃V rect"]],
+        ["copy", "⇧↑↓ extend", "⏎ copy", "esc clear", "the screen is frozen", "⌃V rect"]],
       ["blocks, every span", all, state(all, COUNT),
-        ["copy", "⇧↑⇧↓ extend", "⏎ copy", "esc clear", count, "the screen is frozen", "all loaded entries", "⌃V rect"]],
+        ["copy", "⇧↑↓ extend", "⏎ copy", "esc clear", count, "the screen is frozen", "all loaded entries", "⌃V rect"]],
       // `every` over nothing is true, and nothing is not *all*.
       ["blocks, empty transcript", enter(null, null), state(enter(null, null), null, null, []),
-        ["copy", "⇧↑⇧↓ extend", "⏎ copy", "esc out", "the screen is frozen", "⌃V rect"]],
+        ["copy", "⇧↑↓ extend", "⏎ copy", "esc out", "the screen is frozen", "⌃V rect"]],
       ["rect, unresolved", rectOn, state(rectOn, null, { columns: 0, rows: 0 }),
-        ["copy", "RECT", "cells, not source", "⇧↑⇧↓⇧←⇧→ extend", "⏎ copy", "esc clear", "the screen is frozen", "⌃V blocks"]],
+        ["copy", "RECT", "cells, not source", "⇧↑↓←→ extend", "⏎ copy", "esc clear", "the screen is frozen", "⌃V blocks"]],
       ["rect, resolved", rectOn, state(rectOn, COUNT, { columns: 6, rows: 2 }),
-        ["copy", "RECT 6×2", "cells, not source", "⇧↑⇧↓⇧←⇧→ extend", "⏎ copy", "esc clear", count, "the screen is frozen", "⌃V blocks"]],
+        ["copy", "RECT 6×2", "cells, not source", "⇧↑↓←→ extend", "⏎ copy", "esc clear", count, "the screen is frozen", "⌃V blocks"]],
       // **The table's own find**: the rectangle over a full block set is not
       // *all loaded entries* — its copy is its cells.
       ["rect over every span", rectOverAll, state(rectOverAll, COUNT, { columns: 6, rows: 2 }),
-        ["copy", "RECT 6×2", "cells, not source", "⇧↑⇧↓⇧←⇧→ extend", "⏎ copy", "esc clear", count, "the screen is frozen", "⌃V blocks"]],
+        ["copy", "RECT 6×2", "cells, not source", "⇧↑↓←→ extend", "⏎ copy", "esc clear", count, "the screen is frozen", "⌃V blocks"]],
     ];
     for (const [name, mode, copy, want] of rows) {
       expect(line(copy), name).toEqual(want);

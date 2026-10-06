@@ -918,7 +918,7 @@ describe("C22 §6l.6 J — the chrome's chips declare their ink (F1029)", () => 
       "~/work",
       "copy",
       // The keymap's extend rows (C22 I133) — the bare arrows move the caret.
-      "⇧↑⇧↓ extend",
+      "⇧↑↓ extend",
       "⏎ copy",
       // Two chips: the separator between them is the cluster's to draw, and a
       // literal `·` inside a label is the unresolved join T2.116 refuses.
@@ -1265,9 +1265,9 @@ describe("C22 I133 — the owner line's chords are the keymap's (review batch 2,
     expect(labelsOf("scope", unbound), "and with nothing bound it has none").toEqual([]);
     expect(drawn.length, "the owner words and facts were drawn").toBeGreaterThan(6);
 
-    // The copy line names the extend rows — `⇧↑⇧↓` — and not the caret's `↑↓`.
+    // The copy line names the extend rows — `⇧↑↓` — and not the caret's `↑↓`.
     expect(ownerLine("copy", FULL_CAPS, false, 0, { mode: "semantic", size: null, clears: false, all: false, rect: null }, false, hints).map((c) => c.label))
-      .toContain("⇧↑⇧↓ extend");
+      .toContain("⇧↑↓ extend");
 
     // **A question's line is its own vocabulary**, read through the graph: the
     // state and the default's label come from the open question, not the rung.

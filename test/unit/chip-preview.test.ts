@@ -179,7 +179,7 @@ describe("C22 §6q — the chip preview's box and keys (ruling 53), owed at the 
       edge: "",
       header: "#1 pasted · 47L",
       height: 8,
-      keys: "⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor",
+      keys: "⌥⇧↑↓ scroll  ⌥o open in editor",
     });
     expect(cut(), "and its residue row fits: the layer is whole").toBe(false);
     expect(graph.ownerHints().previewScrolls, "the owner line names the scroll too").toBe(true);
@@ -188,7 +188,7 @@ describe("C22 §6q — the chip preview's box and keys (ruling 53), owed at the 
     // draw no residue; ten overflow, and the box gives the residue its row.
     for (const [lines, height, keys] of [
       [9, 9, "⌥o open in editor"],
-      [10, 8, "⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor"],
+      [10, 8, "⌥⇧↑↓ scroll  ⌥o open in editor"],
     ] as const) {
       graph.editor.clear();
       stdin.emit(`${ESC}[200~${pasteOf(lines, "edge")}${ESC}[201~`);
