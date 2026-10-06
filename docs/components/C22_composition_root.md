@@ -3232,6 +3232,70 @@ constraint* — are normative for appearance, and *"Terminal too small"* is the 
 which the figure does not carry: the `▲` and `needs` say it. The words go; the sentence's job (what
 is wrong) is the mark's, and the figure's second line states what is needed.
 
+### 6u.2 — §067: the new-messages button (I154, I155)
+
+**Unbuilt and unspecified at b6ce58a2** (`grep 'new messages'` finds the registry, the fixture and nothing else). The
+design is `R-BLK-481`–`R-BLK-500` and `R-BLK-435`: a **button directly above the prompt**, at rest `bgElev`,
+counting **messages, not rows**, drawn only while scrolled up with something new, and *a new entry does NOT
+move a scrolled-up reader*.
+
+**What a message is in this tree.** One transcript entry: a command's echo, its blocks and its outcome are
+one entry (C23), so *a reply, a call, a patch, an agent fan-out* are entries, and the two arrivals that
+count are C13's `settle` (a streaming entry finishing — *the running entry: NO, it has not arrived yet*) and an
+`append` of an entry born settled (`streaming: false`). A `patch` is not an arrival (*a patch to a block: NO*),
+and neither is an `evict`.
+
+**Classification table (structural: which rule answers at rest).**
+
+| the transcript is | the button |
+|---|---|
+| at the tail (`followTail`) | none, whatever arrived |
+| scrolled up, nothing settled since | none — *a button that says nothing happened is a row spent on nothing* |
+| scrolled up, N ≥ 1 settled since | `↓ N new messages`, or `↓ 1 new message` |
+| scrolled up and a `keepWhole` hold detached the follow (C14 I56) | the same: the tail is off screen whoever moved it |
+| a region of fewer than three rows | none — it would hide most of the region (ruling b) |
+| a layer is placed over the row | the layer's, as every layer goes on last |
+
+**Sequence trace (event-mediated).**
+
+| # | event | N | the frame |
+|---|---|---|---|
+| 1 | at the tail, an entry settles | 0 | follows it; nothing |
+| 2 | the reader wheels up two rows | 0 | the anchor holds; nothing |
+| 3 | an entry is appended streaming | 0 | the running entry is not counted |
+| 4 | that entry settles | 1 | `↓ 1 new message` |
+| 5 | a patch lands on a settled-above entry | 1 | unchanged |
+| 6 | a born-settled notice is appended | 2 | `↓ 2 new messages` |
+| 7 | the reader submits a command whose entry is born settled (`/help`) | 2 | **not counted** — *your own message: NO* (ruling c) |
+| 8 | that command's slow sibling settles later | 3 | a reply is counted |
+| 9 | a click on the button, or `⌘↓`/`⌃End` | 0 | `scrollBy` to the tail: `followTail` is derived (C14 I5) and the count resets with it in the same frame |
+| 10 | the reader wheels back to the bottom | 0 | the same reset, by the viewport's own `followTail` |
+| 11 | `clear` | 0 | nothing to be new about |
+| 12 | the entry settles after the reader came back to the tail | 0 | following: not counted |
+
+**Rulings (b5-forms).**
+
+- **a — The count is L4's.** `construct.ts` counts from C13's change stream and C14's `followTail`; neither
+  component learns a count (*L4 orchestrates*, A02 Seam 4). A number and not a set of ids: an arrival that is
+  evicted before it is read was still an arrival.
+- **b — The button replaces the region's last row; the geometry is unchanged.** The region keeps its height
+  (`heightsSum` is untouched, and appearance changes where geometry does not), and the row it covers is the one
+  next to the prompt's upper rule — *directly above the prompt*, where the figure puts it. The covered row is one
+  scroll away, and the button is drawn only where at least two region rows remain.
+- **c — Your own message is not counted.** Entries appended *inside the reader's own submit dispatch* are exempt;
+  their later settles are counted as the replies they are. The alternative — snapping a scrolled-up reader to
+  the tail on every submit — changes a scroll rule `R-BLK-435` states and was not taken.
+- **d — The `⏎` is withheld, and the figure's other two states are owed.** The figure prints `⏎` *inside* the
+  button, *because it is the button's own key*. `⏎` at the prompt sends (I51), and the button has no focus
+  target — a rung in C16's ladder, so a change to A02 §2's table and not a drawing — so a `⏎` printed here would be a
+  key that does nothing, which is worse than a missing glyph. Its keys are the ones that already reach the state
+  (`transcript.bottom`) and its pointer gesture is the press. **Owed: the focused state (`›` mark and edge) and `⏎`,
+  with the focus target; the hovered state, with the pointer's hover layer.**
+- **e — The rest ground is `bgElev`** (`R-BLK-490`), the rung label's own pattern (I111): at 1-bit the brackets
+  `[…]` carry it (I147, C09 I102), and at ASCII the arrow is `v`.
+- **f — Width sheds the words, never the number.** `↓ N new messages` → `↓ N new` → `↓ N`; below the width of
+  the last, nothing, rather than a cut label.
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -3573,6 +3637,8 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I151** — *(§097, `R-BLK-569`, `R-BLK-628`, `R-BLK-775`, F1501; §6s ruling 1)* **A panel's rows between its edges take `surface.bgElev`.** The compositor paints `surface.bgElev` behind every line of a `kind: "panel"` layer except the lines of its leading `rule` blocks — the upper edge; the lower edge is the prompt's rule (I81) and is not in the layer — through `based`, so a span that sets its own background keeps its cells (the menu's `pick` row), and the padding to the box's width is grounded (I29). The exemption is by content line, so a row-scrolled panel keeps it (§6s.2 row 7). Where no ground resolves — 1 bit, a theme whose `bgElev` inherits — the rows are byte for byte what they were. A `peek` and an `overlay` take none. → T1.184, T4.121, T6.153, T6.154
 - **I152** — *(§6m.2, ruling 103 b, F1517, C23 I101, C23 §8a A6.9)* **A completion line says `exit N` only of a child's own ending.** Where the settled head's word is one the shell writes — `denied`, `expired`, `cancelled`, `truncated`, `failed` — the verdict names it and appends no code, because the code beside it is the shell's: 126 for a denial and an expiry, 130 for a cancel, 1 for a malformed patch and a throw (C23 I101). A `cancelled` head's word is the verdict's first part — `/ps — denied`, `/ps — expired`, `/ps — cancelled` — and a `failed` head's follows its state, `failed, truncated`. A head whose word is `exit N` keeps it, so a child that ended 130 on its own still reads `failed, exit 130`. C20 records every one of these codes as before (C23 I29). *As it stood:* ~~`exit N` for any non-zero code on a document that is not the shell's own~~ — a denial read `/ps — failed, exit 126` and a cancel `cancelled, exit 130` (F1517). → T1.186, T6.157
 - **I153** — *(§6u.1, §047)* **The too-small render is the design's frame, at the terminal's rung.** `▲ <columns>×<rows>` over `needs 60×16` in a box where four rows and the box's width allow, the same two lines fitted where they do not, the size alone at one row and nothing at zero. The marks resolve at the capability record's rung (`!`, `x`, `+-|` at ASCII); every line is measured at its `ambiguousWidth` and is never wider than the terminal nor taller than its rows. No colour, and no call into the block registry (I9). → T3.8b, T3.8e, T3.8f, T3.15c
+- **I154** — *(§6u.2, §067, `R-BLK-494`, `R-BLK-495`)* **The count is entries that settled while the transcript was not following the tail.** `settle` and an `append` of an entry born settled count; a `patch`, an `evict`, the running entry and an arrival inside the reader's own submit do not. It resets to 0 when `followTail` is true and on `clear`. L4's, held in `construct.ts`; no change to C13 or C14. → T1.188, T4.123, T6.158
+- **I155** — *(§6u.2, §067, `R-BLK-490`–`R-BLK-500`)* **The button is drawn over the region's last row while the count is above zero, and a press on it goes to the tail.** The row is the region's last, `bgElev` at colour and bracketed at 1-bit, `↓ N new message(s)` shedding to `↓ N new` then `↓ N`, indented by the content margin; it is drawn only where at least two region rows remain and the transcript bar's column is left to the bar (I109). The press is `scrollBy` to the tail, which is what `transcript.bottom` does, and `followTail` resets the count. Withheld, and owed: `⏎`, the focused state and the hovered state (§6u.2 ruling d). → T1.189, T4.123, T6.158
 
 ## 11. Commitments
 
@@ -3822,6 +3888,10 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T3.8** (I9): the fallback renders with no call into the block registry or layout — asserted by a spy.
 - **T3.8b** (I153, was I9): the fallback emits no colour, and its box is drawn only at the capability record's rung — `+-|` at ASCII.
 - **T3.8e** (I153, §6u.1): the five rungs of the classification table — zero rows nothing, one row the size, two and three rows two lines, four rows and the box's width the box, four rows and less the lines — and at every size no line is wider than `columns` at the record's `ambiguousWidth` and no more lines than rows. *Fails on revert*: measuring at `narrow` fails the wide-ambiguity row, and dropping the four-row guard fails the three-row row.
+- **T1.188** (I154, §6u.2 trace rows 1–12): the counter, driven by a fake transcript's changes and a fake `followTail`, steps through the trace and asserts the *whole* state after each row. *Fails on revert*: counting a `patch` fails row 5; counting while following fails row 12; not resetting on `followTail` fails row 10; counting inside the own-submit scope fails row 7; counting the streaming `append` fails row 3.
+- **T1.189** (I155, §6u.2 rulings e, f): the button's spans at the three rungs — `bgElev` ground at colour, `[…]` at 1-bit, `v` for the arrow at ASCII — and the shed ladder at the widths where each word goes. *Fails on revert*: painting the row at 1-bit fails the bracket assertion.
+- **T4.123** (I154, I155, §6u.2): a built session at 80 × 24 with a long transcript, scrolled up with the wheel; an entry settles → the region's last row is the button and the row count is unchanged; a second arrival → `2 new messages`; a press on the button row reaches the tail and the row is gone; a scrolled-up transcript with nothing new draws none. *Fails on revert*: drawing the button at the tail fails the last step of the first arm; counting a patch fails the count.
+- **T6.158** (I154, I155): the mutations of T1.188 and T4.123 recorded, each by the row that kills it.
 - **T3.8f** (I153, §047): the figure's two lines, exactly — `▲ 34×8`, `needs 60×16` at Unicode and `! 34x8`, `needs 60x16` at ASCII.
 - **T3.9**: shrinking below minimum mid-session → fallback replaces the frame; scrollback and history survive.
 - **T3.40** (I99, F158, F1024): a greeting whose producer resolves **after** a submission has settled → the greeting is still the transcript's first entry and the result sits below it. Read off the frame by row index, because *above* is the finding's own word and an assertion about `entries.length` would be green for the defect too. The control is T3.9b: without it a row asserting an order proves nothing about whether either thing drew.
