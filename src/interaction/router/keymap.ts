@@ -168,7 +168,7 @@ function chordName(key: Binding["key"]): string {
   const mods =
     (key.ctrl === true ? "C-" : "") +
     (key.meta === true ? "M-" : "") +
-    (shifted && !letter ? "S-" : "") +
+    (shifted ? "S-" : "") +
     (key.super === true ? "s-" : "");
   const name = letter ? (shifted ? key.name.toUpperCase() : key.name.toLowerCase()) : key.name;
   return `${mods}${CHORD_NAMES[key.name] ?? name}`;
