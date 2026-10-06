@@ -235,6 +235,9 @@ describe("C07 fail-on-revert", () => {
     const lines = [
       ...Array.from({ length: 10 }, (_, i) => JSON.stringify({ n: i })),
       "first bad",
+      // A value ends the run (C07 I12, F1432): what is held at the trip is the
+      // lines since it, so the line before it is noise and not the remainder's head.
+      JSON.stringify({ n: 10 }),
       "the tripping line",
       "after",
     ];
