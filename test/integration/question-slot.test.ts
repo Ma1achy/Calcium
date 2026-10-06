@@ -67,7 +67,7 @@ describe("C23 §7f — the prompt's slot", () => {
     // prompt's rows are the band between them and their positions are the
     // arithmetic this row is about.
     const rules = (frame: readonly string[]): readonly number[] =>
-      frame.flatMap((r, i) => (/^─+\s*$/u.test(r.trimEnd()) ? [i] : []));
+      frame.flatMap((r, i) => (/^─+(?: .+ ─)?\s*$/u.test(r.trimEnd()) ? [i] : []));
     const promptBand = (frame: readonly string[]): readonly string[] => {
       const marks = rules(frame);
       const lower = marks.at(-1) ?? 0; // cells-ok — a row index

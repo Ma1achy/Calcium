@@ -55,7 +55,7 @@ async function session() {
 
 /** The prompt's upper rule, and the panel's own edge above it. */
 function edges(f: Frame): Readonly<{ edge: number; lower: number }> {
-  const lower = f.text.findIndex((r, i) => r === "─".repeat(SIZE.columns) && (f.text[i + 1] ?? "").startsWith("❯"));
+  const lower = f.text.findIndex((r, i) => /^─+(?: .+ ─)?$/u.test(r) && r.length === SIZE.columns && (f.text[i + 1] ?? "").startsWith("❯"));
   let edge = lower - 1;
   while (edge >= 0 && f.text[edge]?.slice(0, REGION_WIDTH) !== "─".repeat(REGION_WIDTH)) edge -= 1;
   return { edge, lower };
@@ -106,7 +106,16 @@ describe("C22 §6s — three panels between two rules, on bgElev (I151)", () => 
 
       // **Neither rule takes a ground** (§6s.2 row 1).
       expect(new Set(grounds(after.cells[edge])), `${panel.name}: its edge is on the page`).not.toContain(ELEV);
-      expect(new Set(grounds(after.cells[lower])), `${panel.name}: so is the prompt's rule`).not.toContain(ELEV);
+      // **The label's cells are the one exception** (C22 I111, amended): the app's name
+      // is a thing and takes a ground (§069), and it is inline-end on this rule. Every
+      // other cell of the rule is on the page.
+      const label = /( \S+ )─$/u.exec(after.text[lower] ?? "");
+      expect(label, `${panel.name}: the rule carries the app's name`).not.toBeNull();
+      const labelAt = (after.text[lower] ?? "").length - 1 - (label?.[1] ?? "").length;
+      grounds(after.cells[lower]).forEach((g, col) => {
+        const inLabel = col >= labelAt && col < labelAt + (label?.[1] ?? "").length;
+        if (!inLabel) expect(g, `${panel.name}: the prompt's rule, column ${String(col)}`).not.toBe(ELEV);
+      });
 
       // **Every cell between them does, to the region's last column** — the
       // padding is the panel's (C22 I29) — except the menu's current row, which is

@@ -129,7 +129,7 @@ async function copiedFromBoxed(
   stdin.emit("\u0019");
   await step(0);
   const rows = screen().rows;
-  const rules = rows.flatMap((r, i) => (/^─+$/u.test(r.trim()) ? [i] : []));
+  const rules = rows.flatMap((r, i) => (/^─+(?: .+ ─)?$/u.test(r.trim()) ? [i] : []));
   const [x, y] = rules.slice(-2);
   return rows.slice((x ?? 0) + 1, y).join("\n");
 }

@@ -82,7 +82,7 @@ describe("C14 §6d — the rail, in a session", () => {
       await step();
 
       const rows = screen().rows;
-      const rules = rows.flatMap((r, i) => (/^─+$/u.test(r.trim()) ? [i] : []));
+      const rules = rows.flatMap((r, i) => (/^─+(?: .+ ─)?$/u.test(r.trim()) ? [i] : []));
       const [top, bottom] = [rules[0]! + 1, rules.at(-2)!];
       const transcript = rows.slice(top, bottom);
 
@@ -105,7 +105,7 @@ describe("C14 §6d — the rail, in a session", () => {
       // the transcript's 78 the break would be one cell earlier.
       const promptRows = (): number => {
         const rs = screen().rows;
-        const rr = rs.flatMap((r, i) => (/^─+$/u.test(r.trim()) ? [i] : []));
+        const rr = rs.flatMap((r, i) => (/^─+(?: .+ ─)?$/u.test(r.trim()) ? [i] : []));
         return rr.at(-1)! - rr.at(-2)! - 1;
       };
       stdin.emit("x".repeat(76));

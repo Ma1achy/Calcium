@@ -346,8 +346,9 @@ export type Label = Readonly<{ text: string; hue?: string }>;
 export type LabelFn = (ctx: ChromeContext) => string | Label | null;
 
 /**
- * §6l — the chrome's three members. `label` is optional and absent is the frame
- * that shipped, glyph for glyph (C22 I81, as amended in §6l.10).
+ * §6l — the chrome's three members. `label` is optional and **absent is the
+ * application's name** (C22 I111 as amended, §069 `R-BLK-512`); a `label`
+ * returning `null` is the bare rule, glyph for glyph as it shipped.
  */
 export type Chrome = Readonly<{ header: ChromeFn; footer: ChromeFn; label?: LabelFn }>;
 

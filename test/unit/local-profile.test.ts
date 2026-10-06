@@ -478,6 +478,9 @@ describe("C28 I64 — the capture verb", () => {
     // printed the ask beside shares of the real window read as 140 + 699 of 700.
     expect(text, "the measured window").toContain("captured over 400 ms");
     expect(text, "the file, so the reader can find it").toContain("/tmp/t.cpuprofile");
+    // C28 I66: the follow-up is a verb, not a walk the transcript has no keys for.
+    expect(text, "the follow-up is a verb").toContain("/profile snapshot sampled-stacks");
+    expect(text).not.toContain("walk to");
     expect(text, "what landed on the tree").toContain("3.00 ms");
     expect(text, "and what did not").toContain("7.00 ms");
     expect(setTierCalls, "still nobody's tier").toEqual([]);

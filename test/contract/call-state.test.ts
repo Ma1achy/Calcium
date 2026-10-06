@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import { CALL_HEAD_GLYPH, CALL_STATE_TONE, CALL_STATES, block, validateDocument } from "../../src/data/viewmodel/index.js";
 import type { Block, CallState, Notice } from "../../src/data/viewmodel/index.js";
-import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
+import { createBlockRegistry, elapsed } from "../../src/presentation/blocks/index.js";
 import { paint, tone } from "../../src/presentation/blocks/paint.js";
 import { GLYPH_TOKENS, glyphCells, headMark } from "../../src/presentation/blocks/glyphs.js";
 import { renderSequenceToLines } from "../../src/presentation/render-lines.js";
@@ -260,7 +260,47 @@ describe("C04 I149 — waiting, blocked on you", () => {
 });
 
 describe("C23 I104 — the head rendered per token", () => {
-  it.todo(
-    "T2.49 (C23 I104, C10 I15, C09 I45): a succeeded and a failed head rendered at 24-bit and 1-bit, read per token — not deferred on a component: lands with the composer change in this round",
-  );
+  it("T2.49 (C23 I104, C10 I15, C09 I45): a succeeded and a failed head rendered at 24-bit read per token off the terminal; at 1-bit the verb is plain, the argument and outcome bold, the furniture dim", async () => {
+    const caps = { ...FULL_CAPS, colourDepth: 24 } as TerminalCapabilities;
+    for (const [label, spec, state] of [
+      ["succeeded", { name: "pytest", args: "tests/unit", elapsedMs: 4000, outcome: "47 passed" }, "ok"],
+      ["failed", { name: "pytest", args: "tests/unit", elapsedMs: 4000, outcome: "exit 1" }, "error"],
+    ] as const) {
+      const [row] = renderSequenceToLines(registry, [callHead(call(spec), caps)], 80, { theme: DARK_THEME, capabilities: caps });
+      const text = visible(row ?? "");
+      const read = await cellsOf(row ?? "", 60);
+      const at = (needle: string): Cell => read[text.indexOf(needle)]!;
+      const oracle = async (t: Notice["tone"]): Promise<readonly [number | null, number]> => {
+        const c = await toneCell(t, caps);
+        return [c.fg, c.fgMode];
+      };
+      const got = (c: Cell): readonly [number | null, number] => [c.fg, c.fgMode];
+      expect(got(at("●")), `${label}: the mark is the state's`).toEqual(await oracle(state));
+      expect(got(at("pytest")), `${label}: the verb is the default ink`).toEqual(await oracle("default"));
+      expect(got(at("tests/unit")), `${label}: the argument is the identifier colour`).toEqual(await oracle("identifier"));
+      expect(got(at("(")), `${label}: the parenthesis is muted`).toEqual(await oracle("muted"));
+      expect(got(at(elapsed(4000))), `${label}: the duration is muted`).toEqual(await oracle("muted"));
+      expect(got(at("·")), `${label}: the separator is muted`).toEqual(await oracle("muted"));
+      expect(got(at(spec.outcome)), `${label}: the outcome is the state's`).toEqual(await oracle(state));
+    }
+    // **1 bit**: the registry's mono classes per run — the verb plain, the
+    // argument and the outcome bold, the furniture dim.
+    const mono = { ...FULL_CAPS, colourDepth: 1 } as TerminalCapabilities;
+    const [row] = renderSequenceToLines(
+      registry,
+      [callHead(call({ name: "pytest", args: "tests/unit", elapsedMs: 4000, outcome: "47 passed" }), mono)],
+      80,
+      { theme: DARK_THEME, capabilities: mono },
+    );
+    const bytes = row ?? "";
+    const run = (needle: string): string => {
+      const i = bytes.indexOf(needle);
+      const open = [...bytes.slice(0, i).matchAll(/\x1b\[([0-9;]*)m/gu)];
+      return open.length === 0 ? "" : (open[open.length - 1]![1] ?? "");
+    };
+    expect(run("pytest"), "the verb carries no bold or dim").not.toMatch(/(^|;)[12](;|$)/u);
+    expect(run("tests/unit"), "the argument is bold").toMatch(/(^|;)1(;|$)/u);
+    expect(run("47 passed"), "the outcome is bold").toMatch(/(^|;)1(;|$)/u);
+    expect(run("4s"), "the duration is dim").toMatch(/(^|;)2(;|$)/u);
+  });
 });

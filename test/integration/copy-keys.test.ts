@@ -74,7 +74,7 @@ async function session() {
   const yanked = async (): Promise<string> => {
     await press(CTRL_Y);
     const rows = built.screen().rows;
-    const rules = rows.flatMap((r, i) => (/^─+$/u.test(r.trim()) ? [i] : []));
+    const rules = rows.flatMap((r, i) => (/^─+(?: .+ ─)?$/u.test(r.trim()) ? [i] : []));
     const [x, y] = rules.slice(-2);
     return rows.slice((x ?? 0) + 1, y).map((r) => r.trimEnd()).join("\n");
   };

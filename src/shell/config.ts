@@ -20,7 +20,7 @@ import { createExecutionPipeline } from "./execution.js";
 import { makeDefaultChrome } from "./chrome.js";
 import { createRecording, recordStdin } from "./profiling/record.js";
 import { DEFAULT_TIER } from "./profiling/recorder.js";
-import { ConfigError, type FileSystem, type TuiConfig } from "./types.js";
+import { ConfigError, type Chrome, type FileSystem, type TuiConfig } from "./types.js";
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Motion } from "../presentation/blocks/index.js";
 
@@ -332,6 +332,15 @@ export type Ambient = Readonly<{
  * which is what makes a truncated recording detectable rather than merely
  * short (I15).
  */
+/**
+ * A chrome whose `label` is the application's name where it declares none
+ * (C22 I111 as amended, §069 `R-BLK-512`). An explicit member wins, `null`
+ * included — that is how an application asks for the bare rule.
+ */
+function withNameLabel(chrome: Chrome, name: string): Chrome {
+  return chrome.label !== undefined ? chrome : Object.freeze({ ...chrome, label: () => name });
+}
+
 function recordingSink(fs: FileSystem, path: string): (line: string) => void {
   let pending = "";
   return (line) => {
@@ -421,7 +430,12 @@ export function resolveConfig(config: TuiConfig, ambient: Ambient) {
     completionSources: config.completionSources ?? [],
     // §6l — the chrome is two functions and nothing else: the footer's height
     // is what its blocks measure (I82), so there is no budget to resolve here.
-    chrome: config.chrome ?? makeDefaultChrome(config.name, config.binary),
+    //
+    // **The label defaults to the application's name** (I111 as amended, §069
+    // `R-BLK-512` — *the app — the default*), on a supplied chrome as on the
+    // default one: absent is the name, and a `label` returning `null` is the
+    // bare rule an application asks for.
+    chrome: withNameLabel(config.chrome ?? makeDefaultChrome(config.name, config.binary), config.name),
     blocks: config.blocks ?? [],
     // C14 I24 — the registry's default, resolved here so there is one place
     // the value lives and one constant it is read from (C09 §2b).

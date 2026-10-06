@@ -252,6 +252,34 @@ describe("C28 §3c — the deck, every card", () => {
     expect(gone).toContain("has left the retained set");
   });
 
+  it("T1.130 (C28 I66, R-INT-002): no card names n, p, tab, shift-tab, esc or a letter as a key, over every fixture and over a frame that has left the set; every /profile verb a card names is a verb the handler parses", () => {
+    // **Every string of every card, descended into** — a card is a panel, so a
+    // scan of the top level reads a corpus the reader never saw.
+    const keyNames = /`(?:n|p|tab|shift-tab|esc)`|[Pp]ress `/u;
+    const verbs = new Set<string>();
+    let scanned = 0;
+    for (const name of Object.keys(FIXTURES) as (keyof typeof FIXTURES)[]) {
+      const report = reportOf(name);
+      for (const spec of CARDS) {
+        // The control: a card at a gone `seq` draws the frame-gone notice, which carried the key.
+        for (const seq of spec.perFrame === true ? [undefined, 999_999] : [undefined]) {
+          const blocks = profileCard(report, spec.id, REGIONS[1], ASCII_CAPS, seq);
+          const strings = JSON.stringify(blocks);
+          scanned += 1;
+          expect(strings, `${name}/${spec.id}${seq === undefined ? "" : " (gone)"} names no key`).not.toMatch(keyNames);
+          for (const m of strings.matchAll(/`(\/profile [^`]*)`/gu)) verbs.add((m[1] ?? "").trim());
+        }
+      }
+    }
+    expect(scanned, "the fixture responds: cards were scanned").toBeGreaterThan(CARDS.length);
+    expect(verbs.size, "and the verbs the cards name were found").toBeGreaterThan(0);
+    for (const v of verbs) {
+      const [, arg] = v.split(/\s+/u);
+      const word = (arg ?? "").replace(/[<>].*$/u, "");
+      expect(["", "app", "framework", "verdict", "snapshot", "live", "capture"].includes(word) || (arg ?? "").startsWith("<"), `/profile ${word} parses`).toBe(true);
+    }
+  });
+
   it("T3.22 (C28 I60): every card below its form's floor draws the floor it missed", () => {
     // The whole deck at a region no figure fits, and the control below it: the
     // same deck at a region that meets every floor, where a kit refusing

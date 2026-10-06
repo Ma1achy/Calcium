@@ -229,6 +229,8 @@ describe("C20 §5 — the search drawn between two rules (I30, F1502)", () => {
     // The upper edge is the layer's, at the region's width; the lower is the
     // prompt's, at the frame's (C22 I81, C22 I109).
     expect(rows[at - 1]?.slice(0, 79), "its own rule above").toBe("─".repeat(79));
-    expect(rows[at + 1], "the prompt's rule below").toBe("─".repeat(80));
+    // The prompt's upper rule carries the app's name (C22 I111, amended).
+    expect(rows[at + 1], "the prompt's rule below").toMatch(/^─+(?: .+ ─)?$/u);
+    expect(rows[at + 1]?.length).toBe(80);
   });
 });

@@ -688,6 +688,37 @@ export function railCell(theme: ResolvedTheme, capabilities: TerminalCapabilitie
 export const RAIL_BLANK = " ";
 
 /**
+ * The command echo's rows as the frame draws them (C22 I153, §008): led by the
+ * rail's column and washed `surface.bgElev` from there to the transcript's edge,
+ * in the ink resolved on that ground.
+ *
+ * **After `commandRows`, never inside it.** That function is also the
+ * measurer's (I52), and a wash is appearance: the rows it returns are the rows
+ * C14 counted, and this only paints them.
+ *
+ * **The `❯` in the row's own ink, not muted** — §008's nineteen echoes draw the
+ * mark in the sentence's voice; the muted mark is the live prompt's (I154). **At
+ * 1 bit, and wherever the ground does not resolve, nothing replaces the wash**:
+ * the mark already says *this is what you typed*, and `inverse` is the
+ * selection's at 1 bit (C14 I52), where it would read as a selected row.
+ */
+export function echoRows(
+  rows: readonly string[],
+  width: number,
+  theme: ResolvedTheme,
+  capabilities: TerminalCapabilities,
+): readonly string[] {
+  // No 1-bit arm of its own: a surface does not resolve to a ground there (C10 I21), which is the rung.
+  const ground = background("surface.bgElev", theme, capabilities);
+  if (ground?.background === undefined) return rows.map((row) => RAIL_BLANK + row);
+  const style = withBackground(tone("default", theme, capabilities, "bgElev"), ground);
+  return rows.map((row) => {
+    const pad = Math.max(0, width - cells(row, capabilities.ambiguousWidth));
+    return paintSpans([{ text: `${RAIL_BLANK}${row}${" ".repeat(pad)}`, style }]);
+  });
+}
+
+/**
  * The frame's copy of an entry's lines, with the selected rows grounded
  * (C14 I40).
  *
@@ -853,6 +884,19 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
     out.push(styled(squared, ranges, deps));
   }
 
+  // **The mark is muted, and painted last** (C22 I154, §030): after the row is
+  // squared and after any selection or chip ground, so `styled` never cuts an
+  // SGR it laid itself, and after the spinner and the ghost below, which read
+  // the row's cells. Plain at 1 bit, as the rules around it are (I81).
+  const marked = (rows: string[]): string[] => {
+    if (replaced || deps.capabilities.colourDepth === 1) return rows;
+    const mark = promptFor(deps.capabilities).trimEnd();
+    const first = rows[0];
+    if (first === undefined || !first.startsWith(mark)) return rows;
+    rows[0] = `${paintSpans([{ text: mark, style: tone("muted", deps.theme, deps.capabilities) }])}${first.slice(mark.length)}`; // cells-ok — a code-unit slice past the mark
+    return rows;
+  };
+
   // **The spinner is appearance and never geometry** (I38, C19 §7). It goes on
   // after the rows are squared off, into padding the prompt already has, so
   // `measure` never sees it and `cap` is the same number whether a completion
@@ -876,7 +920,7 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
   if (row !== undefined && !replaced && deps.spinning()) {
     const at = cells(row.trimEnd(), deps.capabilities.ambiguousWidth);
     if (at + 1 <= width) out[last] = exact(`${sliceCells(row, 0, at)}${spinnerGlyph(deps.capabilities)}`, width);
-    return out;
+    return marked(out);
   }
 
   // **Ghost text, on the same terms as the spinner** (I50): read fresh, written
@@ -901,7 +945,7 @@ function promptRegion(frame: Composed, deps: PaintDeps, width: number): readonly
       out[last] = exact(`${sliceCells(row, 0, at)}${paintSpans([{ text: suggestion, style }])}`, width);
     }
   }
-  return out;
+  return marked(out);
 }
 
 /** `muted`, resolved through the theme so the ghost degrades with everything else. */

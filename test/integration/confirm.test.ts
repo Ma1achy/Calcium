@@ -964,7 +964,7 @@ describe("C23 I88 — the inspection scrolls in a built session", () => {
     // its key row or its bottom border (C23 I88's sizing).
     const top = text().findIndex((l) => l.startsWith("┌ Confirm"));
     const bottom = text().findIndex((l, i) => i > at && l.startsWith("└"));
-    const rule = (l: string | undefined) => /^─+$/u.test(l ?? "");
+    const rule = (l: string | undefined) => /^─+(?: .+ ─)?$/u.test(l ?? "");
     expect([rule(text()[top - 1]), rule(text()[bottom + 1])], "between the prompt's two rules").toEqual([true, true]);
     expect(text()[bottom - 1], "the panel's last row is the key row").toContain("↑↓ scroll  esc back to the question");
     expect(answered, "the question is unresolved").toBeNull();

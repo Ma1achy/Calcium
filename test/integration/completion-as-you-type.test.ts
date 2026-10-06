@@ -690,8 +690,21 @@ describe("C19 I15 — a key behind an in-flight request (ruling 106, F1524)", ()
     const rows = (): readonly string[] => session.screen().rows.map((r) => r.trimEnd());
     const prompt = (): string => rows().filter((l) => l.startsWith("❯")).at(-1) ?? "";
     /** A candidate row's label: the ladder's current mark, or a value indented under it, without its summary. */
-    const menu = (): readonly string[] =>
-      rows().filter((l) => /^\s+(›\s+)?(running|failed|queued|alpha|beta|\/help|\/history)\b/u.test(l)).map((l) => l.trim().split(/\s{2,}/u)[0]!);
+    // **The panel's own rows, not every row that looks like one.** A body row is
+    // blank under the hook since C22 I88 was amended, so `/help`'s listing began
+    // with whitespace and a verb exactly as a candidate does. The panel is the
+    // unbroken run directly above the prompt's rule, down to its own edge; an
+    // entry ends in a blank row (C22 I85) and so is never part of it.
+    const menu = (): readonly string[] => {
+      const r = rows();
+      const at = r.map((l, i) => (l.startsWith("❯") ? i : -1)).filter((i) => i >= 0).at(-1) ?? -1;
+      let top = at - 2;
+      while (top >= 0 && (r[top] ?? "").trim() !== "" && !/^─/u.test(r[top] ?? "")) top -= 1;
+      return r
+        .slice(top + 1, Math.max(0, at - 1))
+        .filter((l) => /^\s+(›\s+)?(running|failed|queued|alpha|beta|\/help|\/history)\b/u.test(l))
+        .map((l) => l.trim().split(/\s{2,}/u)[0]!);
+    };
     const owner = (): string => rows().find((l) => l.includes("⏎")) ?? "";
     const escape = async (): Promise<void> => {
       stdin.emit("\u001b");

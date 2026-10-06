@@ -17,7 +17,7 @@ import { PROMPT_GUTTER } from "../../src/shell/config.js";
 import { exact, FrameError } from "../../src/shell/frame-error.js";
 import { displayCells } from "../../src/presentation/text.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
-import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, LIGHT_THEME, measurable, visible } from "../support/render.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import { patchDefinition } from "../../src/presentation/patch/definition.js";
 import { chipLabel, chipSpans, createEditor, selectionSpans } from "../../src/interaction/editor/index.js";
@@ -29,13 +29,14 @@ import type { Placed } from "../../src/viewport/overlay/index.js";
 import type { ProfileReport } from "../../src/shell/profiling/types.js";
 import { registry as measurer, rows as contentRows } from "../support/overlay.js";
 import { buildGraph, buildSession } from "../support/session.js";
-import { fakeStdin } from "../support/fake-terminal.js";
+import { capabilities, fakeStdin } from "../support/fake-terminal.js";
 import { childBorderLegend, makeDefaultChrome, ownerLine, shedToWidth } from "../../src/shell/chrome.js";
 import type { Key, OwnerRung } from "../../src/interaction/router/types.js";
 import { chordText, createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
 import type { Binding } from "../../src/interaction/router/types.js";
 import type { OwnerHints } from "../../src/shell/types.js";
-import { tone } from "../../src/presentation/blocks/paint.js";
+import { background, tone } from "../../src/presentation/blocks/paint.js";
+import { rowContaining, styleAt, styledScreenFrom } from "../support/styled-screen.js";
 import type { Block, Pills } from "../../src/data/viewmodel/index.js";
 
 /** C09's measurer, for the footer's height (C22 I82). */
@@ -260,7 +261,7 @@ describe("C22 §6 — the paint", () => {
     const lines = paint(f, deps({ promptRows: () => ["first", "second", "third"] }));
     const prompt = lines[f.region.top + f.region.height + 1]; // below the upper rule (C22 I81)
 
-    expect(prompt?.startsWith("❯ first"), "the cursor's row, gutter and all").toBe(true);
+    expect(visible(prompt ?? "").startsWith("❯ first"), "the cursor's row, gutter and all").toBe(true);
     expect(lines.join("").includes("⋯"), "and no marker, because there is no room for one").toBe(
       false,
     );
@@ -293,7 +294,7 @@ describe("C22 §6 — the paint", () => {
     const lines = paint(f, deps({ promptRows: () => ["one", "two", "three"] }));
     const prompt = lines.slice(f.region.top + f.region.height + 1, f.region.top + f.region.height + 4);
 
-    expect(prompt[0]?.startsWith("❯ one")).toBe(true);
+    expect(visible(prompt[0] ?? "").startsWith("❯ one")).toBe(true);
     expect(prompt[1]?.startsWith("  two")).toBe(true);
     expect(prompt[2]?.startsWith("  three")).toBe(true);
   });
@@ -427,7 +428,8 @@ describe("C22 — the selection wash (roadmap entry 23)", () => {
    * defect this file is written against.
    */
   const washedCells = (row: string): string => {
-    const m = new RegExp("\u001b\\[[0-9;]*m(.*?)\u001b\\[0m", "u").exec(row);
+    // The prompt's own mark is muted (C22 I154) and is not a wash: skip it.
+    const m = new RegExp("\u001b\\[[0-9;]*m(.*?)\u001b\\[0m", "u").exec(row.replace(/^\u001b\[[0-9;]*m❯\u001b\[0m/u, ""));
     return m?.[1] ?? "";
   };
 
@@ -1471,10 +1473,92 @@ describe("C22 I33 — the echo neutralised (F1401)", () => {
 });
 
 describe("C22 I153, I154 — the echo's wash and the prompt's mark", () => {
-  it.todo(
-    "T1.187 (C22 I153, §008): the echo rows washed bgElev at 24-bit, unwashed at 1-bit — not deferred on a component: lands with the composer change in this round",
-  );
-  it.todo(
-    "T1.188 (C22 I154, §030): the prompt mark muted, plain at 1-bit, absent under a question — not deferred on a component: lands with the paint change in this round",
-  );
+  const SIZE = { columns: 80, rows: 24 };
+  const MANIFEST = {
+    schema: "tui.manifest/1",
+    binary: "prism",
+    version: "1.0.0",
+    tools: [{ name: "rows", local: true, summary: "a row", args: [], flags: [] }],
+  };
+  const META = { verb: "rows", adapter: "passthrough", exitCode: 0, durationMs: 0, truncated: false, argv: [] as string[], stderr: "", transport: "local", origin: "user" };
+  async function typing(colourDepth?: 1) {
+    const stdin = fakeStdin();
+    const built = await buildSession(
+      {
+        stdin: stdin as never,
+        manifest: MANIFEST,
+        localHandlers: { rows: () => ({ schema: "tui.view/1", status: "ok", meta: META, blocks: [] }) },
+        ...(colourDepth === undefined ? {} : { capabilities: { colourDepth } }),
+      } as never,
+      { ...SIZE },
+    );
+    const type = async (bytes: string): Promise<void> => {
+      stdin.emit(bytes);
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+    return { ...built, type, screen: () => styledScreenFrom(built.stdout.chunks, SIZE) };
+  }
+  const params = (style: ReturnType<typeof tone>): string => sgr(style).replace(/^\u001b\[/u, "").replace(/m$/u, "");
+
+  it("T1.187 (C22 I153, §008): the echo rows washed bgElev from the rail's column to the transcript's edge at 24-bit and 8-bit, unwashed at 1-bit; the height is the same", async () => {
+    const caps = capabilities({ colourDepth: 8 });
+    const wash = params(background("surface.bgElev", DARK_THEME, caps));
+    const ink = params(tone("default", DARK_THEME, caps, "bgElev"));
+    const s = await typing();
+    await s.type("/rows\r");
+    await Promise.resolve();
+    const row = rowContaining(s.screen(), "/rows");
+    expect(row, "the fixture responds: an echo row is on screen").not.toBeNull();
+    expect(wash, "the ground is a background").toMatch(/^48;/u);
+    // From column 0 to the last the transcript draws (the region is one short of the terminal).
+    for (let c = 0; c < SIZE.columns - 1; c += 1) expect(row![c]!.style.bg, `column ${String(c)} is washed`).toBe(wash);
+    expect(row![SIZE.columns - 1]!.style.bg, "the margin is not").toBe("");
+    // The mark in the sentence's own ink, resolved on the wash — not muted (I154's is the prompt's).
+    expect(styleAt(row!, "❯")?.fg).toBe(ink);
+    expect(styleAt(row!, "/rows")?.fg).toBe(ink);
+    // At 1-bit nothing replaces the wash: no ground, no inverse.
+    const mono = await typing(1);
+    await mono.type("/rows\r");
+    await Promise.resolve();
+    const monoRow = rowContaining(mono.screen(), "/rows");
+    expect(monoRow).not.toBeNull();
+    for (const c of monoRow!) {
+      expect(c.style.bg).toBe("");
+      expect(c.style.attrs).not.toContain(7);
+    }
+    // And the measurer's count is the same function's.
+    expect(commandRows("/rows", 79, FULL_CAPS)).toHaveLength(1);
+  });
+
+  it("T1.188 (C22 I154, §030): the prompt mark muted and the typed text not; plain at 1-bit; ASCII `$` muted; no muted mark over a question", async () => {
+    const caps = capabilities({ colourDepth: 8 });
+    const muted = params(tone("muted", DARK_THEME, caps));
+    const s = await typing();
+    await s.type("/pro");
+    const row = rowContaining(s.screen(), "/pro");
+    expect(row, "the fixture responds: the typed text is on screen").not.toBeNull();
+    expect(styleAt(row!, "❯")?.fg, "the mark is muted").toBe(muted);
+    // The typed text is unpainted: the terminal's own ink, which is the default's.
+    expect(styleAt(row!, "/pro")?.fg, "the reader's text is not the mark's colour").toBe("");
+    expect(muted, "and the muted colour is a colour").not.toBe("");
+    const mono = await typing(1);
+    await mono.type("/pro");
+    const monoRow = rowContaining(mono.screen(), "/pro");
+    expect(styleAt(monoRow!, "❯")?.attrs, "plain at 1-bit").toEqual([]);
+    // The ASCII form takes the same tone, read from `paint` directly.
+    const f = frameAt(80, 24, 1);
+    const ascii = paint(f, deps({ promptRows: () => ["one"], capabilities: { ...ASCII_CAPS, colourDepth: 8 } as never }));
+    const asciiRow = ascii[f.region.top + f.region.height + 1] ?? "";
+    expect(asciiRow, "the ASCII mark is painted").toMatch(/^\u001b\[[0-9;]*m\$\u001b\[0m/u);
+    expect(visible(asciiRow).startsWith("$ one")).toBe(true);
+    // Over a question (C23 I74) there is no prompt mark, so none is painted.
+    const asked = paint(f, deps({ promptRows: () => ["a question?"], promptReplaced: () => true }));
+    const askedRow = asked[f.region.top + f.region.height + 1] ?? "";
+    expect(visible(askedRow).startsWith("a question?"), "the fixture responds: the replaced row is drawn").toBe(true);
+    expect(askedRow).not.toContain("❯");
+    // The state that makes the guard load-bearing: a question whose own text begins with the mark.
+    const marked = paint(f, deps({ promptRows: () => ["❯ pick one"], promptReplaced: () => true }));
+    expect(marked[f.region.top + f.region.height + 1] ?? "", "a question's own ❯ is not the prompt's mark").toMatch(/^❯ pick one/u);
+  });
 });

@@ -27,6 +27,8 @@ import type {
   DocumentMeta,
   DocumentStatus,
   ErrorLike,
+  TextSpan,
+  Tone,
   ViewDocument,
 } from "../data/viewmodel/index.js";
 
@@ -412,18 +414,51 @@ function spin(caps: Caps, tick: number): string {
  * (I62) — never `ok` (I59).
  */
 export function toolCallHeader(call: ToolCallSpec, caps: Caps, tick = 0): string {
+  return headParts(call, caps, tick).map((p) => p.text).join("");
+}
+
+/**
+ * One run of the head and the voice it is drawn in (C23 I104). `tone` absent is
+ * the state's — the block's own tone, which the mark takes too.
+ */
+type HeadPart = Readonly<{ text: string; tone?: Tone; elide?: true }>;
+
+/**
+ * The head as runs, each in its own voice (C23 I104, §030, §081).
+ *
+ * **The state's tone is the mark's and the outcome's, and nothing else's.** §030
+ * draws `● pytest · 4.2s · 47 passed` in three voices: `●` and `47 passed` in the
+ * state's, the verb in the default ink, the furniture muted — and the argument
+ * in `identifier`. One `notice` in `CALL_STATE_TONE[state]` drew the verb and its
+ * arguments green, and a failure red from end to end. So every run the verdict
+ * is not carries a tone of its own, and what is left untoned is exactly the
+ * outcome and `waiting`'s word, which the block's tone paints.
+ *
+ * **The text is `toolCallHeader`'s, by construction**: it is these runs joined,
+ * so the spans `callHead` takes from them cannot index a different string.
+ */
+function headParts(call: ToolCallSpec, caps: Caps, tick: number): readonly HeadPart[] {
   const sep = ` ${glyphs(caps).separator} `;
-  const parts = [invocation(call)];
+  const out: HeadPart[] = [{ text: call.name, tone: "default" }];
+  // **A bare verb has no parentheses** (`invocation`): `● ps`, not `● ps()`.
+  if (call.args !== "") {
+    out.push({ text: "(", tone: "muted" }, { text: call.args, tone: "identifier", elide: true }, { text: ")", tone: "muted" });
+  }
+  const muted = (text: string): void => {
+    out.push({ text, tone: "muted" });
+  };
   const since = call.elapsedMs === undefined ? "" : elapsed(call.elapsedMs);
   if (call.waiting === true) {
-    parts.push(`${spin(caps, tick)} waiting`);
+    // The spinner is furniture and the word is the state's (§028: `waiting` in warn).
+    muted(`${sep}${spin(caps, tick)} `);
+    out.push({ text: "waiting" });
   } else if (callState(call) === "running") {
     // **`running`'s alone, not *unsettled*'s** (C23 I81): a queued call has not
     // started and R-BLK-214 draws it still, so its slot is empty (F1261).
-    parts.push(since === "" ? spin(caps, tick) : `${spin(caps, tick)} ${since}`);
+    muted(`${sep}${since === "" ? spin(caps, tick) : `${spin(caps, tick)} ${since}`}`);
   } else if (since !== "" && isSettled(call)) {
     // Settled, the duration it took. Queued, nothing has started, so there is none.
-    parts.push(since);
+    muted(`${sep}${since}`);
   }
   const outcome =
     call.outcome !== undefined && call.outcome !== ""
@@ -431,8 +466,33 @@ export function toolCallHeader(call: ToolCallSpec, caps: Caps, tick = 0): string
       : call.children !== undefined && call.children.length > 0 // cells-ok — a child count
         ? rollUp(call.children)
         : [];
-  parts.push(...outcome);
-  return parts.join(sep);
+  for (const part of outcome) {
+    muted(sep);
+    out.push({ text: part });
+  }
+  return out;
+}
+
+/**
+ * The spans a head's runs make (C23 I104, C04 I105): adjacent runs in one voice
+ * are one span, the argument's carries `elide`, and the untoned runs — the
+ * outcome — are in none, so the block's tone draws them.
+ */
+function headSpans(parts: readonly HeadPart[]): readonly TextSpan[] {
+  const spans: { from: number; to: number; tone: Tone; elide?: true }[] = [];
+  let at = 0;
+  for (const part of parts) {
+    const from = at;
+    at += part.text.length; // cells-ok — code-unit offsets (C04 I84)
+    if (part.tone === undefined || part.text === "") continue;
+    const last = spans[spans.length - 1];
+    if (last !== undefined && last.to === from && last.tone === part.tone && last.elide === undefined && part.elide === undefined) {
+      last.to = at;
+      continue;
+    }
+    spans.push(part.elide === true ? { from, to: at, tone: part.tone, elide: true } : { from, to: at, tone: part.tone });
+  }
+  return spans;
 }
 
 /**
@@ -487,9 +547,11 @@ function failureWord(outcome: string | undefined): string | null {
  * outcome, and the call's id so a readout can replace it in place (C23 I54).
  */
 export function callHead(call: ToolCallSpec, caps: Caps, tick = 0, foldTarget?: string): Block {
-  const text = toolCallHeader(call, caps, tick);
-  const from = call.name.length + 1; // cells-ok — a code-unit offset into the text
-  const spans = call.args === "" ? [] : [{ from, to: from + call.args.length, elide: true }]; // cells-ok — code-unit offsets
+  // **Toned per token** (C23 I104): the runs and the text are one walk, so a
+  // span cannot index a different string from the one the head draws.
+  const parts = headParts(call, caps, tick);
+  const text = parts.map((p) => p.text).join("");
+  const spans = headSpans(parts);
   // **The head carries a state, not a character** (C09 I45, C23 I59): which
   // mark it draws is a question about the terminal, and a producer has never
   // seen one. `glyph` is the answer for the rung where tone carries — one `●`

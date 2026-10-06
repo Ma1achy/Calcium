@@ -176,7 +176,7 @@ describe("C22 §6b — the write is a difference", () => {
 
     const before = read(screen().rows);
     expect(before.candidate, "the menu is open").toBeGreaterThanOrEqual(0);
-    expect(before.rule.trim(), "the row above the prompt is I81's rule").toMatch(/^─+$/u);
+    expect(before.rule.trim(), "the row above the prompt is I81's rule").toMatch(/^─+(?: .+ ─)?$/u);
     expect(before.edge, "the menu sits directly above the prompt's rule").toBe(before.prompt - 2);
 
     // **Taller, not shorter, and the direction is the whole row.** On a shrink
@@ -194,7 +194,7 @@ describe("C22 §6b — the write is a difference", () => {
 
     const after = read(screen().rows);
     expect(after.prompt, "the prompt moved with the region").toBeGreaterThan(before.prompt);
-    expect(after.rule.trim(), "the row above the prompt is I81's rule").toMatch(/^─+$/u);
+    expect(after.rule.trim(), "the row above the prompt is I81's rule").toMatch(/^─+(?: .+ ─)?$/u);
     expect(after.edge, "and the menu came with it, with no gap beneath").toBe(after.prompt - 2);
     expect(after.candidate - after.prompt, "at the distance from the prompt it had before").toBe(
       before.candidate - before.prompt,
@@ -1100,7 +1100,7 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     // further column in, so the notice that fits it is 98 and the rows start at
     // the terminal's column 1.
     expect(rows[at + 1]?.startsWith(`   ⎿  ${"a".repeat(93)}`), "the body's first row: the hook at 2 and 93 cells").toBe(true);
-    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, under the bar (C22 I88)").toBe("   │  aaaaa");
+    expect(rows[at + 2]?.trimEnd(), "the wrapped cells, blank under the hook (C22 I88, amended)").toBe("      aaaaa");
     expect(rows[at + 3]?.trim(), "the entry's blank row (I85)").toBe("");
     expect(/^[─-]{20,}/u.test(rows[at + 4] ?? ""), "then the upper rule — nothing dropped between").toBe(true);
     expect(rows[at + 5]?.trimStart().startsWith("❯"), "and the prompt").toBe(true);
@@ -1169,7 +1169,7 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
     // I83) — required, not optional: a `visibleRows` that skipped the layout
     // survived this row while the hook was `(⎿ )?`.
     expect(/^\s*⎿  ┌/u.test(rows[at - 1] ?? ""), "the box opens above it, under the hook").toBe(true);
-    expect(/^\s*│  └/u.test(rows[at + 1] ?? ""), "and closes below it, under the bar (C22 I88)").toBe(true);
+    expect(/^\s+└/u.test(rows[at + 1] ?? ""), "and closes below it, blank under the hook (C22 I88, amended)").toBe(true);
     // **The prompt directly below the closing border is the height assertion.**
     // Three rows measured, three drawn, and nothing between the box and what
     // follows it — a stronger claim than a blank row, which a box one row short

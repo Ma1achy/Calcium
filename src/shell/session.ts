@@ -44,7 +44,7 @@ import { reserveNeeded } from "./block-faults.js";
 import { descendants } from "../data/viewmodel/index.js";
 import type { Block, Image, Plot } from "../data/viewmodel/index.js";
 import { blockSpansOfEntry, elementsOfEntry, entryLayout, renderEntryPieces, windowEntry } from "./entry-layout.js";
-import { RAIL_BLANK, railCell, railRowsOf, selectedElementRowsOf, washedRowsOf, washRectCells, washSelectedRows } from "./paint.js";
+import { echoRows, RAIL_BLANK, railCell, railRowsOf, selectedElementRowsOf, washedRowsOf, washRectCells, washSelectedRows } from "./paint.js";
 import { animationIntervalOf, TICK_MS } from "../presentation/blocks/index.js";
 import { isBand } from "../presentation/blocks/paint.js";
 import type { EntryParts } from "./render-cache.js";
@@ -2650,7 +2650,9 @@ function visibleRows(
     const railRows = railRowsOf(railRowsOf(washedRows, rectRail), elementRows);
     const rail = railRows.size === 0 ? "" : railCell(graph.theme.current, graph.capabilities);
     const led = shown.map((row, i) => (railRows.has(i) ? rail : RAIL_BLANK) + row);
-    out.push(...[...keptChrome.map((row) => RAIL_BLANK + row), ...led].slice(0, ve.takeRows));
+    // **The echo washed** (C22 I153): its rows are `commandRows`' — the measurer's —
+    // painted here, so the wash moves no height.
+    out.push(...[...echoRows(keptChrome, width, graph.theme.current, graph.capabilities), ...led].slice(0, ve.takeRows));
   }
   onAnimation(
     fastest === null && orbits.length === 0 && frames.length === 0

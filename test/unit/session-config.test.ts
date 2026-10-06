@@ -181,7 +181,16 @@ describe("C22 §2 — config", () => {
 });
 
 describe("C22 I111 as amended — the label defaults to the name", () => {
-  it.todo(
-    "T1.189 (C22 I111, §069 R-BLK-512): no label member gives the config's name; a label returning null gives none — not deferred on a component: lands with the config change in this round",
-  );
+  const labelOf = (cfg: TuiConfig): unknown => {
+    const label = resolveConfig(cfg, AMBIENT).chrome.label;
+    return label === undefined ? undefined : (label as (ctx: never) => unknown)(undefined as never);
+  };
+  it("T1.189 (C22 I111, §069 R-BLK-512): no label member gives the config's name on the default chrome and on a supplied one; a label returning null gives none; an explicit label wins", () => {
+    expect(labelOf(minimal()), "the default chrome").toBe("prism");
+    const supplied = { header: () => [], footer: () => [] };
+    expect(labelOf({ ...minimal(), chrome: supplied }), "a chrome with header and footer alone").toBe("prism");
+    expect(labelOf({ ...minimal(), chrome: { ...supplied, label: () => null } }), "null is the bare rule").toBeNull();
+    expect(labelOf({ ...minimal(), chrome: { ...supplied, label: () => "prod" } }), "an explicit label wins").toBe("prod");
+    expect(labelOf({ ...minimal(), name: "other" }), "the name is the config's").toBe("other");
+  });
 });

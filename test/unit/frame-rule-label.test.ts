@@ -52,7 +52,9 @@ const sessionAt = async (
       chrome: {
         header: () => [],
         footer: () => [],
-        ...(label === null ? {} : { label: () => label }),
+        // `null` is the bare rule an application asks for (C22 I111, amended): an
+        // absent member would now be the application's name.
+        label: () => label,
       },
       // The app-facing override, because no environment reaches 1-bit that the
       // session will also start under (session-frame's MONO_ARM says why).

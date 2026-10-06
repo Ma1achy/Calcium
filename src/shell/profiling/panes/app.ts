@@ -182,7 +182,7 @@ const frameGone = (ctx: CardContext, spec: { id: string }): Block[] => [
     ctx.seq === undefined
       ? "no frame has been retained whole yet — a tree is kept only for the worst frames (C28 I32), so there is nothing to open"
       : `frame ${String(ctx.seq)} has left the retained set — \`report()\` recomputes which frames are worst on every call, ` +
-        `and a frame leaving it is itself a reading. Press \`n\` for one that is still there`,
+        `and a frame leaving it is itself a reading. \`/profile app\` again draws the frames still retained`,
     undefined,
     { id: `${spec.id}-gone` },
   ),

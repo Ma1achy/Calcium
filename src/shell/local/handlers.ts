@@ -296,7 +296,7 @@ const profileHandler =
         "info",
         `captured over ${ms(result.durationMs)} ms${sep}${ms(stacks.root.total / 1000)} ms on the stack` +
           `${sep}${ms(idle / 1000)} ms in synthetic frames${sep}${result.path}` +
-          `${sep}\`/profile framework\` and walk to \`sampled-stacks\``,
+          `${sep}\`/profile snapshot sampled-stacks\` draws it`,
         undefined,
         { id: blockId("profile-capture") },
       ),

@@ -172,8 +172,8 @@ function bodyRun(blocks: readonly Block[], width: number, gutter: readonly Gutte
 }
 
 /**
- * A card body's runs (I88, I89): its plain blocks under the hook and then the
- * bar, and each nested card as a head run under a tree glyph followed by its own
+ * A card body's runs (I88, I89): its plain blocks under the hook and then
+ * blanks, and each nested card as a head run under a tree glyph followed by its own
  * body one column further in.
  *
  * **Recurses exactly once.** `depth` is the body's: the top card's body is 1 and
@@ -203,11 +203,17 @@ function bodyRuns(
   const tail = body[body.length - 1];
   const runs: EntryRun[] = [];
   let plain: Block[] = [];
-  // The body's first run hangs under the hook; every later run continues the bar.
+  // The body's first run hangs under the hook; a later run, past a child, meets
+  // the tree's bar on its first row.
   const lead = (): GutterCell => (runs.length === 0 ? "hook" : "bar");
   const flush = (): void => {
     if (plain.length === 0) return; // cells-ok — a block count
-    runs.push(bodyRun(plain, width, [...outer, { first: lead(), rest: "bar" }]));
+    // **Blank below the hook** (C22 I88, amended; coordinator ruling 2). The
+    // registry draws every one of its 58 body rows blank in this column; the
+    // muted `│` that stood here was the pre-registry design's left rule. The
+    // nested tree's glyphs — a child's `├─`/`└─` and the parent's `│` past a
+    // child's body — are §007's marks and stay below.
+    runs.push(bodyRun(plain, width, [...outer, { first: lead(), rest: "blank" }]));
     plain = [];
   };
   for (const b of body) {
@@ -568,9 +574,9 @@ function gutterCell(cell: GutterCell, options: RenderOptions): string {
 
 /**
  * The gutter a body row carries (I88, I89): each column's `first` cell on the
- * run's first row and its `rest` on every row after — the hook, then the bar
- * down the body; a tree glyph at a nested head; the parent's bar or nothing
- * past a child's body. Always `run.indent` cells, so I83 holds by construction.
+ * run's first row and its `rest` on every row after — the hook, then blanks
+ * down the body (I88, amended); a tree glyph at a nested head; the parent's bar
+ * or nothing past a child's body. Always `run.indent` cells, so I83 holds by construction.
  */
 export function bodyGutter(run: EntryRun, row: number, options: RenderOptions): string {
   if (run.gutter.length === 0) return ""; // cells-ok — a column count

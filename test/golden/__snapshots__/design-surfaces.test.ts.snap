@@ -890,7 +890,7 @@ download ###############################################-------------------- 70%
   * /capabilities             the rendering route, and what the terminal can do
     /clear                   empty the transcript; command history is untouched
     /config             every setting, its value, and where the value came from
---------------------------------------------------------------------------------
+---------------------------------------------------------------------- calcium -
 $ /c
 --------------------------------------------------------------------------------
 ── §48 · block states
@@ -2358,7 +2358,7 @@ download ███████████████████████�
   › /capabilities             the rendering route, and what the terminal can do
     /clear                   empty the transcript; command history is untouched
     /config             every setting, its value, and where the value came from
-────────────────────────────────────────────────────────────────────────────────
+──────────────────────────────────────────────────────────────────────[calcium]─
 ❯ /c
 ────────────────────────────────────────────────────────────────────────────────
 ── §48 · block states
@@ -3834,7 +3834,7 @@ download ███████████████████████�
   › /capabilities             the rendering route, and what the terminal can do
     /clear                   empty the transcript; command history is untouched
     /config             every setting, its value, and where the value came from
-────────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────── calcium ─
 ❯ /c
 ────────────────────────────────────────────────────────────────────────────────
 ── §48 · block states

@@ -491,7 +491,8 @@ describe("C22 §6a — the cursor (C15 I19)", () => {
 
     const marker = painted.find((l) => l.includes("⋯"));
     expect(marker, "the marker is drawn").toBeDefined();
-    expect(marker, "and carries no wash").toBe(visible(marker ?? ""));
+    // The prompt's mark is muted (C22 I154) — a foreground, never a ground.
+    expect(marker, "and carries no wash").not.toMatch(/\u001b\[[0-9;]*48;/u);
   });
 
   it("T1.21c (C22 I62, §6e.5): a mid-buffer cursor is marked at both ends", () => {

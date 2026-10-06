@@ -122,7 +122,10 @@ export const contents: CardDraw = (ctx) => {
     b.kv(listed, { id: "verdict-contents", gapBefore: false }),
     b.notice(
       "info",
-      `\`n\`/\`p\` walk the ${String(CARDS.length)} cards${ctx.sep}\`tab\`/\`shift-tab\` walk the groups${ctx.sep}\`esc\` closes`,
+      // **The verbs that reach a card, never keys** (C28 I66, `R-INT-002`): the
+      // deck is entries the transcript scrolls (C23 I68), so nothing binds a
+      // key to walk it — and a letter here would type into the prompt.
+      `\`/profile <section>\`${ctx.sep}\`/profile snapshot <card>\`${ctx.sep}\`/profile live <card>\``,
       undefined,
       { id: "verdict-keys" },
     ),

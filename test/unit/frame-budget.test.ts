@@ -131,9 +131,10 @@ describe("C22 §6l — the frame's default look", () => {
     expect(DEFAULT_FOOTER_ROWS).toBe(1);
     // At MIN_ROWS with the prompt at its cap the tallest footer leaves one row.
     expect(frameAt(MIN_ROWS, FOOTER(MAX_FOOTER_ROWS), 200).region.height).toBe(1);
-    // **No field to refuse** (§6l.4 F): the resolved chrome is two functions.
+    // **No field to refuse** (§6l.4 F): the resolved chrome is two functions and
+    // the label, which defaults to the application's name (C22 I111, amended).
     const resolved = resolveConfig(BASE, AMBIENT).chrome;
-    expect(Object.keys(resolved).sort()).toEqual(["footer", "header"]);
+    expect(Object.keys(resolved).sort()).toEqual(["footer", "header", "label"]);
   });
 
   it("T1.64 (C22 I109, §6l.9 rows 1–4): the region is a column narrower than the terminal, and the rules and the chrome are not", () => {
@@ -360,8 +361,8 @@ describe("C22 §6l — the frame's default look", () => {
     expect(card).toHaveLength(header.length + bodyRows.length + ENTRY_GAP);
     expect(card.slice(0, header.length)).toEqual(header);
     expect(strip(card[header.length] ?? "")).toBe(`  ⎿  ${strip(bodyRows[0] ?? "")}`);
-    // Rows after the first carry the bar (C22 I88) in the cells that were blank.
-    expect(strip(card[header.length + 1] ?? "")).toBe(`  │  ${strip(bodyRows[1] ?? "")}`);
+    // Rows after the first are blank in the hook's column (C22 I88, amended).
+    expect(strip(card[header.length + 1] ?? "")).toBe(`     ${strip(bodyRows[1] ?? "")}`);
     const hookRow = card[header.length] ?? "";
     expect(hasSgr(hookRow.slice(0, hookRow.indexOf("⎿"))), "the hook is muted — an SGR opens before it").toBe(true);
     // Rendered lines are not squared off — `paint`'s `exact` does that — so the
@@ -463,7 +464,7 @@ describe("C22 §6l — the frame's default look", () => {
     const tail = renderEntryPieces(REGISTRY, windowEntry(entryLayout([step, body], 40), 1, measured, REGISTRY), options);
     expect(tail.rows).toHaveLength(measured - 1);
     expect(strip(tail.rows[0] ?? "").startsWith("  ⎿  a")).toBe(true);
-    expect(strip(tail.rows[1] ?? "").startsWith("  │  a"), "the bar, since C22 I88").toBe(true);
+    expect(strip(tail.rows[1] ?? "").startsWith("     a"), "blank, since C22 I88 as amended").toBe(true);
   });
 
   it("T1.43 (C22 §6l.4 E): the default footer is one muted pills row — `/help`, the cwd with $HOME as `~`, and `stopping` when the session says so — and no key name", () => {
@@ -498,7 +499,7 @@ describe("C22 §6l — the frame's default look", () => {
 
     // The resolved default chrome paints the same frame as `makeDefaultChrome`.
     const resolved = resolveConfig(BASE, AMBIENT).chrome;
-    const explicit = paint(frameAt(24, makeDefaultChrome("t", "t")), deps());
+    const explicit = paint(frameAt(24, { ...makeDefaultChrome("t", "t"), label: () => "t" }), deps());
     expect(paint(frameAt(24, resolved), deps())).toEqual(explicit);
     expect(strip(explicit[23] ?? "")).toContain("/help");
   });
@@ -524,7 +525,7 @@ describe("C22 §6l.8 — the gutter carries the call", () => {
     return renderEntryPieces(REGISTRY, windowEntry(layout, 0, total, REGISTRY), options).rows.map(strip);
   };
 
-  it("T1.48 (C22 I88, §6l.8 row 22): a body that wraps to three rows draws the hook on row 0 and the bar on rows 1–2, at three arms; measure is unchanged; one row draws no bar", () => {
+  it("T1.48 (C22 I88 as amended): a body that wraps to three rows draws the hook on row 0 and blanks on rows 1–2, at three arms; measure is unchanged; one row draws no bar", () => {
     const long = body("b", "a body row long enough to wrap three times at the width the card leaves it");
     const blocks = [head("h", "ps · ok"), long];
     expect(REGISTRY.measureSequence([long], 40 - BODY_INDENT), "the fixture responds: three rows").toBe(3);
@@ -544,11 +545,11 @@ describe("C22 §6l.8 — the gutter carries the call", () => {
     //
     // The hook is its two-cell reservation at every arm (C09 I5, R-GLY-003):
     // `⎿` padded, `` `- `` whole, so the text column is five at all three.
-    for (const [caps, hook, bar] of [[FULL_CAPS, "⎿ ", "│ "], [ASCII_CAPS, "`-", "| "], [WIDE_CAPS, "`-", "| "]] as const) {
+    for (const [caps, hook] of [[FULL_CAPS, "⎿ "], [ASCII_CAPS, "`-"], [WIDE_CAPS, "`-"]] as const) {
       const rows = draw(blocks, 40, caps);
       expect(rows[1]?.startsWith(`  ${hook} a`), `row 0 under the hook (${caps.unicode}/${caps.ambiguousWidth})`).toBe(true);
-      expect(rows[2]?.startsWith(`  ${bar} `), "row 1 carries the bar").toBe(true);
-      expect(rows[3]?.startsWith(`  ${bar} `), "row 2 carries the bar").toBe(true);
+      expect(rows[2], "row 1 is blank under the hook (C22 I88, amended)").toMatch(/^ {5}\S/u);
+      expect(rows[3], "row 2 is blank under the hook").toMatch(/^ {5}\S/u);
       for (const row of rows.slice(1, 4)) expect(row.charAt(BODY_INDENT), "the text at BODY_INDENT").not.toBe(" ");
       expect(rows[4], "the closing blank carries nothing").toBe("");
       for (const row of rows) expect(displayCells(row)).toBeLessThanOrEqual(40);

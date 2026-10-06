@@ -269,7 +269,8 @@ describe("C22 I118 — a form in a session", () => {
       // Less the margin column, where the transcript's bar is drawn while the
       // listing overflows (C14 I62).
       const listed = p.rows().filter((r) => {
-        const m = /│\s+\S+\s+(\w+)\s*$/u.exec([...r].slice(0, -1).join(""));
+        // Blank under the hook since C22 I88 was amended; the bar this read is gone.
+        const m = /^\s+\S+\s+(\w+)\s*$/u.exec([...r].slice(0, -1).join(""));
         return m !== null && actions.has(m[1] ?? "");
       });
       expect(listed.length, "F1 answers inside a field").toBeGreaterThan(0);

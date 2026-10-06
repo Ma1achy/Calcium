@@ -200,8 +200,9 @@ const MUTATIONS = [
     // body at column 1 — a frame whose rows disagree about where column 0 is.
     name: "the entry's chrome rows are drawn without the reserved column",
     file: SESSION,
-    from: "keptChrome.map((row) => RAIL_BLANK + row)",
-    to: "keptChrome",
+    // The echo's rows are led by the rail's column inside `echoRows` (C22 I153).
+    from: "...echoRows(keptChrome, width, graph.theme.current, graph.capabilities)",
+    to: "...keptChrome",
     expect: "T4.39 (C14",
   },
   {
