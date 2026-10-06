@@ -9,20 +9,18 @@ import { report, runPass } from "../mutate.mjs";
 const ROOT = process.cwd();
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
-const mk = (files, pre = "") => () => {
-  try {
-    return execSync(`${pre}npx vitest run ${files} 2>&1`, { cwd: ROOT, encoding: "utf8", timeout: 900_000 });
-  } catch (e) {
-    return `${e.stdout ?? ""}${e.stderr ?? ""}`;
-  }
-};
-
 const FILES = "test/edge/manifest.test.ts test/edge/view-model.test.ts test/unit/plot-performance.test.ts test/contract/surface.test.ts";
 
 const results = runPass({
   read,
   write,
-  run: mk(FILES),
+  run: () => {
+    try {
+      return execSync(`npx vitest run ${FILES}`, { cwd: ROOT, encoding: "utf8", timeout: 900_000 });
+    } catch (e) {
+      return `${e.stdout ?? ""}${e.stderr ?? ""}`;
+    }
+  },
   control: {
     file: "src/data/manifest/find.ts",
     from: "  return null;\n}\n\n/**\n * The tools an app offers",
