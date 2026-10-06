@@ -289,8 +289,11 @@ describe("C22 §6l.10 — the labelled rule", () => {
 
     // And below `MIN_COLUMNS` there is no frame at all — recorded rather than
     // asserted as the label's doing, because a fallback notice is not a rule
-    // with no label on it.
-    expect(rulesAt(await framesAt(59, "calcium")), "below the floor there is no rule").toBe(0);
+    // with no label on it. **The notice is a box now** (C22 I153), whose own
+    // edges are runs of `─` fifteen cells wide, so what is absent is the frame's
+    // rules — runs the width of a frame — and not every `─`.
+    const below = await framesAt(59, "calcium");
+    expect(below.some((r) => new RegExp(`${RULE}{40,}`, "u").test(r)), "below the floor there is no frame rule").toBe(false);
 
     // **A label that would leave no rule is shed too**, and the frame keeps its
     // height — the design's *the frame still works*, asserted rather than

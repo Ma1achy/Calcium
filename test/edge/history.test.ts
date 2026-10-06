@@ -195,7 +195,7 @@ describe("C20 §4, §5 — the edges of the two machines", () => {
     expect(store.search("")).toBeNull();
     store.searchOpen("");
     store.searchType("zzz");
-    expect(store.searchState).toEqual({ query: "zzz", hit: null, failed: true });
+    expect(store.searchState).toEqual({ query: "zzz", hit: null, failed: true, total: 0, rank: 0, older: [] });
   });
 
   it("T3.13: 500 matches walk oldest-ward without repeating", async () => {

@@ -1315,11 +1315,10 @@ describe("C22 I133 — the owner line's chords are the keymap's (review batch 2,
     };
     expect(substate("complete")[0]).toBe("complete");
     expect(substate("preview")[0]).toBe("preview");
-    // **§103's find line, word for word** — and the keys are the panel's first
-    // rows, so this is also what holds `↓` ahead of `⇥` for `menuNext`: the
-    // other order spells `↑⇥ hits`, which every row asserting against the
-    // table alone would accept.
-    expect(substate("find")).toEqual(["find", "↑↓ hits", "⏎ open", "esc close"]);
+    // **§046's footer, from the keymap** (C22 I157): `⌃r older`, `⏎ accept`,
+    // `esc cancel` — the search's own keys, where this said `↑↓ hits` for two
+    // the search does not bind.
+    expect(substate("find")).toEqual(["find", "⌃R older", "⏎ accept", "esc cancel"]);
     expect(graph.ownerHints().substate, "and nothing named with no panel up").toBeUndefined();
 
     // **A question's line ends on its default's label** — a different default

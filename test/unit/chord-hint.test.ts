@@ -22,8 +22,13 @@ describe("chord hints", () => {
     expect(keyHint([{ name: "up" }, { name: "down" }], "move", FULL_CAPS)).toBe("↑↓ move");
     expect(keyHint([{ name: "up", meta: true }, { name: "down", shift: true }], "x", FULL_CAPS)).toBe("⌥↑⇧↓ x");
     // Each modifier alone is the difference, so the comparison of every one is driven.
+    // **Against a shared base, not against nothing**: `⌃↑` beside a bare `↓` joins to
+    // `⌃↑↓`, which reads as a collapse whether or not one happened, so the clause
+    // under test would be equivalent. With `⌥` (or `⌃`) on both, a wrong collapse
+    // is `⌥⌃↑↓` and the right join is `⌥⌃↑⌥↓`.
     for (const m of ["ctrl", "meta", "shift", "super"] as const) {
-      expect(keyHint([{ name: "up", shift: true, ...{ [m]: true } }, { name: "down", shift: true }], "x", FULL_CAPS)).not.toMatch(/^[⌃⌥⇧⌘]+↑↓/u);
+      const base = m === "meta" ? "ctrl" : "meta";
+      expect(keyHint([{ name: "up", [base]: true, [m]: true }, { name: "down", [base]: true }], "x", FULL_CAPS)).not.toMatch(/^[⌃⌥⇧⌘]+↑↓/u);
     }
     expect(keyHint([{ name: "n", ctrl: true }, { name: "p", ctrl: true }], "x", FULL_CAPS)).toBe("⌃N⌃P x");
     expect(keyHint([{ name: "up", shift: true }], "x", FULL_CAPS)).toBe("⇧↑ x");

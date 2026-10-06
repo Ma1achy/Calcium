@@ -11,7 +11,7 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/unit/router-keymap.test.ts test/unit/session-paint.test.ts";
+const CMD = "npx vitest run test/unit/router-keymap.test.ts test/unit/session-paint.test.ts test/unit/chord-hint.test.ts";
 const KEYMAP = "src/interaction/router/keymap.ts";
 const CHROME = "src/shell/chrome.ts";
 
@@ -55,17 +55,42 @@ const MUTATIONS = [
     // The line ignores the rung: Unicode chords on an ASCII terminal.
     name: "the owner line asks for the Unicode spelling at every rung",
     file: CHROME,
-    from: '  const unicode = caps.unicode !== "ascii";\n  return `${keys',
-    to: '  const unicode = true;\n  return `${keys',
+    from: '  const unicode = caps.unicode !== "ascii";\n  if (!unicode) return',
+    to: '  const unicode = true;\n  if (!unicode) return',
     expect: "T1.111",
   },
   {
     // One pair rule for the line: `/` between two keys at Unicode as well.
     name: "a pair joins with / at Unicode",
     file: CHROME,
-    from: '.join(unicode ? "" : "/")} ${does}`',
-    to: '.join("/")} ${does}`',
-    expect: "T1.111",
+    from: "  return `${sharedModifiers(keys)} ${does}`;",
+    to: '  return `${keys.map((k) => chordText(k)).join("/")} ${does}`;',
+    // T1.111's pair loop reads `↑/↓` as an unknown head and skips it, so the row
+    // that holds this is T1.187's (a bare pair joins with nothing).
+    expect: "T1.187",
+  },
+  {
+    // C22 I143 (§101, §016) — the collapse of a shared modifier set on arrows.
+    name: "an arrow pair collapses whatever its second member's shift",
+    file: CHROME,
+    from: "        (k.shift === true) === (first.shift === true) &&\n",
+    to: "",
+    expect: "T1.187",
+  },
+  {
+    name: "a non-arrow pair collapses too",
+    file: CHROME,
+    from: "        ARROW_NAMES.has(k.name) &&\n",
+    to: "",
+    expect: "T1.187",
+  },
+  {
+    // The ASCII rung spells every chord, so a collapse never hides a key.
+    name: "the ASCII rung collapses a shared modifier",
+    file: CHROME,
+    from: '  if (!unicode) return `${keys.map((k) => chordText(k, false)).join("/")} ${does}`;\n',
+    to: "",
+    expect: "T1.187",
   },
   {
     // The exit found by the Unicode spelling: at ASCII the way out sheds.
@@ -84,7 +109,7 @@ const results = await runPass({
   control: {
     // **A change the corpus can see**: every chip loses its chord.
     file: CHROME,
-    from: '  return `${keys.map((k) => chordText(k, unicode)).join(unicode ? "" : "/")} ${does}`;',
+    from: "  return `${sharedModifiers(keys)} ${does}`;",
     to: "  return does;",
     why: "the owner line draws no chord — if this survives, nothing reads the line",
   },
