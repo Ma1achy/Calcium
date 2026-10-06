@@ -124,10 +124,16 @@ const results = runPass({
       // T4.109 reaches it through a built session on the linear route. Left out
       // of this run until a row could see it, rather than recorded as a
       // survivor the run had arranged.
-      name: "T6.128: the answered line reads a bidi control as itself",
+      // **Re-aimed from `?? neutraliseControl(ch)` to `?? ch`, which survived**:
+      // the editor's `drawAs` already draws a bidi character as its form (C17
+      // I36) and its insert refuses the C0/C1 controls `neutraliseControl` is
+      // for, so the fallback is reached by nothing a reader can type. The line
+      // that matters is the one that chooses the *text*: `resolved` is the
+      // answer's own reading, where a bidi character arrives raw.
+      name: "T6.128: the answered line is drawn from the resolved text, not the typed one",
       file: "src/shell/construct.ts",
       from: "      for (const ch of stores.editor.text) out += stores.editor.drawAs(ch) ?? neutraliseControl(ch);",
-      to: "      for (const ch of stores.editor.text) out += stores.editor.drawAs(ch) ?? ch;",
+      to: "      for (const ch of stores.editor.resolved) out += stores.editor.drawAs(ch) ?? neutraliseControl(ch);",
       expect: "T4.109",
     },
     {

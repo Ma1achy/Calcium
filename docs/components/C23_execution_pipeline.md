@@ -2928,7 +2928,7 @@ Fake transport, fake stores.
 - **T6.124** (I93, F1495): the no-answer refusal removed from `invalidChoices` → **T1.107** fails on all three sets, and **T4.107** on `reply…` alone, where the tool is invoked.
 - **T6.126** (I94, F1527): `answer.outcome !== "answered"` removed from the approval branch → **T4.110** fails: a withdrawal resolved on `y` runs the tool. `tools/mutate/runs/c23-question-queue.mjs`.
 - **T6.127** (I54, F1430): the card's arguments sliced at one word rather than the verb's → **T4.108** fails on `serving scale(scale web 3)`. `tools/mutate/runs/c23-running-card.mjs`.
-- **T6.128** (I90, F1471): the construction's `drawn` reading a character as itself rather than through `drawAs` → **T4.109** fails on a raw U+202E in the `answer:` line. `tools/mutate/runs/c17-bidi-display.mjs`.
+- **T6.128** (I90, F1471): the construction's `drawn` reading the resolved text rather than the typed one, or a chip as its sentinel → **T4.109** fails on a raw U+202E in the `answer:` line and on the chip. (`?? neutraliseControl(ch)` taken to `?? ch` survives, measured: `drawAs` draws a bidi character itself and the editor's insert refuses the C0/C1 controls the fallback is for.) `tools/mutate/runs/c17-bidi-display.mjs`.
 - **T6.125** (I94, F1495): the approval branch's catch removed → **T4.107** fails: the card stays streaming beside a second entry. `approvalPrompt`'s `deny` check removed → **T4.107** fails on `allow` alone, where the tool is invoked.
 - **T6.126** (I104): the settle into the pending entry rebuilt as `{ line, into }` again → **T1.108** fails on the shell route's settled document.
 
