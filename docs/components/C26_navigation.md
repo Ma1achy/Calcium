@@ -1983,6 +1983,7 @@ Named against the invariants; the tiers are the six.
 - **T6.5** (I32): the key back to the focus address alone → **T4.35** and **T4.36** fail.
 - **T6.6** (I32): the latch never set → **T4.37** fails: the patch drags the box back.
 - **T6.7** (I30): `enterRow` taking the entered row's first element again → **T1.167** fails: `↓` from the mosaic's second cell lands on the first.
+- **T6.9** (I30, I21, §8c.6): `historyNext` taking the live entry's first element again → **T1.168** fails: the entry lands on member 0, off screen.
 - **T6.8** (I30, I31): the drawn-columns dep answering the element's own `cols` for a tape → **T4.38** fails: `↑` lands on member 0 and the window slides to the head.
 
 **The mutation pass is scheduled, not optional.** Every module mutated on landing; a mutation
