@@ -1673,7 +1673,7 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
     expect(violations[0]?.message).toContain("has outlived its reason");
   });
 
-  it("SP3: the exception list is four entries in two kinds, and the kinds are named", () => {
+  it("SP3: the exception list is seven entries in three kinds, and the kinds are named", () => {
     // Written out rather than counted, because the interesting fact is *which*.
     // **And partitioned, because the second kind arrived inside the first.** The
     // row read *two entries, and both are fabrication sites* — true when written,
@@ -1704,8 +1704,17 @@ describe("A03 SP3 — invariant references resolve outside the specs too", () =>
       "docs/notes/CALCIUM_ML_BLOCKS.md",
     ];
 
+    // **The third kind arrived the same way**: the design-check's report numbers
+    // its divergences `I1`..`I12`, the cell comparison's debt is keyed by them,
+    // and a bare `I6` there is an item, not an invariant. Three files, named.
+    const REPORT_ITEM_IDS = [
+      "test/support/design-cells.ts",
+      "test/golden/design-cells.test.ts",
+      "test/golden/DESIGN_FIXTURES.md",
+    ];
+
     expect(Object.keys(REFERENCE_EXCEPTIONS).sort()).toEqual(
-      [...FABRICATION, ...DATED_NOTES].sort(),
+      [...FABRICATION, ...DATED_NOTES, ...REPORT_ITEM_IDS].sort(),
     );
     // **Every excused file exists**, or an exception outlives its subject — the
     // shape the row above this one tests for a stale reason, one field over.

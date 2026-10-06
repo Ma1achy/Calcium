@@ -1,6 +1,6 @@
 # golden
 
-**20 test files — 1 frame, 2 byte corpora, 14 renderings of blocks, 3 censuses.**
+**21 test files — 1 frame, 2 byte corpora, 14 renderings of blocks, 4 censuses.**
 
 Those five figures are asserted against the directory by `corpus.test.ts`, and the
 table below is parsed from this file rather than restated in code. **The reason is
@@ -25,6 +25,7 @@ now fails a row.
 | `theme-tokens.test.ts` | lines | §079 and §074 — every tone and every surface, ten themes × four colour depths, recorded as **values**. The corpus's first frame of colour, and the only form §079 can be compared in: every other frame here strips SGR, and a table of tones with the values stripped is twenty-one identical rows | — |
 | `focus-shapes.test.ts` | census | §017 and §018 — which kinds answer block focus, over `ONE_PER_KIND` × the two `FocusState` forms, compared against a declared set by equality. Not a frame: the question is *which shapes have a treatment at all*, and the answer is two of thirty-six | — |
 | `design-fixtures.test.ts` | census | `DESIGN_FIXTURES.md` against the design's 109 fixtures — M16's map, the row that fails when a fixture is added and nobody classifies it, and each framed fixture's figure against its golden frame, with the differences allowed in `design-differences.json` by equality (review batch 4, M16.1) | — |
+| `design-cells.test.ts` | census | the design's figures against the frames **cell by cell** — tone, ground, weight and position, which `design-fixtures.test.ts`'s mark set cannot see. The registry's `renderHtml` against the framework's SGR, both in the registry's tokens; the design-check's I1–I10, E13 and E14 are listed as debt in `design-cells-debt.json` by equality, with both values (b5-fixcolour) | — |
 | `fallback-docker.test.ts` | lines | docker's real JSON through C07's fallback, unadapted | — |
 | `padding.test.ts` | lines | a block's own padding — alone, inset, in a row group and in a sequence, at 3 widths × 3 variants | `builders/index.js` |
 | `patch.test.ts` | lines | C25's patch block at 4 widths × 4 modes | `builders/index.js` |
