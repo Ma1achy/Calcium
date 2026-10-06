@@ -130,24 +130,34 @@ $ /c
 . link   
 x verify   checksum
 ── §6 · the canonical marks, as a glyph census
-question        ?
-current         *
-ok              +
-warn            !
-error           x
-info            i
-pending         .
-working         %
-work-unit       *
-queued          o
-cancelled       /
-expand          (
-collapse        v
-focus           >
-bullet          -
-quote           |
-nested          ~
-continuation    \`-
+· the registry's 20 canonical marks, each resolved through its home at this rung
+  glyph  ascii        role
+  *  o ! * + x /  work-unit / state dot
+  \`-  \`-           result branch
+  !  !            attention
+  +  +            success
+  $  $            reader position
+  >  >            focus
+  (  (            collapsed disclosure
+  v  v            expanded disclosure
+  ?  ?            question
+  *  *            current item
+  v  v            sort descending
+  ^  ^            trend rising
+  V  V            trend falling
+  =  =            trend held
+  ^  ^            sort ascending
+  ...  ...          omitted content
+  @  @            unchosen choice
+  x  x            failure
+  <  <            undo affordance
+  |  |            selection rail
+
+· supporting registered marks
+  #  #            segmented meter fill
+  -  -            rule segment
+
+  tape delimiters   [ → [    ] → ]
 ── §30 · the head mark's three rungs
 tone carries: false
 queued          o
@@ -767,7 +777,790 @@ line 3                                 |
 line 4                                 |
 line 5                                 |
 line 6                                 |
-... 0 above, 12 below"
+... 0 above, 12 below
+── §3 · the regions with a call running — a settled entry above a running one
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+ $ /build
+ * build : |
+   \`- build #################-------------------------- 40%
+
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §4 · idle — every head settled, nothing running
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §5 · cancelled — the head says so and the block it had stays
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+ $ /build
+ / build : cancelled
+   \`- build #################-------------------------- 40%
+   |  / Cancelled.
+
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §7 · nested calls — a parent and its three children, each a nested card
++ agents : 8m 12s : 3 of 3
+  +- + seams(e~ms) : 2m 53s : 4 findings
+  +- + arm(~rs) : 3m 46s : 3 corrections
+  +- + count(~nt) : 8m 12s : 1 disproved
+
+── §8 · message entries — the echoed command, and the entry it produced
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+ $ /noise again
+ + noise(again)
+   \`- line 1
+   |  line 2
+
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §9 · queued — two lines typed while a verb runs, each waiting its turn
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+
+ $ /slow
+ * slow : |
+
+ $ /noise
+   \`- queued behind slow
+
+ $ /noise again
+   \`- queued behind slow
+
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §10 · startup — the frame a session opens with
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §12 · transient feedback — a copy, and what says it happened
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                        + copied 1 line
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §13 · reviewing what was written — a patch as a call's result
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+
+ $ /diff
+ + diff
+   \`- -- src/server.ts ------------------------------------
+   |  ... 12 unchanged lines
+   |  @@ -18,7 +18,9 @@
+   |  18 18   const app = express();
+   |     19 + app.use(helmet());
+   |  19    - app.use(cors());
+
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §14 · away — what settled while the terminal had no focus
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+   \`- line 1                                               |
+   |  line 2                                               |
+                                                           |
+ $ /boom                                                   |
+ x boom : failed                                           |
+   \`- +---------------------------------------------------+#
+   |  |                                                   |#
+   |  | --------------------- ERROR --------------------- |#
+   |  | x \`boom\` failed: Error: ENOENT: no such file      |#
+   |  |                                                   |#
+   |  +---------------------------------------------------+#
+                                                           #
+ * 2 entries settled while you were away : C-End to the    #
+   bottom                                                  #
+   \`- entry 3: /boom — failed                              #
+   \`- entry 2: /noise — succeeded                          #
+                                                           #
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §22 · the help view as an entry
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+ $ /help keys                                              #
+ + help(keys)                                              #
+   \`- -- prompt — where you are                            |
+   |  Enter        submit                                  |
+   |  S-Enter      insertNewline                           |
+   |  M-Enter      insertNewline                           |
+   |  C-j          insertNewline                           |
+   |  Tab          complete                                |
+   |  Right        acceptGhostOrForward                    |
+   |  Up           historyPrev                             |
+   |  Down         historyNext                             |
+   |  C-r          reverseSearch                           |
+   |  Backspace    backspace                               |
+   |  C-h          backspace                               |
+   |  Delete       delete                                  |
+   |  C-w          killWordLeft                            |
+   |  M-Backspace  killWordLeft                            |
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §23 · a narrow frame — a call running at the narrowest a session draws
+· drawn at 60×24, the size the section is about
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+ $ /build
+ * build : |
+   \`- build #################-------------------------- 40%
+
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §24 · reasoning — collapsed, the default, and open
+· collapsed
+( thinking · 4s · 312 tok
+
+· open
+v thinking · 4s · 312 tok
+  The parser tracks quotes with a boole~
+  flips it back and the run ends early.~
+  that, but I should check whether esca~
+── §27 · the context's fill — one quantity in a meter
+ctx #########################------- 78%
+── §28 · an approval replaces the prompt
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+------------------------------------------------------------
++ Confirm ------------------------------------------------+
+|! may I write to package.json?                           |
+|                                                         |
+|  -  [a]  approve                                        |
+|     [d]  deny                                           |
++---------------------------------------------------------+
+------------------------------------------------------------
+/help                                                  /work
+question  Left/Right move  Enter answer  Esc -> deny
+── §29 · completion expands the prompt
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+-----------------------------------------------------------
+  * /noise                                            noise
+    /long                                              long
+    /boom                                              boom
+    /diff                                              diff
+    /list                                              list
+    /logs                                              logs
++ 16 more
+------------------------------------------------------------
+$ /
+------------------------------------------------------------
+/help                                                  /work
+complete  Enter run  Tab complete  Esc close
+── §45 · the live terminal block
+=== test session starts ===
+..... [ 4%] 
+── §46 · history — the reverse search open over the transcript
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+   |  line 2                                               |
+   |  line 3                                               |
+   |  line 4                                               |
+   |  line 5                                               |
+   |  line 6                                               |
+   |  line 7                                               |
+   |  line 8                                               #
+   |  line 9                                               #
+   |  line 10                                              #
+   |  line 11                                              #
+   |  line 12                                              #
+                                                           #
+ $ /noise again                                            #
+ + noise(again)                                            #
+   \`- line 1                                               #
+-----------------------------------------------------------#
+(reverse-i-search) \`no': /noise again                      #
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+find  Up/Down hits  Enter open  Esc close
+── §47 · empty, too small and refused
+· empty — the table says so in its own box
+  name                                  
+  No matches.
+
+· refused — a contained failure, at the height the fault asked for (C09 I34)
++--------------------------------------+
+| -------------- ERROR --------------- |
+| x plot failed to render: this arm    |
+| draws no density — the estimate      |
+| needs the terminal's width           |
++--------------------------------------+
+
+· too small — below the minimum a session draws only what it needs
+· drawn at 34×8, the size the section is about
+Terminal too small
+34x8
+Needs 60x16
+── §49 · a block of each kind the figure draws — plot, table, image, form
+· plot
+   +-----------------------------------+
+10 +                                   |
+   |                     +--------+    |
+   |                     |        |    |
+   |                     |        |    |
+ 5 +    +--------+       |        +----|
+   |    |        |       |             |
+   |----+        +-------+             |
+ 0 +                                   |
+   ++--------+-------+--------+-------++
+    0        1       2        3       4
+
+· table
+  Name      State                       
+  api       runni~
+  worker    idle  
+
+· image
+:::-::
+-:-:-:
+:-:-:-
+
+· form — its buttons
+name        prism-serve
+port        80
+            x ports below 1024 need root
+replicas    3
+            0 stops the service
+
+* save    cancel
+── §50 · the tool-result gallery — results as entries
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+ $ /list
+ + list : 2 rows
+   \`-   Name      State
+   |    api       runni~
+   |    worker    idle
+
+ $ /logs
+ + logs
+   \`- 12:00:01  info   listening on :8080
+   |  12:00:02  warn   slow query: 1.2s
+
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §51 · approval overflow — the inspection, the payload bounded
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+------------------------------------------------------------
++ Confirm ------------------------------------------------+
+|! Apply this change?                                     |
+|patch line 1                                            #|
+|patch line 2                                            ||
+|patch line 3                                            ||
+|patch line 4                                            ||
+|patch line 5                                            ||
+|patch line 6                                            ||
+|... 0 above, 24 below                                    |
+|Up/Down scroll  Esc back to the question                 |
++---------------------------------------------------------+
+------------------------------------------------------------
+/help                                                  /work
+question  Up/Down scroll  Esc back
+── §52 · a question that wants a sentence — it floats, and the prompt is live
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
++ Confirm ------------------------------------------------+
+|! What should the commit message say?                    |
+|                                                         |
+|     [n]  no                                             |
+|  -  [y]  yes                                            |
+|     [r]  reply…                                         |
++---------------------------------------------------------+
+------------------------------------------------------------
+$ fix the parser
+------------------------------------------------------------
+/help                                                  /work
+question  Enter answer  Esc -> choices
+── §60 · resize — the same transcript at 80 columns, then at 60
+· at 80 columns
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+   |  line 2                                                                   |
+                                                                               |
+ $ /long                                                                       |
+ + long                                                                        #
+   \`- line 1                                                                   #
+   |  line 2                                                                   #
+   |  line 3                                                                   #
+   |  line 4                                                                   #
+   |  line 5                                                                   #
+   |  line 6                                                                   #
+   |  line 7                                                                   #
+   |  line 8                                                                   #
+   |  line 9                                                                   #
+   |  line 10                                                                  #
+   |  line 11                                                                  #
+   |  line 12                                                                  #
+                                                                               #
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+
+· resized to 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+   |  line 2                                               |
+                                                           |
+ $ /long                                                   |
+ + long                                                    #
+   \`- line 1                                               #
+   |  line 2                                               #
+   |  line 3                                               #
+   |  line 4                                               #
+   |  line 5                                               #
+   |  line 6                                               #
+   |  line 7                                               #
+   |  line 8                                               #
+   |  line 9                                               #
+   |  line 10                                              #
+   |  line 11                                              #
+   |  line 12                                              #
+                                                           #
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §66 · a tool's failure — the head says failed, and the session goes on
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+ $ /boom
+ x boom : failed
+   \`- +---------------------------------------------------+
+   |  |                                                   |
+   |  | --------------------- ERROR --------------------- |
+   |  | x \`boom\` failed: Error: ENOENT: no such file      |
+   |  |                                                   |
+   |  +---------------------------------------------------+
+
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §67 · scrolled back while a call runs — the transcript's bar
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+ + long                                                    #
+   \`- line 1                                               #
+   |  line 2                                               #
+   |  line 3                                               #
+   |  line 4                                               #
+   |  line 5                                               #
+   |  line 6                                               #
+   |  line 7                                               #
+   |  line 8                                               |
+   |  line 9                                               |
+   |  line 10                                              |
+   |  line 11                                              |
+   |  line 12                                              |
+                                                           |
+ $ /long                                                   |
+ + long                                                    |
+   \`- line 1                                               |
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §68 · one exchange — drawn at this golden's rung
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+ $ /boom
+ x boom : failed
+   \`- +---------------------------------------------------+
+   |  |                                                   |
+   |  | --------------------- ERROR --------------------- |
+   |  | x \`boom\` failed: Error: ENOENT: no such file      |
+   |  |                                                   |
+   |  +---------------------------------------------------+
+
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §69 · the prompt's upper rule, labelled
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+
+------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+------------------------------------------------------------
+$
+------------------------------------------------------------
+── §74 · weight — each tone's weight at this rung
+tone            this rung  1-bit
+default         plain      plain
+dim             plain      faint
+muted           plain      faint
+ok              plain      bold
+warn            plain      bold
+error           plain      bold
+info            plain      plain
+accent          plain      bold
+meta            plain      plain
+identifier      plain      bold
+── §75 · /config — each value and where it came from
++ config ------------------------------+
+|  key           value                 |
+|  model         qwen3-coder-next      |
+|  endpoint      localhost:8000        |
+|  posture       auto                  |
+|  ui.spinner    braille               |
++--------------------------------------+
+── §77 · syntax highlighting
+name: api
+replicas: 3
+── §78 · tables — sorted by age, descending, the columns that do not fit counted at each row
+          uuid     family               
+  (+8  *  f410d99  family-4             
+  (+8  *  b1c7e34  family-5             
+  (+8  *  7c2d4e1  family-2             
+  (+8  *  a3f9b21  family-1             
+  (+8  *  2e8a04c  family-3             
+── §79 · tones and surfaces — the dark theme, as values at this rung
+· tones
+  default       #d4d4d4  plain
+  dim           #8a8a8a  plain
+  muted         #8c8c8c  plain
+  ok            #87b86c  plain
+  warn          #d4b35a  plain
+  error         #f05a5a  plain
+  info          #7faecf  plain
+  accent        #e8a87c  plain
+  meta          #b89cd2  plain
+  identifier    #7fb8b8  plain
+· surfaces
+  bg            #1a1a1a  plain
+  bgElev        #222222  plain
+  bgDeep        #141414  plain
+  selection     #264057  plain
+  meterFill     #315a34  plain
+  border        #2c2c2c  plain
+  borderStrong  #3a3a3a  plain
+  diffAdd       #002600  plain
+  diffRemove    #490000  plain
+  errorGround   #c62828  plain
+  mAuto         #6b5a1f  plain
+  mAccept       #4a3a63  plain
+  mPlan         #2a4a63  plain
+  mManual       #3a3a3a  plain
+  skipGround    #7a1414  plain
+  focusGround   #2e2e2e  plain
+  errorInk      #ffffff  plain
+  mInk          #f2eede  plain
+  skipInk       #ffe8e8  plain
+  pick          #e8a87c  plain
+  pickInk       #000000  plain
+  link          #7fb8b8  plain
+  linkInk       #000000  plain
+  chosen        #87b86c  plain
+  chosenInk     #000000  plain
+── §100 · a table that cannot shed, and two columns
+· the table at this width, and at 32 columns
+          uuid     family               
+  (+8  *  a3f9b21  family-1             
+  (+8  *  7c2d4e1  family-2             
+
+          uuid     family       
+  (+8  *  a3f9b21  family-1     
+  (+8  *  7c2d4e1  family-2     
+
+· two columns — the patch split
+-- serving/volatility-estimator.yaml ---
+... 14 unchanged lines
+@@ -18,6 +18,7 @@
+18   spec:         |18   spec:
+19     selector:   |19     selector:
+20       matchLabe~|20       matchLabe~
+21 -       app: vo~|21 +       app: vo~
+                   |22 +       prism.e~
+22     replicas: 2 |23     replicas: 2
+23     template:   |24     template:
+── §101 · a chip under the caret, and its preview above the prompt
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+-----------------------------------------------------------
+#1 pasted : 30L
+row 1                                                     #
+row 2                                                     |
+row 3                                                     |
+row 4                                                     |
+... 0 above, 26 below
+M-S-Up/M-S-Down scroll  M-o open in editor
+------------------------------------------------------------
+$  #1 pasted : 30L
+------------------------------------------------------------
+/help                                                  /work
+preview  M-S-Up/M-S-Down scroll  Esc close"
 `;
 
 exports[`golden frames — one per design fixture > dark-ascii at 80 1`] = `
@@ -899,24 +1692,34 @@ $ /c
 . link   
 x verify   checksum
 ── §6 · the canonical marks, as a glyph census
-question        ?
-current         *
-ok              +
-warn            !
-error           x
-info            i
-pending         .
-working         %
-work-unit       *
-queued          o
-cancelled       /
-expand          (
-collapse        v
-focus           >
-bullet          -
-quote           |
-nested          ~
-continuation    \`-
+· the registry's 20 canonical marks, each resolved through its home at this rung
+  glyph  ascii        role
+  *  o ! * + x /  work-unit / state dot
+  \`-  \`-           result branch
+  !  !            attention
+  +  +            success
+  $  $            reader position
+  >  >            focus
+  (  (            collapsed disclosure
+  v  v            expanded disclosure
+  ?  ?            question
+  *  *            current item
+  v  v            sort descending
+  ^  ^            trend rising
+  V  V            trend falling
+  =  =            trend held
+  ^  ^            sort ascending
+  ...  ...          omitted content
+  @  @            unchosen choice
+  x  x            failure
+  <  <            undo affordance
+  |  |            selection rail
+
+· supporting registered marks
+  #  #            segmented meter fill
+  -  -            rule segment
+
+  tape delimiters   [ → [    ] → ]
 ── §30 · the head mark's three rungs
 tone carries: false
 queued          o
@@ -1529,7 +2332,768 @@ line 3                                                                         |
 line 4                                                                         |
 line 5                                                                         |
 line 6                                                                         |
-... 0 above, 12 below"
+... 0 above, 12 below
+── §3 · the regions with a call running — a settled entry above a running one
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+ $ /build
+ * build : |
+   \`- build #########################-------------------------------------- 40%
+
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §4 · idle — every head settled, nothing running
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §5 · cancelled — the head says so and the block it had stays
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+ $ /build
+ / build : cancelled
+   \`- build #########################-------------------------------------- 40%
+   |  / Cancelled.
+
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §7 · nested calls — a parent and its three children, each a nested card
++ agents : 8m 12s : 3 of 3
+  +- + seams(explore the unwired seams) : 2m 53s : 4 findings
+  +- + arm(explore the plot-arm repairs) : 3m 46s : 3 corrections
+  +- + count(verify the refusal count) : 8m 12s : 1 disproved
+
+── §8 · message entries — the echoed command, and the entry it produced
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+ $ /noise again
+ + noise(again)
+   \`- line 1
+   |  line 2
+
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §9 · queued — two lines typed while a verb runs, each waiting its turn
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+ $ /slow
+ * slow : |
+
+ $ /noise
+   \`- queued behind slow
+
+ $ /noise again
+   \`- queued behind slow
+
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §10 · startup — the frame a session opens with
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §12 · transient feedback — a copy, and what says it happened
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                            + copied 1 line
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §13 · reviewing what was written — a patch as a call's result
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+ $ /diff
+ + diff
+   \`- -- src/server.ts --------------------------------------------------------
+   |  ... 12 unchanged lines
+   |  @@ -18,7 +18,9 @@
+   |  18 18   const app = express();
+   |     19 + app.use(helmet());
+   |  19    - app.use(cors());
+
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §14 · away — what settled while the terminal had no focus
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+ + noise                                                                       |
+   \`- line 1                                                                   |
+   |  line 2                                                                   |
+                                                                               |
+ $ /boom                                                                       |
+ x boom : failed                                                               #
+   \`- +-----------------------------------------------------------------------+#
+   |  |                                                                       |#
+   |  | ------------------------------- ERROR ------------------------------- |#
+   |  | x \`boom\` failed: Error: ENOENT: no such file                          |#
+   |  |                                                                       |#
+   |  +-----------------------------------------------------------------------+#
+                                                                               #
+ * 2 entries settled while you were away : C-End to the bottom                 #
+   \`- entry 3: /boom — failed                                                  #
+   \`- entry 2: /noise — succeeded                                              #
+                                                                               #
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §22 · the help view as an entry
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+ $ /help keys                                                                  #
+ + help(keys)                                                                  #
+   \`- -- prompt — where you are                                                |
+   |  Enter        submit                                                      |
+   |  S-Enter      insertNewline                                               |
+   |  M-Enter      insertNewline                                               |
+   |  C-j          insertNewline                                               |
+   |  Tab          complete                                                    |
+   |  Right        acceptGhostOrForward                                        |
+   |  Up           historyPrev                                                 |
+   |  Down         historyNext                                                 |
+   |  C-r          reverseSearch                                               |
+   |  Backspace    backspace                                                   |
+   |  C-h          backspace                                                   |
+   |  Delete       delete                                                      |
+   |  C-w          killWordLeft                                                |
+   |  M-Backspace  killWordLeft                                                |
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §23 · a narrow frame — a call running at the narrowest a session draws
+· drawn at 60×24, the size the section is about
+calcium  prism                                         22:13
+------------------------------------------------------------
+
+
+
+
+
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+ $ /build
+ * build : |
+   \`- build #################-------------------------- 40%
+
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §24 · reasoning — collapsed, the default, and open
+· collapsed
+( thinking · 4s · 312 tok
+
+· open
+v thinking · 4s · 312 tok
+|    The parser tracks quotes with a boolean, so a nested quote
+|    flips it back and the run ends early. A depth counter fixes
+|    that, but I should check whether escaping is handled first.
+── §27 · the context's fill — one quantity in a meter
+ctx ########################################################---------------- 78%
+── §28 · an approval replaces the prompt
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+--------------------------------------------------------------------------------
++ Confirm --------------------------------------------------------------------+
+|! may I write to package.json?                                               |
+|                                                                             |
+|  -  [a]  approve                                                            |
+|     [d]  deny                                                               |
++-----------------------------------------------------------------------------+
+--------------------------------------------------------------------------------
+/help                                                                      /work
+question  Left/Right move  Enter answer  Esc -> deny
+── §29 · completion expands the prompt
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------
+  * /noise                                                                noise
+    /long                                                                  long
+    /boom                                                                  boom
+    /diff                                                                  diff
+    /list                                                                  list
+    /logs                                                                  logs
++ 16 more
+--------------------------------------------------------------------------------
+$ /
+--------------------------------------------------------------------------------
+/help                                                                      /work
+complete  Enter run  Tab complete  Esc close
+── §45 · the live terminal block
+=== test session starts ===
+..... [ 4%] 
+── §46 · history — the reverse search open over the transcript
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+   |  line 2                                                                   |
+   |  line 3                                                                   |
+   |  line 4                                                                   |
+   |  line 5                                                                   |
+   |  line 6                                                                   |
+   |  line 7                                                                   |
+   |  line 8                                                                   #
+   |  line 9                                                                   #
+   |  line 10                                                                  #
+   |  line 11                                                                  #
+   |  line 12                                                                  #
+                                                                               #
+ $ /noise again                                                                #
+ + noise(again)                                                                #
+   \`- line 1                                                                   #
+-------------------------------------------------------------------------------#
+(reverse-i-search) \`no': /noise again                                          #
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+find  Up/Down hits  Enter open  Esc close
+── §47 · empty, too small and refused
+· empty — the table says so in its own box
+  name                                                                          
+  No matches.
+
+· refused — a contained failure, at the height the fault asked for (C09 I34)
++------------------------------------------------------------------------------+
+|----------------------------------- ERROR ------------------------------------|
+|x plot failed to render: this arm draws no density — the estimate needs the   |
+|terminal's width                                                              |
++------------------------------------------------------------------------------+
+
+· too small — below the minimum a session draws only what it needs
+· drawn at 34×8, the size the section is about
+Terminal too small
+34x8
+Needs 60x16
+── §49 · a block of each kind the figure draws — plot, table, image, form
+· plot
+   +---------------------------------------------------------------------------+
+10 +                                                                           |
+   |                                              +------------------+         |
+   |                                              |                  |         |
+   |                                              |                  |         |
+ 5 +         +------------------+                 |                  +---------|
+   |         |                  |                 |                            |
+   |---------+                  +-----------------+                            |
+ 0 +                                                                           |
+   +-+-------+---------+--------+--------+--------+---------+--------+-------+-+
+    0.0     0.5       1.0      1.5      2.0      2.5       3.0      3.5     4.0
+
+· table
+  Name      State                                                               
+  api       runni~
+  worker    idle  
+
+· image
+:::-::
+-:-:-:
+:-:-:-
+
+· form — its buttons
+name        prism-serve
+port        80
+            x ports below 1024 need root
+replicas    3
+            0 stops the service
+
+* save    cancel
+── §50 · the tool-result gallery — results as entries
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+ $ /list
+ + list : 2 rows
+   \`-   Name      State
+   |    api       runni~
+   |    worker    idle
+
+ $ /logs
+ + logs
+   \`- 12:00:01  info   listening on :8080
+   |  12:00:02  warn   slow query: 1.2s
+
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §51 · approval overflow — the inspection, the payload bounded
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+--------------------------------------------------------------------------------
++ Confirm --------------------------------------------------------------------+
+|! Apply this change?                                                         |
+|patch line 1                                                                #|
+|patch line 2                                                                ||
+|patch line 3                                                                ||
+|patch line 4                                                                ||
+|patch line 5                                                                ||
+|patch line 6                                                                ||
+|... 0 above, 24 below                                                        |
+|Up/Down scroll  Esc back to the question                                     |
++-----------------------------------------------------------------------------+
+--------------------------------------------------------------------------------
+/help                                                                      /work
+question  Up/Down scroll  Esc back
+── §52 · a question that wants a sentence — it floats, and the prompt is live
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
++ Confirm -------------------------------------------------------------+
+|! What should the commit message say?                                 |
+|                                                                      |
+|     [n]  no                                                          |
+|  -  [y]  yes                                                         |
+|     [r]  reply…                                                      |
++----------------------------------------------------------------------+
+--------------------------------------------------------------------------------
+$ fix the parser
+--------------------------------------------------------------------------------
+/help                                                                      /work
+question  Enter answer  Esc -> choices
+── §60 · resize — the same transcript at 80 columns, then at 60
+· at 80 columns
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+   |  line 2                                                                   |
+                                                                               |
+ $ /long                                                                       |
+ + long                                                                        #
+   \`- line 1                                                                   #
+   |  line 2                                                                   #
+   |  line 3                                                                   #
+   |  line 4                                                                   #
+   |  line 5                                                                   #
+   |  line 6                                                                   #
+   |  line 7                                                                   #
+   |  line 8                                                                   #
+   |  line 9                                                                   #
+   |  line 10                                                                  #
+   |  line 11                                                                  #
+   |  line 12                                                                  #
+                                                                               #
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+
+· resized to 60
+calcium  prism                                         22:13
+------------------------------------------------------------
+   |  line 2                                               |
+                                                           |
+ $ /long                                                   |
+ + long                                                    #
+   \`- line 1                                               #
+   |  line 2                                               #
+   |  line 3                                               #
+   |  line 4                                               #
+   |  line 5                                               #
+   |  line 6                                               #
+   |  line 7                                               #
+   |  line 8                                               #
+   |  line 9                                               #
+   |  line 10                                              #
+   |  line 11                                              #
+   |  line 12                                              #
+                                                           #
+------------------------------------------------------------
+$
+------------------------------------------------------------
+/help                                                  /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §66 · a tool's failure — the head says failed, and the session goes on
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+ $ /boom
+ x boom : failed
+   \`- +-----------------------------------------------------------------------+
+   |  |                                                                       |
+   |  | ------------------------------- ERROR ------------------------------- |
+   |  | x \`boom\` failed: Error: ENOENT: no such file                          |
+   |  |                                                                       |
+   |  +-----------------------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §67 · scrolled back while a call runs — the transcript's bar
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+ + long                                                                        #
+   \`- line 1                                                                   #
+   |  line 2                                                                   #
+   |  line 3                                                                   #
+   |  line 4                                                                   #
+   |  line 5                                                                   #
+   |  line 6                                                                   #
+   |  line 7                                                                   #
+   |  line 8                                                                   |
+   |  line 9                                                                   |
+   |  line 10                                                                  |
+   |  line 11                                                                  |
+   |  line 12                                                                  |
+                                                                               |
+ $ /long                                                                       |
+ + long                                                                        |
+   \`- line 1                                                                   |
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §68 · one exchange — drawn at this golden's rung
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+ $ /noise
+ + noise
+   \`- line 1
+   |  line 2
+
+ $ /boom
+ x boom : failed
+   \`- +-----------------------------------------------------------------------+
+   |  |                                                                       |
+   |  | ------------------------------- ERROR ------------------------------- |
+   |  | x \`boom\` failed: Error: ENOENT: no such file                          |
+   |  |                                                                       |
+   |  +-----------------------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+$
+--------------------------------------------------------------------------------
+/help                                                                      /work
+Enter send  S-Enter newline  Tab complete  S-Tab transcript
+── §69 · the prompt's upper rule, labelled
+
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---------------------------------------------------------------------- Calcium -
+$
+--------------------------------------------------------------------------------
+── §74 · weight — each tone's weight at this rung
+tone            this rung  1-bit
+default         plain      plain
+dim             plain      faint
+muted           plain      faint
+ok              plain      bold
+warn            plain      bold
+error           plain      bold
+info            plain      plain
+accent          plain      bold
+meta            plain      plain
+identifier      plain      bold
+── §75 · /config — each value and where it came from
++ config ----------------------------------------------------------------------+
+|  key           value                                                 source  |
+|  model         qwen3-coder-next                                      config  |
+|  endpoint      localhost:8000                                        env     |
+|  posture       auto                                                  flag    |
+|  ui.spinner    braille                                               default |
++------------------------------------------------------------------------------+
+── §77 · syntax highlighting
+name: api
+replicas: 3
+── §78 · tables — sorted by age, descending, the columns that do not fit counted at each row
+          uuid     family          status       detail            metric   age v
+  (+4  *  f410d99  family-4        queued       ep 4/40           0.1240      3d
+  (+4  *  b1c7e34  family-5        promoted     ep 5/40           0.0500      2h
+  (+4  *  7c2d4e1  family-2        succeeded    ep 2/40           0.0089  1h 12m
+  (+4  *  a3f9b21  family-1        running      ep 1/40           0.0372     23m
+  (+4  *  2e8a04c  family-3        failed       ep 3/40                -     45s
+── §79 · tones and surfaces — the dark theme, as values at this rung
+· tones
+  default       #d4d4d4  plain
+  dim           #8a8a8a  plain
+  muted         #8c8c8c  plain
+  ok            #87b86c  plain
+  warn          #d4b35a  plain
+  error         #f05a5a  plain
+  info          #7faecf  plain
+  accent        #e8a87c  plain
+  meta          #b89cd2  plain
+  identifier    #7fb8b8  plain
+· surfaces
+  bg            #1a1a1a  plain
+  bgElev        #222222  plain
+  bgDeep        #141414  plain
+  selection     #264057  plain
+  meterFill     #315a34  plain
+  border        #2c2c2c  plain
+  borderStrong  #3a3a3a  plain
+  diffAdd       #002600  plain
+  diffRemove    #490000  plain
+  errorGround   #c62828  plain
+  mAuto         #6b5a1f  plain
+  mAccept       #4a3a63  plain
+  mPlan         #2a4a63  plain
+  mManual       #3a3a3a  plain
+  skipGround    #7a1414  plain
+  focusGround   #2e2e2e  plain
+  errorInk      #ffffff  plain
+  mInk          #f2eede  plain
+  skipInk       #ffe8e8  plain
+  pick          #e8a87c  plain
+  pickInk       #000000  plain
+  link          #7fb8b8  plain
+  linkInk       #000000  plain
+  chosen        #87b86c  plain
+  chosenInk     #000000  plain
+── §100 · a table that cannot shed, and two columns
+· the table at this width, and at 32 columns
+          uuid     family          status       detail            metric     age
+  (+4  *  a3f9b21  family-1        running      ep 1/40           0.0372     23m
+  (+4  *  7c2d4e1  family-2        succeeded    ep 2/40           0.0089  1h 12m
+
+          uuid     family       
+  (+8  *  a3f9b21  family-1     
+  (+8  *  7c2d4e1  family-2     
+
+· two columns — the patch split
+-- serving/volatility-estimator.yaml -------------------------------------------
+... 14 unchanged lines
+@@ -18,6 +18,7 @@
+18   spec:                             |18   spec:
+19     selector:                       |19     selector:
+20       matchLabels:                  |20       matchLabels:
+21 -       app: volatility-estimator   |21 +       app: volatility-estimator   
+                                       |22 +       prism.example.com/family: v~
+22     replicas: 2                     |23     replicas: 2
+23     template:                       |24     template:
+── §101 · a chip under the caret, and its preview above the prompt
+calcium  prism                                                          22:13:20
+--------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------
+#1 pasted : 30L
+row 1                                                                         #
+row 2                                                                         |
+row 3                                                                         |
+row 4                                                                         |
+... 0 above, 26 below
+M-S-Up/M-S-Down scroll  M-o open in editor
+--------------------------------------------------------------------------------
+$  #1 pasted : 30L
+--------------------------------------------------------------------------------
+/help                                                                      /work
+preview  M-S-Up/M-S-Down scroll  M-o open in editor  Esc close"
 `;
 
 exports[`golden frames — one per design fixture > dark-mono-unicode at 40 1`] = `
@@ -1658,24 +3222,34 @@ download ███████████████████░░░░�
 ◌ link   
 ✗ verify   checksum
 ── §6 · the canonical marks, as a glyph census
-question        ⟩
-current         ›
-ok              ✓
-warn            ▲
-error           ✗
-info            ⓘ
-pending         ◌
-working         ◐
-work-unit       ●
-queued          ○
-cancelled       ⊘
-expand          ▹
-collapse        ▿
-focus           ▸
-bullet          •
-quote           ⎸
-nested          ⁃
-continuation    ⎿
+· the registry's 20 canonical marks, each resolved through its home at this rung
+  glyph  ascii        role
+  ●  o ! * + x /  work-unit / state dot
+  ⎿  \`-           result branch
+  ▲  !            attention
+  ✓  +            success
+  ❯  $            reader position
+  ▸  >            focus
+  ▹  (            collapsed disclosure
+  ▿  v            expanded disclosure
+  ⟩  ?            question
+  ›  *            current item
+  ▾  v            sort descending
+  ↑  ^            trend rising
+  ↓  V            trend falling
+  →  =            trend held
+  ▴  ^            sort ascending
+  ⋯  ...          omitted content
+  ○  @            unchosen choice
+  ✗  x            failure
+  ↺  <            undo affordance
+  ▌  |            selection rail
+
+· supporting registered marks
+  ▰  #            segmented meter fill
+  ─  -            rule segment
+
+  tape delimiters   « → [    » → ]
 ── §30 · the head mark's three rungs
 tone carries: false
 queued          ○
@@ -2239,7 +3813,790 @@ line 3                                 │
 line 4                                 │
 line 5                                 │
 line 6                                 │
-⋯ 0 above, 12 below"
+⋯ 0 above, 12 below
+── §3 · the regions with a call running — a settled entry above a running one
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /build
+ ● build · ⠋
+   ⎿  build █████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░ 40%
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §4 · idle — every head settled, nothing running
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §5 · cancelled — the head says so and the block it had stays
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+ ❯ /build
+ ⊘ build · cancelled
+   ⎿  build █████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░ 40%
+   │  ⊘ Cancelled.
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §7 · nested calls — a parent and its three children, each a nested card
+✓ agents · 8m 12s · 3 of 3
+  ├─ ✓ seams(e…ms) · 2m 53s · 4 findings
+  ├─ ✓ arm(…rs) · 3m 46s · 3 corrections
+  └─ ✓ count(…nt) · 8m 12s · 1 disproved
+
+── §8 · message entries — the echoed command, and the entry it produced
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /noise again
+ ✓ noise(again)
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §9 · queued — two lines typed while a verb runs, each waiting its turn
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /slow
+ ● slow · ⠋
+
+ ❯ /noise
+   ⎿  queued behind slow
+
+ ❯ /noise again
+   ⎿  queued behind slow
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §10 · startup — the frame a session opens with
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §12 · transient feedback — a copy, and what says it happened
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                        ✓ copied 1 line
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §13 · reviewing what was written — a patch as a call's result
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /diff
+ ✓ diff
+   ⎿  ── src/server.ts ────────────────────────────────────
+   │  ⋯ 12 unchanged lines
+   │  @@ -18,7 +18,9 @@
+   │  18 18   const app = express();
+   │     19 + app.use(helmet());
+   │  19    - app.use(cors());
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §14 · away — what settled while the terminal had no focus
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+   ⎿  line 1                                               │
+   │  line 2                                               │
+                                                           │
+ ❯ /boom                                                   │
+ ✗ boom · failed                                           │
+   ⎿  ┌───────────────────────────────────────────────────┐┃
+   │  │                                                   │┃
+   │  │ ───────────────────── ERROR ───────────────────── │┃
+   │  │ ✗ \`boom\` failed: Error: ENOENT: no such file      │┃
+   │  │                                                   │┃
+   │  └───────────────────────────────────────────────────┘┃
+                                                           ┃
+ ● 2 entries settled while you were away · ⌃end to the     ┃
+   bottom                                                  ┃
+   ⎿  entry 3: /boom — failed                              ┃
+   ⎿  entry 2: /noise — succeeded                          ┃
+                                                           ┃
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §22 · the help view as an entry
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+ ❯ /help keys                                              ┃
+ ✓ help(keys)                                              ┃
+   ⎿  ── prompt — where you are                            │
+   │  ⏎       submit                                       │
+   │  ⇧⏎      insertNewline                                │
+   │  ⌥⏎      insertNewline                                │
+   │  ⌃J      insertNewline                                │
+   │  ⇥       complete                                     │
+   │  →       acceptGhostOrForward                         │
+   │  ↑       historyPrev                                  │
+   │  ↓       historyNext                                  │
+   │  ⌃R      reverseSearch                                │
+   │  ⌫       backspace                                    │
+   │  ⌃H      backspace                                    │
+   │  delete  delete                                       │
+   │  ⌃W      killWordLeft                                 │
+   │  ⌥⌫      killWordLeft                                 │
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §23 · a narrow frame — a call running at the narrowest a session draws
+· drawn at 60×24, the size the section is about
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /build
+ ● build · ⠋
+   ⎿  build █████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░ 40%
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §24 · reasoning — collapsed, the default, and open
+· collapsed
+▹ thinking · 4s · 312 tok
+
+· open
+▿ thinking · 4s · 312 tok
+  The parser tracks quotes with a boole…
+  flips it back and the run ends early.…
+  that, but I should check whether esca…
+── §27 · the context's fill — one quantity in a meter
+ctx █████████████████████████░░░░░░░ 78%
+── §28 · an approval replaces the prompt
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────
+┌ Confirm ────────────────────────────────────────────────┐
+│▲ may I write to package.json?                           │
+│                                                         │
+│  •  [a]  approve                                        │
+│     [d]  deny                                           │
+└─────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────
+/help                                                  /work
+question  ←→ move  ⏎ answer  esc → deny
+── §29 · completion expands the prompt
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────
+  › /noise                                            noise
+    /long                                              long
+    /boom                                              boom
+    /diff                                              diff
+    /list                                              list
+    /logs                                              logs
++ 16 more
+────────────────────────────────────────────────────────────
+❯ /
+────────────────────────────────────────────────────────────
+/help                                                  /work
+complete  ⏎ run  ⇥ complete  esc close
+── §45 · the live terminal block
+=== test session starts ===
+..... [ 4%] 
+── §46 · history — the reverse search open over the transcript
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+   │  line 2                                               │
+   │  line 3                                               │
+   │  line 4                                               │
+   │  line 5                                               │
+   │  line 6                                               │
+   │  line 7                                               ╽
+   │  line 8                                               ┃
+   │  line 9                                               ┃
+   │  line 10                                              ┃
+   │  line 11                                              ┃
+   │  line 12                                              ┃
+                                                           ┃
+ ❯ /noise again                                            ┃
+ ✓ noise(again)                                            ┃
+   ⎿  line 1                                               ┃
+───────────────────────────────────────────────────────────┃
+(reverse-i-search) \`no': /noise again                      ┃
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+find  ↑↓ hits  ⏎ open  esc close
+── §47 · empty, too small and refused
+· empty — the table says so in its own box
+  name                                  
+  No matches.
+
+· refused — a contained failure, at the height the fault asked for (C09 I34)
+┌──────────────────────────────────────┐
+│ ────────────── ERROR ─────────────── │
+│ ✗ plot failed to render: this arm    │
+│ draws no density — the estimate      │
+│ needs the terminal's width           │
+└──────────────────────────────────────┘
+
+· too small — below the minimum a session draws only what it needs
+· drawn at 34×8, the size the section is about
+Terminal too small
+34x8
+Needs 60x16
+── §49 · a block of each kind the figure draws — plot, table, image, form
+· plot
+   ┌───────────────────────────────────┐
+10 ┤                                   │
+   │                     ╭────────╮    │
+   │                     │        │    │
+   │                     │        │    │
+ 5 ┤    ╭────────╮       │        ╰───╴│
+   │    │        │       │             │
+   │╶───╯        ╰───────╯             │
+ 0 ┤                                   │
+   └┬────────┬───────┬────────┬───────┬┘
+    0        1       2        3       4
+
+· table
+  Name      State 
+  api       runni…
+  worker    idle  
+
+· image
+⠕⠅⠕⠅⠕⠅
+⠕⠅⠕⠅⠕⠅
+⠕⠅⠕⠅⠕⠅
+
+· form — its buttons
+name        prism-serve
+port        80
+            ✗ ports below 1024 need root
+replicas    3
+            0 stops the service
+
+› save    cancel
+── §50 · the tool-result gallery — results as entries
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+ ❯ /list
+ ✓ list · 2 rows
+   ⎿    Name      State
+   │    api       runni…
+   │    worker    idle
+
+ ❯ /logs
+ ✓ logs
+   ⎿  12:00:01  info   listening on :8080
+   │  12:00:02  warn   slow query: 1.2s
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §51 · approval overflow — the inspection, the payload bounded
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────
+┌ Confirm ────────────────────────────────────────────────┐
+│▲ Apply this change?                                     │
+│patch line 1                                            ┃│
+│patch line 2                                            ││
+│patch line 3                                            ││
+│patch line 4                                            ││
+│patch line 5                                            ││
+│patch line 6                                            ││
+│⋯ 0 above, 24 below                                      │
+│↑↓ scroll  esc back to the question                      │
+└─────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────
+/help                                                  /work
+question  ↑↓ scroll  esc back
+── §52 · a question that wants a sentence — it floats, and the prompt is live
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+┌ Confirm ────────────────────────────────────────────────┐
+│▲ What should the commit message say?                    │
+│                                                         │
+│     [n]  no                                             │
+│  •  [y]  yes                                            │
+│     [r]  reply…                                         │
+└─────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────
+❯ fix the parser
+────────────────────────────────────────────────────────────
+/help                                                  /work
+question  ⏎ answer  esc → choices
+── §60 · resize — the same transcript at 80 columns, then at 60
+· at 80 columns
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+   │  line 2                                                                   │
+                                                                               │
+ ❯ /long                                                                       │
+ ✓ long                                                                        ┃
+   ⎿  line 1                                                                   ┃
+   │  line 2                                                                   ┃
+   │  line 3                                                                   ┃
+   │  line 4                                                                   ┃
+   │  line 5                                                                   ┃
+   │  line 6                                                                   ┃
+   │  line 7                                                                   ┃
+   │  line 8                                                                   ┃
+   │  line 9                                                                   ┃
+   │  line 10                                                                  ┃
+   │  line 11                                                                  ┃
+   │  line 12                                                                  ┃
+                                                                               ┃
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+
+· resized to 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+   │  line 2                                               │
+                                                           │
+ ❯ /long                                                   │
+ ✓ long                                                    ┃
+   ⎿  line 1                                               ┃
+   │  line 2                                               ┃
+   │  line 3                                               ┃
+   │  line 4                                               ┃
+   │  line 5                                               ┃
+   │  line 6                                               ┃
+   │  line 7                                               ┃
+   │  line 8                                               ┃
+   │  line 9                                               ┃
+   │  line 10                                              ┃
+   │  line 11                                              ┃
+   │  line 12                                              ┃
+                                                           ┃
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §66 · a tool's failure — the head says failed, and the session goes on
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /boom
+ ✗ boom · failed
+   ⎿  ┌───────────────────────────────────────────────────┐
+   │  │                                                   │
+   │  │ ───────────────────── ERROR ───────────────────── │
+   │  │ ✗ \`boom\` failed: Error: ENOENT: no such file      │
+   │  │                                                   │
+   │  └───────────────────────────────────────────────────┘
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §67 · scrolled back while a call runs — the transcript's bar
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+ ✓ long                                                    ╽
+   ⎿  line 1                                               ┃
+   │  line 2                                               ┃
+   │  line 3                                               ┃
+   │  line 4                                               ┃
+   │  line 5                                               ┃
+   │  line 6                                               ┃
+   │  line 7                                               ┃
+   │  line 8                                               ┃
+   │  line 9                                               │
+   │  line 10                                              │
+   │  line 11                                              │
+   │  line 12                                              │
+                                                           │
+ ❯ /long                                                   │
+ ✓ long                                                    │
+   ⎿  line 1                                               │
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §68 · one exchange — drawn at this golden's rung
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /boom
+ ✗ boom · failed
+   ⎿  ┌───────────────────────────────────────────────────┐
+   │  │                                                   │
+   │  │ ───────────────────── ERROR ───────────────────── │
+   │  │ ✗ \`boom\` failed: Error: ENOENT: no such file      │
+   │  │                                                   │
+   │  └───────────────────────────────────────────────────┘
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §69 · the prompt's upper rule, labelled
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+── §74 · weight — each tone's weight at this rung
+tone            this rung  1-bit
+default         plain      plain
+dim             faint      faint
+muted           faint      faint
+ok              bold       bold
+warn            bold       bold
+error           bold       bold
+info            plain      plain
+accent          bold       bold
+meta            plain      plain
+identifier      bold       bold
+── §75 · /config — each value and where it came from
+┌ config ──────────────────────────────┐
+│  key           value                 │
+│  model         qwen3-coder-next      │
+│  endpoint      localhost:8000        │
+│  posture       auto                  │
+│  ui.spinner    braille               │
+└──────────────────────────────────────┘
+── §77 · syntax highlighting
+name: api
+replicas: 3
+── §78 · tables — sorted by age, descending, the columns that do not fit counted at each row
+          uuid     family               
+  ▹+8  ●  f410d99  family-4
+  ▹+8  ●  b1c7e34  family-5
+  ▹+8  ●  7c2d4e1  family-2
+  ▹+8  ●  a3f9b21  family-1
+  ▹+8  ●  2e8a04c  family-3
+── §79 · tones and surfaces — the dark theme, as values at this rung
+· tones
+  default       —        plain
+  dim           —        faint
+  muted         —        faint
+  ok            —        bold
+  warn          —        bold
+  error         —        bold
+  info          —        plain
+  accent        —        bold
+  meta          —        plain
+  identifier    —        bold
+· surfaces
+  bg            —        plain
+  bgElev        —        plain
+  bgDeep        —        plain
+  selection     —        plain
+  meterFill     —        plain
+  border        —        plain
+  borderStrong  —        plain
+  diffAdd       —        plain
+  diffRemove    —        plain
+  errorGround   —        plain
+  mAuto         —        plain
+  mAccept       —        plain
+  mPlan         —        plain
+  mManual       —        plain
+  skipGround    —        plain
+  focusGround   —        plain
+  errorInk      —        plain
+  mInk          —        plain
+  skipInk       —        plain
+  pick          —        plain
+  pickInk       —        plain
+  link          —        plain
+  linkInk       —        plain
+  chosen        —        plain
+  chosenInk     —        plain
+── §100 · a table that cannot shed, and two columns
+· the table at this width, and at 32 columns
+          uuid     family               
+  ▹+8  ●  a3f9b21  family-1
+  ▹+8  ●  7c2d4e1  family-2
+
+          uuid     family       
+  ▹+8  ●  a3f9b21  family-1
+  ▹+8  ●  7c2d4e1  family-2
+
+· two columns — the patch split
+── serving/volatility-estimator.yaml ───
+⋯ 14 unchanged lines
+@@ -18,6 +18,7 @@
+18   spec:         │18   spec:
+19     selector:   │19     selector:
+20       matchLabe…│20       matchLabe…
+21 -       app: vo…│21 +       app: vo…
+                   │22 +       prism.e…
+22     replicas: 2 │23     replicas: 2
+23     template:   │24     template:
+── §101 · a chip under the caret, and its preview above the prompt
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────
+[#1 pasted · 30L]
+row 1                                                     ╿
+row 2                                                     │
+row 3                                                     │
+row 4                                                     │
+⋯ 0 above, 26 below
+⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor
+────────────────────────────────────────────────────────────
+❯ [#1 pasted · 30L]
+────────────────────────────────────────────────────────────
+/help                                                  /work
+preview  ⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor  esc close"
 `;
 
 exports[`golden frames — one per design fixture > dark-mono-unicode at 80 1`] = `
@@ -2367,24 +4724,34 @@ download ███████████████████████�
 ◌ link   
 ✗ verify   checksum
 ── §6 · the canonical marks, as a glyph census
-question        ⟩
-current         ›
-ok              ✓
-warn            ▲
-error           ✗
-info            ⓘ
-pending         ◌
-working         ◐
-work-unit       ●
-queued          ○
-cancelled       ⊘
-expand          ▹
-collapse        ▿
-focus           ▸
-bullet          •
-quote           ⎸
-nested          ⁃
-continuation    ⎿
+· the registry's 20 canonical marks, each resolved through its home at this rung
+  glyph  ascii        role
+  ●  o ! * + x /  work-unit / state dot
+  ⎿  \`-           result branch
+  ▲  !            attention
+  ✓  +            success
+  ❯  $            reader position
+  ▸  >            focus
+  ▹  (            collapsed disclosure
+  ▿  v            expanded disclosure
+  ⟩  ?            question
+  ›  *            current item
+  ▾  v            sort descending
+  ↑  ^            trend rising
+  ↓  V            trend falling
+  →  =            trend held
+  ▴  ^            sort ascending
+  ⋯  ...          omitted content
+  ○  @            unchosen choice
+  ✗  x            failure
+  ↺  <            undo affordance
+  ▌  |            selection rail
+
+· supporting registered marks
+  ▰  #            segmented meter fill
+  ─  -            rule segment
+
+  tape delimiters   « → [    » → ]
 ── §30 · the head mark's three rungs
 tone carries: false
 queued          ○
@@ -2940,7 +5307,768 @@ line 3                                                                         �
 line 4                                                                         │
 line 5                                                                         │
 line 6                                                                         │
-⋯ 0 above, 12 below"
+⋯ 0 above, 12 below
+── §3 · the regions with a call running — a settled entry above a running one
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /build
+ ● build · ⠋
+   ⎿  build █████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 40%
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §4 · idle — every head settled, nothing running
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §5 · cancelled — the head says so and the block it had stays
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+ ❯ /build
+ ⊘ build · cancelled
+   ⎿  build █████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 40%
+   │  ⊘ Cancelled.
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §7 · nested calls — a parent and its three children, each a nested card
+✓ agents · 8m 12s · 3 of 3
+  ├─ ✓ seams(explore the unwired seams) · 2m 53s · 4 findings
+  ├─ ✓ arm(explore the plot-arm repairs) · 3m 46s · 3 corrections
+  └─ ✓ count(verify the refusal count) · 8m 12s · 1 disproved
+
+── §8 · message entries — the echoed command, and the entry it produced
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /noise again
+ ✓ noise(again)
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §9 · queued — two lines typed while a verb runs, each waiting its turn
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /slow
+ ● slow · ⠋
+
+ ❯ /noise
+   ⎿  queued behind slow
+
+ ❯ /noise again
+   ⎿  queued behind slow
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §10 · startup — the frame a session opens with
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §12 · transient feedback — a copy, and what says it happened
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                            ✓ copied 1 line
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §13 · reviewing what was written — a patch as a call's result
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /diff
+ ✓ diff
+   ⎿  ── src/server.ts ────────────────────────────────────────────────────────
+   │  ⋯ 12 unchanged lines
+   │  @@ -18,7 +18,9 @@
+   │  18 18   const app = express();
+   │     19 + app.use(helmet());
+   │  19    - app.use(cors());
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §14 · away — what settled while the terminal had no focus
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+ ✓ noise                                                                       │
+   ⎿  line 1                                                                   │
+   │  line 2                                                                   │
+                                                                               │
+ ❯ /boom                                                                       ╽
+ ✗ boom · failed                                                               ┃
+   ⎿  ┌───────────────────────────────────────────────────────────────────────┐┃
+   │  │                                                                       │┃
+   │  │ ─────────────────────────────── ERROR ─────────────────────────────── │┃
+   │  │ ✗ \`boom\` failed: Error: ENOENT: no such file                          │┃
+   │  │                                                                       │┃
+   │  └───────────────────────────────────────────────────────────────────────┘┃
+                                                                               ┃
+ ● 2 entries settled while you were away · ⌃end to the bottom                  ┃
+   ⎿  entry 3: /boom — failed                                                  ┃
+   ⎿  entry 2: /noise — succeeded                                              ┃
+                                                                               ┃
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §22 · the help view as an entry
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+ ❯ /help keys                                                                  ┃
+ ✓ help(keys)                                                                  ┃
+   ⎿  ── prompt — where you are                                                │
+   │  ⏎       submit                                                           │
+   │  ⇧⏎      insertNewline                                                    │
+   │  ⌥⏎      insertNewline                                                    │
+   │  ⌃J      insertNewline                                                    │
+   │  ⇥       complete                                                         │
+   │  →       acceptGhostOrForward                                             │
+   │  ↑       historyPrev                                                      │
+   │  ↓       historyNext                                                      │
+   │  ⌃R      reverseSearch                                                    │
+   │  ⌫       backspace                                                        │
+   │  ⌃H      backspace                                                        │
+   │  delete  delete                                                           │
+   │  ⌃W      killWordLeft                                                     │
+   │  ⌥⌫      killWordLeft                                                     │
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §23 · a narrow frame — a call running at the narrowest a session draws
+· drawn at 60×24, the size the section is about
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /build
+ ● build · ⠋
+   ⎿  build █████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░ 40%
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §24 · reasoning — collapsed, the default, and open
+· collapsed
+▹ thinking · 4s · 312 tok
+
+· open
+▿ thinking · 4s · 312 tok
+│    The parser tracks quotes with a boolean, so a nested quote
+│    flips it back and the run ends early. A depth counter fixes
+│    that, but I should check whether escaping is handled first.
+── §27 · the context's fill — one quantity in a meter
+ctx ████████████████████████████████████████████████████████░░░░░░░░░░░░░░░░ 78%
+── §28 · an approval replaces the prompt
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────────────────────────
+┌ Confirm ────────────────────────────────────────────────────────────────────┐
+│▲ may I write to package.json?                                               │
+│                                                                             │
+│  •  [a]  approve                                                            │
+│     [d]  deny                                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+question  ←→ move  ⏎ answer  esc → deny
+── §29 · completion expands the prompt
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────
+  › /noise                                                                noise
+    /long                                                                  long
+    /boom                                                                  boom
+    /diff                                                                  diff
+    /list                                                                  list
+    /logs                                                                  logs
++ 16 more
+────────────────────────────────────────────────────────────────────────────────
+❯ /
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+complete  ⏎ run  ⇥ complete  esc close
+── §45 · the live terminal block
+=== test session starts ===
+..... [ 4%] 
+── §46 · history — the reverse search open over the transcript
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+   │  line 2                                                                   │
+   │  line 3                                                                   │
+   │  line 4                                                                   │
+   │  line 5                                                                   │
+   │  line 6                                                                   │
+   │  line 7                                                                   ╽
+   │  line 8                                                                   ┃
+   │  line 9                                                                   ┃
+   │  line 10                                                                  ┃
+   │  line 11                                                                  ┃
+   │  line 12                                                                  ┃
+                                                                               ┃
+ ❯ /noise again                                                                ┃
+ ✓ noise(again)                                                                ┃
+   ⎿  line 1                                                                   ┃
+───────────────────────────────────────────────────────────────────────────────┃
+(reverse-i-search) \`no': /noise again                                          ┃
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+find  ↑↓ hits  ⏎ open  esc close
+── §47 · empty, too small and refused
+· empty — the table says so in its own box
+  name                                                                          
+  No matches.
+
+· refused — a contained failure, at the height the fault asked for (C09 I34)
+┌──────────────────────────────────────────────────────────────────────────────┐
+│─────────────────────────────────── ERROR ────────────────────────────────────│
+│✗ plot failed to render: this arm draws no density — the estimate needs the   │
+│terminal's width                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+· too small — below the minimum a session draws only what it needs
+· drawn at 34×8, the size the section is about
+Terminal too small
+34x8
+Needs 60x16
+── §49 · a block of each kind the figure draws — plot, table, image, form
+· plot
+   ┌───────────────────────────────────────────────────────────────────────────┐
+10 ┤                                                                           │
+   │                                              ╭──────────────────╮         │
+   │                                              │                  │         │
+   │                                              │                  │         │
+ 5 ┤         ╭──────────────────╮                 │                  ╰────────╴│
+   │         │                  │                 │                            │
+   │╶────────╯                  ╰─────────────────╯                            │
+ 0 ┤                                                                           │
+   └─┬───────┬─────────┬────────┬────────┬────────┬─────────┬────────┬───────┬─┘
+    0.0     0.5       1.0      1.5      2.0      2.5       3.0      3.5     4.0
+
+· table
+  Name      State 
+  api       runni…
+  worker    idle  
+
+· image
+⠕⠅⠕⠅⠕⠅
+⠕⠅⠕⠅⠕⠅
+⠕⠅⠕⠅⠕⠅
+
+· form — its buttons
+name        prism-serve
+port        80
+            ✗ ports below 1024 need root
+replicas    3
+            0 stops the service
+
+› save    cancel
+── §50 · the tool-result gallery — results as entries
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+ ❯ /list
+ ✓ list · 2 rows
+   ⎿    Name      State
+   │    api       runni…
+   │    worker    idle
+
+ ❯ /logs
+ ✓ logs
+   ⎿  12:00:01  info   listening on :8080
+   │  12:00:02  warn   slow query: 1.2s
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §51 · approval overflow — the inspection, the payload bounded
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+┌ Confirm ────────────────────────────────────────────────────────────────────┐
+│▲ Apply this change?                                                         │
+│patch line 1                                                                ┃│
+│patch line 2                                                                ││
+│patch line 3                                                                ││
+│patch line 4                                                                ││
+│patch line 5                                                                ││
+│patch line 6                                                                ││
+│⋯ 0 above, 24 below                                                          │
+│↑↓ scroll  esc back to the question                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+question  ↑↓ scroll  esc back
+── §52 · a question that wants a sentence — it floats, and the prompt is live
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+┌ Confirm ─────────────────────────────────────────────────────────────┐
+│▲ What should the commit message say?                                 │
+│                                                                      │
+│     [n]  no                                                          │
+│  •  [y]  yes                                                         │
+│     [r]  reply…                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────────────────────────
+❯ fix the parser
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+question  ⏎ answer  esc → choices
+── §60 · resize — the same transcript at 80 columns, then at 60
+· at 80 columns
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+   │  line 2                                                                   │
+                                                                               │
+ ❯ /long                                                                       │
+ ✓ long                                                                        ┃
+   ⎿  line 1                                                                   ┃
+   │  line 2                                                                   ┃
+   │  line 3                                                                   ┃
+   │  line 4                                                                   ┃
+   │  line 5                                                                   ┃
+   │  line 6                                                                   ┃
+   │  line 7                                                                   ┃
+   │  line 8                                                                   ┃
+   │  line 9                                                                   ┃
+   │  line 10                                                                  ┃
+   │  line 11                                                                  ┃
+   │  line 12                                                                  ┃
+                                                                               ┃
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+
+· resized to 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+   │  line 2                                               │
+                                                           │
+ ❯ /long                                                   │
+ ✓ long                                                    ┃
+   ⎿  line 1                                               ┃
+   │  line 2                                               ┃
+   │  line 3                                               ┃
+   │  line 4                                               ┃
+   │  line 5                                               ┃
+   │  line 6                                               ┃
+   │  line 7                                               ┃
+   │  line 8                                               ┃
+   │  line 9                                               ┃
+   │  line 10                                              ┃
+   │  line 11                                              ┃
+   │  line 12                                              ┃
+                                                           ┃
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §66 · a tool's failure — the head says failed, and the session goes on
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /boom
+ ✗ boom · failed
+   ⎿  ┌───────────────────────────────────────────────────────────────────────┐
+   │  │                                                                       │
+   │  │ ─────────────────────────────── ERROR ─────────────────────────────── │
+   │  │ ✗ \`boom\` failed: Error: ENOENT: no such file                          │
+   │  │                                                                       │
+   │  └───────────────────────────────────────────────────────────────────────┘
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §67 · scrolled back while a call runs — the transcript's bar
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+ ✓ long                                                                        ╽
+   ⎿  line 1                                                                   ┃
+   │  line 2                                                                   ┃
+   │  line 3                                                                   ┃
+   │  line 4                                                                   ┃
+   │  line 5                                                                   ┃
+   │  line 6                                                                   ┃
+   │  line 7                                                                   ┃
+   │  line 8                                                                   ┃
+   │  line 9                                                                   │
+   │  line 10                                                                  │
+   │  line 11                                                                  │
+   │  line 12                                                                  │
+                                                                               │
+ ❯ /long                                                                       │
+ ✓ long                                                                        │
+   ⎿  line 1                                                                   │
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §68 · one exchange — drawn at this golden's rung
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+ ❯ /noise
+ ✓ noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /boom
+ ✗ boom · failed
+   ⎿  ┌───────────────────────────────────────────────────────────────────────┐
+   │  │                                                                       │
+   │  │ ─────────────────────────────── ERROR ─────────────────────────────── │
+   │  │ ✗ \`boom\` failed: Error: ENOENT: no such file                          │
+   │  │                                                                       │
+   │  └───────────────────────────────────────────────────────────────────────┘
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §69 · the prompt's upper rule, labelled
+
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+──────────────────────────────────────────────────────────────────────[Calcium]─
+❯
+────────────────────────────────────────────────────────────────────────────────
+── §74 · weight — each tone's weight at this rung
+tone            this rung  1-bit
+default         plain      plain
+dim             faint      faint
+muted           faint      faint
+ok              bold       bold
+warn            bold       bold
+error           bold       bold
+info            plain      plain
+accent          bold       bold
+meta            plain      plain
+identifier      bold       bold
+── §75 · /config — each value and where it came from
+┌ config ──────────────────────────────────────────────────────────────────────┐
+│  key           value                                                 source  │
+│  model         qwen3-coder-next                                      config  │
+│  endpoint      localhost:8000                                        env     │
+│  posture       auto                                                  flag    │
+│  ui.spinner    braille                                               default │
+└──────────────────────────────────────────────────────────────────────────────┘
+── §77 · syntax highlighting
+name: api
+replicas: 3
+── §78 · tables — sorted by age, descending, the columns that do not fit counted at each row
+          uuid     family          status       detail            metric   age ▾
+  ▹+4  ●  f410d99  family-4        queued       ep 4/40           0.1240      3d
+  ▹+4  ●  b1c7e34  family-5        promoted     ep 5/40           0.0500      2h
+  ▹+4  ●  7c2d4e1  family-2        succeeded    ep 2/40           0.0089  1h 12m
+  ▹+4  ●  a3f9b21  family-1        running      ep 1/40           0.0372     23m
+  ▹+4  ●  2e8a04c  family-3        failed       ep 3/40                —     45s
+── §79 · tones and surfaces — the dark theme, as values at this rung
+· tones
+  default       —        plain
+  dim           —        faint
+  muted         —        faint
+  ok            —        bold
+  warn          —        bold
+  error         —        bold
+  info          —        plain
+  accent        —        bold
+  meta          —        plain
+  identifier    —        bold
+· surfaces
+  bg            —        plain
+  bgElev        —        plain
+  bgDeep        —        plain
+  selection     —        plain
+  meterFill     —        plain
+  border        —        plain
+  borderStrong  —        plain
+  diffAdd       —        plain
+  diffRemove    —        plain
+  errorGround   —        plain
+  mAuto         —        plain
+  mAccept       —        plain
+  mPlan         —        plain
+  mManual       —        plain
+  skipGround    —        plain
+  focusGround   —        plain
+  errorInk      —        plain
+  mInk          —        plain
+  skipInk       —        plain
+  pick          —        plain
+  pickInk       —        plain
+  link          —        plain
+  linkInk       —        plain
+  chosen        —        plain
+  chosenInk     —        plain
+── §100 · a table that cannot shed, and two columns
+· the table at this width, and at 32 columns
+          uuid     family          status       detail            metric     age
+  ▹+4  ●  a3f9b21  family-1        running      ep 1/40           0.0372     23m
+  ▹+4  ●  7c2d4e1  family-2        succeeded    ep 2/40           0.0089  1h 12m
+
+          uuid     family       
+  ▹+8  ●  a3f9b21  family-1
+  ▹+8  ●  7c2d4e1  family-2
+
+· two columns — the patch split
+── serving/volatility-estimator.yaml ───────────────────────────────────────────
+⋯ 14 unchanged lines
+@@ -18,6 +18,7 @@
+18   spec:                             │18   spec:
+19     selector:                       │19     selector:
+20       matchLabels:                  │20       matchLabels:
+21 -       app: volatility-estimator   │21 +       app: volatility-estimator
+                                       │22 +       prism.example.com/family: v…
+22     replicas: 2                     │23     replicas: 2
+23     template:                       │24     template:
+── §101 · a chip under the caret, and its preview above the prompt
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────
+[#1 pasted · 30L]
+row 1                                                                         ╿
+row 2                                                                         │
+row 3                                                                         │
+row 4                                                                         │
+⋯ 0 above, 26 below
+⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor
+────────────────────────────────────────────────────────────────────────────────
+❯ [#1 pasted · 30L]
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+preview  ⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor  esc close"
 `;
 
 exports[`golden frames — one per design fixture > dark-unicode at 40 1`] = `
@@ -3073,24 +6201,34 @@ download ███████████████████░░░░�
 ◌ link   
 ✗ verify   checksum
 ── §6 · the canonical marks, as a glyph census
-question        ⟩
-current         ›
-ok              ✓
-warn            ▲
-error           ✗
-info            ⓘ
-pending         ◌
-working         ◐
-work-unit       ●
-queued          ○
-cancelled       ⊘
-expand          ▹
-collapse        ▿
-focus           ▸
-bullet          •
-quote           ⎸
-nested          ⁃
-continuation    ⎿
+· the registry's 20 canonical marks, each resolved through its home at this rung
+  glyph  ascii        role
+  ●  o ! * + x /  work-unit / state dot
+  ⎿  \`-           result branch
+  ▲  !            attention
+  ✓  +            success
+  ❯  $            reader position
+  ▸  >            focus
+  ▹  (            collapsed disclosure
+  ▿  v            expanded disclosure
+  ⟩  ?            question
+  ›  *            current item
+  ▾  v            sort descending
+  ↑  ^            trend rising
+  ↓  V            trend falling
+  →  =            trend held
+  ▴  ^            sort ascending
+  ⋯  ...          omitted content
+  ○  @            unchosen choice
+  ✗  x            failure
+  ↺  <            undo affordance
+  ▌  |            selection rail
+
+· supporting registered marks
+  ▰  #            segmented meter fill
+  ─  -            rule segment
+
+  tape delimiters   « → [    » → ]
 ── §30 · the head mark's three rungs
 tone carries: true
 queued          ○
@@ -3711,7 +6849,790 @@ line 3                                 │
 line 4                                 │
 line 5                                 │
 line 6                                 │
-⋯ 0 above, 12 below"
+⋯ 0 above, 12 below
+── §3 · the regions with a call running — a settled entry above a running one
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /build
+ ● build · ⠋
+   ⎿  build █████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░ 40%
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §4 · idle — every head settled, nothing running
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §5 · cancelled — the head says so and the block it had stays
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+ ❯ /build
+ ● build · cancelled
+   ⎿  build █████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░ 40%
+   │  ⊘ Cancelled.
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §7 · nested calls — a parent and its three children, each a nested card
+● agents · 8m 12s · 3 of 3
+  ├─ ● seams(e…ms) · 2m 53s · 4 findings
+  ├─ ● arm(…rs) · 3m 46s · 3 corrections
+  └─ ● count(…nt) · 8m 12s · 1 disproved
+
+── §8 · message entries — the echoed command, and the entry it produced
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /noise again
+ ● noise(again)
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §9 · queued — two lines typed while a verb runs, each waiting its turn
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /slow
+ ● slow · ⠋
+
+ ❯ /noise
+   ⎿  queued behind slow
+
+ ❯ /noise again
+   ⎿  queued behind slow
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §10 · startup — the frame a session opens with
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §12 · transient feedback — a copy, and what says it happened
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                        ✓ copied 1 line
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §13 · reviewing what was written — a patch as a call's result
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /diff
+ ● diff
+   ⎿  ── src/server.ts ────────────────────────────────────
+   │  ⋯ 12 unchanged lines
+   │  @@ -18,7 +18,9 @@
+   │  18 18   const app = express();
+   │     19 + app.use(helmet());
+   │  19    - app.use(cors());
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §14 · away — what settled while the terminal had no focus
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+   ⎿  line 1                                               │
+   │  line 2                                               │
+                                                           │
+ ❯ /boom                                                   │
+ ● boom · failed                                           │
+   ⎿  ┌───────────────────────────────────────────────────┐┃
+   │  │                                                   │┃
+   │  │ ───────────────────── ERROR ───────────────────── │┃
+   │  │ ✗ \`boom\` failed: Error: ENOENT: no such file      │┃
+   │  │                                                   │┃
+   │  └───────────────────────────────────────────────────┘┃
+                                                           ┃
+ ● 2 entries settled while you were away · ⌃end to the     ┃
+   bottom                                                  ┃
+   ⎿  entry 3: /boom — failed                              ┃
+   ⎿  entry 2: /noise — succeeded                          ┃
+                                                           ┃
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §22 · the help view as an entry
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+ ❯ /help keys                                              ┃
+ ● help(keys)                                              ┃
+   ⎿  ── prompt — where you are                            │
+   │  ⏎       submit                                       │
+   │  ⇧⏎      insertNewline                                │
+   │  ⌥⏎      insertNewline                                │
+   │  ⌃J      insertNewline                                │
+   │  ⇥       complete                                     │
+   │  →       acceptGhostOrForward                         │
+   │  ↑       historyPrev                                  │
+   │  ↓       historyNext                                  │
+   │  ⌃R      reverseSearch                                │
+   │  ⌫       backspace                                    │
+   │  ⌃H      backspace                                    │
+   │  delete  delete                                       │
+   │  ⌃W      killWordLeft                                 │
+   │  ⌥⌫      killWordLeft                                 │
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §23 · a narrow frame — a call running at the narrowest a session draws
+· drawn at 60×24, the size the section is about
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /build
+ ● build · ⠋
+   ⎿  build █████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░ 40%
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §24 · reasoning — collapsed, the default, and open
+· collapsed
+▹ thinking · 4s · 312 tok
+
+· open
+▿ thinking · 4s · 312 tok
+  The parser tracks quotes with a boole…
+  flips it back and the run ends early.…
+  that, but I should check whether esca…
+── §27 · the context's fill — one quantity in a meter
+ctx █████████████████████████░░░░░░░ 78%
+── §28 · an approval replaces the prompt
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────
+┌ Confirm ────────────────────────────────────────────────┐
+│▲ may I write to package.json?                           │
+│                                                         │
+│  •  [a]  approve                                        │
+│     [d]  deny                                           │
+└─────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────
+/help                                                  /work
+question  ←→ move  ⏎ answer  esc → deny
+── §29 · completion expands the prompt
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────
+  › /noise                                            noise
+    /long                                              long
+    /boom                                              boom
+    /diff                                              diff
+    /list                                              list
+    /logs                                              logs
++ 16 more
+────────────────────────────────────────────────────────────
+❯ /
+────────────────────────────────────────────────────────────
+/help                                                  /work
+complete  ⏎ run  ⇥ complete  esc close
+── §45 · the live terminal block
+=== test session starts ===
+..... [ 4%] 
+── §46 · history — the reverse search open over the transcript
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+   │  line 2                                               │
+   │  line 3                                               │
+   │  line 4                                               │
+   │  line 5                                               │
+   │  line 6                                               │
+   │  line 7                                               ╽
+   │  line 8                                               ┃
+   │  line 9                                               ┃
+   │  line 10                                              ┃
+   │  line 11                                              ┃
+   │  line 12                                              ┃
+                                                           ┃
+ ❯ /noise again                                            ┃
+ ● noise(again)                                            ┃
+   ⎿  line 1                                               ┃
+───────────────────────────────────────────────────────────┃
+(reverse-i-search) \`no': /noise again                      ┃
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+find  ↑↓ hits  ⏎ open  esc close
+── §47 · empty, too small and refused
+· empty — the table says so in its own box
+  name                                  
+  No matches.
+
+· refused — a contained failure, at the height the fault asked for (C09 I34)
+┌──────────────────────────────────────┐
+│ ────────────── ERROR ─────────────── │
+│ ✗ plot failed to render: this arm    │
+│ draws no density — the estimate      │
+│ needs the terminal's width           │
+└──────────────────────────────────────┘
+
+· too small — below the minimum a session draws only what it needs
+· drawn at 34×8, the size the section is about
+Terminal too small
+34x8
+Needs 60x16
+── §49 · a block of each kind the figure draws — plot, table, image, form
+· plot
+   ┌───────────────────────────────────┐
+10 ┤                                   │
+   │                     ╭────────╮    │
+   │                     │        │    │
+   │                     │        │    │
+ 5 ┤    ╭────────╮       │        ╰───╴│
+   │    │        │       │             │
+   │╶───╯        ╰───────╯             │
+ 0 ┤                                   │
+   └┬────────┬───────┬────────┬───────┬┘
+    0        1       2        3       4
+
+· table
+  Name      State                       
+  api       runni…
+  worker    idle  
+
+· image
+▀▀▀▀▀▀
+▀▀▀▀▀▀
+▀▀▀▀▀▀
+
+· form — its buttons
+name        prism-serve
+port        80
+            ✗ ports below 1024 need root
+replicas    3
+            0 stops the service
+
+› save    cancel
+── §50 · the tool-result gallery — results as entries
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+ ❯ /list
+ ● list · 2 rows
+   ⎿    Name      State
+   │    api       runni…
+   │    worker    idle
+
+ ❯ /logs
+ ● logs
+   ⎿  12:00:01  info   listening on :8080
+   │  12:00:02  warn   slow query: 1.2s
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §51 · approval overflow — the inspection, the payload bounded
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────
+┌ Confirm ────────────────────────────────────────────────┐
+│▲ Apply this change?                                     │
+│patch line 1                                            ┃│
+│patch line 2                                            ││
+│patch line 3                                            ││
+│patch line 4                                            ││
+│patch line 5                                            ││
+│patch line 6                                            ││
+│⋯ 0 above, 24 below                                      │
+│↑↓ scroll  esc back to the question                      │
+└─────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────
+/help                                                  /work
+question  ↑↓ scroll  esc back
+── §52 · a question that wants a sentence — it floats, and the prompt is live
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+┌ Confirm ────────────────────────────────────────────────┐
+│▲ What should the commit message say?                    │
+│                                                         │
+│     [n]  no                                             │
+│  •  [y]  yes                                            │
+│     [r]  reply…                                         │
+└─────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────
+❯ fix the parser
+────────────────────────────────────────────────────────────
+/help                                                  /work
+question  ⏎ answer  esc → choices
+── §60 · resize — the same transcript at 80 columns, then at 60
+· at 80 columns
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+   │  line 2                                                                   │
+                                                                               │
+ ❯ /long                                                                       │
+ ● long                                                                        ┃
+   ⎿  line 1                                                                   ┃
+   │  line 2                                                                   ┃
+   │  line 3                                                                   ┃
+   │  line 4                                                                   ┃
+   │  line 5                                                                   ┃
+   │  line 6                                                                   ┃
+   │  line 7                                                                   ┃
+   │  line 8                                                                   ┃
+   │  line 9                                                                   ┃
+   │  line 10                                                                  ┃
+   │  line 11                                                                  ┃
+   │  line 12                                                                  ┃
+                                                                               ┃
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+
+· resized to 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+   │  line 2                                               │
+                                                           │
+ ❯ /long                                                   │
+ ● long                                                    ┃
+   ⎿  line 1                                               ┃
+   │  line 2                                               ┃
+   │  line 3                                               ┃
+   │  line 4                                               ┃
+   │  line 5                                               ┃
+   │  line 6                                               ┃
+   │  line 7                                               ┃
+   │  line 8                                               ┃
+   │  line 9                                               ┃
+   │  line 10                                              ┃
+   │  line 11                                              ┃
+   │  line 12                                              ┃
+                                                           ┃
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §66 · a tool's failure — the head says failed, and the session goes on
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /boom
+ ● boom · failed
+   ⎿  ┌───────────────────────────────────────────────────┐
+   │  │                                                   │
+   │  │ ───────────────────── ERROR ───────────────────── │
+   │  │ ✗ \`boom\` failed: Error: ENOENT: no such file      │
+   │  │                                                   │
+   │  └───────────────────────────────────────────────────┘
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §67 · scrolled back while a call runs — the transcript's bar
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+ ● long                                                    ╽
+   ⎿  line 1                                               ┃
+   │  line 2                                               ┃
+   │  line 3                                               ┃
+   │  line 4                                               ┃
+   │  line 5                                               ┃
+   │  line 6                                               ┃
+   │  line 7                                               ┃
+   │  line 8                                               ┃
+   │  line 9                                               │
+   │  line 10                                              │
+   │  line 11                                              │
+   │  line 12                                              │
+                                                           │
+ ❯ /long                                                   │
+ ● long                                                    │
+   ⎿  line 1                                               │
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §68 · one exchange — drawn at this golden's rung
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /boom
+ ● boom · failed
+   ⎿  ┌───────────────────────────────────────────────────┐
+   │  │                                                   │
+   │  │ ───────────────────── ERROR ───────────────────── │
+   │  │ ✗ \`boom\` failed: Error: ENOENT: no such file      │
+   │  │                                                   │
+   │  └───────────────────────────────────────────────────┘
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §69 · the prompt's upper rule, labelled
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+── §74 · weight — each tone's weight at this rung
+tone            this rung  1-bit
+default         plain      plain
+dim             plain      faint
+muted           plain      faint
+ok              plain      bold
+warn            plain      bold
+error           plain      bold
+info            plain      plain
+accent          plain      bold
+meta            plain      plain
+identifier      plain      bold
+── §75 · /config — each value and where it came from
+┌ config ──────────────────────────────┐
+│  key           value                 │
+│  model         qwen3-coder-next      │
+│  endpoint      localhost:8000        │
+│  posture       auto                  │
+│  ui.spinner    braille               │
+└──────────────────────────────────────┘
+── §77 · syntax highlighting
+name: api
+replicas: 3
+── §78 · tables — sorted by age, descending, the columns that do not fit counted at each row
+          uuid     family               
+  ▹+8  ●  f410d99  family-4             
+  ▹+8  ●  b1c7e34  family-5             
+  ▹+8  ●  7c2d4e1  family-2             
+  ▹+8  ●  a3f9b21  family-1             
+  ▹+8  ●  2e8a04c  family-3             
+── §79 · tones and surfaces — the dark theme, as values at this rung
+· tones
+  default       #d4d4d4  plain
+  dim           #8a8a8a  plain
+  muted         #8c8c8c  plain
+  ok            #87b86c  plain
+  warn          #d4b35a  plain
+  error         #f05a5a  plain
+  info          #7faecf  plain
+  accent        #e8a87c  plain
+  meta          #b89cd2  plain
+  identifier    #7fb8b8  plain
+· surfaces
+  bg            #1a1a1a  plain
+  bgElev        #222222  plain
+  bgDeep        #141414  plain
+  selection     #264057  plain
+  meterFill     #315a34  plain
+  border        #2c2c2c  plain
+  borderStrong  #3a3a3a  plain
+  diffAdd       #002600  plain
+  diffRemove    #490000  plain
+  errorGround   #c62828  plain
+  mAuto         #6b5a1f  plain
+  mAccept       #4a3a63  plain
+  mPlan         #2a4a63  plain
+  mManual       #3a3a3a  plain
+  skipGround    #7a1414  plain
+  focusGround   #2e2e2e  plain
+  errorInk      #ffffff  plain
+  mInk          #f2eede  plain
+  skipInk       #ffe8e8  plain
+  pick          #e8a87c  plain
+  pickInk       #000000  plain
+  link          #7fb8b8  plain
+  linkInk       #000000  plain
+  chosen        #87b86c  plain
+  chosenInk     #000000  plain
+── §100 · a table that cannot shed, and two columns
+· the table at this width, and at 32 columns
+          uuid     family               
+  ▹+8  ●  a3f9b21  family-1             
+  ▹+8  ●  7c2d4e1  family-2             
+
+          uuid     family       
+  ▹+8  ●  a3f9b21  family-1     
+  ▹+8  ●  7c2d4e1  family-2     
+
+· two columns — the patch split
+── serving/volatility-estimator.yaml ───
+⋯ 14 unchanged lines
+@@ -18,6 +18,7 @@
+18   spec:         │18   spec:
+19     selector:   │19     selector:
+20       matchLabe…│20       matchLabe…
+21 -       app: vo…│21 +       app: vo…
+                   │22 +       prism.e…
+22     replicas: 2 │23     replicas: 2
+23     template:   │24     template:
+── §101 · a chip under the caret, and its preview above the prompt
+· drawn at 60 columns: below that a session draws no frame, only the notice that it needs 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────
+#1 pasted · 30L
+row 1                                                     ╿
+row 2                                                     │
+row 3                                                     │
+row 4                                                     │
+⋯ 0 above, 26 below
+⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor
+────────────────────────────────────────────────────────────
+❯  #1 pasted · 30L
+────────────────────────────────────────────────────────────
+/help                                                  /work
+preview  ⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor  esc close"
 `;
 
 exports[`golden frames — one per design fixture > dark-unicode at 80 1`] = `
@@ -3843,24 +7764,34 @@ download ███████████████████████�
 ◌ link   
 ✗ verify   checksum
 ── §6 · the canonical marks, as a glyph census
-question        ⟩
-current         ›
-ok              ✓
-warn            ▲
-error           ✗
-info            ⓘ
-pending         ◌
-working         ◐
-work-unit       ●
-queued          ○
-cancelled       ⊘
-expand          ▹
-collapse        ▿
-focus           ▸
-bullet          •
-quote           ⎸
-nested          ⁃
-continuation    ⎿
+· the registry's 20 canonical marks, each resolved through its home at this rung
+  glyph  ascii        role
+  ●  o ! * + x /  work-unit / state dot
+  ⎿  \`-           result branch
+  ▲  !            attention
+  ✓  +            success
+  ❯  $            reader position
+  ▸  >            focus
+  ▹  (            collapsed disclosure
+  ▿  v            expanded disclosure
+  ⟩  ?            question
+  ›  *            current item
+  ▾  v            sort descending
+  ↑  ^            trend rising
+  ↓  V            trend falling
+  →  =            trend held
+  ▴  ^            sort ascending
+  ⋯  ...          omitted content
+  ○  @            unchosen choice
+  ✗  x            failure
+  ↺  <            undo affordance
+  ▌  |            selection rail
+
+· supporting registered marks
+  ▰  #            segmented meter fill
+  ─  -            rule segment
+
+  tape delimiters   « → [    » → ]
 ── §30 · the head mark's three rungs
 tone carries: true
 queued          ○
@@ -4474,5 +8405,766 @@ line 3                                                                         �
 line 4                                                                         │
 line 5                                                                         │
 line 6                                                                         │
-⋯ 0 above, 12 below"
+⋯ 0 above, 12 below
+── §3 · the regions with a call running — a settled entry above a running one
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /build
+ ● build · ⠋
+   ⎿  build █████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 40%
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §4 · idle — every head settled, nothing running
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §5 · cancelled — the head says so and the block it had stays
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+ ❯ /build
+ ● build · cancelled
+   ⎿  build █████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 40%
+   │  ⊘ Cancelled.
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §7 · nested calls — a parent and its three children, each a nested card
+● agents · 8m 12s · 3 of 3
+  ├─ ● seams(explore the unwired seams) · 2m 53s · 4 findings
+  ├─ ● arm(explore the plot-arm repairs) · 3m 46s · 3 corrections
+  └─ ● count(verify the refusal count) · 8m 12s · 1 disproved
+
+── §8 · message entries — the echoed command, and the entry it produced
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /noise again
+ ● noise(again)
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §9 · queued — two lines typed while a verb runs, each waiting its turn
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /slow
+ ● slow · ⠋
+
+ ❯ /noise
+   ⎿  queued behind slow
+
+ ❯ /noise again
+   ⎿  queued behind slow
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §10 · startup — the frame a session opens with
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §12 · transient feedback — a copy, and what says it happened
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                            ✓ copied 1 line
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §13 · reviewing what was written — a patch as a call's result
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /diff
+ ● diff
+   ⎿  ── src/server.ts ────────────────────────────────────────────────────────
+   │  ⋯ 12 unchanged lines
+   │  @@ -18,7 +18,9 @@
+   │  18 18   const app = express();
+   │     19 + app.use(helmet());
+   │  19    - app.use(cors());
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §14 · away — what settled while the terminal had no focus
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+ ● noise                                                                       │
+   ⎿  line 1                                                                   │
+   │  line 2                                                                   │
+                                                                               │
+ ❯ /boom                                                                       ╽
+ ● boom · failed                                                               ┃
+   ⎿  ┌───────────────────────────────────────────────────────────────────────┐┃
+   │  │                                                                       │┃
+   │  │ ─────────────────────────────── ERROR ─────────────────────────────── │┃
+   │  │ ✗ \`boom\` failed: Error: ENOENT: no such file                          │┃
+   │  │                                                                       │┃
+   │  └───────────────────────────────────────────────────────────────────────┘┃
+                                                                               ┃
+ ● 2 entries settled while you were away · ⌃end to the bottom                  ┃
+   ⎿  entry 3: /boom — failed                                                  ┃
+   ⎿  entry 2: /noise — succeeded                                              ┃
+                                                                               ┃
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §22 · the help view as an entry
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+ ❯ /help keys                                                                  ┃
+ ● help(keys)                                                                  ┃
+   ⎿  ── prompt — where you are                                                │
+   │  ⏎       submit                                                           │
+   │  ⇧⏎      insertNewline                                                    │
+   │  ⌥⏎      insertNewline                                                    │
+   │  ⌃J      insertNewline                                                    │
+   │  ⇥       complete                                                         │
+   │  →       acceptGhostOrForward                                             │
+   │  ↑       historyPrev                                                      │
+   │  ↓       historyNext                                                      │
+   │  ⌃R      reverseSearch                                                    │
+   │  ⌫       backspace                                                        │
+   │  ⌃H      backspace                                                        │
+   │  delete  delete                                                           │
+   │  ⌃W      killWordLeft                                                     │
+   │  ⌥⌫      killWordLeft                                                     │
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §23 · a narrow frame — a call running at the narrowest a session draws
+· drawn at 60×24, the size the section is about
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /build
+ ● build · ⠋
+   ⎿  build █████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░ 40%
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §24 · reasoning — collapsed, the default, and open
+· collapsed
+▹ thinking · 4s · 312 tok
+
+· open
+▿ thinking · 4s · 312 tok
+│    The parser tracks quotes with a boolean, so a nested quote
+│    flips it back and the run ends early. A depth counter fixes
+│    that, but I should check whether escaping is handled first.
+── §27 · the context's fill — one quantity in a meter
+ctx ████████████████████████████████████████████████████████░░░░░░░░░░░░░░░░ 78%
+── §28 · an approval replaces the prompt
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+────────────────────────────────────────────────────────────────────────────────
+┌ Confirm ────────────────────────────────────────────────────────────────────┐
+│▲ may I write to package.json?                                               │
+│                                                                             │
+│  •  [a]  approve                                                            │
+│     [d]  deny                                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+question  ←→ move  ⏎ answer  esc → deny
+── §29 · completion expands the prompt
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────
+  › /noise                                                                noise
+    /long                                                                  long
+    /boom                                                                  boom
+    /diff                                                                  diff
+    /list                                                                  list
+    /logs                                                                  logs
++ 16 more
+────────────────────────────────────────────────────────────────────────────────
+❯ /
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+complete  ⏎ run  ⇥ complete  esc close
+── §45 · the live terminal block
+=== test session starts ===
+..... [ 4%] 
+── §46 · history — the reverse search open over the transcript
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+   │  line 2                                                                   │
+   │  line 3                                                                   │
+   │  line 4                                                                   │
+   │  line 5                                                                   │
+   │  line 6                                                                   │
+   │  line 7                                                                   ╽
+   │  line 8                                                                   ┃
+   │  line 9                                                                   ┃
+   │  line 10                                                                  ┃
+   │  line 11                                                                  ┃
+   │  line 12                                                                  ┃
+                                                                               ┃
+ ❯ /noise again                                                                ┃
+ ● noise(again)                                                                ┃
+   ⎿  line 1                                                                   ┃
+───────────────────────────────────────────────────────────────────────────────┃
+(reverse-i-search) \`no': /noise again                                          ┃
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+find  ↑↓ hits  ⏎ open  esc close
+── §47 · empty, too small and refused
+· empty — the table says so in its own box
+  name                                                                          
+  No matches.
+
+· refused — a contained failure, at the height the fault asked for (C09 I34)
+┌──────────────────────────────────────────────────────────────────────────────┐
+│─────────────────────────────────── ERROR ────────────────────────────────────│
+│✗ plot failed to render: this arm draws no density — the estimate needs the   │
+│terminal's width                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+· too small — below the minimum a session draws only what it needs
+· drawn at 34×8, the size the section is about
+Terminal too small
+34x8
+Needs 60x16
+── §49 · a block of each kind the figure draws — plot, table, image, form
+· plot
+   ┌───────────────────────────────────────────────────────────────────────────┐
+10 ┤                                                                           │
+   │                                              ╭──────────────────╮         │
+   │                                              │                  │         │
+   │                                              │                  │         │
+ 5 ┤         ╭──────────────────╮                 │                  ╰────────╴│
+   │         │                  │                 │                            │
+   │╶────────╯                  ╰─────────────────╯                            │
+ 0 ┤                                                                           │
+   └─┬───────┬─────────┬────────┬────────┬────────┬─────────┬────────┬───────┬─┘
+    0.0     0.5       1.0      1.5      2.0      2.5       3.0      3.5     4.0
+
+· table
+  Name      State                                                               
+  api       runni…
+  worker    idle  
+
+· image
+▀▀▀▀▀▀
+▀▀▀▀▀▀
+▀▀▀▀▀▀
+
+· form — its buttons
+name        prism-serve
+port        80
+            ✗ ports below 1024 need root
+replicas    3
+            0 stops the service
+
+› save    cancel
+── §50 · the tool-result gallery — results as entries
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+ ❯ /list
+ ● list · 2 rows
+   ⎿    Name      State
+   │    api       runni…
+   │    worker    idle
+
+ ❯ /logs
+ ● logs
+   ⎿  12:00:01  info   listening on :8080
+   │  12:00:02  warn   slow query: 1.2s
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §51 · approval overflow — the inspection, the payload bounded
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+┌ Confirm ────────────────────────────────────────────────────────────────────┐
+│▲ Apply this change?                                                         │
+│patch line 1                                                                ┃│
+│patch line 2                                                                ││
+│patch line 3                                                                ││
+│patch line 4                                                                ││
+│patch line 5                                                                ││
+│patch line 6                                                                ││
+│⋯ 0 above, 24 below                                                          │
+│↑↓ scroll  esc back to the question                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+question  ↑↓ scroll  esc back
+── §52 · a question that wants a sentence — it floats, and the prompt is live
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+┌ Confirm ─────────────────────────────────────────────────────────────┐
+│▲ What should the commit message say?                                 │
+│                                                                      │
+│     [n]  no                                                          │
+│  •  [y]  yes                                                         │
+│     [r]  reply…                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────────────────────────
+❯ fix the parser
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+question  ⏎ answer  esc → choices
+── §60 · resize — the same transcript at 80 columns, then at 60
+· at 80 columns
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+   │  line 2                                                                   │
+                                                                               │
+ ❯ /long                                                                       │
+ ● long                                                                        ┃
+   ⎿  line 1                                                                   ┃
+   │  line 2                                                                   ┃
+   │  line 3                                                                   ┃
+   │  line 4                                                                   ┃
+   │  line 5                                                                   ┃
+   │  line 6                                                                   ┃
+   │  line 7                                                                   ┃
+   │  line 8                                                                   ┃
+   │  line 9                                                                   ┃
+   │  line 10                                                                  ┃
+   │  line 11                                                                  ┃
+   │  line 12                                                                  ┃
+                                                                               ┃
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+
+· resized to 60
+calcium  prism                                         22:13
+────────────────────────────────────────────────────────────
+   │  line 2                                               │
+                                                           │
+ ❯ /long                                                   │
+ ● long                                                    ┃
+   ⎿  line 1                                               ┃
+   │  line 2                                               ┃
+   │  line 3                                               ┃
+   │  line 4                                               ┃
+   │  line 5                                               ┃
+   │  line 6                                               ┃
+   │  line 7                                               ┃
+   │  line 8                                               ┃
+   │  line 9                                               ┃
+   │  line 10                                              ┃
+   │  line 11                                              ┃
+   │  line 12                                              ┃
+                                                           ┃
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+/help                                                  /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §66 · a tool's failure — the head says failed, and the session goes on
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /boom
+ ● boom · failed
+   ⎿  ┌───────────────────────────────────────────────────────────────────────┐
+   │  │                                                                       │
+   │  │ ─────────────────────────────── ERROR ─────────────────────────────── │
+   │  │ ✗ \`boom\` failed: Error: ENOENT: no such file                          │
+   │  │                                                                       │
+   │  └───────────────────────────────────────────────────────────────────────┘
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §67 · scrolled back while a call runs — the transcript's bar
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+ ● long                                                                        ╽
+   ⎿  line 1                                                                   ┃
+   │  line 2                                                                   ┃
+   │  line 3                                                                   ┃
+   │  line 4                                                                   ┃
+   │  line 5                                                                   ┃
+   │  line 6                                                                   ┃
+   │  line 7                                                                   ┃
+   │  line 8                                                                   ┃
+   │  line 9                                                                   │
+   │  line 10                                                                  │
+   │  line 11                                                                  │
+   │  line 12                                                                  │
+                                                                               │
+ ❯ /long                                                                       │
+ ● long                                                                        │
+   ⎿  line 1                                                                   │
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §68 · one exchange — drawn at this golden's rung
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+ ❯ /noise
+ ● noise
+   ⎿  line 1
+   │  line 2
+
+ ❯ /boom
+ ● boom · failed
+   ⎿  ┌───────────────────────────────────────────────────────────────────────┐
+   │  │                                                                       │
+   │  │ ─────────────────────────────── ERROR ─────────────────────────────── │
+   │  │ ✗ \`boom\` failed: Error: ENOENT: no such file                          │
+   │  │                                                                       │
+   │  └───────────────────────────────────────────────────────────────────────┘
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript
+── §69 · the prompt's upper rule, labelled
+
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────── Calcium ─
+❯
+────────────────────────────────────────────────────────────────────────────────
+── §74 · weight — each tone's weight at this rung
+tone            this rung  1-bit
+default         plain      plain
+dim             plain      faint
+muted           plain      faint
+ok              plain      bold
+warn            plain      bold
+error           plain      bold
+info            plain      plain
+accent          plain      bold
+meta            plain      plain
+identifier      plain      bold
+── §75 · /config — each value and where it came from
+┌ config ──────────────────────────────────────────────────────────────────────┐
+│  key           value                                                 source  │
+│  model         qwen3-coder-next                                      config  │
+│  endpoint      localhost:8000                                        env     │
+│  posture       auto                                                  flag    │
+│  ui.spinner    braille                                               default │
+└──────────────────────────────────────────────────────────────────────────────┘
+── §77 · syntax highlighting
+name: api
+replicas: 3
+── §78 · tables — sorted by age, descending, the columns that do not fit counted at each row
+          uuid     family          status       detail            metric   age ▾
+  ▹+4  ●  f410d99  family-4        queued       ep 4/40           0.1240      3d
+  ▹+4  ●  b1c7e34  family-5        promoted     ep 5/40           0.0500      2h
+  ▹+4  ●  7c2d4e1  family-2        succeeded    ep 2/40           0.0089  1h 12m
+  ▹+4  ●  a3f9b21  family-1        running      ep 1/40           0.0372     23m
+  ▹+4  ●  2e8a04c  family-3        failed       ep 3/40                —     45s
+── §79 · tones and surfaces — the dark theme, as values at this rung
+· tones
+  default       #d4d4d4  plain
+  dim           #8a8a8a  plain
+  muted         #8c8c8c  plain
+  ok            #87b86c  plain
+  warn          #d4b35a  plain
+  error         #f05a5a  plain
+  info          #7faecf  plain
+  accent        #e8a87c  plain
+  meta          #b89cd2  plain
+  identifier    #7fb8b8  plain
+· surfaces
+  bg            #1a1a1a  plain
+  bgElev        #222222  plain
+  bgDeep        #141414  plain
+  selection     #264057  plain
+  meterFill     #315a34  plain
+  border        #2c2c2c  plain
+  borderStrong  #3a3a3a  plain
+  diffAdd       #002600  plain
+  diffRemove    #490000  plain
+  errorGround   #c62828  plain
+  mAuto         #6b5a1f  plain
+  mAccept       #4a3a63  plain
+  mPlan         #2a4a63  plain
+  mManual       #3a3a3a  plain
+  skipGround    #7a1414  plain
+  focusGround   #2e2e2e  plain
+  errorInk      #ffffff  plain
+  mInk          #f2eede  plain
+  skipInk       #ffe8e8  plain
+  pick          #e8a87c  plain
+  pickInk       #000000  plain
+  link          #7fb8b8  plain
+  linkInk       #000000  plain
+  chosen        #87b86c  plain
+  chosenInk     #000000  plain
+── §100 · a table that cannot shed, and two columns
+· the table at this width, and at 32 columns
+          uuid     family          status       detail            metric     age
+  ▹+4  ●  a3f9b21  family-1        running      ep 1/40           0.0372     23m
+  ▹+4  ●  7c2d4e1  family-2        succeeded    ep 2/40           0.0089  1h 12m
+
+          uuid     family       
+  ▹+8  ●  a3f9b21  family-1     
+  ▹+8  ●  7c2d4e1  family-2     
+
+· two columns — the patch split
+── serving/volatility-estimator.yaml ───────────────────────────────────────────
+⋯ 14 unchanged lines
+@@ -18,6 +18,7 @@
+18   spec:                             │18   spec:
+19     selector:                       │19     selector:
+20       matchLabels:                  │20       matchLabels:
+21 -       app: volatility-estimator   │21 +       app: volatility-estimator   
+                                       │22 +       prism.example.com/family: v…
+22     replicas: 2                     │23     replicas: 2
+23     template:                       │24     template:
+── §101 · a chip under the caret, and its preview above the prompt
+calcium  prism                                                          22:13:20
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+───────────────────────────────────────────────────────────────────────────────
+#1 pasted · 30L
+row 1                                                                         ╿
+row 2                                                                         │
+row 3                                                                         │
+row 4                                                                         │
+⋯ 0 above, 26 below
+⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor
+────────────────────────────────────────────────────────────────────────────────
+❯  #1 pasted · 30L
+────────────────────────────────────────────────────────────────────────────────
+/help                                                                      /work
+preview  ⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor  esc close"
 `;

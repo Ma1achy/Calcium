@@ -319,6 +319,64 @@ exports[`golden frames — a composed session, not a block > SF1 · boot · warm
 24 ⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript                                   "
 `;
 
+exports[`golden frames — a composed session, not a block > SF1 · chip-preview · dark — the grid 1`] = `
+"            1         2         3         4         5         6         7         8
+   12345678901234567890123456789012345678901234567890123456789012345678901234567890
+01 calcium  prism                                                          22:13:20
+02 ────────────────────────────────────────────────────────────────────────────────
+03                                                                                 
+04                                                                                 
+05                                                                                 
+06                                                                                 
+07                                                                                 
+08                                                                                 
+09                                                                                 
+10                                                                                 
+11                                                                                 
+12 ─────────────────────────────────────────────────────────────────────────────── 
+13 #1 pasted · 30L                                                                 
+14 row 1                                                                         ╿ 
+15 row 2                                                                         │ 
+16 row 3                                                                         │ 
+17 row 4                                                                         │ 
+18 ⋯ 0 above, 26 below                                                             
+19 ⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor                                                
+20 ────────────────────────────────────────────────────────────────────────────────
+21 ❯  #1 pasted · 30L                                                              
+22 ────────────────────────────────────────────────────────────────────────────────
+23 /help                                                                      /work
+24 preview  ⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor  esc close                            "
+`;
+
+exports[`golden frames — a composed session, not a block > SF1 · inspection · dark — the grid 1`] = `
+"            1         2         3         4         5         6         7         8
+   12345678901234567890123456789012345678901234567890123456789012345678901234567890
+01 calcium  prism                                                          22:13:20
+02 ────────────────────────────────────────────────────────────────────────────────
+03                                                                                 
+04                                                                                 
+05                                                                                 
+06                                                                                 
+07                                                                                 
+08                                                                                 
+09                                                                                 
+10 ────────────────────────────────────────────────────────────────────────────────
+11 ┌ Confirm ────────────────────────────────────────────────────────────────────┐ 
+12 │▲ Apply this change?                                                         │ 
+13 │patch line 1                                                                ┃│ 
+14 │patch line 2                                                                ││ 
+15 │patch line 3                                                                ││ 
+16 │patch line 4                                                                ││ 
+17 │patch line 5                                                                ││ 
+18 │patch line 6                                                                ││ 
+19 │⋯ 0 above, 24 below                                                          │ 
+20 │↑↓ scroll  esc back to the question                                          │ 
+21 └─────────────────────────────────────────────────────────────────────────────┘ 
+22 ────────────────────────────────────────────────────────────────────────────────
+23 /help                                                                      /work
+24 question  ↑↓ scroll  esc back                                                   "
+`;
+
 exports[`golden frames — a composed session, not a block > SF1 · label · dark — the grid 1`] = `
 "            1         2         3         4         5         6         7         8
    12345678901234567890123456789012345678901234567890123456789012345678901234567890
@@ -739,6 +797,35 @@ exports[`golden frames — a composed session, not a block > SF1 · transcript �
 17    │                                                                            
 18    │  /help keys   Use                                                          
 19                                                                                 
+20 ────────────────────────────────────────────────────────────────────────────────
+21 ❯                                                                               
+22 ────────────────────────────────────────────────────────────────────────────────
+23 /help                                                                      /work
+24 ⏎ send  ⇧⏎ newline  ⇥ complete  ⇧⇥ transcript                                   "
+`;
+
+exports[`golden frames — a composed session, not a block > SF1 · transcript-bar · dark — the grid 1`] = `
+"            1         2         3         4         5         6         7         8
+   12345678901234567890123456789012345678901234567890123456789012345678901234567890
+01 calcium  prism                                                          22:13:20
+02 ────────────────────────────────────────────────────────────────────────────────
+03  ❯ /long                                                                       ┃
+04  ● long                                                                        ┃
+05    ⎿  line 1                                                                   ┃
+06    │  line 2                                                                   ┃
+07    │  line 3                                                                   ┃
+08    │  line 4                                                                   ┃
+09    │  line 5                                                                   ┃
+10    │  line 6                                                                   ┃
+11    │  line 7                                                                   ┃
+12    │  line 8                                                                   ╿
+13    │  line 9                                                                   │
+14    │  line 10                                                                  │
+15    │  line 11                                                                  │
+16    │  line 12                                                                  │
+17                                                                                │
+18  ❯ /long                                                                       │
+19  ● long                                                                        │
 20 ────────────────────────────────────────────────────────────────────────────────
 21 ❯                                                                               
 22 ────────────────────────────────────────────────────────────────────────────────
@@ -1214,6 +1301,74 @@ A = fg 38;5;253  bg —  attrs —
 B = fg 38;5;244  bg —  attrs —"
 `;
 
+exports[`golden frames — a composed session, not a block > SF2 · chip-preview · dark — the styles 1`] = `
+"AAAAAAA..BBBBB..........................................................BBBBBBBB
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+................................................................................
+................................................................................
+................................................................................
+................................................................................
+................................................................................
+................................................................................
+................................................................................
+................................................................................
+................................................................................
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.
+CCCCCCCCCDDDDDDEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE.
+FFFFFEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEED.
+FFFFFEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEED.
+FFFFFEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEED.
+FFFFFEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEED.
+DDDDDDDDDDDDDDDDDDDEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE.
+DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE.
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+..GGGGGGGGGGGGGGGGG.............................................................
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBBBB......................................................................BBBBB
+HHHHHHH..BBBBBBBBBBBBB..BBBBBBBBBBBBBBBBB..BBBBBBBBB............................
+
+A = fg 38;5;188  bg —  attrs —
+B = fg 38;5;245  bg —  attrs —
+C = fg —  bg 48;5;235  attrs 1
+D = fg 38;5;245  bg 48;5;235  attrs —
+E = fg —  bg 48;5;235  attrs —
+F = fg 38;5;188  bg 48;5;235  attrs —
+G = fg 38;5;140  bg 48;5;233  attrs —
+H = fg 38;5;216  bg —  attrs —"
+`;
+
+exports[`golden frames — a composed session, not a block > SF2 · inspection · dark — the styles 1`] = `
+"AAAAAAA..BBBBB..........................................................BBBBBBBB
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+................................................................................
+................................................................................
+................................................................................
+................................................................................
+................................................................................
+................................................................................
+................................................................................
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BCCCCCCCCCBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.
+BDDDDDDDDDDDDDDDDDDDD.........................................................B.
+.............................................................................C..
+.............................................................................C..
+.............................................................................C..
+.............................................................................C..
+.............................................................................C..
+.............................................................................C..
+.CCCCCCCCCCCCCCCCCCC............................................................
+................................................................................
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBBBB......................................................................BBBBB
+DDDDDDDD..BBBBBBBBB..BBBBBBBB...................................................
+
+A = fg 38;5;188  bg —  attrs —
+B = fg 38;5;245  bg —  attrs —
+C = fg 38;5;216  bg —  attrs —
+D = fg 38;5;179  bg —  attrs —"
+`;
+
 exports[`golden frames — a composed session, not a block > SF2 · label · dark — the styles 1`] = `
 "................................................................................
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
@@ -1674,6 +1829,37 @@ BBBBBB..BBBBBBBBBB..BBBBBBBBBB..BBBBBBBBBBBBB...................................
 A = fg 38;5;253  bg —  attrs —
 B = fg 38;5;244  bg —  attrs —
 C = fg 38;5;150  bg —  attrs —"
+`;
+
+exports[`golden frames — a composed session, not a block > SF2 · transcript-bar · dark — the styles 1`] = `
+"AAAAAAA..BBBBB..........................................................BBBBBBBB
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+...............................................................................B
+.CCCCCC........................................................................B
+...B...........................................................................B
+...B...........................................................................B
+...B...........................................................................B
+...B...........................................................................B
+...B...........................................................................B
+...B...........................................................................B
+...B...........................................................................B
+...B...........................................................................B
+...B...........................................................................B
+...B...........................................................................B
+...B...........................................................................B
+...B...........................................................................B
+...............................................................................B
+...............................................................................B
+.CCCCCC........................................................................B
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+................................................................................
+BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+BBBBB......................................................................BBBBB
+BBBBBB..BBBBBBBBBB..BBBBBBBBBB..BBBBBBBBBBBBB...................................
+
+A = fg 38;5;188  bg —  attrs —
+B = fg 38;5;245  bg —  attrs —
+C = fg 38;5;107  bg —  attrs —"
 `;
 
 exports[`golden frames — a composed session, not a block > SF2 · typed · dark — the styles 1`] = `
@@ -3185,6 +3371,240 @@ ESC[?25l
 ESC[?25l
 ESC[21;3H
 ESC[?25h"
+`;
+
+exports[`golden frames — a composed session, not a block > SF3 · chip-preview · dark — the bytes 1`] = `
+"# 1 chunk(s) of 8
+ESC[?25l
+ESC[12;1H
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«───────────────────────────────────────────────────────────────────────────────»
+ESC[39m
+ESC[0m
+«» +1sp
+ESC[13;1H
+ESC[0m
+ESC[0m
+ESC[48;5;235m
+ESC[1m
+«#1 pasted»
+ESC[22m
+ESC[38;5;245m
+« · 30L»
+ESC[39m
+«» +64sp
+ESC[0m
+ESC[0m
+«» +1sp
+ESC[14;1H
+ESC[0m
+ESC[0m
+ESC[48;5;235m
+ESC[38;5;188m
+«row 1»
+ESC[39m
+«» +73sp
+ESC[38;5;245m
+«╿»
+ESC[39m
+ESC[0m
+ESC[0m
+«» +1sp
+ESC[15;1H
+ESC[0m
+ESC[0m
+ESC[48;5;235m
+ESC[38;5;188m
+«row 2»
+ESC[39m
+«» +73sp
+ESC[38;5;245m
+«│»
+ESC[39m
+ESC[0m
+ESC[0m
+«» +1sp
+ESC[16;1H
+ESC[0m
+ESC[0m
+ESC[48;5;235m
+ESC[38;5;188m
+«row 3»
+ESC[39m
+«» +73sp
+ESC[38;5;245m
+«│»
+ESC[39m
+ESC[0m
+ESC[0m
+«» +1sp
+ESC[17;1H
+ESC[0m
+ESC[0m
+ESC[48;5;235m
+ESC[38;5;188m
+«row 4»
+ESC[39m
+«» +73sp
+ESC[38;5;245m
+«│»
+ESC[39m
+ESC[0m
+ESC[0m
+«» +1sp
+ESC[18;1H
+ESC[0m
+ESC[0m
+ESC[48;5;235m
+ESC[38;5;245m
+«⋯ 0 above, 26 below»
+ESC[39m
+«» +60sp
+ESC[0m
+ESC[0m
+«» +1sp
+ESC[19;1H
+ESC[0m
+ESC[0m
+ESC[48;5;235m
+ESC[38;5;245m
+«⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor»
+ESC[39m
+«» +47sp
+ESC[0m
+ESC[0m
+«» +1sp
+ESC[21;1H
+ESC[0m
+«❯» +1sp
+ESC[38;5;140;48;5;233m
+« #1 pasted · 30L» +1sp
+ESC[0m
+«» +61sp
+ESC[24;1H
+ESC[0m
+ESC[38;5;216m
+«preview»
+ESC[39m
+«» +2sp
+ESC[38;5;245m
+«⌥⇧↑⌥⇧↓ scroll»
+ESC[39m
+«» +2sp
+ESC[38;5;245m
+«⌥o open in editor»
+ESC[39m
+«» +2sp
+ESC[38;5;245m
+«esc close»
+ESC[39m
+«» +28sp
+ESC[?25l
+ESC[21;20H
+ESC[?25h"
+`;
+
+exports[`golden frames — a composed session, not a block > SF3 · inspection · dark — the bytes 1`] = `
+"# 2 chunk(s) of 13
+ESC[?25l
+ESC[10;1H
+ESC[0m
+ESC[38;5;245m
+«────────────────────────────────────────────────────────────────────────────────»
+ESC[0m
+ESC[11;1H
+ESC[0m
+ESC[38;5;245m
+«┌»
+ESC[38;5;216m
+« Confirm» +1sp
+ESC[38;5;245m
+«────────────────────────────────────────────────────────────────────┐»
+ESC[39m
+«» +1sp
+ESC[12;1H
+ESC[0m
+ESC[38;5;245m
+«│»
+ESC[38;5;179m
+«▲ Apply this change?»
+ESC[39m
+«» +57sp
+ESC[38;5;245m
+«│»
+ESC[39m
+«» +1sp
+ESC[13;1H
+ESC[0m
+«│patch line 1» +64sp
+ESC[38;5;216m
+«┃»
+ESC[39m
+«│» +1sp
+ESC[14;1H
+ESC[0m
+«│patch line 2» +64sp
+ESC[38;5;216m
+«│»
+ESC[39m
+«│» +1sp
+ESC[15;1H
+ESC[0m
+«│patch line 3» +64sp
+ESC[38;5;216m
+«│»
+ESC[39m
+«│» +1sp
+ESC[16;1H
+ESC[0m
+«│patch line 4» +64sp
+ESC[38;5;216m
+«│»
+ESC[39m
+«│» +1sp
+ESC[17;1H
+ESC[0m
+«│patch line 5» +64sp
+ESC[38;5;216m
+«│»
+ESC[39m
+«│» +1sp
+ESC[18;1H
+ESC[0m
+«│patch line 6» +64sp
+ESC[38;5;216m
+«│»
+ESC[39m
+«│» +1sp
+ESC[19;1H
+ESC[0m
+«│»
+ESC[38;5;216m
+«⋯ 0 above, 24 below»
+ESC[39m
+«                                                          │» +1sp
+ESC[20;1H
+ESC[0m
+«│↑↓ scroll  esc back to the question                                          │» +1sp
+ESC[24;1H
+ESC[0m
+ESC[38;5;179m
+«question»
+ESC[39m
+«» +2sp
+ESC[38;5;245m
+«↑↓ scroll»
+ESC[39m
+«» +2sp
+ESC[38;5;245m
+«esc back»
+ESC[39m
+«» +51sp
+ESC[?25l
+ESC[?25l
+ESC[?25l"
 `;
 
 exports[`golden frames — a composed session, not a block > SF3 · label · dark — the bytes 1`] = `
@@ -5648,6 +6068,203 @@ ESC[38;5;244m
 «/help keys   Use»
 ESC[39m
 «» +58sp
+ESC[?25l
+ESC[21;3H
+ESC[?25h"
+`;
+
+exports[`golden frames — a composed session, not a block > SF3 · transcript-bar · dark — the bytes 1`] = `
+"# 1 chunk(s) of 12
+ESC[?25l
+ESC[3;1H
+ESC[0m
+« ❯ /long» +71sp
+ESC[0m
+ESC[38;5;245m
+«┃»
+ESC[0m
+ESC[4;1H
+ESC[0m
+«» +1sp
+ESC[38;5;107m
+«● long»
+ESC[39m
+«» +72sp
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«┃»
+ESC[0m
+ESC[5;1H
+ESC[0m
+«» +3sp
+ESC[38;5;245m
+«⎿»
+ESC[0m
+«  line 1» +67sp
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«┃»
+ESC[0m
+ESC[6;1H
+ESC[0m
+«» +3sp
+ESC[38;5;245m
+«│»
+ESC[0m
+«  line 2» +67sp
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«┃»
+ESC[0m
+ESC[7;1H
+ESC[0m
+«» +3sp
+ESC[38;5;245m
+«│»
+ESC[0m
+«  line 3» +67sp
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«┃»
+ESC[0m
+ESC[8;1H
+ESC[0m
+«» +3sp
+ESC[38;5;245m
+«│»
+ESC[0m
+«  line 4» +67sp
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«┃»
+ESC[0m
+ESC[9;1H
+ESC[0m
+«» +3sp
+ESC[38;5;245m
+«│»
+ESC[0m
+«  line 5» +67sp
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«┃»
+ESC[0m
+ESC[10;1H
+ESC[0m
+«» +3sp
+ESC[38;5;245m
+«│»
+ESC[0m
+«  line 6» +67sp
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«┃»
+ESC[0m
+ESC[11;1H
+ESC[0m
+«» +3sp
+ESC[38;5;245m
+«│»
+ESC[0m
+«  line 7» +67sp
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«┃»
+ESC[0m
+ESC[12;1H
+ESC[0m
+«» +3sp
+ESC[38;5;245m
+«│»
+ESC[0m
+«  line 8» +67sp
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«╿»
+ESC[0m
+ESC[13;1H
+ESC[0m
+«» +3sp
+ESC[38;5;245m
+«│»
+ESC[0m
+«  line 9» +67sp
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«│»
+ESC[0m
+ESC[14;1H
+ESC[0m
+«» +3sp
+ESC[38;5;245m
+«│»
+ESC[0m
+«  line 10» +66sp
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«│»
+ESC[0m
+ESC[15;1H
+ESC[0m
+«» +3sp
+ESC[38;5;245m
+«│»
+ESC[0m
+«  line 11» +66sp
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«│»
+ESC[0m
+ESC[16;1H
+ESC[0m
+«» +3sp
+ESC[38;5;245m
+«│»
+ESC[0m
+«  line 12» +66sp
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«│»
+ESC[0m
+ESC[17;1H
+ESC[0m
+«» +79sp
+ESC[0m
+ESC[38;5;245m
+«│»
+ESC[0m
+ESC[18;1H
+ESC[0m
+« ❯ /long» +71sp
+ESC[0m
+ESC[38;5;245m
+«│»
+ESC[0m
+ESC[19;1H
+ESC[0m
+«» +1sp
+ESC[38;5;107m
+«● long»
+ESC[39m
+«» +72sp
+ESC[0m
+ESC[0m
+ESC[38;5;245m
+«│»
+ESC[0m
 ESC[?25l
 ESC[21;3H
 ESC[?25h"

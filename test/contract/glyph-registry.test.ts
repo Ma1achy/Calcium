@@ -8,102 +8,19 @@
 // imports the real exports and reads each mark through the function a renderer
 // calls, which is the only place the answer lives.
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
 
 import { cells } from "../../src/presentation/text.js";
 import { CALL_STATES } from "../../src/data/viewmodel/index.js";
-import type { Glyph } from "../../src/data/viewmodel/index.js";
 import * as glyphModule from "../../src/presentation/blocks/glyphs.js";
-import * as configModule from "../../src/shell/config.js";
-import { ASCII_CAPS, FULL_CAPS, measurable, visible } from "../support/render.js";
+import { ASCII_CAPS, DARK_THEME, FULL_CAPS, measurable, visible } from "../support/render.js";
 import { block } from "../../src/data/viewmodel/index.js";
 import type { Block } from "../../src/data/viewmodel/index.js";
 // **The design's own resolver for a set's ASCII frames** (C09 I98): a pattern
 // fitted to the frame count, or a composite of other sets — read through the
 // function the page is built with, never re-derived here.
 import { loadRegistry, spinnerAsciiFrames } from "../../docs/design/language/build-calcium.mjs";
-
-type Caps = typeof FULL_CAPS;
-type RegistryGlyph = {
-  id: string;
-  unicode?: string;
-  ascii?: string;
-  reservedCells?: number;
-  collisionDomains?: readonly string[];
-  status: string;
-  asciiResolution?: string;
-};
-
-const registry = JSON.parse(readFileSync("docs/design/language/calcium-registry.json", "utf8")) as {
-  glyphs: RegistryGlyph[];
-  delimiters: RegistryGlyph[];
-};
-const records = [...registry.glyphs, ...registry.delimiters].filter((g) => g.status === "current");
-
-/**
- * Each record's home: the module, the exported symbol a renderer reads, and how
- * the mark is resolved from it at a capability. `domains` is the home's own
- * collision table, or `null` where the home has none (see `NO_DOMAIN_TABLE`).
- */
-type Home = Readonly<{
-  path: string;
-  symbol: string;
-  read: (caps: Caps) => string;
-  domains: readonly string[] | null;
-  token?: Glyph;
-}>;
-
-const vocab = (token: Glyph): Home => ({
-  path: "src/presentation/blocks/glyphs.ts",
-  symbol: "glyphFor",
-  read: (caps) => glyphModule.glyphFor(token, caps),
-  domains: glyphModule.GLYPH_DOMAINS[token],
-  token,
-});
-const set = (key: keyof ReturnType<typeof glyphModule.glyphs>): Home => ({
-  path: "src/presentation/blocks/glyphs.ts",
-  symbol: "glyphs",
-  read: (caps) => glyphModule.glyphs(caps)[key],
-  domains: glyphModule.GLYPH_SET_DOMAINS[key],
-});
-
-const HOMES: Readonly<Record<string, Home>> = {
-  "work-unit": vocab("work-unit"),
-  branch: vocab("continuation"),
-  attention: vocab("warn"),
-  success: vocab("ok"),
-  focus: vocab("focus"),
-  "disclosure-collapsed": vocab("expand"),
-  disclosure: vocab("collapse"),
-  question: vocab("question"),
-  current: vocab("current"),
-  failure: vocab("error"),
-  "sort-desc": set("sortDesc"),
-  "sort-asc": set("sortAsc"),
-  "trend-up": set("trendUp"),
-  "trend-down": set("trendDown"),
-  "trend-flat": set("trendFlat"),
-  rule: set("horizontal"),
-  ellipsis: set("residue"),
-  "choice-open": set("choiceOpen"),
-  revert: set("revert"),
-  "selection-rail": set("rail"),
-  "tape-left": set("tapeLeft"),
-  "tape-right": set("tapeRight"),
-  "meter-fill": {
-    path: "src/presentation/blocks/glyphs.ts",
-    symbol: "barStyle",
-    read: (caps) => glyphModule.barStyle(caps, "slant").on,
-    domains: null,
-  },
-  reader: {
-    path: "src/shell/config.ts",
-    symbol: "PROMPT_SUBSTITUTION",
-    // The prompt form carries its trailing gutter blank; the mark is the first cluster.
-    read: (caps) => [...(caps.unicode === "ascii" ? configModule.PROMPT_SUBSTITUTION[1] : configModule.PROMPT_SUBSTITUTION[0])][0] ?? "",
-    domains: null,
-  },
-};
+import { HOMES, canonicalRecords, records } from "../support/glyph-homes.js";
+import { SURFACES } from "../support/design-surfaces.js";
 
 /** Homes with no collision table of their own, and why — compared by equality. */
 const NO_DOMAIN_TABLE: Readonly<Record<string, string>> = {
@@ -208,7 +125,32 @@ describe("C09 I123 — registry ↔ runtime glyphs", () => {
     }
   });
 
-  it.todo("T2.232 (I123, R-GLY-003, F1465): the §006 census is the registry's canonical set, one row per canonical record");
+  it("T2.232 (C09 I123, R-GLY-003, F1465): the §006 census is the registry's canonical set — one row per canonical record, in registry order, each carrying the record's halves and role, and no tree-only token", async () => {
+    // **Read through the golden's own rows**, not a re-derivation: the census
+    // is `design-surfaces` §006, and a test that rebuilt it would agree with
+    // itself. The first draft of the census drew `GLYPH_TOKENS`.
+    const surface = SURFACES.find((x) => x.section === 6);
+    expect(surface, "the §006 surface exists").toBeDefined();
+    const rows = (await surface!.rows(80, FULL_CAPS, DARK_THEME)).map(visible);
+    const body = rows.slice(rows.indexOf("  glyph  ascii        role") + 1);
+    const census = body.slice(0, body.indexOf(""));
+    expect(census.length, "one row per canonical record").toBe(canonicalRecords.length);
+    canonicalRecords.forEach((g, i) => {
+      const ascii =
+        g.asciiResolution === "state"
+          ? CALL_STATES.map((st) => glyphModule.glyphFor(glyphModule.headMark(st, ASCII_CAPS), ASCII_CAPS)).join(" ")
+          : g.ascii;
+      expect(census[i], `${g.id}: the row, in registry order`).toBe(`  ${g.unicode}  ${ascii}`.padEnd(`  ${g.unicode}  `.length + 13, " ") + (g.semanticRole ?? g.id));
+    });
+    // No tree-only token's mark sits in a row of its own.
+    const treeOnly = glyphModule.GLYPH_TOKENS.filter((t) => Object.keys(TREE_ONLY).includes(t));
+    expect(treeOnly.length, "the contract still lists tree-only tokens").toBeGreaterThan(0);
+    for (const token of treeOnly) {
+      const mark = glyphModule.glyphFor(token, FULL_CAPS);
+      if (canonicalRecords.some((g) => g.unicode === mark)) continue; // shared with a canonical mark
+      expect(census.some((r) => r.startsWith(`  ${mark}  `)), `${token} (${mark}) is the tree's and not the registry's`).toBe(false);
+    }
+  });
 
   it("T2.190 (C09 I98, question 39, R-MOT-010): no spinner set's ASCII rung is one repeated character, in the tree or in the registry; downsampling is let through", () => {
     // **Within a set, the ASCII rung must move** (question 39, ruled (a)). A set

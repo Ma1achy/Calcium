@@ -51,6 +51,7 @@ import { describe, expect, it } from "vitest";
 
 import { defaultTheme } from "../../src/presentation/theme/index.js";
 import { readFrame, type Arm, type FrameReading, type Scene } from "../support/frame-golden.js";
+import { SCENES as APP_SCENES } from "../support/session-scenes.js";
 
 const ESC = String.fromCharCode(0x1b);
 /** `⌥a` — select all (C17 §5b). `⌃⇧a` is the same byte as `⌃a`, which is `home`. */
@@ -156,6 +157,23 @@ const SCENES: Readonly<Record<string, Scene>> = {
    * only condition, so `label-shed` above is the frame that shows the shed.
    */
   "label-mono": { columns: 80, rows: 24, drive: [], chrome: labelledChrome("Calcium") },
+
+  /**
+   * F1445's three — **surfaces a call draws, which no scene here could construct**
+   * while the harness's manifest declared no tools. Each runs `session-scenes.ts`'s
+   * small application, the one `design-surfaces.ts` draws §067, §051 and §101
+   * from, so the two corpora read one session each and not two that agree.
+   *
+   * `transcript-bar`: a page back in a transcript taller than its region — the
+   * bar in the margin column (C14 I62), its thumb off the bottom. No call is
+   * running, unlike §067's, because `writes` reads the last input's bytes and a
+   * stream's patch commits on a timer that could land among them.
+   */
+  "transcript-bar": APP_SCENES.scrolledIdle,
+  /** `chip-preview`: a thirty-line paste is a chip, and the caret on it opens its bounded preview (C22 I113). */
+  "chip-preview": APP_SCENES.chip,
+  /** `inspection`: an approval whose payload does not fit, and `s` to see it bounded (C23 I75, I88). */
+  inspection: APP_SCENES.inspection,
 };
 
 /** A terminal with no colour beyond the sixteen and no Unicode (C02 §3). */
@@ -211,6 +229,9 @@ const CORPUS: readonly Readonly<{ scene: string; arm: Arm; name: string }>[] = [
   { scene: "label-mono", arm: MONO_ARM, name: "label-mono · 1-bit" },
   { scene: "boot", arm: { theme: "dark", env: ASCII_ENV }, name: "boot · ascii" },
   { scene: "window-tail", arm: { theme: "dark", env: ASCII_ENV }, name: "window-tail · ascii" },
+  { scene: "transcript-bar", arm: { theme: "dark" }, name: "transcript-bar · dark" },
+  { scene: "chip-preview", arm: { theme: "dark" }, name: "chip-preview · dark" },
+  { scene: "inspection", arm: { theme: "dark" }, name: "inspection · dark" },
 ];
 
 /**
@@ -242,9 +263,10 @@ describe("golden frames — a composed session, not a block", () => {
         `scenes drawn at ${theme}`,
       ).toBeGreaterThan(0); // cells-ok — a count
     }
-    // Twelve fixed arms: nine, plus §069's three — `label`, `label-shed` and
-    // `label-mono`, which are one subject at three rungs and not one scene.
-    expect(CORPUS.length, "scene-arms").toBe(THEMES.length * 2 + 12); // cells-ok — a count
+    // Fifteen fixed arms: nine, plus §069's three — `label`, `label-shed` and
+    // `label-mono`, which are one subject at three rungs and not one scene —
+    // plus F1445's three, the transcript's bar, a chip's preview and an inspection.
+    expect(CORPUS.length, "scene-arms").toBe(THEMES.length * 2 + 15); // cells-ok — a count
     expect(new Set(CORPUS.map((c) => c.name)).size, "names are distinct").toBe(CORPUS.length);
     expect(new Set(CORPUS.map((c) => c.scene)), "every scene is drawn").toEqual(
       new Set(Object.keys(SCENES)),

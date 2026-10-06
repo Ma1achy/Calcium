@@ -18,11 +18,10 @@
 // free, so the cost of covering a surface never argues against covering it.
 import { readFileSync } from "node:fs";
 
-import { block } from "../../src/data/viewmodel/index.js";
+import { CALL_STATES, block } from "../../src/data/viewmodel/index.js";
 import { chordText, defaultKeymap, scopesInReadingOrder } from "../../src/interaction/router/keymap.js";
 import {
   CALL_STATE_GLYPH,
-  GLYPH_TOKENS,
   barStyleNames,
   glyphFor,
   glyphs,
@@ -32,12 +31,14 @@ import {
   spinnerSetNames,
   toneCarries,
 } from "../../src/presentation/blocks/glyphs.js";
-import { operationRows } from "../../src/shell/documents.js";
+import { operationRows, toolCallDoc } from "../../src/shell/documents.js";
+import { entryLayout, measureEntry, renderEntryPieces, windowEntry } from "../../src/shell/entry-layout.js";
 import type { OperationSpec } from "../../src/shell/documents.js";
 import { patchDefinition } from "../../src/presentation/patch/index.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
-import { patchOf } from "./blocks.js";
-import { measurable, registry } from "./render.js";
+import { patchOf, psTable } from "./blocks.js";
+import { HOMES, canonicalRecords, delimiterRecords, supportingRecords, type RegistryGlyph } from "./glyph-homes.js";
+import { ASCII_CAPS, measurable, registry } from "./render.js";
 import { ALL_KINDS, ONE_PER_KIND } from "./blocks.js";
 import { cells, truncate } from "../../src/presentation/text.js";
 import { createEditor } from "../../src/interaction/editor/index.js";
@@ -45,10 +46,15 @@ import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { styledScreenFrom } from "./styled-screen.js";
 import type { ResolvedTheme } from "../../src/presentation/theme/index.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
-import { RAMP_ANIMATIONS, RAMP_ONE_SHOTS } from "../../src/data/viewmodel/types.js";
+import { RAMP_ANIMATIONS, RAMP_ONE_SHOTS, TONES } from "../../src/data/viewmodel/types.js";
 import { HEADER_ROWS, HEADER_RULE_ROWS, MIN_COLUMNS } from "../../src/shell/config.js";
 import { fakeStdin } from "./fake-terminal.js";
-import { opening, settle } from "./frame-golden.js";
+import { driveScene, opening, settle, type Scene } from "./frame-golden.js";
+import { SCENES } from "./session-scenes.js";
+import { SURFACE_SLOTS, cellOf } from "./theme-tokens.js";
+import { createBlockRegistry, type BlockDefinition } from "../../src/presentation/blocks/index.js";
+import { renderToLines } from "../../src/presentation/render-lines.js";
+import { resolveBackground, resolveTone } from "../../src/presentation/theme/index.js";
 import { buildSession } from "./session.js";
 import type { Block, CallState, Ramp, RampAnimation } from "../../src/data/viewmodel/types.js";
 
@@ -209,11 +215,51 @@ const PILLS = block({
 // padded to its longest member leaves no gap at all where it matters most.
 const pair = (name: string, value: string): string => `${name.padEnd(16, " ")}${value}`;
 
-/** §006: every `Glyph` the vocabulary holds, resolved at this rung. */
-const glyphCensus = (
-  _width: number,
-  caps: TerminalCapabilities,
-): readonly string[] => GLYPH_TOKENS.map((t) => pair(t, glyphFor(t, caps)));
+/**
+ * §006: **the registry's canonical marks**, each read through its home in the
+ * tree at this rung, beside its ASCII half and the role the registry names
+ * (F1465).
+ *
+ * **This census was the tree's vocabulary and §006 asks for the design's.** It
+ * drew `GLYPH_TOKENS` — the eighteen tokens a producer may name — so the frame
+ * answered *what does the tree draw* while the figure answers *what did the
+ * registry register*: nine canonical marks were absent (`❯` `⋯` `▌` `↺`, the
+ * trend arrows, the sort marks) and seven tree-only ones present (`ⓘ` `◌` `◐`
+ * `⊘` `•` `⎸` `⁃`). The figure comparison listed the difference and could not
+ * close it, because the two sets were never compared — the census agreed with
+ * itself. The rows now come from the registry's `canonical: true` records and
+ * each mark from `glyph-homes.ts`, the map C09 I123's contract row holds
+ * against the registry by equality; the tree-only tokens stay in that row's
+ * `TREE_ONLY`, each with its reason, and are not §006's subject.
+ *
+ * **`work-unit` has no ASCII character, by the registry's own record**:
+ * `asciiResolution: "state"` names a resolution, so its ASCII column is the
+ * five call states' head marks at the ASCII rung. The page prints `undefined`
+ * there, which is the page's generator padding a missing field, not a mark.
+ */
+const glyphCensus = (_width: number, caps: TerminalCapabilities): readonly string[] => {
+  const row = (g: RegistryGlyph): string => {
+    const home = HOMES[g.id]!;
+    const ascii =
+      g.asciiResolution === "state"
+        ? CALL_STATES.map((st) => glyphFor(headMark(st, ASCII_CAPS), ASCII_CAPS)).join(" ")
+        : home.read(ASCII_CAPS);
+    // The mark is written bare, never padded: its width is `cells()`'s
+    // question, and one space after a one-cell mark is the figure's own gap.
+    return `  ${home.read(caps)}  ${ascii.padEnd(13, " ")}${g.semanticRole ?? g.id}`;
+  };
+  const delimiter = (g: RegistryGlyph): string => `${HOMES[g.id]!.read(caps)} → ${HOMES[g.id]!.read(ASCII_CAPS)}`;
+  return [
+    `· the registry's ${String(canonicalRecords.length)} canonical marks, each resolved through its home at this rung`,
+    "  glyph  ascii        role",
+    ...canonicalRecords.map(row),
+    "",
+    "· supporting registered marks",
+    ...supportingRecords.map(row),
+    "",
+    `  tape delimiters   ${delimiterRecords.map(delimiter).join("    ")}`,
+  ];
+};
 
 /**
  * §030: the head mark's three rungs, and **the rung is the frame's own axis**.
@@ -1528,6 +1574,288 @@ const focusShapes = (
   ];
 };
 
+// --- the frames that had none (F1466, F1445, F1463) -------------------------
+//
+// **Thirty-six framed fixtures were compared against nothing.** The figure
+// comparison finds a frame by its `── §N ·` heading, and those rows named a
+// golden indexed by kind, by state or by scene — or, for four of them, an
+// integration row that asserts on a frame and keeps none. Each was an honest
+// `unlocated` entry, and each recorded an absence rather than checking a
+// picture. The entries below draw them under their headings, so the comparison
+// is made and what differs is listed with a reason a person wrote after
+// reading both.
+//
+// **A session where the subject is composed by L4**, through `driveScene` —
+// the harness `session-frame.test.ts` reads, with `session-scenes.ts`'s small
+// application to run. **A block where the subject is a block**, through `draw`,
+// the same as every entry above.
+//
+// **What a frame here is a picture of, stated once.** This framework is the
+// shell around a JSON CLI, and most of these fixtures draw the design's agent
+// — a model, its reasoning, its turn, its context. Where the framework has the
+// surface the frame draws it; where the surface is the application's, the
+// frame draws the framework's nearest built shape and the listed difference
+// says which part is whose. A frame drawing something else under the heading
+// is §069's defect, and each entry's comment says what its subject is.
+
+/**
+ * A session's whole screen after `scene`, trailing blanks trimmed.
+ *
+ * **Below `MIN_COLUMNS` a session draws no frame**, so the narrow golden draws
+ * it at `MIN_COLUMNS` and says so in a caption, as §097's does. A scene that is
+ * *about* a size — §023's narrow frame, §047's refusal — fixes its columns and
+ * is drawn at them in both goldens.
+ */
+const sessionFrame =
+  (
+    scene: Scene,
+    opts: Readonly<{
+      fixed?: boolean;
+      /**
+       * Capabilities the scene needs beyond the golden's rung. **The rung is an
+       * override, and it replaces detection whole**: `FULL_CAPS` opts into no
+       * notification rung, so a session drawn at it never takes focus
+       * reporting and §014's away mark never opens, whatever the environment.
+       */
+      caps?: Partial<TerminalCapabilities>;
+      then?: (built: Awaited<ReturnType<typeof driveScene>>["built"]) => Promise<void>;
+    }> = {},
+  ) =>
+  async (width: number, capabilities: TerminalCapabilities): Promise<readonly string[]> => {
+    const columns = opts.fixed === true ? scene.columns : Math.max(width, MIN_COLUMNS);
+    const { built } = await driveScene({ ...scene, columns }, { theme: "dark", caps: { ...capabilities, ...opts.caps } });
+    // **A stream's patch and the away notice are committed on the scheduler's
+    // own clock**, a timer and not a turn of the loop: with settles alone
+    // §003's running call drew its head and not its block, and §014 drew the
+    // two settlements and not the notice that reports them. The clock is
+    // frozen, so what the timer commits is the same frame every run.
+    await new Promise((r) => setTimeout(r, 50));
+    await settle();
+    if (opts.then !== undefined) await opts.then(built);
+    const rows = built.screen().rows.map((r) => r.replace(/\s+$/u, ""));
+    while (rows.length > 0 && rows.at(-1) === "") rows.pop();
+    const note =
+      opts.fixed === true
+        ? [`· drawn at ${String(columns)}×${String(scene.rows)}, the size the section is about`]
+        : columns === width
+          ? []
+          : [`· drawn at ${String(columns)} columns: below that a session draws no frame, only the notice that it needs ${String(MIN_COLUMNS)}`];
+    return [...note, ...rows];
+  };
+
+/**
+ * `draw`, with the three kinds C09's defaults do not hold registered — `table`,
+ * `plot` and `patch` are registered by C11, C12 and C25. **An unregistered kind
+ * still renders, as `raw`**, so the first draft of these frames drew the JSON
+ * of a table under §078's heading and every row count agreed (`render.ts`).
+ */
+const drawFull =
+  (b: Block) =>
+  (width: number, capabilities: TerminalCapabilities, theme: ResolvedTheme): readonly string[] =>
+    measurable({
+      theme,
+      capabilities,
+      definitions: [tableDefinition, plotDefinition, patchDefinition] as never,
+    }).renderToLines(b, width);
+
+/** One pass per block, each captioned — the shape §073's and §082's frames take. */
+const passes =
+  (...parts: readonly (readonly [caption: string, b: Block])[]) =>
+  (width: number, capabilities: TerminalCapabilities, theme: ResolvedTheme): readonly string[] =>
+    parts.flatMap(([caption, b], i) => [...(i === 0 ? [] : [""]), `· ${caption}`, ...drawFull(b)(width, capabilities, theme)]);
+
+/**
+ * §007: a subagent's nested calls — **a call whose children are nested cards**
+ * (C23 I62, C22 I89): `toolCallDoc` composes each child as a `group` headed by
+ * its own call head, the parent's outcome is `rollUp`'s, and the entry layout
+ * hangs them under `├─` and `└─`. Composed here and laid out through the
+ * shell's own `entryLayout`, because **no route produces children** — F830
+ * built the mechanism and named no producer, and a local handler cannot compose
+ * a head at all: `callHead` takes the capabilities, and `LocalContext` carries
+ * none, so a handler's separator would be `·` at the ASCII rung.
+ *
+ * The first draft drew the `tree` kind here, with a comment saying its guides
+ * were the figure's `├─` and `└─`. They are not — a tree draws `│` and nothing
+ * else (§105's step) — and the frame said so where the comment did not.
+ */
+const nestedCalls = (width: number, capabilities: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
+  const registry = createBlockRegistry({ defaults: true });
+  const child = (name: string, args: string, elapsedMs: number, outcome: string) => ({ name, args, id: `child-${name}`, elapsedMs, outcome });
+  const blocks = toolCallDoc(
+    "agents",
+    {
+      name: "agents",
+      args: "",
+      elapsedMs: 492_000,
+      settled: true,
+      children: [
+        child("seams", "explore the unwired seams", 173_000, "4 findings"),
+        child("arm", "explore the plot-arm repairs", 226_000, "3 corrections"),
+        child("count", "verify the refusal count", 492_000, "1 disproved"),
+      ],
+    },
+    { origin: "agent" },
+    capabilities,
+  ).blocks;
+  const height = measureEntry(registry.measureSequence, blocks, width);
+  return renderEntryPieces(registry, windowEntry(entryLayout(blocks, width), 0, height, registry), { theme, capabilities }).rows;
+};
+
+/**
+ * §024: reasoning — **there is no reasoning kind, and the nearest built shape is
+ * a tree node with a twisty** (F1463). The fixture's `▹`/`▿` are the tree's
+ * `expand`/`collapse` glyphs, which until this frame agreed with the figure
+ * only in the glyph table: no golden drew either beside a reasoning head. Two
+ * passes, the design's two states — collapsed, the default, and open with the
+ * text beneath. What the tree draws beneath an open node is its guides, where
+ * §024 draws a `│` rail; the difference is listed.
+ */
+const reasoning = (expanded: boolean) =>
+  block({
+    kind: "tree",
+    id: `reasoning-${expanded ? "open" : "closed"}`,
+    nodes: [
+      {
+        id: "thinking",
+        label: "thinking · 4s · 312 tok",
+        expanded,
+        children: [
+          { id: "t1", label: "The parser tracks quotes with a boolean, so a nested quote" },
+          { id: "t2", label: "flips it back and the run ends early. A depth counter fixes" },
+          { id: "t3", label: "that, but I should check whether escaping is handled first." },
+        ],
+      },
+    ],
+  });
+
+/**
+ * §060: the same transcript **before and after** the resize — one frame would
+ * show a transcript at 60 columns and say nothing about what the resize kept,
+ * which is the section's whole claim: *the top visible entry stays the top
+ * visible entry*. Drawn at 80 and then 60 whatever the golden's width, because
+ * the two sizes are the subject. A resize is a frame the scheduler composes on
+ * its own clock, not a key (`focus-repull.test.ts`), so the wait is a timer.
+ */
+const resized = async (_width: number, capabilities: TerminalCapabilities): Promise<readonly string[]> => {
+  let before: readonly string[] = [];
+  const after = await sessionFrame(SCENES.resize, {
+    fixed: true,
+    caps: capabilities,
+    then: async (built) => {
+      before = built.screen().rows.map((r) => r.replace(/\s+$/u, ""));
+      built.resize({ columns: MIN_COLUMNS, rows: SCENES.resize.rows });
+      await new Promise((r) => setTimeout(r, 50));
+    },
+  })(SCENES.resize.columns, capabilities);
+  return [
+    `· at ${String(SCENES.resize.columns)} columns`,
+    ...before,
+    "",
+    `· resized to ${String(MIN_COLUMNS)}`,
+    ...after.filter((l) => !l.startsWith("· drawn at")),
+  ];
+};
+
+/** §027: the context's fill — a meter, the one quantity the tree's bar carries. */
+const CONTEXT_FILL = block({ kind: "progress", id: "ctx", label: "ctx", current: 78, total: 100 });
+
+/**
+ * §047: what a block draws when it cannot draw what it was asked — empty, and
+ * refused. The contained failure is C09 I34's, constructed as
+ * `containment.test.ts` constructs it: a kind whose render throws, and the
+ * second frame at the height the fault asked for.
+ */
+const EMPTY_TABLE = block({
+  kind: "table",
+  id: "empty",
+  columns: [{ key: "name", label: "name", align: "left", priority: 10, minWidth: 12, flex: true, sortable: false }],
+  rows: [],
+  emptyMessage: "No matches.",
+} as never);
+const refused = (width: number, capabilities: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
+  const faults: { rows: number }[] = [];
+  const reg = createBlockRegistry({ defaults: true, onError: (f) => void faults.push({ rows: f.rows }) });
+  reg.register({
+    kind: "plot",
+    measure: () => 1,
+    render: () => {
+      throw new Error("this arm draws no density — the estimate needs the terminal's width");
+    },
+  } as unknown as BlockDefinition);
+  reg.seal();
+  const opts = { theme, capabilities, tick: 0 };
+  renderToLines(reg, block({ kind: "plot", id: "p" } as Block), width, opts);
+  return renderToLines(reg, block({ kind: "plot", id: "p", minHeight: faults[0]?.rows ?? 0 } as Block), width, opts);
+};
+
+/**
+ * §074: each tone's weight at this rung **and at one bit**, because §074's
+ * ladder is the 1-bit rung's — above it colour carries the tone and every
+ * weight is plain, so a column at this rung alone would say nothing at two of
+ * the three goldens.
+ */
+const toneWeights = (_width: number, caps: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => {
+  const weight = (t: (typeof TONES)[number], at: TerminalCapabilities): string => {
+    const style = resolveTone(t, theme, at);
+    return style.bold === true ? "bold" : style.dim === true ? "faint" : "plain";
+  };
+  const oneBit = { ...caps, colourDepth: 1 as const };
+  return [pair("tone", "this rung  1-bit"), ...TONES.map((t) => pair(t, `${weight(t, caps).padEnd(11, " ")}${weight(t, oneBit)}`))];
+};
+
+/**
+ * §079: every tone and every surface of the dark theme, resolved at this rung
+ * and printed as values — a stripped frame of ten swatches is ten identical
+ * rows, which is why `theme-tokens.test.ts` records values too.
+ */
+const toneTable = (_width: number, caps: TerminalCapabilities, theme: ResolvedTheme): readonly string[] => [
+  "· tones",
+  ...TONES.map((t) => `  ${t.padEnd(14, " ")}${cellOf(resolveTone(t, theme, caps))}`),
+  "· surfaces",
+  ...SURFACE_SLOTS.map((sl) => `  ${sl.padEnd(14, " ")}${cellOf(resolveBackground(`surface.${sl}`, theme, caps))}`),
+];
+
+/**
+ * §075: `/config` — every key, its value, and **where the value came from**,
+ * the source toned by who chose it. A table in a titled panel, which is the
+ * framework's own pair; the keys and the four sources are §075's.
+ *
+ * **`env` and `flag` are drawn untoned, and §075 tones them `warn` and
+ * `error`.** C04 I6 refuses a `warn` or `error` tone without a glyph — *colour
+ * alone does not survive 1-bit* — and §075's carrier is the word, with the tone
+ * beside it. The block cannot be constructed as the design draws it; that
+ * disagreement is the report's, not this frame's to settle.
+ */
+const CONFIG = block({
+  kind: "panel",
+  id: "config",
+  title: "config",
+  children: [
+    block({
+      kind: "table",
+      id: "config-table",
+      columns: [
+        { key: "key", label: "key", align: "left", priority: 30, minWidth: 12, sortable: false },
+        { key: "value", label: "value", align: "left", priority: 20, minWidth: 18, flex: true, sortable: false },
+        { key: "source", label: "source", align: "left", priority: 10, minWidth: 8, sortable: false },
+      ],
+      rows: [
+        ["model", "qwen3-coder-next", "config", "meta"],
+        ["endpoint", "localhost:8000", "env", null],
+        ["posture", "auto", "flag", null],
+        ["ui.spinner", "braille", "default", "muted"],
+      ].map(([key, value, source, tone]) => ({
+        id: key!,
+        cells: {
+          key: { text: key! },
+          value: { text: value! },
+          source: { text: source!, ...(tone === null ? {} : { tone: tone as never }) },
+        },
+      })),
+    }),
+  ],
+});
+
 export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 65, name: "the context fills — a capacity beside an operation, and the head that stops", rows: contextFill },
   { section: 11, name: "a mention is a chip — the parts cross the seam and the label does not", rows: mentionChip },
@@ -1537,7 +1865,7 @@ export const SURFACES: readonly Surface[] = Object.freeze([
   { section: 42, name: "widgets — a row of peers that sheds", rows: draw(PILLS) },
   { section: 34, name: "active progress bars", rows: draw(BAR) },
   { section: 96, name: "a status has three parts, and a frame is separate", rows: draw(STATUS) },
-  { section: 97, name: "a transient panel floats, between two rules — the layer, over an empty transcript", rows: (w, c) => panelLayer(w, c) },
+  { section: 97, name: "a transient panel floats, between two rules — the layer, over an empty transcript", rows: (w: number, c: TerminalCapabilities) => panelLayer(w, c) },
   { section: 48, name: "block states", rows: draw(STEPS) },
   { section: 6, name: "the canonical marks, as a glyph census", rows: glyphCensus },
   { section: 30, name: "the head mark's three rungs", rows: headMarks },
@@ -1571,4 +1899,63 @@ export const SURFACES: readonly Surface[] = Object.freeze([
     ...scrollbarCensus(w, c),
     ...draw(SCROLLED)(w, c, t),
   ] },
+
+  // F1466: the thirty-six that were unlocated, and §024 (F1463).
+  { section: 3, name: "the regions with a call running — a settled entry above a running one", rows: sessionFrame(SCENES.running) },
+  { section: 4, name: "idle — every head settled, nothing running", rows: sessionFrame(SCENES.idle) },
+  { section: 5, name: "cancelled — the head says so and the block it had stays", rows: sessionFrame(SCENES.cancelled) },
+  { section: 7, name: "nested calls — a parent and its three children, each a nested card", rows: nestedCalls },
+  { section: 8, name: "message entries — the echoed command, and the entry it produced", rows: sessionFrame(SCENES.conversation) },
+  { section: 9, name: "queued — two lines typed while a verb runs, each waiting its turn", rows: sessionFrame(SCENES.queued) },
+  { section: 10, name: "startup — the frame a session opens with", rows: sessionFrame(SCENES.boot) },
+  { section: 12, name: "transient feedback — a copy, and what says it happened", rows: sessionFrame(SCENES.copied) },
+  { section: 13, name: "reviewing what was written — a patch as a call's result", rows: sessionFrame(SCENES.review) },
+  { section: 14, name: "away — what settled while the terminal had no focus", rows: sessionFrame(SCENES.away, { caps: { notify: ["bell"] } }) },
+  { section: 22, name: "the help view as an entry", rows: sessionFrame(SCENES.help) },
+  { section: 23, name: "a narrow frame — a call running at the narrowest a session draws", rows: sessionFrame({ ...SCENES.running, columns: MIN_COLUMNS }, { fixed: true }) },
+  { section: 24, name: "reasoning — collapsed, the default, and open", rows: passes(["collapsed", reasoning(false)], ["open", reasoning(true)]) },
+  { section: 27, name: "the context's fill — one quantity in a meter", rows: draw(CONTEXT_FILL) },
+  { section: 28, name: "an approval replaces the prompt", rows: sessionFrame(SCENES.approval) },
+  { section: 29, name: "completion expands the prompt", rows: sessionFrame(SCENES.menu) },
+  { section: 45, name: "the live terminal block", rows: draw(ONE_PER_KIND.terminal) },
+  { section: 46, name: "history — the reverse search open over the transcript", rows: sessionFrame(SCENES.search) },
+  { section: 47, name: "empty, too small and refused", rows: async (w, c, t) => [
+    "· empty — the table says so in its own box",
+    ...drawFull(EMPTY_TABLE)(w, c, t),
+    "",
+    "· refused — a contained failure, at the height the fault asked for (C09 I34)",
+    ...refused(w, c, t),
+    "",
+    "· too small — below the minimum a session draws only what it needs",
+    ...(await sessionFrame(SCENES.tooSmall, { fixed: true })(w, c)),
+  ] },
+  { section: 49, name: "a block of each kind the figure draws — plot, table, image, form", rows: passes(
+    ["plot", ONE_PER_KIND.plot],
+    ["table", ONE_PER_KIND.table],
+    ["image", ONE_PER_KIND.image],
+    ["form — its buttons", ONE_PER_KIND.form],
+  ) },
+  { section: 50, name: "the tool-result gallery — results as entries", rows: sessionFrame(SCENES.gallery) },
+  { section: 51, name: "approval overflow — the inspection, the payload bounded", rows: sessionFrame(SCENES.inspection) },
+  { section: 52, name: "a question that wants a sentence — it floats, and the prompt is live", rows: sessionFrame(SCENES.reply) },
+  { section: 60, name: "resize — the same transcript at 80 columns, then at 60", rows: resized },
+  { section: 66, name: "a tool's failure — the head says failed, and the session goes on", rows: sessionFrame(SCENES.failed) },
+  { section: 67, name: "scrolled back while a call runs — the transcript's bar", rows: sessionFrame(SCENES.scrolled) },
+  { section: 68, name: "one exchange — drawn at this golden's rung", rows: sessionFrame(SCENES.failed) },
+  { section: 69, name: "the prompt's upper rule, labelled", rows: sessionFrame(SCENES.labelled) },
+  { section: 74, name: "weight — each tone's weight at this rung", rows: toneWeights },
+  { section: 75, name: "/config — each value and where it came from", rows: drawFull(CONFIG) },
+  { section: 77, name: "syntax highlighting", rows: draw(ONE_PER_KIND.code) },
+  { section: 78, name: "tables — sorted by age, descending, the columns that do not fit counted at each row", rows: drawFull(psTable({ id: "ps", rows: 5, sort: { key: "age", direction: "desc" } })) },
+  { section: 79, name: "tones and surfaces — the dark theme, as values at this rung", rows: toneTable },
+  { section: 100, name: "a table that cannot shed, and two columns", rows: (w, c, t) => [
+    "· the table at this width, and at 32 columns",
+    ...drawFull(psTable({ id: "ps", rows: 2 }))(w, c, t),
+    "",
+    ...drawFull(psTable({ id: "ps", rows: 2 }))(Math.min(w, 32), c, t),
+    "",
+    "· two columns — the patch split",
+    ...drawFull(patchOf({ layout: "split" }))(w, c, t),
+  ] },
+  { section: 101, name: "a chip under the caret, and its preview above the prompt", rows: sessionFrame(SCENES.chip) },
 ]);

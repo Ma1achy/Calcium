@@ -105,6 +105,23 @@ export type Scene = Readonly<{
    * the corpus had no way to be an application with one.
    */
   chrome?: TuiConfig["chrome"];
+  /**
+   * The rest of the application, where a scene needs verbs to run (F1445):
+   * a manifest, its local handlers, a transport and its adapters.
+   *
+   * **The corpus could draw no entry but `/help`'s** until these, because the
+   * harness's manifest declares no tools — so the transcript's bar, an
+   * inspection and anything a running call draws had no scene that could
+   * construct them. Spread before the fields above, so a scene cannot replace
+   * the stdin it is driven through or the theme its arm chose.
+   */
+  config?: Partial<TuiConfig>;
+  /**
+   * How many settles each input is given — one unless a scene says more. A
+   * verb that answers through `ctx.ask`, or a stream's first patch, is more
+   * than one turn of the loop from the byte that started it.
+   */
+  rounds?: number;
 }>;
 
 export type FrameReading = Readonly<{
@@ -122,10 +139,34 @@ export type FrameReading = Readonly<{
  * symmetry hides the transformation under test is not a fixture.
  */
 export async function readFrame(scene: Scene, arm: Arm): Promise<FrameReading> {
+  const { built, size, before } = await driveScene(scene, arm);
+  const last = built.stdout.chunks.slice(scene.drive.length === 0 ? 0 : before);
+  return Object.freeze({
+    text: renderText(built.screen().rows, size),
+    styles: renderStyles(styledScreenFrom(built.stdout.chunks, size)),
+    writes: renderWrites(last, built.stdout.chunks.length),
+  });
+}
+
+/**
+ * Build a session and drive it — the half of `readFrame` that is not a
+ * reading, shared with `design-surfaces.ts` so a design fixture's session frame
+ * and a `session-frame` scene are built by one harness rather than two (F1445).
+ * `before` is the chunk count at the last input, which is where `writes` reads.
+ */
+export async function driveScene(
+  scene: Scene,
+  arm: Arm,
+): Promise<{
+  built: Awaited<ReturnType<typeof buildSession>>;
+  size: { columns: number; rows: number };
+  before: number;
+}> {
   const stdin = fakeStdin();
   const size = { columns: scene.columns, rows: scene.rows };
   const built = await buildSession(
     {
+      ...(scene.config ?? {}),
       name: "calcium",
       binary: "prism",
       stdin: stdin as never,
@@ -142,16 +183,10 @@ export async function readFrame(scene: Scene, arm: Arm): Promise<FrameReading> {
   for (const bytes of scene.drive) {
     before = built.stdout.chunks.length;
     stdin.emit(bytes);
-    await settle();
+    for (let i = 0; i < (scene.rounds ?? 1); i += 1) await settle();
   }
   await settle();
-
-  const last = built.stdout.chunks.slice(scene.drive.length === 0 ? 0 : before);
-  return Object.freeze({
-    text: renderText(built.screen().rows, size),
-    styles: renderStyles(styledScreenFrom(built.stdout.chunks, size)),
-    writes: renderWrites(last, built.stdout.chunks.length),
-  });
+  return { built, size, before };
 }
 
 /** The grid, ruled, so a column can be counted rather than estimated. */
