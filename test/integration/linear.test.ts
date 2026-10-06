@@ -133,7 +133,7 @@ describe("C22 §6m — a linear session", () => {
     // the gate at open is a second site, and the resize above cannot reach it.
     const small = await linear({ columns: 40, rows: 10 });
     try {
-      expect(small.stdout.output, "no fallback").not.toMatch(/too small/iu);
+      expect(small.stdout.output, "no fallback").not.toMatch(/needs 60/iu);
       await small.type("ok");
       expect(small.stdout.output.endsWith(`> ok${ESC}[5G`), "the input line, drawn").toBe(true);
     } finally {

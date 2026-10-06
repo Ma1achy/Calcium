@@ -288,12 +288,12 @@ describe("C22 §4 gate 4 — a terminal too small (C22 I8, I9, C01 I12b, F67)", 
       async () => {
         const pty = interactivePty(`${FIXTURE} session`, { cols, rows });
         try {
-          await pty.waitFor(/Terminal too small/, 15_000);
+          await pty.waitFor(/needs 60[x×]16/, 15_000);
           // The size it has and the size it needs, both — a message naming
           // neither leaves the reader to guess which axis is short, and `30x16`
           // is short on the axis the golden frames sweep.
-          expect(pty.output).toContain(`${String(cols)}x${String(rows)}`);
-          expect(pty.output).toContain("Needs 60x16");
+          expect(pty.output).toMatch(new RegExp(`${String(cols)}[x×]${String(rows)}`, "u"));
+          expect(pty.output).toMatch(/needs 60[x×]16/u);
           // And nothing was acquired: there is no alternate screen to draw into,
           // which is why this goes to the primary one.
           expect(pty.output, "nothing acquired").not.toContain("\u001b[?1049h");
@@ -314,7 +314,7 @@ describe("C22 §4 gate 4 — a terminal too small (C22 I8, I9, C01 I12b, F67)", 
       // resize anyway. Measured before the fix: 44 bytes, then zero more.
       const pty = interactivePty(`${FIXTURE} session`, { cols: 100, rows: 12 });
       try {
-        await pty.waitFor(/Terminal too small/, 15_000);
+        await pty.waitFor(/needs 60[x×]16/, 15_000);
         const atFallback = pty.output.length;
 
         pty.resize(100, 30);

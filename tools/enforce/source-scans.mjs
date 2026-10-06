@@ -1046,7 +1046,6 @@ export const SCANS = [
     allow: [
       "src/interaction/completion/menu.ts",
       "src/interaction/history/layers.ts",
-      "src/shell/fallback.ts",
     ],
     why: "a display measurement says which ambiguous-width convention it is under, or says why it does not need to (C02 I9)" },
 

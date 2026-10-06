@@ -68,8 +68,8 @@ const results = runPass({
     {
       name: "the fallback names neither the size it has nor the one it needs",
       file: "src/shell/fallback.ts",
-      from: "    fitCells(`${String(size.columns)}x${String(size.rows)}`, size.columns),\n    fitCells(`Needs ${String(MIN_COLUMNS)}x${String(MIN_ROWS)}`, size.columns),",
-      to: "    fitCells(`Resize the window`, size.columns),",
+      from: "  const need = `needs ${String(MIN_COLUMNS)}${times}${String(MIN_ROWS)}`;",
+      to: "  const need = `Resize the window`;",
       expect: "T4.21",
     },
     {

@@ -11,6 +11,7 @@ import { drawFallback, fallbackLines, fitCells, tooSmall } from "../../src/shell
 import { MIN_COLUMNS, MIN_ROWS } from "../../src/shell/config.js";
 import { createBlockRegistry } from "../../src/presentation/blocks/index.js";
 import { cells } from "../../src/presentation/text.js";
+import { ASCII_CAPS, FULL_CAPS } from "../support/render.js";
 
 describe("C22 §4 — the size gate", () => {
   it("T3.7a (I8): the gate is either bound, not both", () => {
@@ -30,21 +31,23 @@ describe("C22 §4 — the size gate", () => {
     const render = vi.spyOn(registry, "render");
     const measure = vi.spyOn(registry, "measureSequence");
 
-    drawFallback({ columns: 44, rows: 12 }, () => undefined);
+    drawFallback({ columns: 44, rows: 12 }, FULL_CAPS, () => undefined);
 
     expect(render, "no renderer").not.toHaveBeenCalled();
     expect(measure, "and no measurer — height is not laid out either").not.toHaveBeenCalled();
   });
 
-  it("T3.8b (I9): it emits no colour and no box drawing", () => {
-    // C10 resolves tones against a capability record, and this runs where the
-    // record may say nothing is supported. A structural assertion, because a
-    // colour would render fine on the author's terminal.
-    const out = fallbackLines({ columns: 44, rows: 12 }).join("\n");
-
-    // eslint-disable-next-line no-control-regex
-    expect(out, "no SGR").not.toMatch(/\[/);
-    expect(out, "no box drawing").not.toMatch(/[─-╿]/);
+  it("T3.8b (C22 I153, I9): it emits no colour, and at ASCII nothing outside ASCII", () => {
+    // C10 resolves tones against a theme, which the fallback does not hold. A
+    // structural assertion, because a colour would render fine on the author's
+    // terminal. And the ASCII rung is the one a terminal that cannot draw
+    // anything else is on: `▲`, `×` and the box must not reach it.
+    for (const caps of [FULL_CAPS, ASCII_CAPS]) {
+      const out = fallbackLines({ columns: 44, rows: 12 }, caps).join("\n");
+      expect(out, "no escape byte").not.toContain(String.fromCharCode(27));
+    }
+    const ascii = fallbackLines({ columns: 44, rows: 12 }, ASCII_CAPS).join("\n");
+    expect(ascii, "ASCII only").toMatch(/^[\u0020-\u007e\n]+$/u);
   });
 
   it("T3.8c: truncation counts cells, not code units", () => {
@@ -66,7 +69,7 @@ describe("C22 §4 — the size gate", () => {
     // terminal makes visible, and a line one cell over wraps — which scrolls
     // whatever screen this landed on.
     for (const columns of [10, 20, 44, 59]) {
-      for (const line of fallbackLines({ columns, rows: 12 })) {
+      for (const line of fallbackLines({ columns, rows: 12 }, FULL_CAPS)) {
         expect(cells(line), `${String(columns)} columns: ${line}`).toBeLessThanOrEqual(columns);
       }
     }
@@ -75,9 +78,10 @@ describe("C22 §4 — the size gate", () => {
   it("T3.8d: it never emits more rows than the terminal has", () => {
     // Three lines in a two-row terminal scrolls, and scrolling is the thing
     // being avoided. The clamp is the whole point at the small end.
-    expect(fallbackLines({ columns: 40, rows: 2 })).toHaveLength(2);
-    expect(fallbackLines({ columns: 40, rows: 1 })).toHaveLength(1);
-    expect(fallbackLines({ columns: 40, rows: 0 })).toHaveLength(0);
+    expect(fallbackLines({ columns: 40, rows: 3 }, FULL_CAPS)).toHaveLength(2);
+    expect(fallbackLines({ columns: 40, rows: 2 }, FULL_CAPS)).toHaveLength(2);
+    expect(fallbackLines({ columns: 40, rows: 1 }, FULL_CAPS)).toHaveLength(1);
+    expect(fallbackLines({ columns: 40, rows: 0 }, FULL_CAPS)).toHaveLength(0);
   });
 
   it("T3.15b (§8b): it writes through the sink it is given, not one it finds", () => {
@@ -85,11 +89,11 @@ describe("C22 §4 — the size gate", () => {
     // acquired so this goes to the primary screen, and mid-session it must go
     // through the scheduler or the next frame paints over it.
     const written: string[] = [];
-    drawFallback({ columns: 44, rows: 12 }, (s) => written.push(s));
+    drawFallback({ columns: 44, rows: 12 }, FULL_CAPS, (s) => written.push(s));
 
     expect(written).toHaveLength(1);
-    expect(written[0]).toContain("44x12");
-    expect(written[0], "and it says what is needed").toContain(`${String(MIN_COLUMNS)}x${String(MIN_ROWS)}`);
+    expect(written[0]).toContain("44×12");
+    expect(written[0], "and it says what is needed").toContain(`${String(MIN_COLUMNS)}×${String(MIN_ROWS)}`);
   });
 
   it("T3.15c: the exact bytes, at the sizes where the terminators separate", () => {
@@ -105,12 +109,12 @@ describe("C22 §4 — the size gate", () => {
     // mutations changes the string.
     const at = (columns: number, rows: number): string[] => {
       const out: string[] = [];
-      drawFallback({ columns, rows }, (s) => out.push(s));
+      drawFallback({ columns, rows }, FULL_CAPS, (s) => out.push(s));
       return out;
     };
 
-    expect(at(40, 1)).toEqual(["Terminal too small\r\n"]);
-    expect(at(40, 2)).toEqual(["Terminal too small\r\n40x2\r\n"]);
+    expect(at(40, 1)).toEqual(["▲ 40×1\r\n"]);
+    expect(at(40, 2)).toEqual(["▲ 40×2\r\nneeds 60×16\r\n"]);
 
     // And zero rows writes nothing rather than a lone newline: a terminal with
     // no rows is the one that cannot afford to scroll.

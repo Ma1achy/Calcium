@@ -380,9 +380,9 @@ describe("C22 integration — the frame's viewport", () => {
 
     // Not the fallback. With the viewport sized to the terminal it selects three
     // rows more than the region has, `paint` refuses (I35) and `drawFallback`
-    // draws `Terminal too small` — so this is the assertion that fails against
+    // draws `needs 60` — so this is the assertion that fails against
     // the defect, and it fails loudly rather than by one row.
-    expect(settled.join("\n"), "a real frame, not the fallback").not.toContain("Terminal too small");
+    expect(settled.join("\n"), "a real frame, not the fallback").not.toContain("needs 60");
 
     // The transcript region: rows 1 … 12 − 1 footer − promptRows.
     const regionOf = (frame: readonly string[], promptRows: number): readonly string[] =>
@@ -402,7 +402,7 @@ describe("C22 integration — the frame's viewport", () => {
       const frame = screen().rows;
       expect(frame, `${String(typed.length)}: a frame`).toHaveLength(16);
       expect(frame.join("\n"), `${String(typed.length)}: not the fallback`).not.toContain(
-        "Terminal too small",
+        "needs 60",
       );
 
       // The prompt is every row from the first one wearing the glyph down to the
@@ -462,7 +462,7 @@ describe("C22 integration — the frame's viewport", () => {
     const { clock, screen } = await buildSession(
       { stdin: stdin as never, completionSources: [slow] } as never,
       // 20 rows, not 12: below C22 §8b's 60×16 gate the session draws
-      // `Terminal too small` and every assertion here is about the fallback.
+      // `needs 60` and every assertion here is about the fallback.
       { columns: 80, rows: 20 },
     );
 

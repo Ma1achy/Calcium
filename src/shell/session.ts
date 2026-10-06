@@ -669,7 +669,7 @@ class Session implements TuiInstance {
       // every clause. It conflates *not acquired* with *not redirected*, and
       // C01 separates them deliberately. The mid-session call site below has
       // always used `writer`.
-      drawFallback(size, (s) => void this.#graph?.lifecycle.writer.write(s));
+      drawFallback(size, this.#graph.capabilities, (s) => void this.#graph?.lifecycle.writer.write(s));
       this.#graph.lifecycle.onResize((next) => {
         if (!tooSmall(next)) this.#open();
       });
@@ -1027,7 +1027,7 @@ class Session implements TuiInstance {
       // it (I55). A fallback is a frame's *absence* — counted, and kept out of
       // every duration histogram (C28 I6).
       this.#lastFrame = null;
-      drawFallback(result.size, (s) => void graph.lifecycle.writer.write(s));
+      drawFallback(result.size, graph.capabilities, (s) => void graph.lifecycle.writer.write(s));
       frameSpan?.[Symbol.dispose]();
       prof?.endFrame("fallback");
       return;

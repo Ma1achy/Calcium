@@ -205,7 +205,7 @@ describe("C03 e2e", () => {
           // the fallback, which is a frame of the right shape saying nothing.
           expect(rows.join("").trim(), `frame ${String(i)} is not empty`).not.toBe("");
           expect(rows.join("\n"), `frame ${String(i)} is not the fallback`).not.toContain(
-            "Terminal too small",
+            "needs 60",
           );
         }
 
