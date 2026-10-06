@@ -1,8 +1,9 @@
 // A03 SP16 — a titled row locates the row its spec declares, mutated (F1489).
 //
-// **A gate that stops matching goes green**, and SP16's two arms are each one
-// condition: the file's owner declaring the id, and the attributed spec having
-// retired it. Each mutation below leaves `make enforce` green on the real tree
+// **A gate that stops matching goes green**, and SP16's arms are each one
+// condition: the file's owner declaring the id, the attributed spec having
+// retired it, and neither declaring it (F1500). The last arm's reader is
+// `TEST_ROW`, which SP7 shares, so its head shapes are mutated here too. Each mutation below leaves `make enforce` green on the real tree
 // — the debt list is keyed by what the rule finds, and nothing it finds is new
 // — so the fire tests are what see it.
 //
@@ -89,6 +90,48 @@ const results = runPass({
       from: "      if (mine.declared.has(r.id)) continue;\n",
       to: "",
       expect: "SP16: the controls",
+    },
+    {
+      // **F1500's arm off**: a row naming an id no spec declares is found,
+      // keyed, and not reported — the state the 639 were in.
+      name: "a dangling row not on the list is not reported",
+      file: RULES,
+      from: "  if (unlisted.length > 0) {\n",
+      to: "  if (false) {\n",
+      expect: "SP16 (F1500): a row naming an id no spec declares fails",
+    },
+    {
+      // The list compared as a subset: a row declared since keeps its entry.
+      name: "a dangling entry whose row is declared stays on the list",
+      file: RULES,
+      from: "  if (resolved.length > 0) {\n",
+      to: "  if (false) {\n",
+      expect: "SP16 (F1500): the dangling list is compared by equality",
+    },
+    {
+      // **The reader one shape short**: a letter range read as its ends, so
+      // `T2.4b–e` declares two rows and the two between dangle.
+      name: "a letter range is not expanded",
+      file: RULES,
+      from: "  if (toLetter !== undefined && letter !== undefined && toLetter >= letter) {\n",
+      to: "  if (false) {\n",
+      expect: "SP7 (F1500): the five head shapes",
+    },
+    {
+      // C08's `- **H** — **T1.14**`: the tag refused, the row unread.
+      name: "a tag before the head is not read",
+      file: RULES,
+      from: "^[ \\t]*- (?:\\*\\*[A-Z]\\*\\* — )?\\*\\*(T",
+      to: "^[ \\t]*- \\*\\*(T",
+      expect: "SP7 (F1500): the five head shapes",
+    },
+    {
+      // A list read as one id: `T2.9, T2.9b` declares neither.
+      name: "a list is not split",
+      file: RULES,
+      from: "  if (bare.includes(\", \")) return bare.split(\", \");\n",
+      to: "",
+      expect: "SP7 (F1500): the five head shapes",
     },
   ],
 });

@@ -504,7 +504,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     expect(drawn.find((l) => l.includes("[y]")), "and nothing else does").not.toContain("•");
   });
 
-  it("T4.13 (C09 I22, F122, entry 16 A5): the choices are a block, and no glyph is written here", () => {
+  it("C23 T4.13 (C09 I22, F122, entry 16 A5): the choices are a block, and no glyph is written here", () => {
     // **The seam this deletes.** `ConfirmDeps` carried `capabilities` for one
     // reason — a `raw` block holds text, so a marker written at L4 could never
     // be substituted — and a cell holds a slot instead. The assertion is on the
@@ -806,7 +806,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
 });
 
 describe("C23 I82 — a question refuses once and says so (review batch 2, M5)", () => {
-  it("T4.82 (C23 I82, R-HON-004, ruling 60): the first refused key adds the notice with one update and one invalidate; the second changes nothing", async () => {
+  it("C16 T4.82 (C23 I82, R-HON-004, ruling 60): the first refused key adds the notice with one update and one invalidate; the second changes nothing", async () => {
     const w = world();
     const answer = present(w, { question: "Stop api-gateway?", choices: YES_NO });
     const updates: string[] = [];

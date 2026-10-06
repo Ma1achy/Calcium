@@ -53,8 +53,8 @@ const results = runPass({
       // twice, in a family it does not belong to.
       name: "a single leading capital is a mnemonic label",
       file: RULES,
-      from: "|[A-Z]{2,}\\d+[a-z]?)\\*\\*/gm",
-      to: "|[A-Z]+\\d+[a-z]?)\\*\\*/gm",
+      from: "|[A-Z]{2,}\\d+[a-z]?)\\*\\*(?: ",
+      to: "|[A-Z]+\\d+[a-z]?)\\*\\*(?: ",
       expect: "SP10: an invariant declaration is not a row",
     },
     {
@@ -76,8 +76,8 @@ const results = runPass({
       // exactly like a satisfied one. Also fails on both sides.
       name: "a row must start at column zero",
       file: RULES,
-      from: "const TEST_ROW = /^[ \\t]*- \\*\\*(T",
-      to: "const TEST_ROW = /^- \\*\\*(T",
+      from: "  String.raw`^[ \\t]*- (?:\\*\\*[A-Z]",
+      to: "  String.raw`^- (?:\\*\\*[A-Z]",
       expect: "SP10: an indented label is still a row",
     },
     {

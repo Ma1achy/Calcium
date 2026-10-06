@@ -92,7 +92,7 @@ describe("C22 I78 — the store alone", () => {
 });
 
 describe("C22 I78 — the writer alone", () => {
-  it("T4.17r (C16 I27, C22 I78): 2 on a focused two-series plot toggles the second series, both ways", async () => {
+  it("C22 T4.17r (C16 I27, C22 I78): 2 on a focused two-series plot toggles the second series, both ways", async () => {
     const { graph } = await buildGraph();
     const id = graph.transcript.append(doc([plot("p")]) as never);
 
@@ -146,7 +146,7 @@ describe("C22 I78 — the writer alone", () => {
 });
 
 describe("C22 I78 — the pair, through a frame", () => {
-  it("T4.17s (C12 I116, C22 I78): 2 removes the series' ink and marks its legend row; 2 again restores the frame", async () => {
+  it("C22 T4.17s (C12 I116, C22 I78): 2 removes the series' ink and marks its legend row; 2 again restores the frame", async () => {
     const stdin = fakeStdin();
     const built = await buildSession(
       {

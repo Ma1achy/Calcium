@@ -12,22 +12,23 @@
 // row failing whether or not three others failed beside it.
 //
 //     mutation                     rows that fail
-//     the key goes quiet           T4.17e · T4.17g · T4.17h
-//     the binding is removed       T4.17f · T4.17g · T4.17h
-//     a plot declares no element   T4.17f · T4.17g · T4.17h
-//     the context is unpopulated   T4.17h
-//     the slot drops the axis      T4.17g · T4.17h
+//     the key goes quiet           T4.17e · T4.17g · T4.17w
+//     the binding is removed       T4.17f · T4.17g · T4.17w
+//     a plot declares no element   T4.17f · T4.17g · T4.17w
+//     the context is unpopulated   T4.17w
+//     the slot drops the axis      T4.17g · T4.17w
 //     control, unmutated           (none)
 //
-// **Three parts isolate and one does not.** T4.17e, T4.17f and T4.17h each fail
+// **Three parts isolate and one does not.** T4.17e, T4.17f and T4.17w each fail
 // for exactly one reason; **the slot fails nothing alone**, because dropping it,
 // emptying the key and removing the binding all produce one observable — no
 // re-render. A second writer is what would separate them, and auto-orbit is that
 // writer (step 8).
 //
 // The first draft of this comment claimed T4.17g was the slot's only witness.
-// T4.17h is also one, and the difference between *stated* and *measured* is the
-// whole of why the table is here.
+// T4.17w is also one, and the difference between *stated* and *measured* is the
+// whole of why the table is here. (T4.17w was titled T4.17h until F1500: C22
+// had declared that id twice, once inside a range about the cursor writer.)
 //
 // **One mutation was tried and withdrawn, and it is recorded rather than
 // deleted.** Removing `if (plot.camera === undefined) continue;` from the
@@ -127,13 +128,13 @@ const results = await runPass({
     },
     {
       // **The context field is not populated** — `cursorPositions`' exact state,
-      // and the mutation that says T4.17h is about population rather than about
+      // and the mutation that says T4.17w is about population rather than about
       // the type.
       name: "the render context is built without the cameras",
       file: SESSION,
       from: "          cameras: graph.cameras.forEntry(entry.id),",
       to: "",
-      expect: "T4.17h",
+      expect: "T4.17w",
     },
     {
       // **The slot, and it has one witness.** Stated rather than discovered: the

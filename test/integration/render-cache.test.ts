@@ -365,7 +365,7 @@ describe("C22 §6c — the render cache", () => {
   });
 
 
-  it("T4.17h (C12 I83): the context field is populated, by block id", async () => {
+  it("C22 T4.17w (C12 I83): the context field is populated, by block id", async () => {
     // **The row `cursorPositions` never had.** That field is declared, threaded
     // and read in one place, and written by nothing in `src/` — so every
     // reference exists and the seam is broken (C12 §3s). This asserts the half

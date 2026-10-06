@@ -99,7 +99,7 @@ const shown = (text: readonly string[]): readonly string[] =>
   text.slice(text.findIndex((r) => r.trimStart().startsWith("❯ /work")));
 
 describe("C22 I69 — the next frame honours the floor", () => {
-  it("T4.49 (C22 I69, C04 I67, C04 I68): one row, then three, and the block after it survives both", async () => {
+  it("C04 T4.49 (C22 I69, C04 I67, C04 I68): one row, then three, and the block after it survives both", async () => {
     const { screen, stdin } = await session("boom", boom);
 
     const first = shown(screen().text);
@@ -269,7 +269,7 @@ describe("C22 I69 — two blocks failing in one entry", () => {
 });
 
 describe("C04 I68 — a block failing once is not permanently tall", () => {
-  it("T4.52 (C04 I68, C22 I69): a far-side patch clears the floor and the height comes back", async () => {
+  it("C22 T4.52 (C04 I68, C22 I69): a far-side patch clears the floor and the height comes back", async () => {
     // **Through the store and the registry that a session uses**, because the
     // claim spans both: the floor is C04's field, the height is C09's answer,
     // and *not permanently tall* is only true if the second follows the first.

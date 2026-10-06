@@ -47,7 +47,7 @@ describe("C13 I20 — the policy", () => {
     expect(persists(policy, docFor("ps"))).toBe(false);
   });
 
-  it("T1.29 (C05 I25): the verb declares, and absent means no", () => {
+  it("C13 T1.29 (C05 I25): the verb declares, and absent means no", () => {
     // The asymmetry is the ruling: `persist: true` opts in, and **every other
     // value including absence is a refusal**. A row per direction, because a
     // policy that read `!== false` would pass the first assertion alone.

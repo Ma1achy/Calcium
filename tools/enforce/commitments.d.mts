@@ -212,6 +212,7 @@ export declare function checkRowResolves(
   specs: readonly string[],
   readFile?: (file: string) => string,
   exempt?: readonly string[],
+  unresolved?: readonly string[],
 ): { violations: Violation[]; rows: number; misfiled: number; dangling: number };
 
 /** Every invariant a spec lists as retired, each carrying a finding number. */

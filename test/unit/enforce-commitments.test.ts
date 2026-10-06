@@ -709,16 +709,22 @@ describe("A03 SP16 — a titled row locates the row its spec declares", () => {
   const THEIRS = "docs/components/C98_cited.md";
 
   /** The owner's spec, the cited spec, and one test file, judged with a list. */
-  function run(test: readonly string[], owner: readonly string[], cited: readonly string[], exempt: readonly string[] = []) {
+  function run(
+    test: readonly string[],
+    owner: readonly string[],
+    cited: readonly string[],
+    exempt: readonly string[] = [],
+    unresolved: readonly string[] = [],
+  ) {
     const read = (f: string): string => (f === PLOT ? test : f === MINE ? owner : cited).join("\n");
-    return checkRowResolves([PLOT], [MINE, THEIRS], read, exempt);
+    return checkRowResolves([PLOT], [MINE, THEIRS], read, exempt, unresolved);
   }
 
   it("SP16: the real corpus, and it is a corpus", () => {
     const r = checkRowResolves(walkTests(), specFiles());
     expect(r.rows, "4060 titled rows a spec owns when the rule was wired").toBeGreaterThan(3_000); // cells-ok — a row count
     expect(r.misfiled, "and the debt it lists is still debt").toBeGreaterThan(0);
-    expect(r.dangling, "the dangling are counted, not dropped").toBeGreaterThan(0);
+    expect(r.dangling, "the dangling are still debt, and listed").toBeGreaterThan(0);
     expect(r.violations, "run `make enforce` for the detail").toEqual([]);
   });
 
@@ -753,12 +759,13 @@ describe("A03 SP16 — a titled row locates the row its spec declares", () => {
     }
   });
 
-  it("SP16: the controls — declared, named, dangling, and a deferral are not misfiled", () => {
+  it("SP16: the controls — declared, named, and a deferral are not misfiled", () => {
     const owner = ["- **T4.1** (I66): the owner's row"];
     expect(run([row("T4.1 (C98 I1): x")], owner, ["- **T4.1** (I1): the cited spec's own"]).violations, "the cited spec declares it").toEqual([]);
     expect(run([row(`${OWNER} T4.1 (C98 I1): x`)], owner, []).violations, "the title names its spec").toEqual([]);
-    const dangling = run([row("T4.7 (C98 I1): x")], owner, []);
-    expect(dangling.violations, "neither declares it: counted, not judged").toEqual([]);
+    const dangling = run([row("T4.7 (C98 I1): x")], owner, [], [], [`C98 T4.7 ${PLOT}`]);
+    expect(dangling.violations, "neither declares it, and it is listed: not misfiled").toEqual([]);
+    expect(dangling.misfiled).toBe(0);
     expect(dangling.dangling).toBe(1);
     expect(
       run([`it.${"todo"}("T4.1 (C98 I1): lands next");`], owner, []).violations,
@@ -772,6 +779,35 @@ describe("A03 SP16 — a titled row locates the row its spec declares", () => {
     const stale = run([row("T4.1 (C98 I1): x")], [], ["- **T4.1** (I1): declared now"], [`C98 T4.1 ${PLOT}`]);
     expect(stale.violations).toHaveLength(1);
     expect(stale.violations[0]?.message).toContain("locate their row now");
+  });
+
+  it("SP16 (F1500): a row naming an id no spec declares fails unless it is listed", () => {
+    // **The fabricated violation**: a title in an owned file, under an id that
+    // neither its attributed spec nor the owner declares — the shape 639 rows
+    // had when the first two arms landed.
+    const { violations, dangling } = run([row("T4.7 (C98 I1): x")], ["- **T4.1** (I66): y"], ["- **T4.2** (I1): z"]);
+    expect(dangling).toBe(1);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.rule).toBe("SP16");
+    expect(violations[0]?.message).toContain(`C98 T4.7 ${PLOT}`);
+    expect(violations[0]?.message).toContain("neither does the file's owner");
+    // A bare title is its owner's, and dangles in the owner's name.
+    const bare = run([row("T4.7: x")], ["- **T4.1** (I66): y"], []);
+    expect(bare.violations[0]?.message).toContain(`${OWNER} T4.7 ${PLOT}`);
+  });
+
+  it("SP16 (F1500): the dangling list is compared by equality, both ways", () => {
+    const owner = ["- **T4.1** (I66): y"];
+    // Listed and still dangling: green.
+    expect(run([row("T4.7 (C98 I1): x")], owner, [], [], [`C98 T4.7 ${PLOT}`]).violations).toEqual([]);
+    // Listed and declared now: the entry must go.
+    const declared = run([row("T4.7 (C98 I1): x")], owner, ["- **T4.7** (I1): x"], [], [`C98 T4.7 ${PLOT}`]);
+    expect(declared.violations).toHaveLength(1);
+    expect(declared.violations[0]?.file).toBe("tools/enforce/dangling-rows.mjs");
+    expect(declared.violations[0]?.message).toContain("can only shrink");
+    // Listed and titled nowhere: the same.
+    const gone = run([], owner, [], [], [`C98 T4.7 ${PLOT}`]);
+    expect(gone.violations[0]?.message).toContain(`C98 T4.7 ${PLOT}`);
   });
 });
 
@@ -872,6 +908,57 @@ describe("A03 SP7 — a test row's number is unique within its spec", () => {
     const read = at(source, FILE);
     expect(testRowsOf(FILE, read), "the mid-line id is a reference").toEqual(["T1.1", "T6.1"]);
     expect(checkTestRowIds([FILE], read)).toEqual([]);
+  });
+
+  it("SP7 (F1500): the five head shapes the corpus writes are each read as the ids they declare", () => {
+    // **A spec that declares a row in a form the reader refused hid the row
+    // from SP7 and SP16 both** — and the first run that could see them found
+    // C22 declaring T4.17i and T4.17j twice, once inside a range.
+    const read = at(
+      [
+        "- **H** — **T1.14** (I3): a tag before the head.",
+        "- **T2.9, T2.9b** (I4): a list.",
+        "- **T1.36–T1.39** (I5): a numeric range.",
+        "- **T2.4b–e** (I6): a letter range.",
+        "- **T1.3a (I18)**: a citation inside the bold.",
+        "- **T1.3b2** (I19): a digit after the letter.",
+        "- **T1.44 reads the registry.** A bold head that is prose.",
+        "- **I39** — an invariant, not a tag.",
+      ].join("\n"),
+      FILE,
+    );
+    expect(testRowsOf(FILE, read)).toEqual([
+      "T1.14", "T2.9", "T2.9b", "T1.36", "T1.37", "T1.38", "T1.39",
+      "T2.4b", "T2.4c", "T2.4d", "T2.4e", "T1.3a", "T1.3b2",
+    ]);
+    // And a collision inside a range is a collision.
+    const clash = at("- **T4.17h–j** (I1): a range.\n- **T4.17i** (I2): its own row.", FILE);
+    expect(checkTestRowIds([FILE], clash).map((v) => v.message).join(" ")).toContain("T4.17i");
+  });
+
+  it("SP7 (F1390): two lanes' rows taking one id are a collision in the merged spec, whichever form each wrote", () => {
+    // **The merge is the only tree that contains both lanes**, and `make enforce`
+    // runs on it at integration: each lane's spec was self-consistent, and the
+    // merged one holds `T6.134` twice. Built here as the merge produces it — one
+    // lane's row as a plain bullet, the other's inside a range or a list, which
+    // is the form the reader refused until F1500 — so the check is the one the
+    // gate runs and not a second one for lanes.
+    const lanes = at(
+      [
+        "### Tier 6",
+        "",
+        "- **T6.133** (I1): before either lane.",
+        "- **T6.134** (I135): the watch lane's row.",
+        "- **T6.134–T6.136** (I131): the trail lane's rows, written as a range.",
+        "- **T1.78, T1.173** (I137): one lane's list.",
+        "- **T1.78** (I138): the other lane's row.",
+      ].join("\n"),
+      FILE,
+    );
+    const message = checkTestRowIds([FILE], lanes).map((v) => v.message).join(" ");
+    expect(message, "the plain bullet against the range").toContain("T6.134");
+    expect(message, "the plain bullet against the list").toContain("T1.78");
+    expect(message, "and the row nobody took twice is not named").not.toContain("T6.133");
   });
 
   it("SP7: an indented row is still a row", () => {

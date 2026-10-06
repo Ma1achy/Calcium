@@ -158,7 +158,7 @@ describe("C10 §2 / C09 §4 — the curated tables", () => {
     expect(canon([{ b: 1, a: 2 }])).toEqual([{ a: 2, b: 1 }]);
   });
 
-  it("T2.41 (C09 I45, C02 I9): the ASCII set is also the wide set, and that is a ruling", () => {
+  it("C10 T2.41 (C09 I45, C02 I9): the ASCII set is also the wide set, and that is a ruling", () => {
     // **A collision, asserted so it is not read as one.** Two different
     // capability records producing byte-identical output is ordinarily the tell
     // for a dropped input — and here it is the documented answer: box drawing is

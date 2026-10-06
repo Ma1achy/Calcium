@@ -360,7 +360,7 @@ describe("record and replay", () => {
     expect(differs.divergence?.replayed).toBe("x");
   });
 
-  it("T1.90 (C01 I1, SS14): the replay comparison recognises escapes and writes none", () => {
+  it("C28 T1.90 (C01 I1, SS14): the replay comparison recognises escapes and writes none", () => {
     // **The row the allow entry is paired with.** SS14 lets this module hold
     // escape literals because it *recognises* bytes a recording already holds
     // — and an allow entry is precisely what would hide it if the module ever

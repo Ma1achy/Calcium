@@ -158,7 +158,7 @@ describe("C16 §6c — the palette's way in (review batch 2, M6, ruling 45)", ()
     }
   });
 
-  it("T4.109 (C16 I68): `> notes` ⏎ submits nothing, appends one warn notice and keeps the line; `ls > notes` is submitted", async () => {
+  it("C22 T4.109 (C16 I68): `> notes` ⏎ submits nothing, appends one warn notice and keeps the line; `ls > notes` is submitted", async () => {
     const w = await world();
     const submit = vi.spyOn(w.graph.pipeline, "submit").mockImplementation(() => undefined as never);
     await w.type("> notes");

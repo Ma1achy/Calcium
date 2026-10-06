@@ -883,7 +883,7 @@ describe("C16 §4a — the pointer sets the crosshair (C12 §3s, C22 I76)", () =
     expect(graph.cursorPositions.get(settled, "p"), "the settled entry keeps its own").toBe(1);
   });
 
-  it("T4.71c (C12 I85): a plot with a camera and no cursor takes the click as focus and nothing else", async () => {
+  it("C16 T4.71c (C12 I85): a plot with a camera and no cursor takes the click as focus and nothing else", async () => {
     const { graph, term } = await graphAt80();
     const live = graph.transcript.append(
       doc("/cloud", [{ kind: "plot", id: "c", form: "plot3d", height: 8, series: [], camera: {}, points3: [{ label: "cloud", points: [{ x: 1, y: 2, z: 3 }, { x: 2, y: 1, z: 0 }] }] }]) as never,
@@ -896,7 +896,7 @@ describe("C16 §4a — the pointer sets the crosshair (C12 §3s, C22 I76)", () =
 });
 
 describe("C16 §4a — the crosshair, read from the painted frame", () => {
-  it("T4.70c (C12 I37, §3s): after the click the ▲ is under the pointer's column and the readout names that sample", async () => {
+  it("C16 T4.70c (C12 I37, §3s): after the click the ▲ is under the pointer's column and the readout names that sample", async () => {
     const stdin = fakeStdin();
     const s = await buildSession(
       {

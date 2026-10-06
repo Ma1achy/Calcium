@@ -36,7 +36,7 @@ describe("C14 §6e — where the copy goes, tier 6", () => {
     expect(said, "with the deadline never firing, pending is all it says").toEqual(["copying with pbcopy"]);
   });
 
-  it("T6.38 (C17 I31): the kill buffer skipped when a clipboard took the text → T4.43 fails", () => {
+  it("C14 T6.38 (C17 I31): the kill buffer skipped when a clipboard took the text → T4.43 fails", () => {
     // **The defect, as two paste targets and one paste key**: the clipboard
     // holds the copy, the kill buffer holds the previous kill, and `⌃y` pastes
     // the second. The session writes the buffer before it hands the copier

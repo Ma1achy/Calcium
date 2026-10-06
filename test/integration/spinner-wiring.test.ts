@@ -80,7 +80,7 @@ const HANDLERS: NonNullable<TuiConfig["localHandlers"]> = {
 };
 
 describe("C22 §6c — the counter advances in a real session", () => {
-  it("T4.35 (C09 I32, C22 I60, F227): ten frames, ten spinner cells", async () => {
+  it("C22 T4.35 (C09 I32, C22 I60, F227): ten frames, ten spinner cells", async () => {
     // **Fake timers rather than real ones**, because the claim is that the chain
     // is wired and not that a machine can keep 80 ms. The harness's `schedule`
     // is `setTimeout`, so advancing them drives exactly the production path:
@@ -187,7 +187,7 @@ describe("C22 §6c — the counter advances in a real session", () => {
 });
 
 describe("C09 I32 — the animating record", () => {
-  it("T4.37 (C09 I32, F228): ANIMATES is measured against behaviour, not a second list", () => {
+  it("C22 T4.37 (C09 I32, F228): ANIMATES is measured against behaviour, not a second list", () => {
     // **A behavioural equality rather than two lists compared.** F228's class is
     // a hand-maintained list beside a generated one, and comparing `ANIMATES` to
     // another literal would be exactly that — a coverage set drawn from the

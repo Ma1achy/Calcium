@@ -28,6 +28,8 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 
+import { DANGLING_ROWS } from "./dangling-rows.mjs";
+
 const COMPONENTS = "docs/components";
 const ARCHITECTURE = "docs/architecture";
 const SURFACES = "docs/surfaces";
@@ -548,7 +550,54 @@ export function checkOrdering(files, readFile = (f) => readFileSync(f, "utf8")) 
  * invariant list under a rule SP2 already owns, in a family it does not belong
  * to.
  */
-const TEST_ROW = /^[ \t]*- \*\*(T\d+\.(?:\d+[a-z]?|x)|[A-Z]{2,}\d+[a-z]?)\*\*/gm;
+//
+// **Five head shapes the corpus writes and the first version read one of**
+// (F1500). 117 titled rows dangled because their spec declared them in a form
+// this pattern refused, so SP7 could not see those rows either — and the first
+// run with them visible found C22 declaring `T4.17i` and `T4.17j` twice, once
+// inside a `T4.17h–j` range. Each is read as the ids it declares:
+//
+// - **a tag before the head** — C08's `- **H** — **T1.14**`, where `H` and `W`
+//   say which repository runs the row. One capital, so `- **I39** — ` (an
+//   invariant) is not one;
+// - **a list** — `- **T2.9, T2.9b**`, every member a row;
+// - **a range** — `- **T1.36–T1.39**` or `- **T2.4b–e**`, expanded, because a
+//   collision inside one is a collision;
+// - **a citation inside the bold** — `- **T1.3a (I18)**`;
+// - **a digit after the letter** — `T1.3b2`, which a test title could always
+//   carry and a spec could not.
+//
+// A bold head that is prose — `- **T1.44 reads the registry.**` — is none of
+// these and is not a row, which is the direction that leaves it to the reader.
+const ROW_HEAD = String.raw`T\d+\.\d+(?:[a-z]\d*)?`;
+const TEST_ROW = new RegExp(
+  String.raw`^[ \t]*- (?:\*\*[A-Z]\*\* — )?\*\*(T\d+\.x|${ROW_HEAD}(?:(?:, ${ROW_HEAD})+|–(?:T\d+\.\d+|[a-z])| \([^)*\n]*\))?|[A-Z]{2,}\d+[a-z]?)\*\*(?: \(([^)\n]*)\))?`,
+  "gmu",
+);
+
+/**
+ * The ids one head declares: a list's members, a range's every step, a single
+ * id without its parenthesis. A range whose ends this cannot step between —
+ * across tiers, say — is read as its two ends rather than dropped.
+ */
+function idsOfHead(head) {
+  const bare = head.replace(/ \(.*$/u, "");
+  if (bare.includes(", ")) return bare.split(", ");
+  const r = /^(T(\d+)\.(\d+))([a-z])?–(?:T(\d+)\.(\d+)|([a-z]))$/u.exec(bare);
+  if (r === null) return [bare];
+  const [, base, tier, from, letter, toTier, to, toLetter] = r;
+  if (toLetter !== undefined && letter !== undefined && toLetter >= letter) {
+    const out = [];
+    for (let c = letter.charCodeAt(0); c <= toLetter.charCodeAt(0); c++) out.push(`${base}${String.fromCharCode(c)}`);
+    return out;
+  }
+  if (to !== undefined && toTier === tier && letter === undefined && Number(to) >= Number(from)) {
+    const out = [];
+    for (let n = Number(from); n <= Number(to); n++) out.push(`T${tier}.${String(n)}`);
+    return out;
+  }
+  return [`${base}${letter ?? ""}`, to === undefined ? `${base}${toLetter ?? ""}` : `T${toTier}.${to}`];
+}
 
 /** Every row id of either family a spec declares, in document order. */
 function rowIdsOf(file, readFile) {
@@ -556,7 +605,7 @@ function rowIdsOf(file, readFile) {
   const src = readFile(file);
   TEST_ROW.lastIndex = 0;
   let m;
-  while ((m = TEST_ROW.exec(src))) ids.push(m[1]);
+  while ((m = TEST_ROW.exec(src))) ids.push(...idsOfHead(m[1]));
   return ids;
 }
 
@@ -2070,10 +2119,19 @@ export function checkRowFiles(testFiles, readFile = (f) => readFileSync(f, "utf8
 // keyed `spec id file`, because two titles in one file under one id are one
 // entry to repair, and a line number would move on every unrelated edit.
 //
-// **Stated blind spots.** (1) A row that *dangles* — its attributed spec
-// declares no such id and neither does the file's owner — is counted and
-// reported, not gated: **639** when this landed, across 28 specs, which is a
-// different defect (a row with no spec row) and a different remedy. (2) A row
+// - **Dangling** (F1500): the attributed spec declares no such id, and the
+//   file's owner does not either — a row with no spec row, so nothing it
+//   asserts can be checked against what its spec says. **639** when the first
+//   two arms landed, counted and not gated. Fewer once the reader took the
+//   five head shapes `TEST_ROW` names and C29, C26 and the compound bullets
+//   declared what they had always meant to (8074b121), and the titles that
+//   were another spec's row under its number were prefixed with that spec.
+//   The rest — **453** keys — are `DANGLING_ROWS`, by name, with the reason
+//   each is there, compared by equality like the arms above.
+//
+// **Stated blind spots.** (1) A dangling row whose id another spec declares
+// about something else reads the same as one no spec declares: the list says
+// which, and the rule does not. (2) A row
 // whose attributed spec declares the id about **something else** is invisible:
 // that is the citation-resolves-against-the-wrong-thing class, which
 // `docs/COMMITMENT_INVARIANT_AUDIT.md` §Fourth pass argues against
@@ -2114,8 +2172,6 @@ const MISFILED_ROWS = Object.freeze([
   "C26 T1.3h test/unit/router-focus.test.ts", // C16's T1.3h is a decoder row (I17)
   "C26 T1.3i test/unit/router-focus.test.ts", // C16's T1.3i is a decoder row (I17)
   "C26 T1.3j test/unit/router-focus.test.ts", // C16's T1.3j is a decoder row (I17)
-  "C26 T1.42 test/unit/table.test.ts", // C11's T1.42 is a different row (I32)
-  "C26 T1.43 test/unit/table.test.ts", // C11's T1.43 is a different row (I33)
 ]);
 
 /**
@@ -2127,6 +2183,7 @@ export function checkRowResolves(
   specs,
   readFile = (f) => readFileSync(f, "utf8"),
   exempt = MISFILED_ROWS,
+  unresolved = DANGLING_ROWS,
 ) {
   const specOf = new Map(specs.map((f) => [(f.split("/").pop() ?? "").slice(0, 3), f]));
   const declared = new Map();
@@ -2142,7 +2199,7 @@ export function checkRowResolves(
   };
   const found = new Map();
   let rows = 0;
-  let dangling = 0;
+  const dangles = new Set();
   for (const f of testFiles) {
     let text;
     try { text = readFile(f); } catch { continue; }
@@ -2162,7 +2219,7 @@ export function checkRowResolves(
         found.set(key, `${owner}, which owns the file, declares ${r.id} and ${r.spec} does not`);
         continue;
       }
-      dangling++;
+      dangles.add(key);
     }
   }
   const keys = [...found.keys()].sort();
@@ -2192,7 +2249,37 @@ export function checkRowResolves(
         `The list is compared by equality so it can only shrink; remove them.`,
     });
   }
-  return { violations, rows, misfiled: keys.length, dangling };
+  // **The third arm, compared by equality for the first two's reason**: the
+  // list can only shrink, and a row added without a spec row fails on the
+  // commit that adds it.
+  const loose = [...dangles].sort();
+  const owed = [...unresolved].sort();
+  const unlisted = loose.filter((k) => !owed.includes(k));
+  const resolved = owed.filter((k) => !loose.includes(k));
+  if (unlisted.length > 0) {
+    violations.push({
+      rule: "SP16",
+      file: "test",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(unlisted.length)} titled row(s) name an id their spec does not declare, and neither ` +
+        `does the file's owner — ${unlisted.join("; ")}. Nothing the row asserts can be checked ` +
+        `against what its spec says. Declare the row in its spec, or title it with the spec and id ` +
+        `that already declare it (F1500).`,
+    });
+  }
+  if (resolved.length > 0) {
+    violations.push({
+      rule: "SP16",
+      file: "tools/enforce/dangling-rows.mjs",
+      spec: "A03 §2 · A03 §7a",
+      message:
+        `${String(resolved.length)} entr(y/ies) on SP16's dangling list name a row their spec declares ` +
+        `now, or no titled row at all — ${resolved.join(", ")}. The list is compared by equality so ` +
+        `it can only shrink; remove them.`,
+    });
+  }
+  return { violations, rows, misfiled: keys.length, dangling: loose.length };
 }
 
 export function checkSectionReferences(

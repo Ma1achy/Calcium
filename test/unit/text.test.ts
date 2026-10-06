@@ -149,7 +149,7 @@ describe("wrapCells (§3)", () => {
     }
   });
 
-  it("T3.10b2 (C04 I86, §5): no row could have taken the first word of the next row", () => {
+  it("C09 T3.10b2 (C04 I86, §5): no row could have taken the first word of the next row", () => {
     // The general property F591 is one instance of, swept rather than pinned:
     // a row breaking one word early is invisible to a per-row width assertion,
     // because a short row fits. Measured before the arm: 161 violating joins

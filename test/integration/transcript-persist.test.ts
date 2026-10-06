@@ -177,7 +177,7 @@ describe("C13 I20 — the resume arc", () => {
     await expect(fs.readFile(PATH), "no file, not an empty one").rejects.toThrow();
   });
 
-  it("T4.40 (C22 I67): the state directory ignores itself", async () => {
+  it("C13 T4.40 (C22 I67): the state directory ignores itself", async () => {
     // One line, and it does not depend on the app author having thought of it.
     const fs = fakeFs();
     const built = await buildSession({ fs });

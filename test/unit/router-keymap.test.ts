@@ -1781,7 +1781,7 @@ describe("a continuous control commits only from inside (C26 I27, R-INT-005)", (
 });
 
 describe("a block key with nowhere to be placed (C16 I27, C26 I26)", () => {
-  it("T2.173 (C16 I27, C26 I26): a collision that is also the inside's own is refused", () => {
+  it("C26 T2.173 (C16 I27, C26 I26): a collision that is also the inside's own is refused", () => {
     const keymap = createKeymap(defaultKeymap);
 
     // `↑` is bound at `liveBlock` as `rowUp` **and** at `interaction` as the
