@@ -129,7 +129,7 @@ describe("C22 §6l.12 — a chip previews above the prompt", () => {
     expect(shows(await a.rows(), "gamma 0"), "the preview is up").toBe(true);
     a.send(CTRL_R);
     const searching = await a.rows();
-    expect(shows(searching, "reverse-i-search"), "the search took the region").toBe(true);
+    expect(shows(searching, "reverse search"), "the search took the region").toBe(true);
     expect(shows(searching, "gamma 0"), "and the preview gave way whole").toBe(false);
 
     // **The push arm, and it is the half a dismissal cannot cover.** C15's
@@ -141,7 +141,7 @@ describe("C22 §6l.12 — a chip previews above the prompt", () => {
     b.send(CTRL_R);
     b.paste(pasteOf(6, "delta"));
     const under = await b.rows();
-    expect(shows(under, "reverse-i-search"), "the search still holds it").toBe(true);
+    expect(shows(under, "reverse search"), "the search still holds it").toBe(true);
     expect(shows(under, "delta 0"), "nothing is pushed beneath it").toBe(false);
   });
 });

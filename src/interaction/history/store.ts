@@ -28,7 +28,7 @@ import {
   type SearchState,
 } from "./types.js";
 
-const EMPTY_SEARCH: SearchState = Object.freeze({ query: "", hit: null, failed: false });
+const EMPTY_SEARCH: SearchState = Object.freeze({ query: "", hit: null, failed: false, total: 0, rank: 0, older: Object.freeze([]) });
 
 /** A missing file is a first run, not a fault; anything else is worth a warning. */
 async function readOrEmpty(

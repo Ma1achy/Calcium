@@ -553,6 +553,14 @@ export type Graph = Readonly<{
    */
   fieldHeld: () => LineState | null;
   /**
+   * The open reverse search's query as the line the prompt draws, or `null`
+   * (C22 I157, §046). **A derived line and not a held one**: the reader's own
+   * is untouched under it (the editor keeps it, and `esc` gives it back), and
+   * every prompt reader — rows, caret, selection, chips, the frame's row
+   * count — asks this before the editor.
+   */
+  searchShown: () => LineState | null;
+  /**
    * What the owner line names its keys from (C22 I133) — the session keymap
    * as dispatch resolves it, the substate's declared name, the open question's
    * vocabulary, and semantic copy mode's refused interrupt. Read per frame.
@@ -5450,6 +5458,11 @@ export async function constructGraph(
     focusedEntryId,
     focusedElements,
     fieldHeld: () => fieldBorrow?.held.line ?? null,
+    searchShown: () => {
+      // The search *on top*: one a question has displaced is held and draws nothing.
+      const search = stores.overlays.top?.id === SEARCH_ID ? stores.history.searchState : null;
+      return search === null ? null : { text: search.query, cursor: search.query.length, selection: null };
+    },
     watchRow,
     ownerHints: (): OwnerHints => {
       const top = stores.overlays.top?.owner;

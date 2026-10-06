@@ -53,11 +53,19 @@ async function session() {
   return { stdin, send, frame };
 }
 
+/**
+ * A panel's edge: a rule to the region's width, plain or carrying a label (find's
+ * header, `── reverse search  1 of 2 ───…`, C20 I31). Words in a rule are the only
+ * thing the plain form lacks, and no transcript row is made of `─` and a label.
+ */
+const isEdge = (row: string): boolean =>
+  row.length === REGION_WIDTH && row.startsWith("──") && row.endsWith("──") && row.replace(/[─ A-Za-z0-9]/g, "") === "";
+
 /** The prompt's upper rule, and the panel's own edge above it. */
 function edges(f: Frame): Readonly<{ edge: number; lower: number }> {
   const lower = f.text.findIndex((r, i) => r === "─".repeat(SIZE.columns) && (f.text[i + 1] ?? "").startsWith("❯"));
   let edge = lower - 1;
-  while (edge >= 0 && f.text[edge]?.slice(0, REGION_WIDTH) !== "─".repeat(REGION_WIDTH)) edge -= 1;
+  while (edge >= 0 && !isEdge(f.text[edge]?.slice(0, REGION_WIDTH) ?? "")) edge -= 1;
   return { edge, lower };
 }
 
@@ -81,7 +89,8 @@ describe("C22 §6s — three panels between two rules, on bgElev (I151)", () => 
           await settle();
           await s.send("h");
         },
-        current: false,
+        // **A list now** (C20 I31): its hit is a table's current row, `pick` across, as the menu's is.
+        current: true,
       },
       {
         name: "the chip preview",
@@ -109,7 +118,7 @@ describe("C22 §6s — three panels between two rules, on bgElev (I151)", () => 
       expect(new Set(grounds(after.cells[lower])), `${panel.name}: so is the prompt's rule`).not.toContain(ELEV);
 
       // **Every cell between them does, to the region's last column** — the
-      // padding is the panel's (C22 I29) — except the menu's current row, which is
+      // padding is the panel's (C22 I29) — except a list's current row (the menu's, and find's since C20 I31), which is
       // `pick` across (§6s.2 row 2).
       for (let row = edge + 1; row < lower; row += 1) {
         const want = panel.current && row === edge + 1 ? PICK : ELEV;

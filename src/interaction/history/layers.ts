@@ -14,38 +14,59 @@
  */
 
 import { escape } from "./codec.js";
-import { cells, type Block, type Layer } from "./deps.js";
+import { type Block, type Layer } from "./deps.js";
 import type { Anchor, HistoryEntry, SearchState } from "./types.js";
 
 export const SEARCH_ID = "reverse-search";
 export const LIST_ID = "history-list";
 
 /**
- * The prompt line.
+ * The header's words: `reverse search  N of M` (I31, §046).
  *
- * The match is shown in its **escaped** form, so a multi-line command stays one
- * row: an overlay that grows to four rows because the recalled command has three
- * newlines is a search box that moves while you type in it.
+ * `N of M` is the hit's rank among the entries containing the query; a query
+ * that matches nothing says so rather than printing `0 of 0`, and an empty one
+ * has no figures to give.
  */
-export function searchLine(state: SearchState): string {
-  const label = state.failed ? "(failed reverse-i-search)" : "(reverse-i-search)";
-  const match = state.hit === null ? "" : escape(state.hit.command);
-  return `${label} \`${state.query}': ${match}`;
+export function searchHeader(state: SearchState): string {
+  if (state.query === "") return "reverse search";
+  if (state.total === 0) return "reverse search  no match";
+  return `reverse search  ${String(state.rank)} of ${String(state.total)}`;
 }
 
 /**
- * **The upper edge, then the line** (I30, §097, ruling 90). *A transient panel
- * floats, between two rules*: the lower one is the prompt's, which C22 I81
- * draws on every frame, and the upper one is the layer's own first row, as
- * C19's menu draws it. Without it the search line sat directly on the
- * transcript's last row and read as one more line of it (F1502). An empty
- * label is a plain line, and it degrades with the rest (C09 I21).
+ * **The upper edge carrying the header, then the list** (I30, I31, §097,
+ * §046). *A transient panel floats, between two rules*: the lower one is the
+ * prompt's, which C22 I81 draws on every frame, and the upper one is the
+ * layer's own first row, as C19's menu draws it — here it also holds the words
+ * and the count, so the figure's header costs no row of its own. Without the
+ * edge the list sat directly on the transcript's last row and read as more of
+ * it (F1502).
+ *
+ * **The list is C19's form**: a one-column table with `current` on the hit, so
+ * the mark, the ground and the degradation are C11's and this file names none
+ * (C19 I29). Each row is the command's escaped form, so a multi-line command
+ * stays one row — an overlay that grows because the recalled command has three
+ * newlines is a search box that moves while you type in it.
+ *
+ * An empty query has no rows and no table: nothing is shown rather than the
+ * whole history, which `/history` is for (§5).
  */
 export function searchBlocks(state: SearchState): readonly Block[] {
-  return Object.freeze([
-    { kind: "rule", id: `${SEARCH_ID}-edge-top`, label: "" } satisfies Block,
-    { kind: "raw", id: `${SEARCH_ID}-line`, text: searchLine(state) } satisfies Block,
-  ]);
+  const edge = { kind: "rule", id: `${SEARCH_ID}-edge-top`, label: searchHeader(state) } satisfies Block;
+  if (state.hit === null) return Object.freeze([edge]);
+  const rows = [state.hit.command, ...state.older].map((command, i) => ({
+    id: `${SEARCH_ID}-${String(i)}`,
+    cells: { value: { text: escape(command) } },
+  }));
+  const body = {
+    kind: "table",
+    id: `${SEARCH_ID}-table`,
+    columns: [{ key: "value", label: "", align: "left", priority: 1, minWidth: 8, flex: true, sortable: false }],
+    rows,
+    current: `${SEARCH_ID}-0`,
+    showHeader: false,
+  } satisfies Block;
+  return Object.freeze([edge, body]);
 }
 
 /**
@@ -79,24 +100,10 @@ export function searchLayer(state: SearchState, anchor: Anchor): Layer {
     // `content` and `cursor`: `⌃r h` over `/help` drew `/h…` in 27 cells, and
     // `his` over `/history` drew `…` alone (F1502). The region's width is
     // resolved at every layout, so the hit is whole wherever it fits.
-    // **The search has a cursor and the menu does not** (C15 I19). Text is
-    // being typed into this one, and leaving the terminal's cursor blinking at
-    // a prompt that is not taking keys is the *somewhere invisible* symptom
-    // derived focus exists to prevent.
-    //
-    // At the end of the query rather than of the line: the match after it is
-    // the history's text, not the user's, and a caret sitting after a recalled
-    // command claims the recall is editable here. Relative to the layer's own
-    // origin, which is what lets this be stated without knowing where the
-    // layer will be placed — row 1, because the rule is row 0 (I30).
-    cursor: Object.freeze({ row: 1, col: cells(queryPrefix(state)) }),
+    // **No cursor** (I31, C22 I157). The query is on the prompt's own line and
+    // the caret is the prompt's; a cursor declared here is the one-liner that
+    // §046 replaces, and two carets would be one too many.
   });
-}
-
-/** Everything before the caret on the search line — the label and the query. */
-function queryPrefix(state: SearchState): string {
-  const label = state.failed ? "(failed reverse-i-search)" : "(reverse-i-search)";
-  return `${label} \`${state.query}`;
 }
 
 const DAYS_TO_MONTH = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334] as const;

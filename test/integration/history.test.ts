@@ -57,36 +57,23 @@ describe("T4.3 (with C15) — the search overlay", () => {
     });
 
     // **The caret is at the end of the query, and it moves with it** (C15 I19).
-    // The search has a cursor because text is entered into it, which is the
-    // half of the field the completion menu answers the other way. Asserted
-    // before and after narrowing, because a cursor stated once and never
-    // updated passes every assertion about the layer's content.
+    // The search has no cursor: the query is drawn on the prompt's line, which
+    // is where the caret is (C22 I157). Asserted before and after narrowing, so
+    // a cursor restored at the push and never updated is seen either way.
     const opened = store.searchLayer(ANCHOR);
-    // Row 1: the panel's own rule is row 0 (C20 I30).
-    expect(opened.cursor, "at the end of an empty query").toEqual({
-      row: 1,
-      col: "(reverse-i-search) `".length,
-    });
+    // No caret of its own (C20 I31): the query is the prompt's line (C22 I157).
+    expect(opened.cursor, "none, however the query moves").toBeUndefined();
 
     store.searchType("logs");
     const narrowed = store.searchLayer(ANCHOR);
-    expect(narrowed.cursor?.col, "and four cells further on after four keystrokes").toBe(
-      (opened.cursor?.col ?? 0) + 4,
-    );
-    expect(
-      overlays.update(SEARCH_ID, {
-        content: narrowed.content,
-        ...(narrowed.cursor !== undefined && { cursor: narrowed.cursor }),
-      }),
-    ).toBe(true);
+    expect(narrowed.cursor, "still none after four keystrokes").toBeUndefined();
+    expect(overlays.update(SEARCH_ID, { content: narrowed.content })).toBe(true);
 
     expect(overlays.stack.map((l) => l.id)).toEqual([SEARCH_ID, "later"]);
     const placed = overlays.layout(REGION);
     const line = placed.find((p) => p.layer.id === SEARCH_ID);
-    expect(line?.layer.content).toEqual([
-      { kind: "rule", id: `${SEARCH_ID}-edge-top`, label: "" },
-      { kind: "raw", id: `${SEARCH_ID}-line`, text: "(reverse-i-search) `logs': /logs digit-42" },
-    ]);
+    expect(line?.layer.content.map((b) => b.kind), "the header edge, then the list").toEqual(["rule", "table"]);
+    expect(line?.layer.content[0]).toMatchObject({ kind: "rule", label: "reverse search  1 of 1" });
     expect(line?.cursor, "and placement carries it through unchanged").toEqual(narrowed.cursor);
     // Anchored above the prompt, and measured by C09 rather than asserted:
     // the edge and the line (C20 I30).
@@ -107,7 +94,9 @@ describe("T4.3 (with C15) — the search overlay", () => {
     // The edge and one line — the match does not add rows (C20 I30).
     const placed = overlays.layout(REGION);
     expect(placed[0]?.height).toBe(2);
-    expect(placed[0]?.layer.content[1]).toMatchObject({ text: expect.stringContaining("\\\\n") });
+    const list = placed[0]?.layer.content[1];
+    if (list?.kind !== "table") throw new Error("expected the list");
+    expect(list.rows[0]?.cells.value?.text).toContain("\\\\n");
   });
 });
 
@@ -223,12 +212,15 @@ describe("C20 §5 — the search drawn between two rules (I30, F1502)", () => {
       await settle();
     }
     const rows = screen().rows;
-    const at = rows.findIndex((r) => r.startsWith("(reverse-i-search)"));
+    const at = rows.findIndex((r) => r.startsWith("  › /history"));
     expect(at, "the search is drawn").toBeGreaterThan(0);
-    expect(rows[at]?.trimEnd(), "the hit whole").toBe("(reverse-i-search) `his': /history");
+    expect(rows[at]?.trimEnd(), "the hit whole").toBe("  › /history");
     // The upper edge is the layer's, at the region's width; the lower is the
     // prompt's, at the frame's (C22 I81, C22 I109).
-    expect(rows[at - 1]?.slice(0, 79), "its own rule above").toBe("─".repeat(79));
+    const edge = rows[at - 1]?.slice(0, 79) ?? "";
+    expect(edge.startsWith("── reverse search  1 of 1 "), "its own rule above, carrying the header").toBe(true);
+    expect(edge.replace("reverse search  1 of 1", "").replace(/[─ ]/g, ""), "and it is a rule to the region's width").toBe("");
+    expect(edge.length).toBe(79);
     expect(rows[at + 1], "the prompt's rule below").toBe("─".repeat(80));
   });
 });

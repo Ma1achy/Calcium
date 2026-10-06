@@ -27,11 +27,43 @@ export interface Search {
   readonly state: SearchState | null;
 }
 
+/** The older matches the list shows after the hit (I31). */
+const LIST_OLDER = 2;
+
 export function createSearch(
   entriesOf: () => readonly HistoryEntry[],
   nav: Navigator,
 ): Search {
   let state: SearchState | null = null;
+
+  /**
+   * The state, with the list's figures taken from the entries as they are now.
+   *
+   * **Matches, not entries** (I31): the header says `3 of 214` about the
+   * lines containing the query. The window below the hit is the next matches,
+   * which are not the entries beside it — `/ps` between two `h` hits is none.
+   * A retained hit that no longer matches (`failed`) has no rank, and the
+   * total is then the truth about the query: none.
+   */
+  function make(query: string, hit: SearchHit | null, failed: boolean): SearchState {
+    const needle = query.toLowerCase();
+    const matched: number[] = [];
+    if (needle !== "") {
+      entriesOf().forEach((e, i) => {
+        if (e.command.toLowerCase().includes(needle)) matched.push(i);
+      });
+    }
+    const at = hit === null ? -1 : matched.indexOf(hit.index);
+    const older = at < 0 ? [] : matched.slice(0, at).reverse().slice(0, LIST_OLDER);
+    return Object.freeze({
+      query,
+      hit,
+      failed,
+      total: matched.length,
+      rank: at < 0 ? 0 : matched.length - at,
+      older: Object.freeze(older.map((i) => entriesOf()[i]?.command ?? "")),
+    });
+  }
 
   function find(query: string, from?: number): SearchHit | null {
     if (query === "") return null;
@@ -51,15 +83,11 @@ export function createSearch(
   function renarrow(query: string): void {
     if (state === null) return;
     if (query === "") {
-      state = Object.freeze({ query, hit: null, failed: false });
+      state = make(query, null, false);
       return;
     }
     const hit = find(query, state.hit?.index);
-    state = Object.freeze({
-      query,
-      hit: hit ?? state.hit,
-      failed: hit === null,
-    });
+    state = make(query, hit ?? state.hit, hit === null);
   }
 
   return {
@@ -68,7 +96,7 @@ export function createSearch(
       // stashes it: accepting a match replaces the buffer, and `↓` past the
       // newest has to have something to give back.
       nav.stash(current);
-      state = Object.freeze({ query: "", hit: null, failed: false });
+      state = make("", null, false);
     },
 
     type(text) {
@@ -84,13 +112,9 @@ export function createSearch(
     older() {
       if (state === null) return;
       const hit = state.hit === null ? null : find(state.query, state.hit.index - 1);
-      state = Object.freeze({
-        query: state.query,
-        hit: hit ?? state.hit,
-        // At the oldest match there is nothing older, and the label says so —
-        // the same word for the same fact, that the last action found nothing new.
-        failed: hit === null,
-      });
+      // At the oldest match there is nothing older, and the header says so —
+      // the same word for the same fact, that the last action found nothing new.
+      state = make(state.query, hit ?? state.hit, hit === null);
     },
 
     end(action) {

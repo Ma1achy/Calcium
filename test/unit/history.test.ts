@@ -131,7 +131,7 @@ describe("C20 §5 — reverse search", () => {
     const { store } = await openWith(three);
 
     store.searchOpen("");
-    expect(store.searchState).toEqual({ query: "", hit: null, failed: false });
+    expect(store.searchState).toEqual({ query: "", hit: null, failed: false, total: 0, rank: 0, older: [] });
 
     store.searchType("logs");
     expect(store.searchState?.hit).toEqual({ command: "/logs digit-42", index: 1 });
@@ -234,6 +234,10 @@ describe("C20 §7a — where the two machines meet", () => {
       query: "psx",
       hit: { command: "/ps --status=running", index: 0 },
       failed: true,
+      // The retained hit has no rank in a query nothing matches (I31).
+      total: 0,
+      rank: 0,
+      older: [],
     });
 
     // And the backspace resumes from the retained hit rather than jumping back
@@ -243,6 +247,10 @@ describe("C20 §7a — where the two machines meet", () => {
       query: "ps",
       hit: { command: "/ps --status=running", index: 0 },
       failed: false,
+      // Two entries contain `ps`; the walk is on the older of them (I31).
+      total: 2,
+      rank: 2,
+      older: [],
     });
   });
 
@@ -262,7 +270,7 @@ describe("C20 §7a — where the two machines meet", () => {
 });
 
 describe("C20 §5 — reverse search is a panel between two rules (I30, F1502)", () => {
-  it("T1.21 (I30, C15 I16, C15 I19): the layer opens with its edge, declares no width, and its caret is on row 1", async () => {
+  it("T1.21 (I30, I31, C15 I16, C15 I19): the layer opens with its edge, declares no width, and has no caret — the prompt's is the query's", async () => {
     // **Asserted before and after narrowing**, because the defect was a field
     // set at the push and never again: the empty query's width is right for
     // the empty query and for nothing typed after it.
@@ -272,13 +280,16 @@ describe("C20 §5 — reverse search is a panel between two rules (I30, F1502)",
     for (const query of ["", "logs"]) {
       if (query !== "") store.searchType(query);
       const layer = store.searchLayer(anchor);
-      expect(layer.content.map((b) => b.kind), `the edge, then the line — at "${query}"`).toEqual(["rule", "raw"]);
-      expect(layer.content[0], "a plain rule").toMatchObject({ kind: "rule", label: "" });
-      expect(layer.width, "the region's width, by declaring none").toBeUndefined();
-      expect(layer.cursor, "row 1, at the end of the query").toEqual({
-        row: 1,
-        col: `(reverse-i-search) \`${query}`.length,
+      expect(
+        layer.content.map((b) => b.kind),
+        `the edge, then the list once there is a hit — at "${query}"`,
+      ).toEqual(query === "" ? ["rule"] : ["rule", "table"]);
+      expect(layer.content[0], "the edge carries the header").toMatchObject({
+        kind: "rule",
+        label: query === "" ? "reverse search" : "reverse search  1 of 1",
       });
+      expect(layer.width, "the region's width, by declaring none").toBeUndefined();
+      expect(layer.cursor, "none: the query is on the prompt's line (C22 I157)").toBeUndefined();
     }
   });
 });

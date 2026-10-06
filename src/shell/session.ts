@@ -1384,7 +1384,7 @@ class Session implements TuiInstance {
       promptRows: () => {
         const question = this.#questionRows(graph, promptWidth);
         if (question !== null) return question;
-        const held = graph.fieldHeld();
+        const held = graph.searchShown() ?? graph.fieldHeld();
         return held === null
           ? graph.editor.layout(promptWidth, PROMPT_GUTTER)
           : layout(held.text, promptWidth, PROMPT_GUTTER, graph.editor.drawAs);
@@ -1395,7 +1395,7 @@ class Session implements TuiInstance {
       // question's box, on a row the editor did not write.
       promptCursor: () => {
         if (this.#questionRows(graph, promptWidth) !== null) return { row: 0, col: 0 };
-        const held = graph.fieldHeld();
+        const held = graph.searchShown() ?? graph.fieldHeld();
         return held === null
           ? graph.editor.cursorCell(promptWidth, PROMPT_GUTTER)
           : cursorCell(held.text, held.cursor, promptWidth, PROMPT_GUTTER, graph.editor.drawAs);
@@ -1415,7 +1415,7 @@ class Session implements TuiInstance {
         // are the question's — so a live region would wash cells of a box it
         // has no coordinates in.
         if (this.#questionRows(graph, promptWidth) !== null) return EMPTY_SPANS;
-        const held = graph.fieldHeld();
+        const held = graph.searchShown() ?? graph.fieldHeld();
         const sel = held === null ? graph.editor.selection : held.selection;
         if (sel === null) return EMPTY_SPANS;
         return selectionSpans(
@@ -1438,9 +1438,9 @@ class Session implements TuiInstance {
       // ground is measured where its label was drawn or it is somewhere else,
       // which is the same argument `promptSelection` above rests on.
       promptChips: () =>
-        chipSpans(graph.fieldHeld()?.text ?? graph.editor.text, promptWidth, PROMPT_GUTTER, graph.editor.drawAs),
+        chipSpans((graph.searchShown() ?? graph.fieldHeld())?.text ?? graph.editor.text, promptWidth, PROMPT_GUTTER, graph.editor.drawAs),
       promptFocused: () =>
-        graph.router.target === "prompt" || graph.promptUnderMenu(),
+        graph.router.target === "prompt" || graph.promptUnderMenu() || graph.searchShown() !== null,
       // **Read at paint, not captured** (C22 I66). `/theme light --no-bg`
       // changes it between frames, and the frame that shows the change is the
       // one the notice commits.
@@ -2218,6 +2218,12 @@ class Session implements TuiInstance {
       // rather than computed, because this is the pair T6.30 records.
       promptRows: (width, gutter) =>
         (graph === undefined || graph === null ? undefined : this.#questionRows(graph, width)?.length) ??
+        (graph === undefined || graph === null
+          ? undefined
+          : (() => {
+              const shown = graph.searchShown();
+              return shown === null ? undefined : layout(shown.text, width, gutter, graph.editor.drawAs).length;
+            })()) ??
         graph?.editor.layout(width, gutter).length ??
         1,
       // **The footer's height, from the same measurer C14 uses** (C22 I82).

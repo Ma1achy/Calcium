@@ -111,23 +111,23 @@ const results = runPass({
       name: "find declares its width from the line at the push",
       file: LAYERS,
       from: "    owner: Object.freeze({ rung: \"substate\" as const, name: \"find\" as const }),\n",
-      to: "    owner: Object.freeze({ rung: \"substate\" as const, name: \"find\" as const }),\n    width: cells(searchLine(state)) + 4,\n",
+      to: "    owner: Object.freeze({ rung: \"substate\" as const, name: \"find\" as const }),\n    width: 20 + state.query.length,\n",
       expect: "T4.9",
     },
     {
       // T6.28 (C20 I30) — find without its upper edge.
       name: "find draws no rule above its line",
       file: LAYERS,
-      from: "    { kind: \"rule\", id: `${SEARCH_ID}-edge-top`, label: \"\" } satisfies Block,\n",
-      to: "",
+      from: "  return Object.freeze([edge, body]);",
+      to: "  return Object.freeze([body]);",
       expect: "T1.21",
     },
     {
-      // C20 I30, C15 I19 — the caret on the rule's row.
-      name: "find's caret stays on row 0",
+      // C20 I31, C22 I157 — a caret of the layer's own, beside the prompt's.
+      name: "find declares a caret again",
       file: LAYERS,
-      from: "    cursor: Object.freeze({ row: 1, col: cells(queryPrefix(state)) }),",
-      to: "    cursor: Object.freeze({ row: 0, col: cells(queryPrefix(state)) }),",
+      from: "    // **No cursor** (I31, C22 I157).",
+      to: "    cursor: Object.freeze({ row: 1, col: 0 }),\n    // **No cursor** (I31, C22 I157).",
       expect: "T1.21",
     },
   ],

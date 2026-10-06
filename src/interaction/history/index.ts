@@ -18,7 +18,7 @@ export {
   SEARCH_ID,
   listBlocks,
   searchLayer,
-  searchLine,
+  searchHeader,
   stamp,
   type Listed,
 } from "./layers.js";

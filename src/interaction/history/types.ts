@@ -25,7 +25,20 @@ export type SearchHit = Readonly<{ command: string; index: number }>;
  * contain the query printed beside it, or clear it and the next backspace
  * silently undoes a walk the user made on purpose.
  */
-export type SearchState = Readonly<{ query: string; hit: SearchHit | null; failed: boolean }>;
+export type SearchState = Readonly<{
+  query: string;
+  hit: SearchHit | null;
+  failed: boolean;
+  /**
+   * What the list draws (I31): how many entries contain the query, the hit's
+   * rank among them from the most recent (1 is the newest), and the next two
+   * older matches after it. Computed with the state, so the layer stays a pure
+   * function of it and no keystroke leaves the header describing the last one.
+   */
+  total: number;
+  rank: number;
+  older: readonly string[];
+}>;
 
 /** The prompt's own extent, as C15 wants it — C19's `menuLayer` takes the same. */
 export type Anchor = Readonly<{ row: number; rows: number }>;

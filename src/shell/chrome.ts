@@ -731,12 +731,14 @@ function ownerChips(
             ...one("panel", "dismiss", "close"),
           ];
         default:
-          // §103's specimen, word for word; the keys are the panel's rows.
+          // §046's footer, from the keymap (C22 I157, I133): `⌃r older`, `⏎ accept`,
+          // `esc cancel`. **`↑↓ hits` was named for keys a search does not
+          // bind**, and `⌥s newer` is owed because no key steps toward the newest.
           return [
             { label: "find", tone: "accent" },
-            ...keyed(hints, "panel", ["menuPrev", "menuNext"], "hits", caps),
-            ...keyed(hints, "panel", ["menuAccept"], "open", caps),
-            ...one("panel", "dismiss", "close"),
+            ...keyed(hints, "panel", ["searchOlder"], "older", caps),
+            ...keyed(hints, "panel", ["menuAccept"], "accept", caps),
+            ...one("panel", "dismiss", "cancel"),
           ];
       }
     case "inside":

@@ -54,8 +54,8 @@ const results = runPass({
     {
       name: "the fallback goes back to `config.stdout`",
       file: "src/shell/session.ts",
-      from: "drawFallback(size, (s) => void this.#graph?.lifecycle.writer.write(s));",
-      to: "drawFallback(size, (s) => void this.config.stdout.write(s));",
+      from: "drawFallback(size, this.#graph.capabilities, (s) => void this.#graph?.lifecycle.writer.write(s));",
+      to: "drawFallback(size, this.#graph.capabilities, (s) => void this.config.stdout.write(s));",
       expect: "T4.21",
     },
     {

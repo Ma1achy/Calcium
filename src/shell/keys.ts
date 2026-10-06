@@ -812,10 +812,8 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   /**
    * Redraw the search overlay after its query or its hit moved (C15 I19).
    *
-   * **The cursor goes with the content.** The caret sits at the end of the
-   * query and the query is what just changed, so an update carrying only
-   * `content` leaves it where the previous keystroke put it — a caret that
-   * stops following the text being typed into it.
+   * **The content only** (C20 I31, C22 I157): the query is the prompt's line
+   * and the caret the prompt's, so there is no layer cursor to carry.
    *
    * Shared by `searchOlder` and `searchTyped` rather than written twice: they
    * are two ways to move the same overlay, and a second copy is the arm that
@@ -824,10 +822,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
   function refreshSearchLayer(): void {
     if (deps.history.searchState === null) return;
     const next = deps.history.searchLayer(deps.anchor());
-    deps.overlays.update(SEARCH_ID, {
-      content: next.content,
-      ...(next.cursor !== undefined && { cursor: next.cursor }),
-    });
+    deps.overlays.update(SEARCH_ID, { content: next.content });
   }
 
   function afterEdit(): void {
@@ -1089,7 +1084,19 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       selection.prev();
       redrawMenu();
     },
-    menuAccept: () => void applyCandidate(true),
+    menuAccept: () => {
+      // **A search accepts into the buffer and runs nothing** (C20 I32, §046's
+      // `⏎ accept`). The row is the completion menu's and read the menu's
+      // candidates, which a search has none of, so `⏎` and `⇥` did nothing at
+      // all in a search.
+      if (deps.overlays.top?.id === SEARCH_ID) {
+        const found = deps.history.searchEnd("accept");
+        deps.overlays.pop();
+        if (found !== null) recall(found);
+        return;
+      }
+      applyCandidate(true);
+    },
 
     // Generic rather than the menu's alone: C15's `pop()` inspects the top and
     // refuses a non-dismissable layer, which is what lets one row serve every
@@ -1111,8 +1118,11 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         return;
       }
       if (top.id === SEARCH_ID) {
-        const found = deps.history.searchEnd("cancel");
-        if (found !== null) deps.editor.setText(found);
+        // **The layer goes with the state** (C20 I32). `searchEnd` ends the
+        // search and removes nothing, so `esc` closed the search and left the
+        // panel drawn over a prompt that had stopped answering it.
+        deps.history.searchEnd("cancel");
+        deps.overlays.pop();
         return;
       }
       deps.overlays.pop();

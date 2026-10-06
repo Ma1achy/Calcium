@@ -9,6 +9,7 @@ const SUITE = [
   "test/unit/session-frame.test.ts",
   "test/unit/session-fallback.test.ts",
   "test/unit/session-identity.test.ts",
+  "test/unit/fallback-frame.test.ts",
 ].join(" ");
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
@@ -96,7 +97,7 @@ const results = runPass({
     {
       name: "fallback: measure with .length rather than cells()",
       file: "src/shell/fallback.ts",
-      from: "    if (cells(out) + cells(ch) > width) break;",
+      from: "    if (cells(out, ambiguous) + cells(ch, ambiguous) > width) break;",
       to: "    if (out.length + ch.length > width) break;", // graphemes-ok: the mutation is the defect
       expect: "T3.8c",
     },
@@ -159,13 +160,12 @@ const results = runPass({
       to: "  if (size.rows >= 4) {",
       expect: "T3.8e",
     },
-    {
-      name: "fallback: measure the lines at the narrow reading whatever the record says",
-      file: "src/shell/fallback.ts",
-      from: "  const width = (t: string): number => cells(t, caps.ambiguousWidth);",
-      to: "  const width = (t: string): number => cells(t, \"narrow\");",
-      expect: "T3.8e",
-    },
+    // **No mutation of the `ambiguousWidth` argument to `width`, and that is a
+    // finding rather than an omission** (C22 I153). It was here and survived, and
+    // it is an *equivalent* mutant: at the wide reading the vocabulary has fallen
+    // to ASCII (C09 I48), so no string measured there holds an ambiguous cell, and
+    // at narrow the narrow reading is the record's. The argument is required by
+    // SS50 and costs nothing, but no input makes it observable.
     {
       name: "fallback: spell the multiplication with a Unicode `×` at the wide reading",
       file: "src/shell/fallback.ts",
