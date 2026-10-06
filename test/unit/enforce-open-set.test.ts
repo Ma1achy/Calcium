@@ -9,7 +9,7 @@ import {
   TRIAGE_OPEN,
 } from "../../tools/enforce/findings.mjs";
 
-const TRIAGE = "examples/docker/TRIAGE.md";
+const TRIAGE = "docs/archive/records/TRIAGE.md";
 const real = (): string => readFileSync(TRIAGE, "utf8");
 const io = (text: string): { read: () => string } => ({ read: () => text });
 
@@ -118,7 +118,7 @@ describe("SP12 — the register's open set", () => {
     // citation resolver, which is SP6's fabrication's precedent: its id was a
     // literal `F999` until the ledger reached F999 and the row then failed
     // while the gate was correct. FINDINGS F1041.
-    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const ledger = readFileSync("docs/archive/records/FINDINGS.md", "utf8");
     const top = Math.max(0, ...[...ledger.matchAll(/^## F(\d+)/gmu)].map((m) => Number(m[1])));
     const absent = `F${String(top + 1)}`;
     const alsoAbsent = `F${String(top + 2)}`;

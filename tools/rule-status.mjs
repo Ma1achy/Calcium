@@ -41,7 +41,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
-const LEDGER = "docs/design/language/RULE_LEDGER.md";
+const LEDGER = "docs/archive/records/RULE_LEDGER.md";
 const REGISTRY = "docs/design/language/calcium-registry.json";
 // The corpus a citation may live in — everything but the registry's own home,
 // because a rule citing itself is not a reference to it.

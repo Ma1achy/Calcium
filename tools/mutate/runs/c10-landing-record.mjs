@@ -11,7 +11,7 @@ import { execSync } from "node:child_process";
 import { fsIo, report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const MD = "docs/design/language/MILESTONES.md";
+const MD = "docs/archive/records/MILESTONES.md";
 
 const { read, write } = fsIo(ROOT);
 const run = () => {

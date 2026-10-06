@@ -16,7 +16,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const LEDGER = "docs/design/language/RULE_LEDGER.md";
+const LEDGER = "docs/archive/records/RULE_LEDGER.md";
 const text = (): string => readFileSync(LEDGER, "utf8");
 
 /** The tool against a mutated ledger — `{ code, out }`, because the code is the verdict. */

@@ -1818,8 +1818,8 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
 
   /** The ledger and the triage as they are, for the two fabrications below. */
   const inventoryIo = (): { ledger: string; triage: string } => ({
-    ledger: readFileSync("examples/docker/FINDINGS.md", "utf8"),
-    triage: readFileSync("examples/docker/TRIAGE.md", "utf8"),
+    ledger: readFileSync("docs/archive/records/FINDINGS.md", "utf8"),
+    triage: readFileSync("docs/archive/records/TRIAGE.md", "utf8"),
   });
   const io = (l: string, t: string) => ({
     read: (f: string) => (f.endsWith("TRIAGE.md") ? t : l),
@@ -1990,7 +1990,7 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     // heading and a two-row table above the real entry, and every citation of
     // that id resolved to the stub. `declared()` answers *does this exist*, so
     // it was green throughout.
-    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const ledger = readFileSync("docs/archive/records/FINDINGS.md", "utf8");
     const dup = `${ledger}\n\n## F164 — a second section under a live id\n`;
     const v = checkFindingIds({ read: () => dup });
     expect(v).toHaveLength(1);
@@ -2003,7 +2003,7 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     // The other arm, and the reason the convention is a list rather than a
     // pattern: matching any heading with text before the dash would excuse a
     // real duplicate written the same way.
-    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const ledger = readFileSync("docs/archive/records/FINDINGS.md", "utf8");
     const extra = `${ledger}\n\n## F164 revisited — a fifth continuation nobody decided on\n`;
     const v = checkFindingIds({ read: () => extra });
     expect(v).toHaveLength(1);
@@ -2129,7 +2129,7 @@ describe("A03 SP4 — Seam 4 and its owners agree, both directions", () => {
     // carries for the other reason. **A number is never written out in a file
     // this rule reads**, which is a limit on how the fixture may be phrased and
     // not on the rule.
-    const ledger = readFileSync("examples/docker/FINDINGS.md", "utf8");
+    const ledger = readFileSync("docs/archive/records/FINDINGS.md", "utf8");
     const next =
       Math.max(0, ...[...ledger.matchAll(/^## F(\d+)/gmu)].map((m) => Number(m[1]))) + 1; // cells-ok — a finding number
     const id = `F${String(next)}`;

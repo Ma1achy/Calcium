@@ -1737,7 +1737,7 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
 
 
   it("T2.172 (C10 I57, MILESTONES): every recorded deliverable still resolves — the sweep, made a command", () => {
-    const md = readFileSync(new URL("../../docs/design/language/MILESTONES.md", import.meta.url), "utf8");
+    const md = readFileSync(new URL("../../docs/archive/records/MILESTONES.md", import.meta.url), "utf8");
     // **The whole heading line**, for T2.58's reason two sections up: a prefix
     // anchor let a rename survive the control twice, in two different gates,
     // an hour apart.
@@ -1776,7 +1776,7 @@ describe("C10 I52 — the registry's state axes and the spec's declarations", ()
   });
 
   it("T2.58 (C10 I57, MILESTONES): every MR's seam still resolves — the revert detector", () => {
-    const md = readFileSync(new URL("../../docs/design/language/MILESTONES.md", import.meta.url), "utf8");
+    const md = readFileSync(new URL("../../docs/archive/records/MILESTONES.md", import.meta.url), "utf8");
     // **The WHOLE heading line, and this is the second time.** §4k.5's gate was
     // anchored on `### 4k.5` and matched `### 4k.5x`, so its control — rename
     // the heading — survived; the lesson was written into §4k.5 and then the

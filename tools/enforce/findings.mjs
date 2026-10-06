@@ -38,7 +38,7 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 
-const LEDGER = "examples/docker/FINDINGS.md";
+const LEDGER = "docs/archive/records/FINDINGS.md";
 
 /**
  * Where a citation may appear. Anything else is prose about the number.
@@ -383,7 +383,7 @@ export function checkFindings(io) {
   return violations;
 }
 
-const TRIAGE = "examples/docker/TRIAGE.md";
+const TRIAGE = "docs/archive/records/TRIAGE.md";
 
 /**
  * SP6 — every finding in the ledger is keyed in the triage, and the triage's
