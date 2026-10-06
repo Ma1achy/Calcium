@@ -53,7 +53,7 @@ const results = runPass({
       name: "THE DEFECT: the indent is capped per row, by the row's own name",
       file: KIND,
       from: "        const indent = Math.min(rung.step * r.depth, rung.cap);",
-      to: "        const indent = rung.cap === Infinity ? rung.step * r.depth : Math.min(rung.step * r.depth, Math.max(0, w - TWISTY_CELLS - measure(stripControl(r.node.label))));",
+      to: "        const indent = rung.cap === Infinity ? rung.step * r.depth : Math.min(rung.step * r.depth, Math.max(0, w - TWISTY_CELLS - measure(r.node.label)));",
       expect: "T1.53",
     },
     {
@@ -68,8 +68,8 @@ const results = runPass({
       // L3 — one row's aside dropped, the rest kept: a column with a hole.
       name: "an aside goes alone rather than as a group",
       file: KIND,
-      from: "        const aside = rung.asides && r.node.aside !== undefined ? stripControl(r.node.aside) : \"\";",
-      to: "        const aside = r.node.aside !== undefined && indent + TWISTY_CELLS + measure(stripControl(r.node.label)) + ASIDE_GAP + measure(stripControl(r.node.aside)) <= w ? stripControl(r.node.aside) : \"\";",
+      from: "        const aside = rung.asides && r.node.aside !== undefined ? r.node.aside : \"\";",
+      to: "        const aside = r.node.aside !== undefined && indent + TWISTY_CELLS + measure(r.node.label) + ASIDE_GAP + measure(r.node.aside) <= w ? r.node.aside : \"\";",
       expect: "T1.53",
     },
     {

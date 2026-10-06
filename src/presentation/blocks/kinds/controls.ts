@@ -12,7 +12,7 @@
  */
 import { normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Choice, Control } from "../../../data/viewmodel/index.js";
-import { cells, stripControl, truncate } from "../../text.js";
+import { cells, truncate } from "../../text.js";
 import { glyphs } from "../glyphs.js";
 import { clampSpans, focusShapeStyle, paint, rows, tone, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Rendered } from "../types.js";
@@ -46,7 +46,7 @@ function markOf(block: Choice, chosen: boolean, caps: Caps): string {
 function optionText(block: Choice, index: number, caps: Caps): string {
   const option = block.options[index];
   if (option === undefined) return "";
-  return `${markOf(block, option.chosen === true, caps)} ${stripControl(option.label)}`;
+  return `${markOf(block, option.chosen === true, caps)} ${option.label}`;
 }
 
 /**
@@ -59,7 +59,7 @@ function optionText(block: Choice, index: number, caps: Caps): string {
 function optionColumns(block: Choice, width: number, caps: Caps): readonly (readonly [number, number])[] {
   const w = normaliseWidth(width);
   const out: [number, number][] = [];
-  let col = block.label === undefined ? 0 : cells(stripControl(block.label), caps.ambiguousWidth) + GAP;
+  let col = block.label === undefined ? 0 : cells(block.label, caps.ambiguousWidth) + GAP;
   block.options.forEach((_, i) => {
     const text = optionText(block, i, caps);
     const from = Math.min(col, w);
@@ -116,7 +116,7 @@ export const choiceDefinition: BlockDefinition<Choice> = {
     const head = ctx.focus !== null && ctx.focus.blockId === block.id ? ctx.focus.rowId : null;
     const spans: Span[] = [];
     if (block.label !== undefined) {
-      spans.push({ text: stripControl(block.label), style: tone("muted", ctx.theme, ctx.capabilities) });
+      spans.push({ text: block.label, style: tone("muted", ctx.theme, ctx.capabilities) });
       spans.push({ text: " ".repeat(GAP) }); // cells-ok — a fixed gap
     }
     block.options.forEach((option, i) => {
@@ -213,8 +213,8 @@ export const controlDefinition: BlockDefinition<Control> = {
     // is a control drawn as three things, and it satisfies every assertion that
     // only asks whether focus changed anything.
     const on = focused ? "focusGround" : undefined;
-    const label = truncate(stripControl(block.label), Math.max(0, Math.floor(width / 3)), ctx.capabilities);
-    const value = stripControl(block.value);
+    const label = truncate(block.label, Math.max(0, Math.floor(width / 3)), ctx.capabilities);
+    const value = block.value;
     const used = cells(label, ctx.capabilities.ambiguousWidth) + cells(value, ctx.capabilities.ambiguousWidth) + GAP * 2;
     const room = Math.max(3, width - used); // cells-ok — the track's residual
     const base = tone("default", ctx.theme, ctx.capabilities, on);

@@ -64,8 +64,8 @@ const results = runPass({
       // that only asks whether a ground appeared.
       name: "the wash covers the label and not the mark",
       file: FILE,
-      from: "  return `${markOf(block, option.chosen === true, caps)} ${stripControl(option.label)}`;",
-      to: "  return stripControl(option.label);",
+      from: "  return `${markOf(block, option.chosen === true, caps)} ${option.label}`;",
+      to: "  return option.label;",
       expect: "T1.72",
     },
     {
@@ -94,8 +94,8 @@ const results = runPass({
       // weight that no longer says *chosen*.
       name: "the block label is drawn bold",
       file: FILE,
-      from: '      spans.push({ text: stripControl(block.label), style: tone("muted", ctx.theme, ctx.capabilities) });',
-      to: '      spans.push({ text: stripControl(block.label), style: { ...tone("muted", ctx.theme, ctx.capabilities), bold: true } });',
+      from: '      spans.push({ text: block.label, style: tone("muted", ctx.theme, ctx.capabilities) });',
+      to: '      spans.push({ text: block.label, style: { ...tone("muted", ctx.theme, ctx.capabilities), bold: true } });',
       expect: "T1.90",
     },
     {

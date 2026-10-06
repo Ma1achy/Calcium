@@ -24,7 +24,7 @@ import {
 import type { Block, CopyFn, Group, MeasureFn, Mosaic, MosaicRect, Panel, Scroll, WidthFn } from "../../../data/viewmodel/index.js";
 import { axesOf, groupPlacements, mosaicRects, parseAreas } from "../../../data/viewmodel/index.js";
 import type { NavElement } from "../types.js";
-import { cells, sliceCells, stripControl, truncate } from "../../text.js";
+import { cells, sliceCells, truncate } from "../../text.js";
 import { SPINNER_CELLS, glyphs, scrollbarSet, spinnerFrameAt } from "../glyphs.js";
 import { scrollbarColumn } from "../scrollbar.js";
 import { based, clampSpans, paint, paneFocus, rows, tone } from "../paint.js";
@@ -112,7 +112,7 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // written as arithmetic.
     const framed = layout(panelMeasureBox(block, w, { kind: "fit", min: 1 }, undefined, widthChild), w).rect.width;
     const rail = (text: string | undefined, live: boolean): number => {
-      const shown = stripControl(text ?? "");
+      const shown = text ?? "";
       if (shown === "") return 0;
       // **One cell for the spinner frame and one for its space** — a constant
       // rather than a lookup, and that is what makes `measure` capability-free
@@ -146,7 +146,7 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // mirrored — and two copies would be two places for the fill arithmetic to
     // drift, which is the arithmetic a border that does not close reports.
     const railPart = (text: string | undefined, room = inner): string => {
-      const shown = truncate(stripControl(text ?? ""), Math.max(0, room - 3), ctx.capabilities);
+      const shown = truncate(text ?? "", Math.max(0, room - 3), ctx.capabilities);
       return shown === "" ? "" : ` ${shown} `;
     };
 
@@ -174,7 +174,7 @@ export const panelDefinition: BlockDefinition<Panel> = {
     // change width as it animates and `measure` never sees the tick (I8).
     const titlePart = railPart(
       block.live === true
-        ? `${spinnerFrameAt(ctx.capabilities, glyphTick(ctx.tick, ctx.motion)) || g.dotted} ${stripControl(block.title)}`.trimEnd()
+        ? `${spinnerFrameAt(ctx.capabilities, glyphTick(ctx.tick, ctx.motion)) || g.dotted} ${block.title}`.trimEnd()
         : block.title,
       inner - noticeRoom,
     );

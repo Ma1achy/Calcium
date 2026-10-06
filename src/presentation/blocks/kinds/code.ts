@@ -35,7 +35,7 @@ import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Code, Probe } from "../../../data/viewmodel/index.js";
-import { cells, clusterEnds, expandTabs, hardWrapCells, stripControl, truncateParts } from "../../text.js";
+import { cells, clusterEnds, expandTabs, hardWrapCells, truncateParts } from "../../text.js";
 import { sliceRuns } from "../../runs.js";
 import { paint, rows, slot, tone, type Span } from "../paint.js";
 import type { BlockDefinition, RenderContext, Windowed, Rendered } from "../types.js";
@@ -402,7 +402,7 @@ function lineRangeOf(block: Code, lineCount: number): readonly [number, number] 
  * re-basing it, for the same reason.
  */
 function codeRows(block: Code, width: number): readonly Row[] {
-  const source = expandTabs(stripControl(block.text));
+  const source = expandTabs(block.text);
 
   // A trailing newline terminates the last line rather than starting a blank
   // one. `"a\n"` is one line of code, and counting two makes every fixture with
@@ -507,7 +507,7 @@ export const codeDefinition: BlockDefinition<Code> = {
   render(block: Code, ctx: RenderContext): Rendered {
     const width = normaliseWidth(ctx.width);
     const probe = ctx.probe;
-    const source = expandTabs(stripControl(block.text));
+    const source = expandTabs(block.text);
     // **Tokenise and paint, because they scale with different things.**
     // Tokenising is a whole-block parse memoised on `(language, text)` — paid
     // once and then free — and painting is per *visible* row, paid every frame.

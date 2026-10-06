@@ -25,7 +25,7 @@
  */
 
 import { insetWidth, type KeyValue } from "../../data/viewmodel/index.js";
-import { cells, stripControl, truncate } from "../text.js";
+import { cells, truncate } from "../text.js";
 import { background, based, clampSpans, focusStyle, groundSequence, paint, selectionStyle, tone, withBackground, type Span } from "./paint.js";
 import type { NavElement, RenderContext } from "./types.js";
 
@@ -396,8 +396,8 @@ export function withheldLines(
   const elev = background("surface.bgElev", ctx.theme, ctx.capabilities);
   const base = elev.background === undefined ? "" : groundSequence("surface.bgElev", ctx.theme, ctx.capabilities);
   return list.map((part) => {
-    const label = stripControl(part.label);
-    const value = stripControl(part.value);
+    const label = part.label;
+    const value = part.value;
     const labelled = cells(label, ambiguous) + DETAIL_GAP + minValue <= inner;
     const spans: Span[] = labelled
       ? [

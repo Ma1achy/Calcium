@@ -12,7 +12,7 @@
 import type { AmbiguousWidth } from "../../text.js";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
 import type { Comparison, Events, Glyph, KeyValue, Logs, Steps, Tone } from "../../../data/viewmodel/index.js";
-import { cells, stripControl, truncate } from "../../text.js";
+import { cells, truncate } from "../../text.js";
 import { glyphFor, glyphs, spinnerFrameAt } from "../glyphs.js";
 import { valueBar } from "../../plot/bar.js";
 import { clampSpans, pad, paint, rows, tone, type Span } from "../paint.js";
@@ -96,7 +96,7 @@ function valueOf(
   // a default would make the invalid document render, which is the one thing
   // that keeps a gate from being reached.
   if (entry.bar === undefined || entry.barWidth === undefined) {
-    return truncate(stripControl(entry.value), valueWidth, ctx.capabilities);
+    return truncate(entry.value, valueWidth, ctx.capabilities);
   }
 
   const barWidth = Math.min(Math.floor(entry.barWidth), valueWidth);
@@ -125,7 +125,7 @@ function valueOf(
   const rest = valueWidth - barWidth - COLUMN_GAP;
   if (rest < MIN_DETAIL) return run;
 
-  const detail = truncate(stripControl(entry.value), rest, ctx.capabilities);
+  const detail = truncate(entry.value, rest, ctx.capabilities);
   return detail === "" ? run : `${run}${" ".repeat(COLUMN_GAP)}${detail}`;
 }
 
@@ -140,7 +140,7 @@ function valueOf(
  */
 function keyColumn(block: KeyValue, width: number): number {
   return widest(
-    block.rows.map((r) => stripControl(r.label)),
+    block.rows.map((r) => r.label),
     Math.min(KEY_COLUMN_CAP, Math.max(1, normaliseWidth(width) - 4)),
   );
 }
@@ -151,7 +151,7 @@ function keyColumn(block: KeyValue, width: number): number {
  * targets cannot disagree about whether the block shed.
  */
 function keyValueParts(block: KeyValue, width: number, ambiguous: AmbiguousWidth): readonly Part[] {
-  const valueNat = widest(block.rows.map((r) => stripControl(r.value)), width, ambiguous);
+  const valueNat = widest(block.rows.map((r) => r.value), width, ambiguous);
   // **The declared order** (C09 I81): the value gives way first and the key
   // is the last part standing, because a value with no key is not a fact —
   // which is the half of the invariant's table this kind's frame agreed with.
@@ -163,7 +163,7 @@ function keyValueParts(block: KeyValue, width: number, ambiguous: AmbiguousWidth
   // that is `… ⋯1` — a key crushed to an ellipsis beside a statement about
   // something else. A part's natural width is what it wants; what it gets is
   // the ladder's to decide, and the two must not be the same number.
-  const keyNat = block.keyWidth ?? widest(block.rows.map((r) => stripControl(r.label)), KEY_COLUMN_CAP);
+  const keyNat = block.keyWidth ?? widest(block.rows.map((r) => r.label), KEY_COLUMN_CAP);
   return [
     {
       id: "key",
@@ -228,7 +228,7 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
     if (block.rows.some((row) => row.bar !== undefined)) return w;
     const keyWidth = block.keyWidth ?? keyColumn(block, w);
     let longest = 0;
-    for (const row of block.rows) longest = Math.max(longest, cells(stripControl(row.value))); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
+    for (const row of block.rows) longest = Math.max(longest, cells(row.value)); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
     return Math.max(1, Math.min(w, Math.max(keyWidth + 4, keyWidth + COLUMN_GAP + longest)));
   },
 
@@ -350,7 +350,7 @@ export const keyValueDefinition: BlockDefinition<KeyValue> = {
         // column is a width rather than the longest key that happens to fit
         // (T1.5).
         const key = pad(
-          truncate(stripControl(entry.label), keyRoom, ctx.capabilities),
+          truncate(entry.label, keyRoom, ctx.capabilities),
           keyRoom,
           ambiguous,
         );
@@ -453,9 +453,9 @@ export const logsDefinition: BlockDefinition<Logs> = {
 
     return rows(
       block.lines.map((line) => {
-        const ts = stripControl(line.ts);
+        const ts = line.ts;
         const level = pad(
-          truncate(stripControl(line.level), LEVEL_WIDTH, ctx.capabilities),
+          truncate(line.level, LEVEL_WIDTH, ctx.capabilities),
           LEVEL_WIDTH,
         );
 
@@ -463,7 +463,7 @@ export const logsDefinition: BlockDefinition<Logs> = {
         // the block's height depend on its content, and a tail that reflows is
         // a tail nobody can read (§3, T6.10).
         const room = Math.max(1, width - cells(ts, ctx.capabilities.ambiguousWidth) - LEVEL_WIDTH - COLUMN_GAP * 2);
-        const message = truncate(stripControl(line.message), room, ctx.capabilities);
+        const message = truncate(line.message, room, ctx.capabilities);
 
         return paint(
           clampSpans(
@@ -505,15 +505,15 @@ function shortTime(ts: string): string {
  * layout snaps between them.
  */
 function eventsLayout(block: Events, width: number, ambiguous: AmbiguousWidth) {
-  const typeWidth = widest(block.events.map((e) => stripControl(e.type)), width);
+  const typeWidth = widest(block.events.map((e) => e.type), width);
   // **One ladder for the block, not one per row** (C09 I81). The columns have
   // to agree down the block or the rows stop being a table, so the parts are
   // measured over every event and the shed decision is taken once. A per-row
   // ladder would shed the type on one line and keep it on the next, which is
   // the same defect this replaces wearing a tidier shape.
-  const tsWidth = widest(block.events.map((e) => stripControl(e.ts)), width, ambiguous);
-  const tsFloor = widest(block.events.map((e) => shortTime(stripControl(e.ts))), width, ambiguous);
-  const msgWidth = widest(block.events.map((e) => stripControl(e.message)), width, ambiguous);
+  const tsWidth = widest(block.events.map((e) => e.ts), width, ambiguous);
+  const tsFloor = widest(block.events.map((e) => shortTime(e.ts)), width, ambiguous);
+  const msgWidth = widest(block.events.map((e) => e.message), width, ambiguous);
   // **The declared order** (C09 I81), highest rank last to go: the time is
   // what a reader locates an event by, the message is what it says, and the
   // type is the part a row can lose and still be read. The tone costs no
@@ -649,7 +649,7 @@ export const eventsDefinition: BlockDefinition<Events> = {
       block.events.flatMap((event, i) => {
         const lit = litAt(i);
         const ink = (t: Tone): ReturnType<typeof tone> => tone(t, ctx.theme, ctx.capabilities, lit?.on);
-        const full = stripControl(event.ts);
+        const full = event.ts;
         // The floor form when the column is narrower than the whole time, which
         // is the shrink rather than a cut.
         const ts = tsRoom === null ? null : pad(cells(full, ambiguous) <= tsRoom ? full : shortTime(full), tsRoom, ambiguous);
@@ -670,7 +670,7 @@ export const eventsDefinition: BlockDefinition<Events> = {
                 ? []
                 : [
                     {
-                      text: pad(truncate(stripControl(event.type), typeRoom, ctx.capabilities), typeRoom),
+                      text: pad(truncate(event.type, typeRoom, ctx.capabilities), typeRoom),
                       style: ink(event.tone ?? "accent"),
                     },
                     { text: " ".repeat(COLUMN_GAP) },
@@ -679,7 +679,7 @@ export const eventsDefinition: BlockDefinition<Events> = {
                 ? []
                 : [
                     {
-                      text: truncate(stripControl(event.message), msgRoom, ctx.capabilities),
+                      text: truncate(event.message, msgRoom, ctx.capabilities),
                       style: ink("default"),
                     },
                   ]),
@@ -793,16 +793,16 @@ function comparisonParts(block: Comparison, width: number, ambiguous: AmbiguousW
   // Parts carry their own leading gap and the step is given `gap: 0`, because
   // this row is not evenly separated: the change mark abuts the field name
   // and the verdict mark abuts its value inside one column.
-  const labelA = stripControl(block.labels?.[0] ?? "a");
-  const labelB = stripControl(block.labels?.[1] ?? "b");
+  const labelA = block.labels?.[0] ?? "a";
+  const labelB = block.labels?.[1] ?? "b";
   const valueNat = Math.max(
-    widest(block.rows.map((r) => stripControl(r.a)), width, ambiguous),
-    widest(block.rows.map((r) => stripControl(r.b)), width, ambiguous),
+    widest(block.rows.map((r) => r.a), width, ambiguous),
+    widest(block.rows.map((r) => r.b), width, ambiguous),
     cells(labelA, ambiguous),
     cells(labelB, ambiguous),
   );
   const fieldNat = Math.max(
-    widest(block.rows.map((r) => stripControl(r.field)), width, ambiguous),
+    widest(block.rows.map((r) => r.field), width, ambiguous),
     cells("field", ambiguous),
   );
   // **The declared order** (C09 I81), and it is the reverse of the one the
@@ -1056,11 +1056,11 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
       return [
       line({
         change: CHANGE_MARKERS[entry.change ?? "unchanged"],
-        field: stripControl(entry.field),
-        a: stripControl(entry.a),
+        field: entry.field,
+        a: entry.a,
         verdict: markFor(entry.verdict, judgedRoom, ctx),
         reserve: judgedRoom,
-        b: stripControl(entry.b),
+        b: entry.b,
         style: (id) =>
           id === "b"
             ? tone(verdictTone(entry.verdict), ctx.theme, ctx.capabilities, on)
@@ -1084,9 +1084,9 @@ export const comparisonDefinition: BlockDefinition<Comparison> = {
  * answer for the layout and the elements** (C09 I113).
  */
 function stepsParts(block: Steps, width: number, ambiguous: AmbiguousWidth) {
-  const labelNat = widest(block.steps.map((s) => stripControl(s.label)), width, ambiguous);
+  const labelNat = widest(block.steps.map((s) => s.label), width, ambiguous);
   const detailNat = widest(
-    block.steps.map((s) => stripControl(s.detail ?? "")),
+    block.steps.map((s) => s.detail ?? ""),
     width,
     ambiguous,
   );
@@ -1228,7 +1228,7 @@ export const stepsDefinition: BlockDefinition<Steps> = {
         const label =
           labelWidth <= 0
             ? ""
-            : pad(truncate(stripControl(step.label), labelWidth, ctx.capabilities), labelWidth);
+            : pad(truncate(step.label, labelWidth, ctx.capabilities), labelWidth);
         const detailRoom =
           detailWidth ??
           Math.max(1, width - cells(marker, ambiguous) - 1 - labelWidth - COLUMN_GAP);
@@ -1242,7 +1242,7 @@ export const stepsDefinition: BlockDefinition<Steps> = {
         const detail =
           step.detail === undefined || detailRoom <= 0
             ? ""
-            : truncate(stripControl(step.detail), detailRoom, ctx.capabilities);
+            : truncate(step.detail, detailRoom, ctx.capabilities);
 
         const spans: Span[] = [
           { text: `${marker} `, style: ink(markerTone) },

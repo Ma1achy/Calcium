@@ -54,8 +54,8 @@ const results = runPass({
       // T6.2 (C26 I30, D10).
       name: "↓ walks the row rather than leaving it",
       file: KEYS,
-      from: "      const next = elements.slice(i + 1).find((q) => !passedOver(here, q) && (here === undefined || !oneRow(here, q)));",
-      to: "      const next = elements.slice(i + 1).find((q) => !passedOver(here, q));",
+      from: "      const at = elements.findIndex((q, k) => k > i && !passedOver(here, q) && (here === undefined || !oneRow(here, q)));",
+      to: "      const at = elements.findIndex((q, k) => k > i && !passedOver(here, q));",
       expect: "T1.165",
     },
     {
@@ -115,15 +115,15 @@ const results = runPass({
       // T6.4 (C26 I31, M14.2).
       name: "a press on a tape tested against the row's whole width",
       file: CONSTRUCT,
-      from: '      if (block.kind === "tape") {\n        if (!tapeCols.has(block.id)) {',
-      to: '      if (block.kind === "tape-") {\n        if (!tapeCols.has(block.id)) {',
+      from: '      if (block === null || block.kind !== "tape") return p.element.cols;',
+      to: '      if (block === null || block.kind !== "tape" || true) return p.element.cols;',
       expect: "T4.34",
     },
     {
       name: "the pointer's columns asked at current's anchor",
       file: CONSTRUCT,
-      from: "                  focusedMemberOf(hit.id, block.id),\n                ),",
-      to: "                  null,\n                ),",
+      from: "                focusedMemberOf(entry.id, block.id),\n              ),",
+      to: "                null,\n              ),",
       expect: "T4.34",
     },
     {

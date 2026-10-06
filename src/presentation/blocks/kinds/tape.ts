@@ -6,12 +6,13 @@
  */
 import type { CallState, Tape } from "../../../data/viewmodel/index.js";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
-import { cells, stripControl, truncate } from "../../text.js";
+import { cells, truncate } from "../../text.js";
 import { CALL_STATE_GLYPH, glyphCells, glyphFor, glyphs, spinnerFrameAt } from "../glyphs.js";
 import { clampSpans, focusShapeStyle, paint, rows, selectionStyle, tone, type Span } from "../paint.js";
 import { tapeWindow, type TapeMarks } from "../tape-window.js";
 import type { BlockDefinition, NavElement, RenderContext, Rendered } from "../types.js";
 import { glyphTick } from "../ramp.js";
+import { neutralBlock } from "../neutral.js";
 
 /**
  * Two spaces between members, as `pills` uses between chips — one is too close
@@ -41,7 +42,7 @@ function memberText(
   detail: boolean,
   ctx: Pick<RenderContext, "capabilities" | "tick" | "motion">,
 ): string {
-  const label = stripControl(member.label);
+  const label = member.label;
   // **A state this build does not know carries no mark, and does not throw.**
   // `validateDocument` refuses one now (C04 I144), and the sentence here that
   // said it was *not checked* is superseded. The guard stays for a tape built
@@ -57,7 +58,7 @@ function memberText(
       : running
         ? spinnerFrameAt(ctx.capabilities, glyphTick(ctx.tick, ctx.motion), TAPE_SPINNER)
         : glyphFor(slot, ctx.capabilities);
-  const shown = detail ? stripControl(member.detail ?? "") : "";
+  const shown = detail ? member.detail ?? "" : "";
   const tail = running ? [mark, shown] : [shown, mark];
   const parts = [label, ...tail].filter((p) => p !== "");
   return parts.join(" ");
@@ -151,7 +152,10 @@ export function tapeStart(
   held: number,
   focused: string | null = null,
 ): number {
-  return layout(block, width, { capabilities, tick: 0 }, held, focused).window.from;
+  // **The neutral block** (C09 I127, T2.232): the shell calls this with the
+  // document's own block, and the columns it reads are measured over the text
+  // the frame draws.
+  return layout(neutralBlock(block) as Tape, width, { capabilities, tick: 0 }, held, focused).window.from;
 }
 
 /**
@@ -175,8 +179,8 @@ function naturalWidth(block: Tape): number {
   block.members.forEach((m, i) => {
     const slot = m.state === undefined ? undefined : CALL_STATE_GLYPH[m.state];
     const parts = [
-      cells(stripControl(m.label), ambiguous),
-      cells(stripControl(m.detail ?? ""), ambiguous),
+      cells(m.label, ambiguous),
+      cells(m.detail ?? "", ambiguous),
       slot === undefined ? 0 : m.state === "running" ? 1 : glyphCells(slot),
     ].filter((n) => n > 0);
     const text = parts.reduce((a, n) => a + n, 0) + Math.max(0, parts.length - 1); // cells-ok — measured cells and the joins between them
@@ -249,7 +253,7 @@ export function tapeMemberCols(
   held: number,
   focused: string | null = null,
 ): readonly Readonly<{ from: number; to: number }>[] {
-  const { room, pieces } = piecesOf(block, width, { capabilities, tick: 0 }, held, focused);
+  const { room, pieces } = piecesOf(neutralBlock(block) as Tape, width, { capabilities, tick: 0 }, held, focused);
   const drawn = new Map<number, { from: number; to: number }>();
   let cursor = 0;
   for (const piece of pieces) {
@@ -287,7 +291,7 @@ function tapeElements(block: Tape, width: number): readonly NavElement[] {
         level: "cell" as const,
         rows: Object.freeze({ from: 0, to: 1 }),
         cols: Object.freeze({ from: 0, to: w }),
-        copy: stripControl(m.label),
+        copy: m.label,
       }),
     );
   }
@@ -301,7 +305,7 @@ export const tapeDefinition: BlockDefinition<Tape> = {
 
   // §7a — the labels, space-joined, and **every member** rather than the window
   // (C09 I86). What a reader copies is the row, and nothing is lost from it.
-  copy: (block) => block.members.map((m) => stripControl(m.label)).join(" "),
+  copy: (block) => block.members.map((m) => m.label).join(" "),
 
   // One row, at every width. The window is what changes, never the height —
   // which is the measurement contract holding across a kind whose content moves.

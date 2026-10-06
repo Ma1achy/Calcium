@@ -91,7 +91,7 @@ const results = runPass({
       // and `ctx` spends eighteen for three. Every count agrees either way.
       name: "the label column is a share of the row rather than the label's width",
       file: SIMPLE,
-      from: '      : Math.min(labelCap, cells(stripControl(block.label), ctx.capabilities.ambiguousWidth));',
+      from: '      : Math.min(labelCap, cells(block.label, ctx.capabilities.ambiguousWidth));',
       to: "      : labelCap;",
       expect: "T1.71",
     },

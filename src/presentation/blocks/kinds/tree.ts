@@ -7,7 +7,7 @@
  */
 import type { Tree, TreeNode } from "../../../data/viewmodel/index.js";
 import { atLeastOne, normaliseWidth } from "../../../data/viewmodel/index.js";
-import { cells, stripControl, truncate } from "../../text.js";
+import { cells, truncate } from "../../text.js";
 import { glyphFor, glyphs } from "../glyphs.js";
 import { clampSpans, focusStyle, paint, rows, selectionStyle, tone, type Span } from "../paint.js";
 import type { BlockDefinition, NavElement, RenderContext, Rendered } from "../types.js";
@@ -57,9 +57,9 @@ type Rung = Readonly<{ guides: boolean; step: number; asides: boolean; cap: numb
  */
 function rungAt(list: readonly Row[], width: number, measure: (t: string) => number): Rung {
   const w = normaliseWidth(width);
-  const label = (r: Row): number => measure(stripControl(r.node.label));
+  const label = (r: Row): number => measure(r.node.label);
   const aside = (r: Row): number =>
-    r.node.aside === undefined || r.node.aside === "" ? 0 : ASIDE_GAP + measure(stripControl(r.node.aside));
+    r.node.aside === undefined || r.node.aside === "" ? 0 : ASIDE_GAP + measure(r.node.aside);
   const fits = (step: number, asides: boolean): boolean =>
     list.every((r) => step * r.depth + TWISTY_CELLS + label(r) + (asides ? aside(r) : 0) <= w);
 
@@ -90,7 +90,7 @@ function treeElements(block: Tree, width: number): readonly NavElement[] {
               }),
             }
           : {}),
-        copy: stripControl(r.node.label),
+        copy: r.node.label,
       }),
     ),
   );
@@ -105,7 +105,7 @@ export const treeDefinition: BlockDefinition<Tree> = {
   // a reader sees and what pastes as a tree.
   copy: (block) =>
     visibleRows(block.nodes)
-      .map((r) => `${" ".repeat(BARE_STEP * r.depth)}${stripControl(r.node.label)}`)
+      .map((r) => `${" ".repeat(BARE_STEP * r.depth)}${r.node.label}`)
       .join("\n"),
 
   // One row per visible node, at every width (C04 I130), and I17's one row for
@@ -117,8 +117,8 @@ export const treeDefinition: BlockDefinition<Tree> = {
   width: (block: Tree, width: number): number => {
     const w = normaliseWidth(width);
     const need = visibleRows(block.nodes).reduce((m, r) => {
-      const aside = r.node.aside === undefined || r.node.aside === "" ? 0 : ASIDE_GAP + cells(stripControl(r.node.aside), "narrow"); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42)
-      return Math.max(m, GUIDED_STEP * r.depth + TWISTY_CELLS + cells(stripControl(r.node.label), "narrow") + aside); // narrow-ok — as above
+      const aside = r.node.aside === undefined || r.node.aside === "" ? 0 : ASIDE_GAP + cells(r.node.aside, "narrow"); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42)
+      return Math.max(m, GUIDED_STEP * r.depth + TWISTY_CELLS + cells(r.node.label, "narrow") + aside); // narrow-ok — as above
     }, 0);
     return Math.max(1, Math.min(w, need));
   },
@@ -165,10 +165,10 @@ export const treeDefinition: BlockDefinition<Tree> = {
         spans.push({ text: mark + " ".repeat(Math.max(0, TWISTY_CELLS - measure(mark))), style: ink("muted") });
 
         const room = Math.max(0, w - indent - TWISTY_CELLS);
-        const name = truncate(stripControl(r.node.label), room, caps);
+        const name = truncate(r.node.label, room, caps);
         spans.push({ text: name, style: ink(id === held ? "accent" : "default") });
 
-        const aside = rung.asides && r.node.aside !== undefined ? stripControl(r.node.aside) : "";
+        const aside = rung.asides && r.node.aside !== undefined ? r.node.aside : "";
         if (aside !== "") {
           const gap = room - measure(name) - measure(aside);
           spans.push({ text: " ".repeat(Math.max(ASIDE_GAP, gap)), ...(on === undefined ? {} : { style: ground }) });

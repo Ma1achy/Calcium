@@ -158,8 +158,8 @@ const results = runPass({
       // The step that consults the rule at all.
       name: "rowDown ignores passedOver",
       file: KEYS,
-      from: "      const next = elements.slice(i + 1).find((q) => !passedOver(here, q) && (here === undefined || !oneRow(here, q)));",
-      to: "      const next = elements.slice(i + 1).find((q) => here === undefined || !oneRow(here, q));",
+      from: "      const at = elements.findIndex((q, k) => k > i && !passedOver(here, q) && (here === undefined || !oneRow(here, q)));",
+      to: "      const at = elements.findIndex((q, k) => k > i && (here === undefined || !oneRow(here, q)));",
       expect: "T4.96",
     },
     {

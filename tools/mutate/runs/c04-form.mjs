@@ -49,7 +49,7 @@ const results = runPass({
       // §3ar S4 — the hint is decoration: whole or not at all.
       name: "a hint too wide for the field is drawn anyway",
       file: KIND,
-      from: 'field.hint !== "" && cells(stripControl(field.hint)) <= room) {',
+      from: 'field.hint !== "" && cells(field.hint) <= room) {',
       to: 'field.hint !== "") {',
       expect: "T1.60",
     },
@@ -57,8 +57,8 @@ const results = runPass({
       // §3ar S3 — the error hangs under its own text, past the `✗ `.
       name: "the error wraps at the field's width, not under its own text",
       file: KIND,
-      from: "wrapCells(stripControl(field.error), Math.max(1, room - HANG))",
-      to: "wrapCells(stripControl(field.error), Math.max(1, room))",
+      from: "wrapCells(field.error, Math.max(1, room - HANG))",
+      to: "wrapCells(field.error, Math.max(1, room))",
       expect: "T1.60",
     },
     {

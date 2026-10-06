@@ -9,7 +9,7 @@
 import type { AmbiguousWidth } from "../../text.js";
 import { atLeastOne, normaliseWidth, RAMP_ONE_SHOTS, TRAIL_ANIMATION } from "../../../data/viewmodel/index.js";
 import type { Glyph, Notice, Pills, Progress, Raw, Rule, Tip, Tone } from "../../../data/viewmodel/index.js";
-import { cells, graphemes, stripControl, truncate, truncateParts, wrapCells } from "../../text.js";
+import { cells, graphemes, truncate, truncateParts, wrapCells } from "../../text.js";
 import type { Run } from "../../runs.js";
 import { runLines, runsOf, runsText, sliceRuns, wrapRuns } from "../../runs.js";
 import { NO_STYLE, rampStyle } from "../../theme/index.js";
@@ -169,7 +169,7 @@ export const ruleDefinition: BlockDefinition<Rule> = {
     // rule measures 1 at every width and every label, so nothing else in the
     // report can say why a frame full of them is slow.
     ctx.probe?.gauge("rule.label", block.label.length); // cells-ok — an input size, not a display width
-    const label = stripControl(block.label);
+    const label = block.label;
     // **Three tiers, and the fill is the whole axis** (C09 I40, C04 I94). The
     // lead stays two cells and the label stays in its column, so `measure` is 1
     // at every tier and the tiers differ where the eye already is.
@@ -184,7 +184,7 @@ export const ruleDefinition: BlockDefinition<Rule> = {
     // lead with nothing after it is not a rule at all.
     const weight = block.level === 1 ? g.heavyHorizontal : g.horizontal;
     const fillChar = block.level === 3 && label !== "" ? " " : weight;
-    const meta = block.meta === undefined || block.meta === "" ? "" : ` ${stripControl(block.meta)}`;
+    const meta = block.meta === undefined || block.meta === "" ? "" : ` ${block.meta}`;
 
     // `\u2500\u2500 label \u2500\u2500\u2500\u2500 meta`. The fill takes what the two ends leave; the
     // label truncates before the fill goes negative, so the row is exactly the
@@ -728,7 +728,7 @@ export const noticeDefinition: BlockDefinition<Notice> = {
  */
 function tipText(block: Tip): string {
   const actions = (block.actions ?? []).map((a) => a.label).join("   ");
-  const text = stripControl(block.text);
+  const text = block.text;
   return actions === "" ? text : `${text}   ${actions}`;
 }
 
@@ -827,11 +827,11 @@ export const progressDefinition: BlockDefinition<Progress> = {
     const labelRoom =
       block.label === ""
         ? 0
-        : Math.min(labelCap, cells(stripControl(block.label), ctx.capabilities.ambiguousWidth));
+        : Math.min(labelCap, cells(block.label, ctx.capabilities.ambiguousWidth));
     const labelColumn =
       labelRoom === 0
         ? ""
-        : pad(truncate(stripControl(block.label), labelRoom, ctx.capabilities), labelRoom);
+        : pad(truncate(block.label, labelRoom, ctx.capabilities), labelRoom);
 
     // The bar takes the residual (\u00a73), which is what makes this one row at any
     // width rather than one row at most widths. It can reach zero, and a bar of
@@ -988,7 +988,7 @@ function chipRows(
   let used = 0;
 
   for (const chip of block.chips) {
-    const text = stripControl(chip.label);
+    const text = chip.label;
     const w = cells(text, ambiguous);
     const needed = line.length === 0 ? w : w + CHIP_GAP; // cells-ok
     if (used + needed > limit && line.length > 0) { // cells-ok
@@ -1097,7 +1097,7 @@ export const pillsDefinition: BlockDefinition<Pills> = {
 
   render(block: Pills, ctx: RenderContext): Rendered {
     ctx.probe?.gauge("pills.chips", block.chips.length); // cells-ok — a count of items, not a display width
-    const byLabel = new Map(block.chips.map((chip) => [stripControl(chip.label), chip]));
+    const byLabel = new Map(block.chips.map((chip) => [chip.label, chip]));
     // **Focus, and it read `ctx.focus` nowhere before this** (C11 I14, F764's
     // neighbour): a focused chip drew as an unfocused one in every frame, so a
     // reader stepping through a `pills` row saw nothing move. The head is
@@ -1169,7 +1169,7 @@ export const pillsDefinition: BlockDefinition<Pills> = {
  * lines it has" is what makes an unrecognised envelope cheap to virtualise.
  */
 function rawLines(block: Raw): readonly string[] {
-  return stripControl(block.text).split("\n");
+  return block.text.split("\n");
 }
 
 export const rawDefinition: BlockDefinition<Raw> = {

@@ -52,8 +52,8 @@ const results = runPass({
     {
       name: "the find by rows alone — cols ignored",
       file: "src/shell/construct.ts",
-      from: "      if (col < cols.from || col >= cols.to) continue;\n",
-      to: "",
+      from: "      if (cols === null || col < cols.from || col >= cols.to) continue;\n",
+      to: "      if (cols === null) continue;\n",
       expect: "T4.63",
     },
     {

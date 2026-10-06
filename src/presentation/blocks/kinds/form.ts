@@ -79,7 +79,7 @@ export function defaultButton(block: Form): number {
  */
 function layout(block: Form, width: number): Layout {
   const w = normaliseWidth(width);
-  const labelWidth = Math.max(0, ...block.fields.map((f) => cells(stripControl(f.label)))); // narrow-ok — the measurer's convention, above
+  const labelWidth = Math.max(0, ...block.fields.map((f) => cells(f.label))); // narrow-ok — the measurer's convention, above
   const wide = w - (INDENT + labelWidth + LABEL_GAP);
   // **Below a one-cell field the labels stack** (§094's representation rung):
   // the label is the fact that says what the field is, and never shortens to
@@ -99,12 +99,12 @@ function layout(block: Form, width: number): Layout {
     let kind: FieldPlace["kind"] = "none";
     if (field.error !== undefined && field.error !== "") {
       // Content: wrapped, hung, never dropped (§096 — losing the end loses the fact).
-      const text = wrapCells(stripControl(field.error), Math.max(1, room - HANG));
+      const text = wrapCells(field.error, Math.max(1, room - HANG));
       under = text;
       kind = "error";
-    } else if (field.hint !== undefined && field.hint !== "" && cells(stripControl(field.hint)) <= room) { // narrow-ok — the measurer's convention
+    } else if (field.hint !== undefined && field.hint !== "" && cells(field.hint) <= room) { // narrow-ok — the measurer's convention
       // Decoration: whole or not at all — a cut sentence reads as another one.
-      under = [stripControl(field.hint)];
+      under = [field.hint];
       kind = "hint";
     }
     row += under.length; // cells-ok — a row count
@@ -119,7 +119,7 @@ function layout(block: Form, width: number): Layout {
     row += 1;
     let at = 0;
     list.forEach((b, index) => {
-      const want = Math.min(w, SLOT + cells(stripControl(b.label))); // narrow-ok — the measurer's convention
+      const want = Math.min(w, SLOT + cells(b.label)); // narrow-ok — the measurer's convention
       // **Whole buttons wrap; none is shed** — a shed button is an action the
       // reader cannot reach (C04 I136).
       if (at > 0 && at + want > w) {
@@ -249,7 +249,7 @@ export const formDefinition: BlockDefinition<Form> = {
       const focused = focus?.rowId === p.field.id;
       const disabled = p.field.availability === "disabled";
       const draft = focused ? focus?.draft : undefined;
-      const label = stripControl(p.field.label);
+      const label = p.field.label;
       const value: Span[] =
         draft === undefined
           ? disabled
@@ -305,7 +305,7 @@ export const formDefinition: BlockDefinition<Form> = {
       if (b.from > drawn) spans.push({ text: " ".repeat(b.from - drawn) });
       const focused = focus?.rowId === button.id;
       const mark = b.index === primary ? `${glyphFor("current", caps)} ` : "  ";
-      const text = truncate(stripControl(button.label), Math.max(0, b.to - b.from - SLOT), caps);
+      const text = truncate(button.label, Math.max(0, b.to - b.from - SLOT), caps);
       // `›` marks the default and never focus (C09 I119, C04 §3ar S7).
       spans.push({ text: mark, style: focused ? washed : tone("accent", ctx.theme, caps) });
       spans.push({ text, style: focused ? washed : plain });

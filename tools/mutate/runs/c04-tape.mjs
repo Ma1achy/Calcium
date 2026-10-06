@@ -176,7 +176,7 @@ const results = runPass({
       // not counted, which is most of the measured case's missing cells.
       name: "THE DEFECT: the natural width leaves out the details",
       file: KIND,
-      from: "      cells(stripControl(m.detail ?? \"\"), ambiguous),",
+      from: "      cells(m.detail ?? \"\", ambiguous),",
       to: "      0,",
       expect: "T1.81",
     },
