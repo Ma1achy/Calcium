@@ -210,6 +210,10 @@ const COVERED = [
   // a prerequisite of this target — the catalogue's reason, one artefact on.
   ["tools/design/chromium.mjs", ["npx", "vitest", "run", "--dir", "test/browser"]],
   ["tools/design/figures.ts", ["npx", "vitest", "run", "test/golden/design-fixtures.test.ts"]],
+  // The cell comparison's own fixture: DC7 draws every figure as its own frame
+  // and fabricates one changed cell, DC8 constructs the weight, underline and
+  // ground arms, and DC1 reads every projected section against its fixture.
+  ["tools/design/cells.ts", ["npx", "vitest", "run", "test/golden/design-cells.test.ts"]],
   // A03-DSN1–4 spawn `release.mjs` and `released-against.mjs` over fabricated
   // baselines and refs, and DSN2 runs `fixtures.ts --check --out` over a
   // drifted corpus — one filter, three tools, each row naming its file.
