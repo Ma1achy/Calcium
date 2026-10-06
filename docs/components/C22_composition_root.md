@@ -3232,6 +3232,50 @@ constraint* — are normative for appearance, and *"Terminal too small"* is the 
 which the figure does not carry: the `▲` and `needs` say it. The words go; the sentence's job (what
 is wrong) is the mark's, and the figure's second line states what is needed.
 
+### 6u.3 — §023: what the 60 protects (I156)
+
+**The question.** §023 draws a working session at 40 columns with a shed order; `MIN_COLUMNS` is 60 and the
+gate refuses below it. *Do not lower it without the reason being answered.*
+
+**Measured at b6ce58a2** (`MIN_COLUMNS` mocked to 20 in a scratch test, 8 scenes — boot, `/help`, a typed line that
+wraps, `/help keys`, `/ps`, `/capabilities`, `/config`, `/history` — at widths 20, 30, 36, 40, 44, 50, 59 and
+60, the widest painted row read from every chunk the session wrote, after stripping control sequences):
+
+| width | 20 | 30 | 36 | 40 | 44 | 50 | 59 | 60 |
+|---|---|---|---|---|---|---|---|---|
+| widest row, any scene | 20 | 30 | 36 | 40 | 44 | 50 | 59 | 60 |
+
+**Not one row is wider than the terminal at any width**, so the hazard the CLAUDE.md warns of — a wrapped line
+scrolling the alternate screen — is **not what the 60 protects**; the frame's own rows are `exact()`-padded to the
+width at every size (I109). The composition at 40 is coherent: the label is shed, the footer's chips shed to the
+width (I133), the prompt wraps, and the rules are whole.
+
+**What the 60 does hold, found by asking where the number is written down** (it is a *policy* number, C02 §8, and
+nothing derives it):
+
+1. **§069's label drop is keyed to it** (`labelSpansOf`: `width <= MIN_COLUMNS`), and its comment argues the
+   comparison is `<=` *because* the gate is the same number. A gate at 40 makes the label's floor reachable and the
+   constant a separate one — a change, not a loosening.
+2. **S14 and S15 state `nothing drops` against it** — the config table's four columns sum to 51 (53 with detail) and
+   the identity table's to 45, both *cited to D30*. At 40–59 columns those are false.
+3. **Five golden scenes are drawn at exactly 60** (`window-tail`, `window-head`, `window-both`, `window-wash`,
+   `label-shed`): their meaning is *the narrowest frame there is*.
+
+**The design does not settle a number.** §023 draws 40; §047's figure says `needs 60×16`; §069 says *at 60 columns the
+label drops… and the frame still works*. All three are specimens, and `R-SEC-*` says *specimen values and sample
+content remain examples* — so no current rule fixes the gate, and the two figures that name a number name two.
+
+**Ruled (b5-forms): the gate stays 60, the measurement is recorded, and the half that can be held is.** Lowering needs
+the surfaces of item 2 above walked at 40–59 (a table shedding columns by priority, a question with long evidence, a
+completion menu, a chip row) — none of which this measurement touched — and the label's floor re-derived; that is a
+build with its own walk, owed. What lands now is the **standing instrument**: I156 and its sweep, so the day the gate
+moves the row-width half of the question is already answered by a gate rather than a recollection.
+
+*Owed, named so it is not read as coverage:* §023's shed order is the **application chrome's** (endpoint, effort, the
+path and branch row, the context-bar segments), and the default chrome has none of those parts — so the order is the
+reference app's contract at the widths the gate admits, and the 40-column rung is a gate change plus a surfaces
+walk, not a drawing.
+
 ### 6u.2 — §067: the new-messages button (I154, I155)
 
 **Unbuilt and unspecified at b6ce58a2** (`grep 'new messages'` finds the registry, the fixture and nothing else). The
@@ -3639,6 +3683,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I153** — *(§6u.1, §047)* **The too-small render is the design's frame, at the terminal's rung.** `▲ <columns>×<rows>` over `needs 60×16` in a box where four rows and the box's width allow, the same two lines fitted where they do not, the size alone at one row and nothing at zero. The marks resolve at the capability record's rung (`!`, `x`, `+-|` at ASCII); every line is measured at its `ambiguousWidth` and is never wider than the terminal nor taller than its rows. No colour, and no call into the block registry (I9). → T3.8b, T3.8e, T3.8f, T3.15c
 - **I154** — *(§6u.2, §067, `R-BLK-494`, `R-BLK-495`)* **The count is entries that settled while the transcript was not following the tail.** `settle` and an `append` of an entry born settled count; a `patch`, an `evict`, the running entry and an arrival inside the reader's own submit do not. It resets to 0 when `followTail` is true and on `clear`. L4's, held in `construct.ts`; no change to C13 or C14. → T1.188, T4.123, T6.158
 - **I155** — *(§6u.2, §067, `R-BLK-490`–`R-BLK-500`)* **The button is drawn over the region's last row while the count is above zero, and a press on it goes to the tail.** The row is the region's last, `bgElev` at colour and bracketed at 1-bit, `↓ N new message(s)` shedding to `↓ N new` then `↓ N`, indented by the content margin; it is drawn only where at least two region rows remain and the transcript bar's column is left to the bar (I109). The press is `scrollBy` to the tail, which is what `transcript.bottom` does, and `followTail` resets the count. Withheld, and owed: `⏎`, the focused state and the hovered state (§6u.2 ruling d). → T1.189, T4.123, T6.158
+- **I156** — *(§6u.3, I109)* **At every width the frame composes at, no painted row is wider than the terminal.** The size gate is policy (C02 §8) and the row width is the frame's own: each row is padded or cut to `size.columns` (I109), so the property is independent of where the gate sits and a gate lowered below 60 inherits it. → T4.124
 
 ## 11. Commitments
 
@@ -3888,6 +3933,7 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T3.8** (I9): the fallback renders with no call into the block registry or layout — asserted by a spy.
 - **T3.8b** (I153, was I9): the fallback emits no colour, and its box is drawn only at the capability record's rung — `+-|` at ASCII.
 - **T3.8e** (I153, §6u.1): the five rungs of the classification table — zero rows nothing, one row the size, two and three rows two lines, four rows and the box's width the box, four rows and less the lines — and at every size no line is wider than `columns` at the record's `ambiguousWidth` and no more lines than rows. *Fails on revert*: measuring at `narrow` fails the wide-ambiguity row, and dropping the four-row guard fails the three-row row.
+- **T4.124** (I156, §6u.3): through built sessions with the gate's number mocked below the widths drawn, eight scenes at 20, 40 and 59 columns — no row any chunk wrote is wider than the terminal. *Fails on revert*: cutting `exact()` from the transcript's rows fails the wide-content scenes.
 - **T1.188** (I154, §6u.2 trace rows 1–12): the counter, driven by a fake transcript's changes and a fake `followTail`, steps through the trace and asserts the *whole* state after each row. *Fails on revert*: counting a `patch` fails row 5; counting while following fails row 12; not resetting on `followTail` fails row 10; counting inside the own-submit scope fails row 7; counting the streaming `append` fails row 3.
 - **T1.189** (I155, §6u.2 rulings e, f): the button's spans at the three rungs — `bgElev` ground at colour, `[…]` at 1-bit, `v` for the arrow at ASCII — and the shed ladder at the widths where each word goes. *Fails on revert*: painting the row at 1-bit fails the bracket assertion.
 - **T4.123** (I154, I155, §6u.2): a built session at 80 × 24 with a long transcript, scrolled up with the wheel; an entry settles → the region's last row is the button and the row count is unchanged; a second arrival → `2 new messages`; a press on the button row reaches the tail and the row is gone; a scrolled-up transcript with nothing new draws none. *Fails on revert*: drawing the button at the tail fails the last step of the first arm; counting a patch fails the count.
