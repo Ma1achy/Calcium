@@ -595,7 +595,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       // **The falsifier for three seams at once** (F971, F972, F973, F974). A
       // 1.2 s far side puts two things in the recording a fast one never does:
       // the frame the readout's one-second wake drew while the call ran —
-      // `· ⠙ 1s` — and a settled head carrying a whole-second figure, `· 1s ·
+      // `· ⠙ 1s` — and a settled head carrying a tenths figure, `· 1.2s ·
       // 20 rows`. The figure is a duration the frame draws *unmasked*. Taken
       // from the wall clock it sat on the channel the header's second hand is
       // served from; taken from `elapsed` it is reproduced only if every mono
@@ -639,15 +639,16 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       // same race: `elapsed()` floors, and under load the answer was measured
       // at 1 959 ms — 41 ms from drawing `2s` and failing here instead. Which
       // second it lands in is a fact about the harness's sleep; that the head
-      // carries a whole-second figure and a row count is the claim.
+      // carries a tenths figure (C09 I140's `settled`, not `elapsed`'s floor)
+      // and a row count is the claim.
       const settled = frames
-        .map((f) => /ps\(--limit 20\)( · \d+s · 20 rows)/u.exec(f))
+        .map((f) => /ps\(--limit 20\)( · \d+(?:\.\d)?s · 20 rows)/u.exec(f))
         .find((m) => m !== null);
       expect(
         settled !== undefined,
         unless(
           settled !== undefined,
-          () => `and the settled head carries a whole-second figure\n${sofar("T5.1d", recd)}`,
+          () => `and the settled head carries a tenths figure\n${sofar("T5.1d", recd)}`,
         ),
       ).toBe(true);
       // **And no mask excuses it**: byte-identity here is over the figure — and
