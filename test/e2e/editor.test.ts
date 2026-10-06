@@ -23,6 +23,7 @@ import { describe, expect, it } from "vitest";
 // else — theme T5.4 kept its own `find` for a further commit and could no longer
 // fail. A helper that has gone wrong in two files belongs in neither.
 import { interactivePty, PROMPT, promptRow, type InteractivePty } from "../support/pty.js";
+import { hangGuard } from "../support/budget.js";
 
 const session = (cols = 100, rows = 24): InteractivePty =>
   interactivePty("node test/support/fixture.mjs session", { cols, rows });
@@ -66,7 +67,7 @@ describe("C17 tier 5 — at a real prompt", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
 
 
   it("T5.2: pasting a 200-line block → the prompt grows, the viewport shrinks, and submission sends one command", async () => {
@@ -148,7 +149,7 @@ describe("C17 tier 5 — at a real prompt", () => {
     } finally {
       pty.kill();
     }
-  }, 60_000);
+  }, hangGuard(60_000));
 
   it("T5.3: editing a command containing CJK and emoji → the cursor lands where the user sees it", async () => {
     const pty = session();
@@ -180,7 +181,7 @@ describe("C17 tier 5 — at a real prompt", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
 
 
   it("T5.4: an undo/redo sequence interleaved with paste and history navigation returns to the expected text", async () => {
@@ -233,7 +234,7 @@ describe("C17 tier 5 — at a real prompt", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
 
 
   it("T5.5: resizing with a wrapped multi-line command in the buffer → the prompt reflows and the frame stays whole", async () => {
@@ -267,5 +268,5 @@ describe("C17 tier 5 — at a real prompt", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
 });

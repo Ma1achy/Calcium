@@ -50,6 +50,7 @@ import { DARK_THEME, DITHER_CAPS, FULL_CAPS, measurable } from "../support/rende
 import { buildSession } from "../support/session.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
+import { hangGuard } from "../support/budget.js";
 
 const ESC = String.fromCharCode(27);
 const SGR = new RegExp(ESC + String.raw`\[[0-9;]*m`, "gu");
@@ -659,7 +660,7 @@ describe("C22 I77 — the wake", () => {
     } finally {
       vi.useRealTimers();
     }
-  }, 120_000);
+  }, hangGuard(120_000));
 
   it("T4.17q (C22 I77, I74): a GIF beside a spinner keeps its own cadence", async () => {
     vi.useFakeTimers();

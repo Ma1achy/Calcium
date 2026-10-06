@@ -31,6 +31,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import { hangGuard } from "../support/budget.js";
 
 const run = promisify(execFile);
 const root = new URL("../../examples/", import.meta.url);
@@ -122,11 +123,11 @@ describe("F858: every example's bin is a command, not a declaration", () => {
           // type-stripped and run, capabilities are detected and the terminal is
           // found wanting. stdout is a pipe, so the app takes its no-TTY branch
           // and exits 0. Nothing shallower can go wrong without this failing.
-          const { stdout } = await run(path, [], { timeout: 60_000 });
+          const { stdout } = await run(path, [], { timeout: hangGuard(60_000) });
           expect(stdout).toContain(name);
           expect(stdout).toContain("needs a terminal");
         },
-        90_000,
+        hangGuard(90_000),
       );
     });
   }

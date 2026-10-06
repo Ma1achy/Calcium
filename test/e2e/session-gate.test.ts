@@ -13,6 +13,7 @@
 import { describe, expect, it } from "vitest";
 
 import { runInPty } from "../support/pty.js";
+import { hangGuard } from "../support/budget.js";
 
 const FIXTURE = "node test/support/fixture.mjs caught-refusal";
 
@@ -44,16 +45,20 @@ describe("C22 §4 gate 3b — a caught refusal leaves nothing running", () => {
       expect(run.bytes, "and carried on past it").toContain("FELL-THROUGH");
       expect(run.bytes, "the session was never opened").not.toContain("OPENED");
 
-      // **The assertion is the exit itself**, and `runInPty` rejects rather than
-      // resolving when the program does not end — so reaching this line is
-      // already most of the row. The bound is here to say that it ended *because
-      // nothing was left running* rather than because something else eventually
-      // gave up: three seconds is four times the measured 744 ms and a fifth of
-      // the timeout the defect ran into.
-      expect(run.ms, `exited in ${String(run.ms)} ms`).toBeLessThan(3_000);
+      // **The assertion is what is left holding the loop** (RULING-a, F1447).
+      // It was a 3 s bound on the run, which read 4777 ms under the batch's
+      // load with the teardown working. The fixture lists
+      // `process.getActiveResourcesInfo()` at the line after the catch: the
+      // terminal's two handles and one pending read are the test's own, and a
+      // `Timeout` is the armed timer F140's missing `stop("fault")` leaves.
+      // Measured: the tree lists no `Timeout`; with the teardown removed the
+      // dumb arm lists one and the run never exits (killed at 15 s).
+      const held = /RESOURCES (\[[^\n]*\])/u.exec(run.bytes);
+      expect(held, "the fixture reported what still holds the loop").not.toBeNull();
+      expect(JSON.parse(held![1]!) as string[], "no timer outlives the refusal").not.toContain("Timeout");
       expect(run.exitCode, "and cleanly, because the rejection was handled").toBe(0);
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   it(
@@ -70,6 +75,6 @@ describe("C22 §4 gate 3b — a caught refusal leaves nothing running", () => {
       expect(run.bytes, "and it still ended").toContain("FELL-THROUGH");
       expect(run.exitCode, "cleanly").toBe(0);
     },
-    30_000,
+    hangGuard(30_000),
   );
 });

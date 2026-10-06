@@ -1,34 +1,43 @@
 /**
  * Performance tests — render cost per tick.
  *
- * **One ceiling, with both figures beside it** (F809; F262's shape). The rows
- * below asserted `< 50` each, under a header that named 16 ms as the target —
- * a figure no row here has met: the 60×20 heatmap renders in **17–22 ms** on an
- * idle developer machine (three runs, 2026-09-05) and read **54.6 ms** on the CI
- * runner the same day, which `make regime` measured at **2.7×** the recorded
- * machine on the scan benchmark. A 50 ms ceiling over a 19 ms render leaves a
- * 2.7× host no room, so the row's verdict was a function of the runner's load:
- * green on two runs, red on the third, no `src/` change between them. The
- * ceiling is the asymmetry, not the odds — a green run costs nothing extra and a
- * load-dependent red costs a session — and a quadratic regression or a hang
- * still fails: 150 is under three times the runner's own reading.
+ * **In references, not milliseconds, since RULING-a** (F1406, F1447). The rows
+ * below asserted `< 150` ms each, and before that `< 50` (F809), and both were a
+ * function of the machine: the 60×20 heatmap rendered in 17–22 ms idle and read
+ * 54.6 ms on the CI runner, and the one-sample update below went red at 2.91
+ * against 2 under the golden lane's load with no `src/` change. A wider ceiling
+ * only moves the load at which it flips.
+ *
+ * So each subject is timed against `reference()` — a fixed workload of the same
+ * kind, run interleaved with it in this process (`support/paired.ts`) — and the
+ * ceiling is written in those units. Measured 2026-10-03 in the devcontainer
+ * with other lanes building (load 9–13 on 11 CPUs), medians of fifteen rounds
+ * across three runs: line 0.8–3.7, small multiples 2.0–4.1, pie 0.5–1.3, KDE
+ * 0.5–1.0, heatmap 1.5–3.5. **25 is about six times the worst of those**, so a
+ * contended run has room and a quadratic regression or a hang, which multiplies
+ * the cost by tens, still fails. The milliseconds are printed with every
+ * reading and asserted on by nothing.
  */
-const RENDER_CEILING_MS = 150;
+const RENDER_CEILING_REFS = 25;
 import { describe, expect, it } from "vitest";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { FULL_CAPS, measurable } from "../support/render.js";
 import { block, type Plot } from "../../src/data/viewmodel/index.js";
 import { ONE_PER_FORM } from "../support/plot-forms.js";
 import { kde } from "../../src/presentation/plot/derive.js";
+import { describeReading, paired, reference } from "../support/paired.js";
 
 const kit = () => measurable({ definitions: [plotDefinition], capabilities: FULL_CAPS });
 
-function timeRender(b: Plot, width: number, iterations = 10): number {
+/** The subject's cost in references, with the reading for a failure message. */
+function costInReferences(subject: () => unknown): { refs: number; why: string } {
+  const r = paired(subject, reference, { floorMs: 20 });
+  return { refs: r.ratio, why: describeReading(r) };
+}
+
+function renderCost(b: Plot, width: number): { refs: number; why: string } {
   const k = kit();
-  k.renderToLines(b, width);
-  const start = performance.now();
-  for (let i = 0; i < iterations; i++) k.renderToLines(b, width);
-  return (performance.now() - start) / iterations;
+  return costInReferences(() => k.renderToLines(b, width));
 }
 
 describe("render cost per tick", () => {
@@ -37,8 +46,8 @@ describe("render cost per tick", () => {
       kind: "plot", id: "perf-line", form: "line", height: 10, axes: true,
       series: [{ values: Array.from({ length: 500 }, (_, i) => Math.sin(i * 0.1) * 50 + 50) }],
     });
-    const ms = timeRender(b, 80);
-    expect(ms).toBeLessThan(RENDER_CEILING_MS);
+    const { refs, why } = renderCost(b, 80);
+    expect(refs, why).toBeLessThan(RENDER_CEILING_REFS);
   });
 
   it("36-form small-multiples at 120 columns — the worst case", () => {
@@ -48,8 +57,8 @@ describe("render cost per tick", () => {
       series: [{ values: [1] }],
       facets: facets as Plot[],
     });
-    const ms = timeRender(b, 120);
-    expect(ms).toBeLessThan(RENDER_CEILING_MS);
+    const { refs, why } = renderCost(b, 120);
+    expect(refs, why).toBeLessThan(RENDER_CEILING_REFS);
   });
 
   it("pie at radius 20 — Bresenham circle", () => {
@@ -63,17 +72,15 @@ describe("render cost per tick", () => {
         { label: "D", value: 10 },
       ],
     });
-    const ms = timeRender(b, 40);
-    expect(ms).toBeLessThan(RENDER_CEILING_MS);
+    const { refs, why } = renderCost(b, 40);
+    expect(refs, why).toBeLessThan(RENDER_CEILING_REFS);
   });
 
   it("KDE with 1000 samples", () => {
     const data = Array.from({ length: 1000 }, (_, i) => Math.sin(i * 0.01) * 10 + Math.random() * 2);
     const points = Array.from({ length: 100 }, (_, i) => -12 + i * 0.24);
-    const start = performance.now();
-    for (let i = 0; i < 10; i++) kde(data, points);
-    const ms = (performance.now() - start) / 10;
-    expect(ms).toBeLessThan(RENDER_CEILING_MS);
+    const { refs, why } = costInReferences(() => kde(data, points));
+    expect(refs, why).toBeLessThan(RENDER_CEILING_REFS);
   });
 
   it("60×20 heatmap with continuous palette — the monitor load", () => {
@@ -86,8 +93,8 @@ describe("render cost per tick", () => {
       series: rows,
       colormap: "viridis",
     });
-    const ms = timeRender(b, 80);
-    expect(ms).toBeLessThan(RENDER_CEILING_MS);
+    const { refs, why } = renderCost(b, 80);
+    expect(refs, why).toBeLessThan(RENDER_CEILING_REFS);
   });
 });
 
@@ -99,20 +106,17 @@ describe("incremental rendering", () => {
       series: [{ values }],
     });
     const k = kit();
-    k.renderToLines(b1, 80);
-    const start1 = performance.now();
-    for (let i = 0; i < 20; i++) k.renderToLines(b1, 80);
-    const ms1 = (performance.now() - start1) / 20;
-
     const b2 = block({
       kind: "plot", id: "perf-inc", form: "line", height: 10, axes: true,
       series: [{ values: [...values, 55] }],
     });
-    const start2 = performance.now();
-    for (let i = 0; i < 20; i++) k.renderToLines(b2, 80);
-    const ms2 = (performance.now() - start2) / 20;
 
-    expect(ms2 / ms1).toBeLessThan(2);
+    // **Paired, and that is the whole repair** (F1406). The two arms used to be
+    // timed one after the other, twenty renders each, so a burst of load
+    // between them landed on one operand: 2.91 against 2 with nothing changed.
+    // Interleaved round by round, the median read 0.92–1.05 at load 9–13.
+    const r = paired(() => k.renderToLines(b2, 80), () => k.renderToLines(b1, 80), { floorMs: 20 });
+    expect(r.ratio, describeReading(r)).toBeLessThan(2);
   });
 });
 

@@ -89,6 +89,7 @@ import { checkDependencies, DEPENDENCY_RULES } from "../../tools/enforce/depende
 import { WORKFLOW_RULES } from "../../tools/enforce/workflows.mjs";
 import { SPEC_RULES } from "../../tools/enforce/commitments.mjs";
 import { COMPONENT_SOURCES, defaultIsImplemented } from "../../tools/enforce/todo-expiry.mjs";
+import { hangGuard } from "../support/budget.js";
 
 /** A file that must fail `rule`, at a path inside its scope. */
 type Fabrication = { rule: string; file: string; source: string };
@@ -4320,7 +4321,7 @@ describe("the design fixtures — derived from the page, checked against it", ()
     // And the copy is clean again, so every refusal above was the fabrication's.
     expect(check(dir).status, "restored").toBe(0);
     rmSync(dir, { recursive: true, force: true });
-  }, 60_000);
+  }, hangGuard(60_000));
 
   it("A03-DSN2: --check writes nothing", () => {
     const dir = copy();
@@ -4330,5 +4331,5 @@ describe("the design fixtures — derived from the page, checked against it", ()
     const after = readdirSync(dir).sort().map((f) => [f, readFileSync(join(dir, f), "utf8")]);
     expect(after).toEqual(before);
     rmSync(dir, { recursive: true, force: true });
-  }, 30_000);
+  }, hangGuard(30_000));
 });

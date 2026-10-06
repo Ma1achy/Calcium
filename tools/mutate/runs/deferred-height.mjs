@@ -127,6 +127,28 @@ const results = runPass({
       expect: "T4.50",
     },
     {
+      // C22 I69's single pass, and the shape F1351's rows were blind to on a
+      // held clock until they were made to read one frame at a time. `input`
+      // is an immediate reason, so the reserve is honoured in the same turn as
+      // the frame that found the fault — the first frame the reader sees
+      // already has the box, which is the re-entry the invariant forbids.
+      name: "the floor is honoured inside the frame that found the fault",
+      file: SESSION,
+      from: "    if (raised) graph.scheduler.commit(\"stream\");",
+      to: "    if (raised) graph.scheduler.commit(\"input\");",
+      expect: "T4.49",
+    },
+    {
+      // T4.53's third count. A settled entry with its floor held is served from
+      // the render cache; without the lookup every frame re-renders it, and a
+      // key that commits a frame re-runs a renderer that already gave way.
+      name: "the render cache is never consulted",
+      file: SESSION,
+      from: "    const held = graph.rendered.get(entry.id, entry.rev, width, slot, theme, range, tickKey);",
+      to: "    const held = undefined as ReturnType<typeof graph.rendered.get>;",
+      expect: "T4.53",
+    },
+    {
       // C22 I70, F230. The trim goes back to reconciling two components'
       // answers in silence and taking the block below with it.
       name: "the over-draw is not reported",

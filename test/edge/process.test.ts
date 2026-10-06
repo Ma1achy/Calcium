@@ -12,7 +12,7 @@ import { findClipboardTool, writeClipboard } from "../../src/data/process/clipbo
 import { recorded, removeDir, runPath, stub, toolDir } from "../support/clipboard-tools.js";
 import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
-import { CORPUS_BUDGET_MS } from "../support/budget.js";
+import { CORPUS_BUDGET_MS, hangGuard } from "../support/budget.js";
 
 import { createProcessRunner } from "../../src/data/process/runner.js";
 import { createBoundedStream } from "../../src/data/process/stream.js";
@@ -178,7 +178,7 @@ describe("C21 streams", () => {
     expect(child.overflowed).toBe(true);
     expect(text.length).toBe(8 * 1024 * 1024);
     expect(await child.exited).toEqual({ code: 0, signal: null });
-  }, 60_000);
+  }, hangGuard(60_000));
 
   it("T3.4 (I5): a child writing with nobody reading is drained, never blocked", async () => {
     // No consumer at all. If the runner paused the stream at the bound instead
@@ -188,7 +188,7 @@ describe("C21 streams", () => {
 
     expect(await child.exited).toEqual({ code: 0, signal: null });
     expect(child.overflowed).toBe(true);
-  }, 60_000);
+  }, hangGuard(60_000));
 
   it("T3.5: a child closing stdout stays alive, and exited waits for it", async () => {
     const r = runner();
@@ -452,5 +452,5 @@ describe("C21 the clipboard tool, at its edges (I20)", () => {
     } finally {
       removeDir(dir);
     }
-  }, 15_000);
+  }, hangGuard(15_000));
 });

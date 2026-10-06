@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import { join, relative as relativePath } from "node:path";
 import { findClipboardTool, writeClipboard } from "../../src/data/process/clipboard.js";
 import { removeDir, runPath, stub, toolDir } from "../support/clipboard-tools.js";
+import { hangGuard } from "../support/budget.js";
 
 const opts = { cwd: (): string => process.cwd() };
 
@@ -266,5 +267,5 @@ describe("C21 fail-on-revert, the clipboard tool (I20)", () => {
       }
       removeDir(dir);
     }
-  }, 15_000);
+  }, hangGuard(15_000));
 });

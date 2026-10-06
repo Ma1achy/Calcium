@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { hangGuard } from "../support/budget.js";
 
 const TABLE = "src/presentation/theme/quantised.generated.ts";
 
@@ -24,7 +25,7 @@ describe("tools/theme/quantised.mjs — the shipped themes' quantisations, writt
     const dir = mkdtempSync(join(tmpdir(), "calcium-quantised-"));
     try {
       const out = join(dir, "quantised.generated.ts");
-      const said = execFileSync("node", ["tools/theme/quantised.mjs", "--out", out], { encoding: "utf8", timeout: 120_000 });
+      const said = execFileSync("node", ["tools/theme/quantised.mjs", "--out", out], { encoding: "utf8", timeout: hangGuard(120_000) });
       const written = readFileSync(out, "utf8");
       // The count it prints is the count it wrote — the entries, one per key.
       const sets = Number(/quantised: (\d+) sets written to /u.exec(said)?.[1]);

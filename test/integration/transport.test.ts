@@ -26,6 +26,7 @@ import { asScriptFile, scripts, waitForFileToContain } from "../support/process.
 import { clockOf, drain, invocation, recorded, result } from "../support/transport.js";
 
 import { producerContext } from "../support/producer-context.js";
+import { hangGuard } from "../support/budget.js";
 /**
  * The routing decision C23 will make, in the two lines it actually is.
  *
@@ -167,7 +168,7 @@ describe("C06 with C05", () => {
     expect(result.signal).toBe("SIGKILL");
     expect(result.exitCode).toBeNull();
     expect(result.cancelled).toBe(true);
-  }, 20_000);
+  }, hangGuard(20_000));
 
   it("T4.3 (with C07): a RawResult from either transport adapts to the same document", async () => {
     // C06's own claim, from C07's side: the transports differ in how they get a

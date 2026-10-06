@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { mermaidCode } from "../../src/presentation/mermaid.js";
 import { FULL_CAPS } from "../support/render.js";
+import { hangGuard } from "../support/budget.js";
 
 const execFileP = promisify(execFile);
 
@@ -36,7 +37,7 @@ describe("C24 I38 — every entry resolves into one bundled graph", () => {
         "--import", fileURLToPath(new URL("import-trace.mjs", here)),
         fileURLToPath(new URL("bundle-graph-child.mjs", here)),
         out,
-      ], { timeout: 90_000 });
+      ], { timeout: hangGuard(90_000) });
     } catch (e) {
       rmSync(dir, { recursive: true, force: true });
       throw e;
@@ -98,7 +99,7 @@ describe("C24 I38 — every entry resolves into one bundled graph", () => {
       expect(existsSync(new URL(target.default, root)), `${target.default} exists`).toBe(true);
       expect(existsSync(new URL(target.types, root)), `${target.types} exists`).toBe(true);
     }
-  }, 150_000);
+  }, hangGuard(150_000));
 });
 
 describe("C24 I36 — the Mermaid renderer is off the runtime barrel's graph", () => {
@@ -111,7 +112,7 @@ describe("C24 I36 — the Mermaid renderer is off the runtime barrel's graph", (
         "--import", fileURLToPath(new URL("import-trace.mjs", here)),
         fileURLToPath(new URL("mermaid-graph-child.mjs", here)),
         out,
-      ], { timeout: 60_000 });
+      ], { timeout: hangGuard(60_000) });
     } catch (e) {
       rmSync(dir, { recursive: true, force: true });
       throw e;
@@ -143,5 +144,5 @@ describe("C24 I36 — the Mermaid renderer is off the runtime barrel's graph", (
       types: "./dist/mermaid.d.ts",
       default: "./dist/bundle/mermaid.js",
     });
-  }, 90_000);
+  }, hangGuard(90_000));
 });

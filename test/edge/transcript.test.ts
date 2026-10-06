@@ -7,7 +7,7 @@
 // asserting the whole state after each step is the substitute, and it is what
 // turned up the sweep-on-settle defect that R2 fixed.
 import { describe, expect, it, vi } from "vitest";
-import { CORPUS_BUDGET_MS } from "../support/budget.js";
+import { CORPUS_BUDGET_MS, hangGuard } from "../support/budget.js";
 
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { countBlocks } from "../../src/viewport/transcript/cap.js";
@@ -264,7 +264,7 @@ describe("C13 edge — the cap and the sweep", () => {
     // appended is either still held or counted as dropped, and the marker's own
     // block is the one thing in `blockCount` that was never appended.
     expect(s.droppedBlocks + (s.blockCount - 1)).toBe(100_000);
-  }, 30_000);
+  }, hangGuard(30_000));
 
   it("T3.14: a merge touching no existing row is an upsert; untouched rows keep identity", () => {
     const s = createTranscriptStore();

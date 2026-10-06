@@ -34,6 +34,7 @@ import {
   type Recording,
   type ReplayResult,
 } from "../../src/testing/replay.js";
+import { hangGuard } from "../support/budget.js";
 
 const FIXTURE = "node test/support/fixture.mjs";
 
@@ -205,7 +206,7 @@ type Verdict = ReplayResult &
 function replay(path: string, envOverride: string | null = null): Verdict {
   const res = spawnSync("node", ["test/support/fixture.mjs", "replay", path], {
     encoding: "utf8",
-    timeout: 60_000,
+    timeout: hangGuard(60_000),
     env: envOverride === null ? process.env : { ...process.env, CALCIUM_REPLAY_ENV: envOverride },
   });
   const last = res.stderr.trim().split("\n").at(-1) ?? "";
@@ -403,7 +404,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       // a claim about a comparison that never happened.
       expect(out.masked, `and the clock-derived mask fired\n${why}`).toBeGreaterThan(0);
     },
-    120_000,
+    hangGuard(120_000),
   );
 
   it(
@@ -439,7 +440,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       expect(out.compared, `over the whole session\n${why}`).toBeGreaterThan(3);
       expect(out.stalled, `and paced, not slept\n${why}`).toBe(0);
     },
-    120_000,
+    hangGuard(120_000),
   );
 
   it(
@@ -461,7 +462,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       // replayed verdict could produce.
       const dumb = spawnSync("node", ["test/support/fixture.mjs", "replay", recd.path], {
         encoding: "utf8",
-        timeout: 60_000,
+        timeout: hangGuard(60_000),
         env: { ...process.env, CALCIUM_REPLAY_ENV: JSON.stringify({ TERM: "dumb" }) },
       });
       expect(dumb.status, "a different environment is detected, not replayed").not.toBe(0);
@@ -480,7 +481,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       expect(out.queries.writes, "no query among the raw writes").toBe(0);
       expect(out.queries.frames, "nor among the frames").toBe(0);
     },
-    120_000,
+    hangGuard(120_000),
   );
 
   it(
@@ -541,7 +542,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
         true,
       );
     },
-    120_000,
+    hangGuard(120_000),
   );
 
   it(
@@ -586,7 +587,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
         true,
       );
     },
-    120_000,
+    hangGuard(120_000),
   );
 
   it(
@@ -666,7 +667,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       expect(out.compared, `every recorded frame compared\n${why}`).toBe(rec.frames.length);
       expect(out.identical, `and the figure is reproduced, not excused\n${why}`).toBe(true);
     },
-    120_000,
+    hangGuard(120_000),
   );
 
   it(
@@ -683,7 +684,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
       expect(a.frameHash, `run one\n${why}`).toBe(b.frameHash);
       expect(a.compared, `over the same count\n${why}`).toBe(b.compared);
     },
-    120_000,
+    hangGuard(120_000),
   );
   it("T5.3 (C28 I37, A01 Appendix B): make profile fills all six appendix rows against dist/", () => {
     // **Tier 5 because the subject is `dist/`.** `checkBudget` has tier-1 rows
@@ -697,7 +698,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
     // one does while costing the suite a second instead of a minute.
     const out = execFileSync("node", ["tools/profile.mjs", "300", "6"], {
       encoding: "utf8",
-      timeout: 120_000,
+      timeout: hangGuard(120_000),
     });
 
     // The fixture is shown to respond before anything is read from it — the
@@ -736,7 +737,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
     expect(out, "compute against draw, from PHASE_GROUP on the published face").toContain(
       "Where the frame went",
     );
-  }, 120_000);
+  }, hangGuard(120_000));
   it(
     "T5.4 (C28 I8): a replayed input gives deterministic miss counts, and recomputes nothing it held",
     async () => {
@@ -776,7 +777,7 @@ describe("C28 — profiler, tier 5 spec-first rows", () => {
         );
       }
     },
-    120_000,
+    hangGuard(120_000),
   );
 });
 
@@ -840,5 +841,5 @@ describe("C28 §3c — the sampled stacks, against the real inspector", () => {
       .not.toContain("(idle)");
 
     rmSync(dir, { recursive: true, force: true });
-  }, 30_000);
+  }, hangGuard(30_000));
 });

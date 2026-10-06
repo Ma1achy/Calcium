@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { plotDefinition } from "../../src/presentation/plot/index.js";
 import { FULL_CAPS, measurable } from "../support/render.js";
 import { block } from "../../src/data/viewmodel/index.js";
+import { describeReading, paired, reference } from "../support/paired.js";
 
 const kit = () => measurable({ definitions: [plotDefinition], capabilities: FULL_CAPS });
 
@@ -120,13 +121,16 @@ describe("two plots updating on the same tick", () => {
 });
 
 describe("render cost over sustained ticks", () => {
-  it("100 ticks of a 5-series heatmap stay under 50ms each", () => {
+  it("100 ticks of a 5-series heatmap stay under a ceiling in references, each tick a new block", () => {
+    // **In references since RULING-a** (F1447): `< 50` ms each was a verdict on
+    // the machine. Each round renders the next tick's block, so a cache keyed
+    // on the block cannot answer for the work, and the reference workload runs
+    // interleaved with it (`support/paired.ts`). Measured at load 9–13 on 11
+    // CPUs: medians 0.4–0.6 references. The ceiling is plot-performance's 25.
     const k = kit();
-    const times: number[] = [];
-
-    for (let tick = 0; tick < 100; tick++) {
+    const ticks = Array.from({ length: 100 }, (_, tick) => {
       const values = Array.from({ length: 60 }, (_, i) => Math.sin((tick + i) * 0.1) * 50 + 50);
-      const b = block({
+      return block({
         kind: "plot", id: "sustain", form: "heatmap", height: 5, axes: true,
         colormap: "viridis",
         series: Array.from({ length: 5 }, (_, r) => ({
@@ -134,13 +138,10 @@ describe("render cost over sustained ticks", () => {
           label: `s${String(r)}`,
         })),
       });
+    });
 
-      const start = performance.now();
-      k.renderToLines(b, 80);
-      times.push(performance.now() - start);
-    }
-
-    const avg = times.reduce((a, b) => a + b, 0) / times.length; // cells-ok — a count
-    expect(avg).toBeLessThan(50);
+    let tick = 0;
+    const r = paired(() => k.renderToLines(ticks[(tick += 1) % ticks.length]!, 80), reference, { floorMs: 20 });
+    expect(r.ratio, describeReading(r)).toBeLessThan(25);
   });
 });

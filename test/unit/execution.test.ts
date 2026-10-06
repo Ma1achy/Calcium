@@ -40,6 +40,7 @@ import type { Block, ViewDocument, ViewPatch } from "../../src/data/viewmodel/in
 
 import { FULL_CAPABILITIES } from "../support/producer-context.js";
 import type { AdapterContext, StreamContext } from "../../src/data/adapters/types.js";
+import { hangGuard } from "../support/budget.js";
 type Scripted = Readonly<{
   invoke?: () => Promise<RawResult>;
   stream?: () => AsyncIterable<RawPatch>;
@@ -368,7 +369,7 @@ const settled = async (p?: { readonly inFlight: unknown }): Promise<void> => {
   // the full deadline for those would be ten seconds a call site.
   const started = Date.now() + 20;
   while (p.inFlight === null && Date.now() < started) await wait();
-  const deadline = Date.now() + 10_000;
+  const deadline = Date.now() + hangGuard(10_000);
   while (p.inFlight !== null && Date.now() < deadline) await wait();
   await turn();
   await turn();

@@ -22,6 +22,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { hangGuard } from "../support/budget.js";
 
 const ROADMAP = readFileSync("CALCIUM_ROADMAP.md", "utf8");
 const DIR = mkdtempSync(join(tmpdir(), "roadmap-status-"));
@@ -390,7 +391,7 @@ describe("roadmap-status — the Order column's verifier", () => {
   // 34.1 s and 38.2 s in three consecutive loaded chains against the file's 30 s.
   // The row asserts counts, not speed, so a timeout here is a verdict about the
   // machine; 120 s costs nothing when the tree is right.
-  }, 120_000);
+  }, hangGuard(120_000));
 
   it("RS9: the grep-reach signal counts the sweep's own evidence, not the Order row", () => {
     // **The sixth sweep's finding, made countable.** Every earlier sweep claimed

@@ -12,6 +12,7 @@ import { createEditor } from "../../src/interaction/editor/index.js";
 import { chipLabel, displayRows, layout } from "../../src/interaction/editor/layout.js";
 import { cells } from "../../src/presentation/text.js";
 import { graphemes } from "../../src/interaction/editor/graphemes.js";
+import { describeReading, paired } from "../support/paired.js";
 
 // This file builds a large corpus; `budget.ts` carries the measurement and
 // why the 5 s default is not a margin. Re-measure before raising it.
@@ -28,12 +29,22 @@ describe("C17 §6 — large input", () => {
     const chunk = "the quick brown fox jumps over the lazy dog ";
     const text = chunk.repeat(Math.ceil(1_000_000 / chunk.length));
 
-    const pasted = Date.now();
     e.insert(text, { atomic: true });
-    const insertMs = Date.now() - pasted;
-
     expect(e.text.length, "a megabyte, near enough").toBeGreaterThan(1_000_000); // graphemes-ok
-    expect(insertMs, "one paste, one edit").toBeLessThan(2000);
+
+    // **The paste's cost as a shape, since RULING-a** (F1447). `< 2000` ms was
+    // the machine's verdict: 248–452 ms at load 9–13 against tens idle. An
+    // eighth of the text, pasted into a fresh editor interleaved with the whole
+    // (`support/paired.ts`), is the control — 8× for a linear insert, 64× for
+    // one that rescans the buffer per cluster. Measured: medians 10.7× and
+    // 16.4×. The bound is four times linear.
+    const eighth = text.slice(0, Math.floor(text.length / 8)); // graphemes-ok
+    const paste = paired(
+      () => createEditor().insert(text, { atomic: true }),
+      () => createEditor().insert(eighth, { atomic: true }),
+      { rounds: 5, warm: 1 },
+    );
+    expect(paste.ratio, `one paste, one edit · ${describeReading(paste)}`).toBeLessThan(32);
 
     const halfText = text.slice(0, Math.floor(text.length / 2)); // graphemes-ok
 

@@ -21,6 +21,7 @@ import * as fsSync from "node:fs";
 import { pipelineHarness, settled } from "../support/execution.js";
 
 import { createProcessRunner } from "../../src/data/process/runner.js";
+import { hangGuard } from "../support/budget.js";
 
 /** Run a command under a pty, feeding every chunk into the emulator. */
 const through = async (
@@ -59,7 +60,7 @@ describe("C27 terminal emulator — tier 5", () => {
     expect(lines[1]?.text).toBe("ok");
     expect(lines[1]?.runs).toEqual([{ from: 0, to: 2, fg: { kind: "ansi16", index: 2 } }]);
     term.dispose();
-  }, 20_000);
+  }, hangGuard(20_000));
 
   it("T5.2 (C27 I7): a real child overruns the cap by the same figure the unit row measured", async () => {
     const term = await through("seq 1 30", { cols: 20, rows: 4, scrollback: 20 });
@@ -68,7 +69,7 @@ describe("C27 terminal emulator — tier 5", () => {
     expect(term.dropped).toBe(7);
     expect(snap.lines[0]?.text).toBe("8");
     term.dispose();
-  }, 20_000);
+  }, hangGuard(20_000));
 });
 
 describe("C21 — the PTY port, spec-first rows", () => {
@@ -118,7 +119,7 @@ describe("C21 — the PTY port, spec-first rows", () => {
     expect(out, "a pipe has no device to name").toContain("not a tty");
     expect(out, "and grep drops the colour").not.toMatch(/\u001b\[[0-9;]*m/u);
     expect(out, "with the text unchanged").toContain("hello");
-  }, 20_000);
+  }, hangGuard(20_000));
 
   it("T5.7 (C21 I17): a signalled PTY child takes its pipeline with it", async () => {
     // T3.1's claim on the PTY arm. A shell that signals only its own process
@@ -164,7 +165,7 @@ describe("C21 — the PTY port, spec-first rows", () => {
     // against itself.
     await new Promise((r) => void setTimeout(r, 300));
     expect(matching(), "nothing from the pipeline outlived the signal").toEqual([]);
-  }, 20_000);
+  }, hangGuard(20_000));
 });
 
 describe("C23 — the shell route as a live screen, spec-first rows", () => {
@@ -218,7 +219,7 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
 
     const tailStart = Date.now();
     const firstLines = lines();
-    const tailDeadline = tailStart + 5_000;
+    const tailDeadline = tailStart + hangGuard(5_000);
     let tailText = JSON.stringify(h.transcript.entries[0]?.doc.blocks);
     while (!tailText.includes('"200"') && Date.now() < tailDeadline) {
       await new Promise((r) => void setTimeout(r, 25));
@@ -248,7 +249,7 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
     // `await writes` and the child's death — so `settled()` returns while the
     // entry is still pending, and a row that waited on `inFlight` would read a
     // half-finished document. Wait for the artefact.
-    const deadline = Date.now() + 10_000;
+    const deadline = Date.now() + hangGuard(10_000);
     while (
       Date.now() < deadline &&
       !JSON.stringify(c.transcript.entries[0]?.doc.blocks ?? {}).includes("Cancelled.")
@@ -265,7 +266,7 @@ describe("C23 — the shell route as a live screen, spec-first rows", () => {
     // that settled an empty screen would satisfy every assertion above.
     expect(kept, "the first tick is still on screen").toContain("tick 1");
     expect(kept, "and the last one before the press").toContain("tick 2");
-  }, 30_000);
+  }, hangGuard(30_000));
 });
 
 describe("C23 I71 — the emulator is loaded by the route, not by the import", () => {
@@ -283,7 +284,7 @@ describe("C23 I71 — the emulator is loaded by the route, not by the import", (
         "--import", fileURLToPath(new URL("import-trace.mjs", here)),
         fileURLToPath(new URL("startup-graph-child.mjs", here)),
         out,
-      ], { timeout: 60_000 });
+      ], { timeout: hangGuard(60_000) });
     } catch (e) {
       rmSync(dir, { recursive: true, force: true });
       throw e;
@@ -298,6 +299,6 @@ describe("C23 I71 — the emulator is loaded by the route, not by the import", (
     expect(xterm(first.afterImport ?? []), "and nothing from the emulator's package is").toEqual([]);
     expect(second.seen, "the shell command drew through the route").toBe(true);
     expect(xterm(second.afterShell ?? []).length, "which loaded the emulator").toBeGreaterThan(0);
-  }, 90_000);
+  }, hangGuard(90_000));
 });
 

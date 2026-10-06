@@ -14,6 +14,7 @@
 import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { control, interactivePty, PROMPT, runInPty } from "../support/pty.js";
+import { hangGuard } from "../support/budget.js";
 
 const FAR_SIDE = "./test/support/farside.mjs";
 
@@ -29,7 +30,7 @@ describe("runInPty parameters", () => {
       });
       expect(run.bytes).toContain("VALUE=reached");
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   it(
@@ -50,7 +51,7 @@ describe("runInPty parameters", () => {
       const fallback = await runInPty("echo TERM=$TERM");
       expect(fallback.bytes).toContain("TERM=xterm-256color");
     },
-    45_000,
+    hangGuard(45_000),
   );
 
   it(
@@ -67,7 +68,7 @@ describe("runInPty parameters", () => {
       const off = await runInPty("echo FLAGS=$-");
       expect(off.bytes).not.toMatch(/FLAGS=\S*m/);
     },
-    45_000,
+    hangGuard(45_000),
   );
 
   it(
@@ -78,7 +79,7 @@ describe("runInPty parameters", () => {
       // about `sleep` being unreachable.
       await expect(runInPty("sleep 0.1", { timeoutMs: 10_000 })).resolves.toBeDefined();
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   it(
@@ -99,7 +100,7 @@ describe("runInPty parameters", () => {
         scrollRegion: false,
       });
     },
-    30_000,
+    hangGuard(30_000),
   );
 });
 
@@ -127,7 +128,7 @@ describe("interactivePty parameters", () => {
       expect(pty.output).toMatch(/43\s+132/);
       pty.kill();
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   it(
@@ -142,7 +143,7 @@ describe("interactivePty parameters", () => {
       expect(pty.output).toContain("TERM=vt100");
       pty.kill();
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   it(
@@ -155,7 +156,7 @@ describe("interactivePty parameters", () => {
       expect(pty.output).toContain("VALUE=reached");
       pty.kill();
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   it(
@@ -197,7 +198,7 @@ describe("interactivePty parameters", () => {
         pty.kill();
       }
     },
-    40_000,
+    hangGuard(40_000),
   );
 
   it(
@@ -234,7 +235,7 @@ describe("interactivePty parameters", () => {
         pty.kill();
       }
     },
-    40_000,
+    hangGuard(40_000),
   );
 
   it(
@@ -248,7 +249,7 @@ describe("interactivePty parameters", () => {
       await pty.waitFor(/GOT=hello/, 10_000);
       pty.kill();
     },
-    30_000,
+    hangGuard(30_000),
   );
 });
 
@@ -290,7 +291,7 @@ describe("session far-side variants", () => {
         pty.kill();
       }
     },
-    45_000,
+    hangGuard(45_000),
   );
 
   it(
@@ -321,7 +322,7 @@ describe("session far-side variants", () => {
         absent.kill();
       }
     },
-    45_000,
+    hangGuard(45_000),
   );
 
   it(
@@ -343,7 +344,7 @@ describe("session far-side variants", () => {
         pty.kill();
       }
     },
-    45_000,
+    hangGuard(45_000),
   );
 
   it("farside.mjs: --json in any position leaves every verb answering", () => {
@@ -379,5 +380,5 @@ describe("session far-side variants", () => {
       const doc = run(args) as unknown as { blocks: { text?: string }[] };
       expect(doc.blocks[0]?.text, args.join(" ")).toBe("promoted app.web:main");
     }
-  }, 30_000);
+  }, hangGuard(30_000));
 });

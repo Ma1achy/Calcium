@@ -47,6 +47,7 @@ import { glyphs } from "../../src/presentation/blocks/glyphs.js";
 import { defaultTheme } from "../../src/presentation/theme/index.js";
 import { CURATED, DERIVED, PROJECTIONS, SCOPE, canon, canonical, entryDiff } from "../support/curated.js";
 import { discoverTables } from "../support/exported-tables.js";
+import { hangGuard } from "../support/budget.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PINNED = JSON.parse(
@@ -141,7 +142,7 @@ describe("C10 §2 / C09 §4 — the curated tables", () => {
       Object.keys(CURATED).filter((n) => !names.includes(n)).sort(),
       "a CURATED key that is no exported table names the private table it projects",
     ).toEqual(Object.keys(PROJECTIONS).sort());
-  }, 60_000);
+  }, hangGuard(60_000));
 
   it("T2.40a (C10 I44): canon reads a Set as its sorted members and refuses other non-plain objects", () => {
     expect(canon(new Set(["b", "a"]))).toEqual(["a", "b"]);

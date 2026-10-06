@@ -163,11 +163,55 @@
  * are what a later reader needs to tell a regression from growth.
  */
 
+import { availableParallelism, loadavg } from "node:os";
+
+/**
+ * **RULING-a, the correctness arm: a correctness row does not gate on
+ * wall-clock** (F1348, F1351, F1406, F1447). Every limit in this file, every
+ * per-row `timeout` and every deadline a harness waits against is a **hang
+ * guard** — its verdict is *stuck*, never *slow* — and a hang guard goes
+ * through `hangGuard`, which stretches it by how contended the machine is.
+ *
+ * **Why stretching rather than one enormous number.** The rows those findings
+ * record went red under other lanes' load and passed alone, and the recorded
+ * overruns are small multiples: contract/theme T2.62 at 15.2 s against 15,
+ * RS14b at 46.6 s against 30, T5.8 at 4777 ms against 3000, SS66's T1.154b at
+ * 207.5 s against 120. The stretch is paid only when something hangs on a
+ * loaded machine; not stretching cost a session per red. A flat raise to the
+ * loaded worst would charge every red e2e `waitFor` — which is how a missing
+ * frame *reports* — the same 207 s on an idle machine.
+ *
+ * **The factor is the heaviest of the three load averages over the CPUs**, and
+ * not the one-minute figure alone, because the one-minute figure is the wrong
+ * instrument for *is this quiet now* (the paragraph above, F155): a chain that
+ * starts in a lull reads 0.02 and is loaded a minute later. The fifteen-minute
+ * figure is the slow one and is what a lane's sustained build reads as. Floored
+ * at 1, so an idle machine runs every limit as written, and capped at 8, so a
+ * real hang under absurd load still ends inside a bounded multiple.
+ *
+ * **The blind spot, stated.** Load average counts runnable and
+ * uninterruptible threads in the container's kernel; I/O the host's bind mount
+ * makes slow is not all of that. tier 5's `overlay` T5.4 timed out at 15.4 s
+ * at a load of 3.3 on eleven CPUs (F1406) — a factor of 1 — so the stretch
+ * would not have saved it. What saves that class is the limit being a hang
+ * guard sized for the mount (`budget.ts`'s taxonomy), not the factor.
+ *
+ * **Read at call time**, which for a per-row `timeout` is collection and for a
+ * harness deadline is the moment it is armed.
+ */
+export function contention(): number {
+  const heaviest = Math.max(...loadavg());
+  return Math.min(8, Math.max(1, heaviest / availableParallelism()));
+}
+
+/** A hang guard of `ms` on an idle machine, stretched by `contention()`. */
+export const hangGuard = (ms: number): number => Math.ceil(ms * contention());
+
 /**
  * For a file whose tests walk `src/`. Five times the worst measured, which is
  * the same ratio C12 T2.1 chose over its 3.2 s.
  */
-export const SCAN_BUDGET_MS = 15_000;
+export const SCAN_BUDGET_MS = hangGuard(15_000);
 
 /**
  * For a file whose work is bounded by its own fixture rather than by the
@@ -213,7 +257,7 @@ export const SCAN_BUDGET_MS = 15_000;
  * The next run prints T3.15's own runner figure beside the 4.78 s; when it does,
  * the estimate above becomes a measurement and this comment should say so.
  */
-export const CORPUS_BUDGET_MS = 60_000;
+export const CORPUS_BUDGET_MS = hangGuard(60_000);
 
 /**
  * For the two rows that shell out to `tools/mutate/anchors.mjs` — MA4 and MS3,
@@ -275,7 +319,7 @@ export const CORPUS_BUDGET_MS = 60_000;
  * still surfaces inside two minutes. The constant is unchanged; what changed is
  * that it is true again.
  */
-export const SWEEP_BUDGET_MS = 120_000;
+export const SWEEP_BUDGET_MS = hangGuard(120_000);
 
 /**
  * For C06 T5.1 — a real binary emitting a large document, spawned, parsed,
@@ -306,3 +350,14 @@ export const SWEEP_BUDGET_MS = 120_000;
  * hearing about early.
  */
 export const DOCUMENT_BUDGET_MS = 5_000;
+
+/**
+ * **`DOCUMENT_BUDGET_MS` in the unit `paired.ts`'s `reference()` defines**
+ * (RULING-a, F1447), which is what C06 T5.1 asserts. 1.3 s idle over a
+ * reference of a few milliseconds is a few hundred; **4,000 references** is
+ * several times that, and a pipeline that stopped virtualising or went
+ * quadratic costs tens of times more. The figure is provisional until the row
+ * has printed its own unit on a quiet machine — the row's message carries it.
+ */
+export const DOCUMENT_BUDGET_REFS = 4_000;
+

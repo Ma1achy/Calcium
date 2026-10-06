@@ -17,6 +17,7 @@
 import { describe, expect, it } from "vitest";
 import { cells, displayCells, fitStyled, sliceCells, truncateParts } from "../../src/presentation/text.js";
 import { SGR_RESET } from "../../src/terminal/escapes.js";
+import { paired } from "../support/paired.js";
 
 /** Built rather than written, as T1.14 builds its ESC: a literal here is a byte no reader sees. */
 const ESC = String.fromCharCode(27);
@@ -31,31 +32,22 @@ function styledRow(n: number): string {
 }
 
 /**
- * Milliseconds per call, best of three batches, each batch running until at
- * least `floorMs` has elapsed.
+ * **One row's cost against another's, interleaved** (RULING-a, F1447).
  *
- * **The floor is the guard against F8.** A single call at 50 cells is a few
- * microseconds, and a clock reading `0.00` for it makes any ratio — or `NaN` —
- * so each operand is a batch long enough for the clock to see, and the count
- * of calls in the batch is what divides it. Best of three rather than a mean,
- * because contention only ever adds: the smallest batch is the one the machine
- * interfered with least, and a ratio of two minima is the figure a loaded box
- * can still reproduce (F929).
+ * This was two `perCall`s — the best of three batches of each, one subject
+ * after the other — and a ratio of the two minima, on F929's argument that
+ * contention only ever adds. It does, and the two measurements were still taken
+ * at different moments: T3.77's control lost once with the small row at 2.4× the
+ * large one, on a host killing processes for memory, and the comment that
+ * recorded it named the repair if it happened again — *a different instrument,
+ * not a wider bound*. This is that instrument: `support/paired.ts` times both
+ * operands round by round, alternating which goes first, so the load lands on
+ * both, and reads the median of the per-round ratios. Each batch still runs for
+ * at least 20 ms, so a clock reading `0.00` cannot make the ratio (F8).
  */
-function perCall(fn: () => unknown, floorMs = 20): number {
-  let best = Infinity;
-  for (let rep = 0; rep < 3; rep += 1) {
-    let calls = 0;
-    const start = performance.now();
-    let elapsed = 0;
-    do {
-      fn();
-      calls += 1;
-      elapsed = performance.now() - start;
-    } while (elapsed < floorMs);
-    best = Math.min(best, elapsed / calls);
-  }
-  return best;
+function scaling(large: () => unknown, small: () => unknown): { ratio: number; largeMs: number; smallMs: number } {
+  const r = paired(large, small, { floorMs: 20 });
+  return { ratio: r.ratio, largeMs: r.subjectMs, smallMs: r.controlMs };
 }
 
 /**
@@ -79,9 +71,10 @@ describe("C09 §5a — the walk is linear in the row (C09 I60)", () => {
     // the cut and its cost is what this row is about.
     const small = styledRow(50);
     const large = styledRow(400);
-    const smallMs = perCall(() => fitStyled(small, 49, SGR_RESET));
-    const largeMs = perCall(() => fitStyled(large, 399, SGR_RESET));
-    const ratio = largeMs / smallMs;
+    const { ratio, largeMs, smallMs } = scaling(
+      () => fitStyled(large, 399, SGR_RESET),
+      () => fitStyled(small, 49, SGR_RESET),
+    );
 
     // The control that says the operands measured something: a longer row costs
     // more, whatever the clock's resolution.
@@ -103,7 +96,11 @@ describe("C09 §5a — the walk is linear in the row (C09 I60)", () => {
     // ASCII and never touch the segmenter, which is the whole point of the row
     // below it. If it reds again outside a memory-pressured chain, that is the
     // second sample and the repair is a different instrument, not a wider bound.
-    expect(largeMs, `400 cells took ${largeMs.toFixed(4)} ms against ${smallMs.toFixed(4)} at 50`).toBeGreaterThan(smallMs);
+    //
+    // **That instrument is `scaling`** (RULING-a): the two are timed
+    // interleaved, and the control is now the median per-round ratio above 1 —
+    // one number from both operands at once, not two numbers minutes apart.
+    expect(ratio, `400 cells took ${largeMs.toFixed(4)} ms against ${smallMs.toFixed(4)} at 50`).toBeGreaterThan(1);
     expect(
       ratio,
       `fitStyled at 400 cells cost ${ratio.toFixed(1)}× its cost at 50 (${largeMs.toFixed(4)} ms against ${smallMs.toFixed(4)}); ` +
@@ -117,11 +114,9 @@ describe("C09 §5a — the walk is linear in the row (C09 I60)", () => {
     // instance F937 did not name sat (F938).
     const small = styledRow(50);
     const large = styledRow(400);
-    const smallMs = perCall(() => sliceCells(small, 10, 50));
-    const largeMs = perCall(() => sliceCells(large, 10, 400));
-    const ratio = largeMs / smallMs;
+    const { ratio, largeMs, smallMs } = scaling(() => sliceCells(large, 10, 400), () => sliceCells(small, 10, 50));
 
-    expect(largeMs, `400 cells took ${largeMs.toFixed(4)} ms against ${smallMs.toFixed(4)} at 50`).toBeGreaterThan(smallMs);
+    expect(ratio, `400 cells took ${largeMs.toFixed(4)} ms against ${smallMs.toFixed(4)} at 50`).toBeGreaterThan(1);
     expect(
       ratio,
       `sliceCells at 400 cells cost ${ratio.toFixed(1)}× its cost at 50 (${largeMs.toFixed(4)} ms against ${smallMs.toFixed(4)}); ` +
@@ -228,19 +223,19 @@ describe("C09 §5a — the cluster step is linear, and one glyph does not segmen
     // no longer walks, so the row fits one cell over the width.
     const small = cjkRow(50);
     const large = cjkRow(400);
-    const smallMs = perCall(() => fitStyled(small, 49, SGR_RESET));
-    const largeMs = perCall(() => fitStyled(large, 399, SGR_RESET));
-    const ratio = largeMs / smallMs;
-    expect(largeMs, `400 cells took ${largeMs.toFixed(4)} ms against ${smallMs.toFixed(4)} at 50`).toBeGreaterThan(smallMs);
+    const { ratio, largeMs, smallMs } = scaling(
+      () => fitStyled(large, 399, SGR_RESET),
+      () => fitStyled(small, 49, SGR_RESET),
+    );
+    expect(ratio, `400 cells took ${largeMs.toFixed(4)} ms against ${smallMs.toFixed(4)} at 50`).toBeGreaterThan(1);
     expect(
       ratio,
       `fitStyled over CJK at 400 cells cost ${ratio.toFixed(1)}× its cost at 50 (${largeMs.toFixed(4)} ms against ${smallMs.toFixed(4)}); linear is 8× and the bound is 24×`,
     ).toBeLessThan(LINEAR_AT_8X_WITH_MARGIN);
 
-    const smallTail = perCall(() => sliceCells(small, 10, 50));
-    const largeTail = perCall(() => sliceCells(large, 10, 400));
-    const tailRatio = largeTail / smallTail;
-    expect(largeTail).toBeGreaterThan(smallTail);
+    const tail = scaling(() => sliceCells(large, 10, 400), () => sliceCells(small, 10, 50));
+    const { ratio: tailRatio, largeMs: largeTail, smallMs: smallTail } = tail;
+    expect(tailRatio).toBeGreaterThan(1);
     expect(
       tailRatio,
       `sliceCells over CJK at 400 cells cost ${tailRatio.toFixed(1)}× its cost at 50 (${largeTail.toFixed(4)} ms against ${smallTail.toFixed(4)}); the bound is 24×`,
@@ -312,13 +307,15 @@ describe("C09 §5a — the cluster step is linear, and one glyph does not segmen
     // it always had still holds — a row that must segment every cluster costs
     // more than one that segments a single glyph — and that comparison has no
     // denominator to compress.
-    const gutterMs = perCall(() => fitStyled(gutter, 201, SGR_RESET));
-    const cjkMs = perCall(() => fitStyled(cjk, 201, SGR_RESET));
+    const { ratio: cjkOverGutter, largeMs: cjkMs, smallMs: gutterMs } = scaling(
+      () => fitStyled(cjk, 201, SGR_RESET),
+      () => fitStyled(gutter, 201, SGR_RESET),
+    );
     expect(
-      cjkMs,
+      cjkOverGutter,
       `CJK took ${cjkMs.toFixed(4)} ms against ${gutterMs.toFixed(4)} for the gutter row ` +
-        `(${(cjkMs / gutterMs).toFixed(1)}×, reported not gated — F1084)`,
-    ).toBeGreaterThan(gutterMs);
+        `(${cjkOverGutter.toFixed(1)}×, reported not gated — F1084)`,
+    ).toBeGreaterThan(1);
   });
   it("T3.90 (C09 I63, I79, F1205): a 400-cell CJK line cut to 100 asks the segmenter for 250 clusters and iterates no Segments; kept from the tail it asks for the whole line's 400; an ASCII line asks for none", () => {
     // **The cut path, counted rather than timed** (C09 I79). Before I79 both

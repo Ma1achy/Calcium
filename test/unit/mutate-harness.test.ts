@@ -29,6 +29,7 @@ import {
   tscTypecheck,
   unbuilt,
 } from "../../tools/mutate/mutate.mjs";
+import { hangGuard } from "../support/budget.js";
 
 /**
  * **The type-check, stubbed green** (F1106). `runPass`'s default shells out to
@@ -965,7 +966,7 @@ describe("mutation harness", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  }, 60_000);
+  }, hangGuard(60_000));
 
   it("MH12 (F1472): a passing row's ✓ line under a file that failed is not a catch — the real bytes", () => {
     // **The named row passed and the report said `caught`.** Vitest lists every

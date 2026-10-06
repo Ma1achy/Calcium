@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
 import { readCounter, stateOf } from "../../tools/instruments.mjs";
+import { hangGuard } from "../support/budget.js";
 
 type Counter =
   | { rows: number; failed: number; reported: number; collected: number | null }
@@ -214,6 +215,6 @@ describe("instruments — the runner's row reader", () => {
         rmSync(dir, { recursive: true, force: true });
       }
     },
-    60_000,
+    hangGuard(60_000),
   );
 });

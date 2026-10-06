@@ -51,6 +51,7 @@ import {
 import { emulatorMissing, sleep } from "../support/x-emulator.js";
 import { rgbPng } from "../support/png.js";
 import type { Pixels } from "../../src/presentation/image/index.js";
+import { hangGuard } from "../support/budget.js";
 
 const ID = 911;
 const SPARE = 912;
@@ -289,7 +290,7 @@ describe("C09 §4c e2e — the protocol readings the arm rests on", () => {
       expect(at(3).blue, "the unaddressed picture was held and is drawn now").toBeGreaterThan(1000);
       expect(at(3).green, "beside the one already on screen").toBe(at(1).green);
     },
-    180_000,
+    hangGuard(180_000),
   );
 
   it.skipIf(missing !== null)(
@@ -321,6 +322,6 @@ describe("C09 §4c e2e — the protocol readings the arm rests on", () => {
         expect(s.red + s.green, `shot ${String(i)} keeps none of the animation`).toBe(0);
       }
     },
-    180_000,
+    hangGuard(180_000),
   );
 });

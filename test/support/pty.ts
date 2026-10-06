@@ -16,6 +16,8 @@
 import { spawn } from "node-pty";
 
 import { cells } from "../../src/presentation/text.js";
+// Every deadline below is a hang guard (RULING-a): it says *stuck*, never *slow*.
+import { hangGuard } from "./budget.js";
 
 const MARKER = "__TERMIOS__";
 
@@ -516,7 +518,7 @@ export function runInPty(
     const timer = setTimeout(() => {
       term.kill();
       reject(new Error(`PTY run timed out: ${program}\n${output}`));
-    }, opts.timeoutMs ?? 20_000);
+    }, hangGuard(opts.timeoutMs ?? 20_000));
 
     term.onExit(({ exitCode }) => {
       clearTimeout(timer);
@@ -817,7 +819,7 @@ export function interactivePty(
     return new Promise((resolve, reject) => {
       const timer = setTimeout(
         () => reject(new Error(`never saw ${String(re)}${from > 0 ? " after the mark" : ""} in:\n${output.slice(-2000)}`)),
-        ms,
+        hangGuard(ms),
       );
       waiters.push({
         re,
@@ -860,7 +862,7 @@ export function interactivePty(
       // Polled rather than driven by the data event: the frame is a derived
       // view of everything received so far, and a predicate over it is not a
       // function of any single chunk.
-      const deadline = Date.now() + ms;
+      const deadline = Date.now() + hangGuard(ms);
       const self = this as InteractivePty;
       return new Promise<void>((resolve, reject) => {
         const tick = (): void => {
@@ -895,7 +897,7 @@ export function interactivePty(
                 paint.rows().join("\n"),
             ),
           );
-        }, ms);
+        }, hangGuard(ms));
         exitWaiters.push((code: number) => {
           clearTimeout(timer);
           resolve(code);

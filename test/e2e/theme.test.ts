@@ -11,6 +11,7 @@ import { tableDefinition } from "../../src/presentation/table/index.js";
 import { cells } from "../../src/presentation/text.js";
 import type { BlockDefinition } from "../../src/presentation/blocks/index.js";
 import { interactivePty, promptRow, type InteractivePty } from "../support/pty.js";
+import { hangGuard } from "../support/budget.js";
 
 const DEPTHS = [24, 8, 4, 1] as const;
 const VARIANTS = [
@@ -144,7 +145,7 @@ describe("C10 e2e", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
 
   // **The deferral was right about detection and wrong about the session.**
   // `TERM=dumb` is the only *detected* route to depth 1 and it fails C01's
@@ -190,7 +191,7 @@ describe("C10 e2e", () => {
     } finally {
       detected.kill();
     }
-  }, 60_000);
+  }, hangGuard(60_000));
 
   it("T5.4: /theme toggled fifty times mid-session leaves no half-themed frame", async () => {
     const pty = session("xterm-256color");
@@ -246,5 +247,5 @@ describe("C10 e2e", () => {
     } finally {
       pty.kill();
     }
-  }, 60_000);
+  }, hangGuard(60_000));
 });

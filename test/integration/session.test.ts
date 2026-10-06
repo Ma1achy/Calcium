@@ -4,7 +4,7 @@
 // stubs `render` with a counter, so the graph it builds never paints — and the
 // one thing asserted here happens *inside* `Session#render` and nowhere else.
 // A row about it written against `buildGraph` would measure the harness.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { buildSession, fakeFs } from "../support/session.js";
 import { SessionStateError } from "../../src/shell/types.js";
@@ -1138,58 +1138,75 @@ describe("C22 §8 step 3 — the diagnostics nobody read (I6a, C23 I48, F15)", (
       } as never,
     ];
 
-    const stdin = fakeStdin();
-    const { stdout, tui, screen } = await buildSession({
-      manifest,
-      localHandlers,
-      blocks,
-      stdin: stdin as never,
-    });
-    await settle();
+    // **Time held, since RULING-a** (F1447). The frame read below is the one
+    // that found the fault, and that frame raises the floor after its write and
+    // commits the next on C03's 16 ms `stream` window — through the harness's
+    // `schedule`, a real `setTimeout`. A loaded machine that took longer than
+    // the window to reach the read drew the next frame first, at the floor's
+    // height, and the row read a four-row box as this one: deferred-height's
+    // T4.49 and T4.53 failed the same way (F1351). On fake timers nothing on a
+    // window runs until a row advances it, and this row never does.
+    vi.useFakeTimers();
+    try {
+      const now = async (): Promise<void> => {
+        await vi.advanceTimersByTimeAsync(0);
+        await settle();
+      };
+      const stdin = fakeStdin();
+      const { stdout, tui, screen } = await buildSession({
+        manifest,
+        localHandlers,
+        blocks,
+        stdin: stdin as never,
+      });
+      await now();
 
-    stdin.emit("/boom\r");
-    await settle();
+      stdin.emit("/boom\r");
+      await now();
 
-    // **The height, read from a real frame rather than from a registry.** The
-    // definition measures 3; the error block that replaces it occupies 3, so the
-    // rows below sit where the measurement put them. This is C09 I11 through the
-    // whole stack, and it is the assertion the unit rows cannot make — every
-    // count agreed while the frame was one row tall.
-    const rows = screen().rows;
-    const at = rows.findIndex((r) => r.includes("failed to render"));
-    expect(at, "the containment is on the screen").toBeGreaterThan(0);
+      // **The height, read from a real frame rather than from a registry.** The
+      // definition measures 3; the error block that replaces it occupies 3, so the
+      // rows below sit where the measurement put them. This is C09 I11 through the
+      // whole stack, and it is the assertion the unit rows cannot make — every
+      // count agreed while the frame was one row tall.
+      const rows = screen().rows;
+      const at = rows.findIndex((r) => r.includes("failed to render"));
+      expect(at, "the containment is on the screen").toBeGreaterThan(0);
 
-    // **The figure moved and the claim did not** (C09 I31). The boundary used to
-    // draw a bare message with blank rows below it, which is indistinguishable
-    // from a block that under-drew — so it now draws the `status` box, and the
-    // border is the evidence the height was honoured. The definition measures 3,
-    // so the box is border · message · border and the rows below sit where the
-    // measurement put them.
-    // The box is a card's body (C23 I55), so its first row carries the hook (C22
-    // I83) — required, not optional: a `visibleRows` that skipped the layout
-    // survived this row while the hook was `(⎿ )?`.
-    expect(/^\s*⎿  ┌/u.test(rows[at - 1] ?? ""), "the box opens above it, under the hook").toBe(true);
-    expect(/^\s*│  └/u.test(rows[at + 1] ?? ""), "and closes below it, under the bar (C22 I88)").toBe(true);
-    // **The prompt directly below the closing border is the height assertion.**
-    // Three rows measured, three drawn, and nothing between the box and what
-    // follows it — a stronger claim than a blank row, which a box one row short
-    // would also satisfy.
-    // The entry closes with its blank row (C22 I85), then the rule bounding the
-    // prompt (C22 I81), then the prompt.
-    expect(rows[at + 2]?.trim(), "the entry's blank row").toBe("");
-    expect(/^[─-]{20,}/u.test(rows[at + 3] ?? ""), "the upper rule follows the box").toBe(true);
-    expect(rows[at + 4]?.trimStart().startsWith("❯"), "the prompt follows the rule").toBe(true);
+      // **The figure moved and the claim did not** (C09 I31). The boundary used to
+      // draw a bare message with blank rows below it, which is indistinguishable
+      // from a block that under-drew — so it now draws the `status` box, and the
+      // border is the evidence the height was honoured. The definition measures 3,
+      // so the box is border · message · border and the rows below sit where the
+      // measurement put them.
+      // The box is a card's body (C23 I55), so its first row carries the hook (C22
+      // I83) — required, not optional: a `visibleRows` that skipped the layout
+      // survived this row while the hook was `(⎿ )?`.
+      expect(/^\s*⎿  ┌/u.test(rows[at - 1] ?? ""), "the box opens above it, under the hook").toBe(true);
+      expect(/^\s*│  └/u.test(rows[at + 1] ?? ""), "and closes below it, under the bar (C22 I88)").toBe(true);
+      // **The prompt directly below the closing border is the height assertion.**
+      // Three rows measured, three drawn, and nothing between the box and what
+      // follows it — a stronger claim than a blank row, which a box one row short
+      // would also satisfy.
+      // The entry closes with its blank row (C22 I85), then the rule bounding the
+      // prompt (C22 I81), then the prompt.
+      expect(rows[at + 2]?.trim(), "the entry's blank row").toBe("");
+      expect(/^[─-]{20,}/u.test(rows[at + 3] ?? ""), "the upper rule follows the box").toBe(true);
+      expect(rows[at + 4]?.trimStart().startsWith("❯"), "the prompt follows the rule").toBe(true);
 
-    const before = stdout.chunks.length;
-    await tui.stop("exit");
-    const after = stdout.chunks.slice(before).join("");
+      const before = stdout.chunks.length;
+      await tui.stop("exit");
+      const after = stdout.chunks.slice(before).join("");
 
-    const LEAVE_ALT = "\u001b[?1049l";
-    expect(after, "the terminal was released on this path").toContain(LEAVE_ALT);
-    expect(
-      after.indexOf("renderer exploded"),
-      "what the containment swallowed is reported, and after the release",
-    ).toBeGreaterThan(after.indexOf(LEAVE_ALT));
+      const LEAVE_ALT = "\u001b[?1049l";
+      expect(after, "the terminal was released on this path").toContain(LEAVE_ALT);
+      expect(
+        after.indexOf("renderer exploded"),
+        "what the containment swallowed is reported, and after the release",
+      ).toBeGreaterThan(after.indexOf(LEAVE_ALT));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

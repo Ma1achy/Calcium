@@ -14,6 +14,7 @@ import { fakeStdin } from "../support/fake-terminal.js";
 import { createEditor } from "../../src/interaction/editor/editor.js";
 import type { TuiConfig } from "../../src/shell/types.js";
 import { COPY_DEADLINE_MS } from "../../src/shell/clipboard.js";
+import { hangGuard } from "../support/budget.js";
 
 const ESC = "\u001b";
 const ENTER_MODE = `${ESC}V`;
@@ -87,7 +88,7 @@ describe("C14 §6a — the clipboard in a real session", () => {
       await t.press("y");
       // The pending sentence is T3.26's: a `cat` answers inside the settle, so
       // the frame that would have drawn it has already been replaced.
-      await vi.waitFor(() => expect(t.toast("copied via pbcopy")).toBe(true), { timeout: 5_000 });
+      await vi.waitFor(() => expect(t.toast("copied via pbcopy")).toBe(true), { timeout: hangGuard(5_000) });
       expect(readFileSync(out, "utf8"), "the tool took exactly the kill buffer's text").toBe(spy.mock.calls.at(-1)?.[0]);
       expect(t.footer(), "K5: a route that worked offers nothing").toContain("⏎ copy");
 
@@ -149,7 +150,7 @@ describe("C14 §6a — the clipboard in a real session", () => {
       set.mockRestore();
       clear.mockRestore();
     }
-  }, 10_000);
+  }, hangGuard(10_000));
 
   it("T4.45 (C14 I61, §6e K7, K9, K10, K16): a pbcopy exiting 1 offers the file for that copy and writes nothing until ⏎", async () => {
     const dir = mkdtempSync(join(tmpdir(), "calcium-pbcopy-"));
@@ -170,7 +171,7 @@ describe("C14 §6a — the clipboard in a real session", () => {
     expect(t.footer(), "a tool is a route: no offer before the copy").toContain("⏎ copy");
     await t.press("y");
     await vi.waitFor(() => expect(t.toast("pbcopy failed (exited with code 1) — the kill buffer holds it")).toBe(true), {
-      timeout: 5_000,
+      timeout: hangGuard(5_000),
     });
     // **K7** — said, offered, and nothing written.
     await expect(fs.readFile(path), "the failure wrote nothing").rejects.toBeDefined();
@@ -188,7 +189,7 @@ describe("C14 §6a — the clipboard in a real session", () => {
     await t.press("\r");
     expect(t.toast(`saved to ${path}`), "the full path").toBe(true);
     expect(await fs.readFile(path), "the file holds the copy").toContain("two words");
-  }, 10_000);
+  }, hangGuard(10_000));
 
   it("T4.8 (C17 I31): a copy sent by OSC 52, then ⌃y → the prompt holds the text the payload decodes to", async () => {
     const o = await session({ capabilities: { clipboard: "osc52" } });

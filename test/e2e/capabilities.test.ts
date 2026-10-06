@@ -18,6 +18,7 @@ import { KITTY_KEYBOARD } from "../../src/terminal/escapes.js";
 import { createDecoder } from "../../src/interaction/router/decode.js";
 import { detectCapabilities } from "../../src/terminal/capabilities.js";
 import { captureFromEmulator, emulatorMissing, sleep } from "../support/x-emulator.js";
+import { hangGuard } from "../support/budget.js";
 
 const FIXTURE = "node test/support/fixture.mjs caps";
 
@@ -60,7 +61,7 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
       // assertion above reads the bytes, this one reads the folded state.
       expect(run.decset).toMatchObject({ altScreen: false, cursorVisible: true });
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   it(
@@ -81,7 +82,7 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
       expect(painted, "24-bit colour on a 16-colour terminal").not.toMatch(TRUECOLOUR);
       expect(painted, "256-colour on a 16-colour terminal").not.toMatch(INDEXED_256);
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   it(
@@ -110,7 +111,7 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
       expect(painted).toContain("a failure");
       expect(painted).toContain("a success");
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   it(
@@ -131,7 +132,7 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
       expect(run.decset.altScreen).toBe(false);
       expect(frame(run)).toContain("capabilities");
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   it(
@@ -150,7 +151,7 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
       expect(frame(detected)).not.toMatch(TRUECOLOUR);
       expect(frame(detected)).toMatch(FOUR_BIT);
     },
-    45_000,
+    hangGuard(45_000),
   );
 
   it(
@@ -184,7 +185,7 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
       expect(detected.bytes).not.toMatch(/\x1b\[[<>=][0-9;]*u/);
       expect(detected.bytes).toContain('"keyboardProtocol":"none"');
     },
-    45_000,
+    hangGuard(45_000),
   );
 
   // **Was an `it.todo` for want of an emulator; the container has kitty now** (C02
@@ -293,7 +294,7 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
       const keys = events.map((e) => (e.kind === "key" ? `${e.key.name}${e.key.shift ? "+shift" : ""}${e.event === "release" ? "/release" : ""}` : ""));
       expect(keys).toEqual(["escape", "escape/release", "enter+shift", "enter+shift/release", "k", "k/release"]);
     },
-    60_000,
+    hangGuard(60_000),
   );
 
   // **T5.8 — the identification's claims put to the terminals they are about.**
@@ -421,7 +422,7 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
       // would produce. `ESC Q` is not an introducer and is still Meta.
       expect(decode("\x1bQ"), "the decoder has not simply stopped emitting").toEqual(["Q+meta"]);
     },
-    240_000,
+    hangGuard(240_000),
   );
 
   // **T5.9 — I14's premise, executed rather than described** (F1057).
@@ -495,7 +496,7 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
       // so `[?2026;2$y` appears there too and only the `^[` separates them.
       expect(pty.output, "the canonical-mode echo reached the display").toContain("^[[?2026;2$y");
     },
-    60_000,
+    hangGuard(60_000),
   );
 
   it(
@@ -578,6 +579,6 @@ describe("C02 e2e — the environment decides, and the terminal shows it", () =>
         pty.kill();
       }
     },
-    60_000,
+    hangGuard(60_000),
   );
 });

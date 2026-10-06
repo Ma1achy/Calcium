@@ -9,6 +9,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_LANGUAGES } from "../../src/presentation/blocks/kinds/code.js";
+import { hangGuard } from "../support/budget.js";
 
 const execFileP = promisify(execFile);
 
@@ -22,7 +23,7 @@ describe("C09 e2e — the code block's import graph", () => {
         "--import", fileURLToPath(new URL("import-trace.mjs", here)),
         fileURLToPath(new URL("code-graph-child.mjs", here)),
         out,
-      ], { timeout: 60_000 });
+      ], { timeout: hangGuard(60_000) });
     } catch (e) {
       rmSync(dir, { recursive: true, force: true });
       throw e;
@@ -44,5 +45,5 @@ describe("C09 e2e — the code block's import graph", () => {
     const after = hljs(second.afterRegister ?? []);
     expect(after.filter((f) => !before.includes(f)), "one file more, the seventeenth grammar's").toEqual(["languages/ruby.js"]);
     expect(second.coloured, "which tokenises on the next call").toBe(true);
-  }, 90_000);
+  }, hangGuard(90_000));
 });

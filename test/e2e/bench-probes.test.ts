@@ -14,6 +14,7 @@
 import { execFileSync } from "node:child_process";
 
 import { describe, expect, it } from "vitest";
+import { hangGuard } from "../support/budget.js";
 
 /**
  * The environment a person runs a bench in. vitest sets `NODE_ENV=test`, and
@@ -24,7 +25,7 @@ const env = Object.fromEntries(
   Object.entries(process.env).filter(([k]) => !k.startsWith("VITEST") && k !== "NODE_ENV"),
 );
 const node = (args: readonly string[], extra: Readonly<Record<string, string>> = {}): string =>
-  execFileSync("node", args, { encoding: "utf8", timeout: 120_000, env: { ...env, ...extra } });
+  execFileSync("node", args, { encoding: "utf8", timeout: hangGuard(120_000), env: { ...env, ...extra } });
 
 describe("tools/bench/stress.mjs — a transcript full of one thing", () => {
   const STRESS = ["--expose-gc", "--experimental-strip-types", "tools/bench/stress.mjs"];

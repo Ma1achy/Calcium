@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { hangGuard } from "../support/budget.js";
 
 const LEDGER = "docs/design/language/RULE_LEDGER.md";
 const text = (): string => readFileSync(LEDGER, "utf8");
@@ -60,7 +61,7 @@ function row(id: string): string {
  * unchanged, and a row that fails on its own still fails. `mutate-anchors`'
  * `SWEEP_BUDGET_MS` is the same decision one file over, for the same reason.
  */
-const LEDGER_BUDGET_MS = 120_000;
+const LEDGER_BUDGET_MS = hangGuard(120_000);
 
 describe("A03 SS66 — the rule ledger resolves against the tree", () => {
   it("T1.154 (SS66, R-SPC-001): the live ledger is green, and its five states partition the registry", { timeout: LEDGER_BUDGET_MS }, () => {

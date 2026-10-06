@@ -28,6 +28,7 @@ import {
   installedPrograms,
   sleep,
 } from "../support/x-emulator.js";
+import { hangGuard } from "../support/budget.js";
 
 const FIXTURE = "node test/support/fixture.mjs session";
 const PROMPT = /❯/;
@@ -131,7 +132,7 @@ describe("C16 e2e — the mouse through a PTY (I31, §4a)", () => {
         pty.kill();
       }
     },
-    60_000,
+    hangGuard(60_000),
   );
 
   it(
@@ -185,7 +186,7 @@ describe("C16 e2e — the mouse through a PTY (I31, §4a)", () => {
         pty.kill();
       }
     },
-    90_000,
+    hangGuard(90_000),
   );
 
   it(
@@ -231,7 +232,7 @@ describe("C16 e2e — the mouse through a PTY (I31, §4a)", () => {
         pty.kill();
       }
     },
-    60_000,
+    hangGuard(60_000),
   );
 });
 
@@ -376,7 +377,7 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808
       }
       expect(drove.sort(), "every declared emulator was driven, not merely listed").toEqual([...MEASURED].sort());
     },
-    360_000,
+    hangGuard(360_000),
   );
 
   it.skipIf(bothMissing !== null)(
@@ -450,6 +451,6 @@ describe("C16 §2 / C01 I21 — the mouse modes, answered by two emulators (F808
         "wheelUp", "wheelDown", "wheelLeft", "wheelRight",
       ]);
     },
-    240_000,
+    hangGuard(240_000),
   );
 });

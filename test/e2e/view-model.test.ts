@@ -20,6 +20,7 @@
 import { describe, expect, it } from "vitest";
 
 import { interactivePty, PROMPT, promptRow, type InteractivePty } from "../support/pty.js";
+import { hangGuard } from "../support/budget.js";
 
 const FIXTURE = "node test/support/fixture.mjs session subprocess";
 
@@ -181,7 +182,7 @@ describe("C04 e2e — the drift tests", () => {
     } finally {
       pty.kill();
     }
-  }, 120_000);
+  }, hangGuard(120_000));
 
   it("T5.1b (C16 I23): ⌃Home and ⌃End reach the document's extremes, and Home still edits", async () => {
     // **The keys the walk above had to page around.** `scrollToTop` and
@@ -230,7 +231,7 @@ describe("C04 e2e — the drift tests", () => {
     } finally {
       pty.kill();
     }
-  }, 120_000);
+  }, hangGuard(120_000));
 
   it("T5.2 (C14 I8): the same at four widths, with a resize between every pass", async () => {
     // **The width axis, and the one that wraps.** A width change invalidates
@@ -289,7 +290,7 @@ describe("C04 e2e — the drift tests", () => {
     } finally {
       pty.kill();
     }
-  }, 180_000);
+  }, hangGuard(180_000));
   it("T5.3a (C14 I4): a live stream appending above a detached viewport does not move it", async () => {
     // **The single most noticeable correctness property in C14** (C14 §3), and
     // the half of T5.3 that is reachable today. A frozen streaming entry that
@@ -370,7 +371,7 @@ describe("C04 e2e — the drift tests", () => {
     } finally {
       pty.kill();
     }
-  }, 90_000);
+  }, hangGuard(90_000));
 
   it.todo(
     "T5.3b: a --watch stream applying *merge* patches — an expanded row stays expanded and stays put. Not deferred on a component: what it needs is two harness parameters, and every component involved is built. The append half is T5.3a. What this needs is a patch that is not an append: the default stream adapter maps every `data` patch to `op: \"append\"` (`src/data/adapters/stream.ts`), and `op: \"merge\"` is only reachable through an app adapter's `adaptPatch`. So it needs two harness parameters — a registered adapter in `fixture.mjs` mapping a far-side line onto an existing table row, and a `tail` that emits rows rather than notices — and neither exists. Split from T5.3 rather than left bundled: the append half was reachable and was waiting behind the merge half's blocker",

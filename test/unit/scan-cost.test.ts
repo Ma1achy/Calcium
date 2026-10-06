@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — a `.mjs` instrument with no declarations, like its siblings.
 import { lines, measure, median, notices, RECORDED, summarise } from "../../tools/scan-cost.mjs";
+import { hangGuard } from "../support/budget.js";
 
 const recorded = RECORDED as {
   afterMsPerPass: number;
@@ -91,5 +92,5 @@ describe("scan-cost — the regime reporter", () => {
     const s = (measure as (passes?: number) => { files: number; msPerPass: number }) (1);
     expect(s.files, "src/ has more than a hundred files").toBeGreaterThan(100);
     expect(s.msPerPass).toBeGreaterThan(0);
-  }, 30_000);
+  }, hangGuard(30_000));
 });

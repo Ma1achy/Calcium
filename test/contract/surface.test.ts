@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { ESC_DISAMBIGUATION_MS } from "../../src/interaction/router/decode.js";
 
 import type {
   ChildSurface,
@@ -484,29 +485,51 @@ describe("C16 I49 — the child rung consumes (review batch 2, M5 item 8)", () =
     // sequence prefix, and only the timer names it — so a row that dispatched
     // `{ name: "escape" }` directly is passed by a decoder that never releases
     // it. vi's insert-mode exit is this byte.
-    const h = await buildGraph();
-    h.graph.lifecycle.acquire();
-    const seen: string[] = [];
-    const handle = h.graph.surface.open({
-      schema: "calcium.child-surface/1",
-      id: "vi",
-      keymap: [{ key: { name: "escape" }, action: "normal-mode" }],
-      render: () => [{ kind: "raw", id: "board", text: "VI" }],
-      onAction: (event) => void seen.push(`${event.action}:${event.phase}`),
-    });
-    const entriesBefore = h.graph.transcript.entries.length;
+    //
+    // **Time held, since RULING-a** (F1406). The harness's `schedule` is a real
+    // `setTimeout`, and two of its timers meet here: the decoder's poll at the
+    // escape window (`ESC_DISAMBIGUATION_MS`, 50 ms) and the legacy release the
+    // press arms another 50 ms on (`LEGACY_RELEASE_MS`). This row waited 80 ms
+    // of real time and read, so the release was due 20 ms after the read; a
+    // loaded machine that stalled the loop past it ran both timers in one pass
+    // and the row read an extra `normal-mode:release` — red in the shell lane's
+    // chain at load 5, green three of three alone. On fake timers the window
+    // closes because the row says so, and the release is asserted as what comes
+    // next rather than raced.
+    vi.useFakeTimers();
+    try {
+      const h = await buildGraph();
+      h.graph.lifecycle.acquire();
+      const seen: string[] = [];
+      const handle = h.graph.surface.open({
+        schema: "calcium.child-surface/1",
+        id: "vi",
+        keymap: [{ key: { name: "escape" }, action: "normal-mode" }],
+        render: () => [{ kind: "raw", id: "board", text: "VI" }],
+        onAction: (event) => void seen.push(`${event.action}:${event.phase}`),
+      });
+      const entriesBefore = h.graph.transcript.entries.length;
 
-    h.stdin.emit("\u001b");
-    expect(seen, "held while the window is open").toEqual([]);
-    h.clock.advance(80);
-    await new Promise((r) => setTimeout(r, 80));
-    await tick();
+      h.stdin.emit("\u001b");
+      expect(seen, "held while the window is open").toEqual([]);
+      h.clock.advance(80);
+      await vi.advanceTimersByTimeAsync(ESC_DISAMBIGUATION_MS);
 
-    expect(seen, "the surface saw escape, once").toEqual(["normal-mode:press"]);
-    expect(h.graph.router.target, "and it is still attached").toBe("child");
-    expect(h.graph.transcript.entries.length, "nothing else acted").toBe(entriesBefore);
+      expect(seen, "the surface saw escape, once").toEqual(["normal-mode:press"]);
+      expect(h.graph.router.target, "and it is still attached").toBe("child");
+      expect(h.graph.transcript.entries.length, "nothing else acted").toBe(entriesBefore);
 
-    await handle.close();
-    await h.graph.lifecycle.release();
+      // **And then the release, on its own timer** — the event the row used to
+      // race. A legacy terminal sends no release, so the surface synthesises
+      // one; it belongs to the same key and is not something else acting.
+      h.clock.advance(50);
+      await vi.advanceTimersByTimeAsync(50);
+      expect(seen, "the press, then its synthesised release").toEqual(["normal-mode:press", "normal-mode:release"]);
+
+      await handle.close();
+      await h.graph.lifecycle.release();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

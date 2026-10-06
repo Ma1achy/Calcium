@@ -286,6 +286,13 @@ switch (mode) {
     // Nothing below keeps the loop alive. Whether the process ends here is the
     // whole of the assertion.
     say("FELL-THROUGH");
+    // **What is still holding the loop, by name** (RULING-a, F1447). T5.8 used
+    // to read *it ended* through a 3 s bound on the run, which is the mount and
+    // the machine as much as the subject — 4777 ms under the batch's load and
+    // 744 ms alone. The property is that nothing the session made outlives the
+    // refusal, and node can list that directly: a history file, a live store
+    // or an armed timer each appears here by kind, on any machine at any load.
+    say(`RESOURCES ${JSON.stringify(process.getActiveResourcesInfo())}`);
     break;
   }
 
@@ -323,8 +330,23 @@ switch (mode) {
       }
     }, 5);
 
+    // **The control: a bare 16 ms timer, re-armed each time it fires, in this
+    // process and for the same seconds** (RULING-a, F1447). It is what the
+    // event loop can deliver at the window's period under whatever load the
+    // machine is carrying, so the row's floor is written against it rather
+    // than against 40 frames a second, which a starved process misses with the
+    // scheduler working perfectly.
+    let controlTicks = 0;
+    let control = null;
+    const controlTick = () => {
+      controlTicks += 1;
+      control = setTimeout(controlTick, 16);
+    };
+    control = setTimeout(controlTick, 16);
+
     setTimeout(() => {
       clearInterval(tick);
+      clearTimeout(control);
       const elapsed = performance.now() - t0;
       const cpu = process.cpuUsage(cpu0);
       lifecycle.release();
@@ -333,6 +355,7 @@ switch (mode) {
         commits,
         elapsedMs: elapsed,
         framesPerSecond: frames / (elapsed / 1000),
+        controlPerSecond: controlTicks / (elapsed / 1000),
         cpuFraction: (cpu.user + cpu.system) / 1000 / elapsed,
       });
       process.exit(0);
@@ -360,9 +383,16 @@ switch (mode) {
     // The same 1,000/s stream T5.1 measures, driven off the clock for the same
     // reason: a drifting tick makes the load lighter than the one specified,
     // and this test is only meaningful under the specified load.
-    const t0 = performance.now();
+    //
+    // **`-` pauses it and `+` resumes it** (RULING-a, F1447): the row's control
+    // is a keystroke with no stream running, typed between two that have one,
+    // so the machine's own latency is measured beside the stream's and taken
+    // off it. Resuming restarts the count, so a pause is not repaid as a burst.
+    let t0 = performance.now();
     let commits = 0;
+    let streaming = true;
     const tick = setInterval(() => {
+      if (!streaming) return;
       const owed = Math.floor(performance.now() - t0) - commits;
       for (let i = 0; i < owed; i += 1) {
         scheduler.commit("stream");
@@ -377,6 +407,12 @@ switch (mode) {
           lifecycle.release();
           report({ done: true });
           process.exit(0);
+        }
+        if (ch === "-" || ch === "+") {
+          streaming = ch === "+";
+          t0 = performance.now();
+          commits = 0;
+          continue;
         }
         pendingKey = ch;
         scheduler.commit("input");

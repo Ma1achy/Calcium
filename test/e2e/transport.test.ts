@@ -11,7 +11,19 @@
 // quietly fell back to the fixture corpus would make every row below pass while
 // asserting nothing about a transport.
 import { describe, expect, it } from "vitest";
-import { DOCUMENT_BUDGET_MS } from "../support/budget.js";
+import { DOCUMENT_BUDGET_REFS, hangGuard } from "../support/budget.js";
+import { reference } from "../support/paired.js";
+
+/** One reference workload's cost now, the median of nine — `support/paired.ts`. */
+const referenceMs = (): number => {
+  const xs: number[] = [];
+  for (let i = 0; i < 9; i += 1) {
+    const t0 = performance.now();
+    reference();
+    xs.push(performance.now() - t0);
+  }
+  return xs.sort((a, b) => a - b)[4]!;
+};
 import { interactivePty, PROMPT, type InteractivePty, runInPty } from "../support/pty.js";
 
 const FIXTURE = "node test/support/fixture.mjs";
@@ -58,7 +70,7 @@ describe("C06 e2e — I15, through a real session", () => {
         pty.kill();
       }
     },
-    45_000,
+    hangGuard(45_000),
   );
 
   it("T5.1c (I15): and the three lines are identical, not merely all present", () => {
@@ -88,7 +100,14 @@ describe("C06 e2e", () => {
       try {
         await pty.waitFor(PROMPT, 15_000);
 
-        const started = Date.now();
+        // **Bracketed by the reference workload, since RULING-a** (F1447). The
+        // budget was 5 s of wall clock against 1.3 s measured idle, which is a
+        // statement about the host: the subject is a spawn, a parse and a draw
+        // in another process on a machine other lanes are building on. The
+        // reference runs in this process immediately before and after, so the
+        // budget is written in what the machine was giving out at the time.
+        const before = referenceMs();
+        const started = performance.now();
         pty.type("/ps --limit 2000\r");
         // **Near the tail, but not at it, and both halves are deliberate.**
         // A settled entry bottom-anchors, so the visible window is the document's
@@ -100,9 +119,13 @@ describe("C06 e2e", () => {
         // would fail on that and read as a transport defect. Recorded with
         // view-model T5.1, the drift row it belongs to.
         await pty.waitForFrame((f) => f.join("").includes("0001990"), 30_000);
-        const elapsed = Date.now() - started;
+        const elapsed = performance.now() - started;
+        const unit = (before + referenceMs()) / 2;
 
-        expect(elapsed, `spawn → parse → render of 2,000 rows`).toBeLessThan(DOCUMENT_BUDGET_MS);
+        expect(
+          elapsed / unit,
+          `spawn → parse → render of 2,000 rows: ${elapsed.toFixed(0)} ms, ${(elapsed / unit).toFixed(0)} references of ${unit.toFixed(2)} ms`,
+        ).toBeLessThan(DOCUMENT_BUDGET_REFS);
 
         // **The far side really produced it**, rather than the fallback adapter
         // rendering a parse failure that happens to contain digits.
@@ -111,7 +134,7 @@ describe("C06 e2e", () => {
         pty.kill();
       }
     },
-    60_000,
+    hangGuard(60_000),
   );
 
   it(
@@ -145,7 +168,7 @@ describe("C06 e2e", () => {
       expect(result.overflowed).toBe(false);
       expect(result.rssGrowthMb).toBeLessThan(64);
     },
-    150_000,
+    hangGuard(150_000),
   );
 
   it(
@@ -175,7 +198,7 @@ describe("C06 e2e", () => {
         // subscription rung did not: the row that fails when the rung is gone
         // is this one, and it fails on the pid still being alive.
         pty.type("\u0003");
-        const bound = Date.now() + 5_000;
+        const bound = Date.now() + hangGuard(5_000);
         let alive = true;
         while (alive && Date.now() < bound) {
           try {
@@ -200,7 +223,7 @@ describe("C06 e2e", () => {
         pty.kill();
       }
     },
-    60_000,
+    hangGuard(60_000),
   );
 
   it(
@@ -239,7 +262,7 @@ describe("C06 e2e", () => {
         pty.kill();
       }
     },
-    60_000,
+    hangGuard(60_000),
   );
 
   it(
@@ -274,7 +297,7 @@ describe("C06 e2e", () => {
         pty.kill();
       }
     },
-    75_000,
+    hangGuard(75_000),
   );
 
   it(
@@ -376,6 +399,6 @@ describe("C06 e2e", () => {
         pty.kill();
       }
     },
-    75_000,
+    hangGuard(75_000),
   );
 });

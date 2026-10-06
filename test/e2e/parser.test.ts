@@ -13,6 +13,7 @@ import { dirname } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { interactivePty, PROMPT, type InteractivePty } from "../support/pty.js";
+import { hangGuard } from "../support/budget.js";
 
 /** The prompt glyph reaching the PTY: the shell composed and painted a frame. */
 
@@ -53,7 +54,7 @@ describe("C18 tier 5 — in a real session", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
 
   it("T5.6: a trailing & is refused with the documented message, and the session lives", async () => {
     const pty = session();
@@ -74,7 +75,7 @@ describe("C18 tier 5 — in a real session", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
 
   it("T5.4: cd .. then /ps → the verb spawns in the new directory", async () => {
     // **Nothing in the shell had to change for this**, and that is the finding
@@ -121,7 +122,7 @@ describe("C18 tier 5 — in a real session", () => {
     } finally {
       pty.kill();
     }
-  }, 60_000);
+  }, hangGuard(60_000));
 
   it("T5.5: /ps --search=$_ --open-mr → the UUID resolves and the line is reproducible in bash exactly as displayed", async () => {
     // **The spec row named `/promote $_ --open-mr` and could not be written**:
@@ -212,5 +213,5 @@ describe("C18 tier 5 — in a real session", () => {
     } finally {
       pty.kill();
     }
-  }, 60_000);
+  }, hangGuard(60_000));
 });

@@ -657,7 +657,8 @@ describe("C28 I30 — a component's own phases, and the gauge that makes them a 
   }
 
   /**
-   * The same three plots rendered round-robin into three recorders.
+   * The configurations rendered round-robin, each into a recorder of its own
+   * per round, and the last over the first read as a median of rounds.
    *
    * **Contemporaneous, because sequential was not reproducible.** Measuring one
    * configuration to completion and then the next makes the ratio between them
@@ -669,7 +670,7 @@ describe("C28 I30 — a component's own phases, and the gauge that makes them a 
   function areasInterleaved(
     configs: readonly (readonly [samples: number, height: number])[],
     renders: number,
-  ): readonly number[] {
+  ): { readonly ratio: number; readonly ratios: readonly number[] } {
     const registry = fullRegistry();
     const docs = configs.map(([samples, height]) => [
       b.plot({
@@ -682,10 +683,6 @@ describe("C28 I30 — a component's own phases, and the gauge that makes them a 
         ],
       }),
     ]);
-    const profs = configs.map(() =>
-      profiler(() => Number(process.hrtime.bigint()) / 1e6),
-    );
-
     // **Forty rounds, and the number was measured rather than chosen.** At ten,
     // the first run in a cold process read the base configuration at 30.4 ms
     // against 5.8–10.5 in every later run — the cheapest configuration absorbs
@@ -698,19 +695,32 @@ describe("C28 I30 — a component's own phases, and the gauge that makes them a 
       }
     }
 
-    for (const prof of profs) prof.beginFrame("input");
+    // **A ratio per round, and the median of them** (RULING-a, F1406). The sum
+    // over every round that stood here is a mean, and one descheduled render is
+    // most of a sum: the row read 53.5× against 40 in the shell lane's chain at
+    // load 5 and passed three of three alone. Each round now records each
+    // configuration into a recorder of its own, once, alternating which goes
+    // first, and the verdict is the middle round's — moved by load only if it
+    // lands on more than half of them.
+    const ratios: number[] = [];
     for (let i = 0; i < renders; i += 1) {
-      for (const [j, doc] of docs.entries()) {
-        renderSequenceToLines(registry, doc, 100, {
+      const order = i % 2 === 0 ? docs.map((_, j) => j) : docs.map((_, j) => docs.length - 1 - j);
+      const area: number[] = docs.map(() => 0);
+      for (const j of order) {
+        const prof = profiler(() => Number(process.hrtime.bigint()) / 1e6);
+        prof.beginFrame("input");
+        renderSequenceToLines(registry, docs[j]!, 100, {
           theme: DARK_THEME,
           capabilities: FULL_CAPS,
-          probe: profs[j]!.asProbe(),
+          probe: prof.asProbe(),
         });
+        prof.endFrame("frame");
+        area[j] = prof.report().spans?.["plot.area"]?.sum ?? 0;
       }
+      ratios.push(area[area.length - 1]! / Math.max(area[0]!, Number.EPSILON));
     }
-    for (const prof of profs) prof.endFrame("frame");
-
-    return profs.map((prof) => prof.report().spans?.["plot.area"]?.sum ?? 0);
+    const sorted = [...ratios].sort((x, y) => x - y);
+    return { ratio: sorted[Math.floor(sorted.length / 2)]!, ratios };
   }
 
   it("T1.40 (C28 I30): each kind's phases are recorded under its own names", () => {
@@ -824,7 +834,10 @@ describe("C28 I30 — a component's own phases, and the gauge that makes them a 
     // the series read 4.9–6.5× before F981 and 9.8–12.4× after, six runs each,
     // in its own process. The bound is wide enough that the direction load can
     // move it — the base cannot get faster — does not reach it.
-    const [base, dense] = areasInterleaved([[200, 4], [20000, 4]], 15) as readonly [number, number];
-    expect(dense / Math.max(base, Number.EPSILON), `100× the data: ${(dense / base).toFixed(1)}× the area`).toBeLessThan(40);
+    const dense = areasInterleaved([[200, 4], [20000, 4]], 15);
+    expect(
+      dense.ratio,
+      `100× the data: ${dense.ratio.toFixed(1)}× the area, the median of ${dense.ratios.map((x) => x.toFixed(1)).join(" ")}`,
+    ).toBeLessThan(40);
   });
 });

@@ -23,6 +23,7 @@
 import { describe, expect, it } from "vitest";
 
 import { interactivePty, PROMPT, promptRow, type InteractivePty } from "../support/pty.js";
+import { hangGuard } from "../support/budget.js";
 
 /** The prompt glyph reaching the PTY: the shell composed and painted a frame. */
 
@@ -65,7 +66,7 @@ describe("C19 tier 5 — at a real prompt", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
   it("T5.2 (C22 I38, §7): a slow source → the spinner appears, typing continues, the late result never touches the buffer", async () => {
     // **The half that can only be seen from outside**, per this file's header:
     // that the spinner is *visible* in the prompt while typing stays
@@ -102,7 +103,7 @@ describe("C19 tier 5 — at a real prompt", () => {
     } finally {
       pty.kill();
     }
-  }, 60_000);
+  }, hangGuard(60_000));
   it("T5.3: Tab near the bottom of the terminal → the menu flips above the prompt and shows every candidate", async () => {
     // **"Near the bottom" is every frame, and that is a finding about the row.**
     // It was written for a shell whose prompt moves with the content; in this
@@ -142,7 +143,7 @@ describe("C19 tier 5 — at a real prompt", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
   it("T5.4: completing a path with `ls ` and Tab \u2192 filesystem candidates from the real reader, not verbs", async () => {
     // The `pathSource` cases are tier 3 over an injected reader. Here the
     // reader is the real one, reading the real working directory \u2014 which is the
@@ -165,7 +166,7 @@ describe("C19 tier 5 — at a real prompt", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
   it("T5.5 (§5): repeated Tab on one dynamic slot is one invocation, then a second after the TTL expires", async () => {
     // **The count leaves the process in the candidate labels**, because it
     // cannot leave any other way: `stdout` belongs to C01 from construction
@@ -218,7 +219,7 @@ describe("C19 tier 5 — at a real prompt", () => {
     } finally {
       pty.kill();
     }
-  }, 60_000);
+  }, hangGuard(60_000));
 });
 
 describe("C19 tier 5 — a key behind an in-flight request (ruling 106)", () => {
@@ -252,5 +253,5 @@ describe("C19 tier 5 — a key behind an in-flight request (ruling 106)", () => 
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
 });

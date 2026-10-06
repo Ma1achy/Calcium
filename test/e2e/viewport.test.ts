@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { createTranscriptStore } from "../../src/viewport/transcript/index.js";
 import { createViewport } from "../../src/viewport/viewport/index.js";
 import { W, measureSequence, renderEntry, rowsDoc } from "../support/viewport.js";
+import { hangGuard } from "../support/budget.js";
 
 describe("C14 e2e", () => {
   it("T5.1: a 10,000-block transcript scrolled top to bottom → rows match at every screenful", () => {
@@ -34,7 +35,7 @@ describe("C14 e2e", () => {
       if (screens > 1_000) break;
     }
     expect(screens).toBeGreaterThan(400);
-  }, 30_000);
+  }, hangGuard(30_000));
 
   it("T5.3: a log tail at speed while scrolled up reading → the view does not move", () => {
     const store = createTranscriptStore({ cap: 200_000 });
@@ -56,7 +57,7 @@ describe("C14 e2e", () => {
     expect(viewport.scroll.topRow).toBe(beforeTop + 1_000);
     // And the cache did not grow with the stream, which is the other ruling.
     expect(viewport.stats.cacheSize).toBeLessThanOrEqual(viewport.stats.entryCount);
-  }, 30_000);
+  }, hangGuard(30_000));
 
   it("T5.4: the same, then End → snaps to the bottom and resumes following", () => {
     const store = createTranscriptStore();
@@ -111,5 +112,5 @@ describe("C14 e2e", () => {
     expect(r.entries.reduce((n, e) => n + e.takeRows, 0)).toBe(
       Math.min(viewport.scroll.viewportHeight, viewport.scroll.totalRows),
     );
-  }, 30_000);
+  }, hangGuard(30_000));
 });

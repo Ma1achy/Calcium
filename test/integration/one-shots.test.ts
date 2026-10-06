@@ -24,6 +24,7 @@ import { buildGraph, buildSession } from "../support/session.js";
 import { SESSION_BLOCK_CAP } from "../../src/viewport/transcript/cap.js";
 import { fakeStdin } from "../support/fake-terminal.js";
 import { rowContaining, styledScreenFrom } from "../support/styled-screen.js";
+import { hangGuard } from "../support/budget.js";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -190,7 +191,7 @@ describe("C22 §6o — a one-shot from a producer that cannot stamp it", () => {
     // A producer's own `since` is left alone: at 1 000 000 the effect has not
     // begun, so it still asks. A stamp that overwrote it would have finished.
     expect(future.timers, "a future since is honoured, not overwritten").toBe(shimmer.timers);
-  }, 60_000);
+  }, hangGuard(60_000));
 
   it("T4.107 (C22 I131): a b.live poll re-emitting a wipe does not replay it, and a changed effect plays", async () => {
     // Polls at 0, 0.5, 1.0 … s. The wipe is sixteen ticks — 1.28 s from its first
@@ -225,7 +226,7 @@ describe("C22 §6o — a one-shot from a producer that cannot stamp it", () => {
       return cells[0] === accent && cells[cells.length - 1] !== accent;
     });
     expect(fromTheStart, "the sweep starts from the inline-start edge").toBe(true);
-  }, 60_000);
+  }, hangGuard(60_000));
 
   it("T4.108 (C22 I131): the stamps join the eviction subscription — eviction takes one entry's, clear the rest, and the memo returns the same array", async () => {
     // **`buildGraph` stubs the render**, so no frame stamps here; the row is about

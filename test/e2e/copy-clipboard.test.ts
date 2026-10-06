@@ -11,6 +11,7 @@
 import { describe, expect, it } from "vitest";
 
 import { interactivePty } from "../support/pty.js";
+import { hangGuard } from "../support/budget.js";
 
 const FIXTURE = "node test/support/fixture.mjs session";
 const PROMPT = /❯/;
@@ -62,6 +63,6 @@ describe("C14 e2e — the clipboard through a PTY", () => {
         pty.kill();
       }
     },
-    60_000,
+    hangGuard(60_000),
   );
 });

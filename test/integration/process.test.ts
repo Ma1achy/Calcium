@@ -21,6 +21,7 @@ import { createSubprocessTransport } from "../../src/data/transport/index.js";
 import { fakeClock } from "../support/fake-scheduler.js";
 import { asScriptFile, collect, scripts } from "../support/process.js";
 import { clockOf, drain, invocation } from "../support/transport.js";
+import { hangGuard } from "../support/budget.js";
 
 function realTransport(over: { cwd?: () => string } = {}) {
   return createSubprocessTransport({
@@ -156,7 +157,7 @@ describe("C21 with C06", () => {
     expect(result.overflowed).toBe(true);
     expect(result.stdoutRaw.length).toBe(8 * 1024 * 1024);
     expect(result.exitCode).toBe(0);
-  }, 60_000);
+  }, hangGuard(60_000));
 
   it("T4.4 (with C23, C18): a shell result routes to spawnShell and an app result does not", async () => {
     // **C18 classifies, C23 routes** — and the pair is the assertion. A test

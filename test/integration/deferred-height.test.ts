@@ -92,6 +92,57 @@ async function session(kind: string, definition: BlockDefinition) {
   return { ...built, stdin };
 }
 
+/**
+ * **The same session with time held, for the rows that read one frame at a time**
+ * (F1351). The frame that finds a fault raises the floor after its write and
+ * commits the next frame on C03's `stream` window — 16 ms, armed through the
+ * harness's `schedule`, which is a real `setTimeout` unless the row fakes it. On
+ * real time the first frame is readable only for as long as the window stays
+ * open, so a row that reads it after two `setImmediate`s races the machine: idle,
+ * the read wins; under load, or with 15 ms of synthetic delay inside `settle`,
+ * the second frame has already been drawn and the row reads it as the first.
+ * **Measured:** both rows passed with 10 ms of delay and failed with 15.
+ *
+ * So time moves only when the row says so. `advanceTimersByTimeAsync(0)` runs
+ * what is due now and nothing on a window; `frame()` advances exactly one
+ * `stream` window, which is what the next frame is waiting for.
+ */
+async function heldSession(kind: string, definition: BlockDefinition) {
+  vi.useFakeTimers();
+  try {
+    return await held(kind, definition);
+  } catch (err) {
+    vi.useRealTimers();
+    throw err;
+  }
+}
+
+async function held(kind: string, definition: BlockDefinition) {
+  const stdin = fakeStdin();
+  const built = await buildSession({
+    manifest: MANIFEST,
+    localHandlers: handlers(kind),
+    blocks: [definition],
+    stdin: stdin as never,
+  } as never);
+  const now = async (): Promise<void> => {
+    await vi.advanceTimersByTimeAsync(0);
+    await settle();
+    await vi.advanceTimersByTimeAsync(0);
+    await settle();
+  };
+  await now();
+  stdin.emit("/work\r");
+  await now();
+  return { ...built, stdin, now, frame: async (): Promise<void> => {
+    await vi.advanceTimersByTimeAsync(STREAM_WINDOW_MS);
+    await now();
+  } };
+}
+
+/** C03's `stream` window (C03 §3, F1199) — the wait between a raised floor and the frame that honours it. */
+const STREAM_WINDOW_MS = 16;
+
 /** A frame's transcript rows, chrome included, blanks dropped. */
 // The echo sits one column in, past the rail's reserved column 0 (C14 I57), so
 // the row is found by its content rather than by equality with a column-0 string.
@@ -100,30 +151,32 @@ const shown = (text: readonly string[]): readonly string[] =>
 
 describe("C22 I69 — the next frame honours the floor", () => {
   it("T4.49 (C22 I69, C04 I67, C04 I68): one row, then three, and the block after it survives both", async () => {
-    const { screen, stdin } = await session("boom", boom);
+    const { screen, frame } = await heldSession("boom", boom);
+    try {
+      const first = shown(screen().text);
+      expect(first.join("\n"), "the failure is stated").toContain("failed to render");
+      expect(
+        first.filter((r) => r.includes("failed to render") || r.includes(SENTINEL)).length,
+        "and the block after it is on the frame",
+      ).toBe(2);
+      // **One row, because that is what a `rule` measured** — the frame that
+      // discovered the throw could not have drawn more without cutting the notice.
+      // The corners, not `─` or `│`: the frame's two rules are `─` at every size
+      // (C22 I81), and the card's gutter draws `│` down every body after the
+      // first row (C22 I88) — so a bar is not a border, and a corner is.
+      expect(first.some((r) => r.includes("┌") || r.includes("└")), "no border yet").toBe(false);
 
-    const first = shown(screen().text);
-    expect(first.join("\n"), "the failure is stated").toContain("failed to render");
-    expect(
-      first.filter((r) => r.includes("failed to render") || r.includes(SENTINEL)).length,
-      "and the block after it is on the frame",
-    ).toBe(2);
-    // **One row, because that is what a `rule` measured** — the frame that
-    // discovered the throw could not have drawn more without cutting the notice.
-    // The corners, not `─` or `│`: the frame's two rules are `─` at every size
-    // (C22 I81), and the card's gutter draws `│` down every body after the
-    // first row (C22 I88) — so a bar is not a border, and a corner is.
-    expect(first.some((r) => r.includes("┌") || r.includes("└")), "no border yet").toBe(false);
+      // One more frame — the one the raised floor committed on the `stream`
+      // window. Nothing is typed: the next frame is the session's own.
+      await frame();
 
-    // One more frame. Nothing else changed.
-    stdin.emit("x");
-    await settle();
-    await settle();
-
-    const second = shown(screen().text);
-    expect(second.some((r) => r.includes("│")), "the second frame has the box").toBe(true);
-    expect(second.join("\n"), "and still says what failed").toContain("failed to render");
-    expect(second.some((r) => r.includes(SENTINEL)), "and still holds the block below").toBe(true);
+      const second = shown(screen().text);
+      expect(second.some((r) => r.includes("│")), "the second frame has the box").toBe(true);
+      expect(second.join("\n"), "and still says what failed").toContain("failed to render");
+      expect(second.some((r) => r.includes(SENTINEL)), "and still holds the block below").toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("T4.50 (C22 I69): the floor is raised once, and the session goes quiet", async () => {
@@ -175,20 +228,23 @@ describe("C22 I69 — the next frame honours the floor", () => {
     // inside the first frame would make it three, and the picture would be
     // identical.
     RENDERS = 0;
-    const { stdin } = await session("boom", boom);
-    const afterFirst = RENDERS;
-    expect(afterFirst, "one render on the frame that found the fault").toBe(1);
+    const { stdin, now, frame } = await heldSession("boom", boom);
+    try {
+      const afterFirst = RENDERS;
+      expect(afterFirst, "one render on the frame that found the fault").toBe(1);
 
-    stdin.emit("x");
-    await settle();
-    await settle();
-    expect(RENDERS, "and one on the frame that honoured it").toBe(2);
+      await frame();
+      expect(RENDERS, "and one on the frame that honoured it").toBe(2);
 
-    // And then nothing: the entry is cached and the floor is held.
-    stdin.emit("y");
-    await settle();
-    await settle();
-    expect(RENDERS, "a settled entry is served from cache").toBe(2);
+      // And then nothing: the entry is cached and the floor is held — a key
+      // commits a frame of its own, and that frame does not re-render the block.
+      stdin.emit("y");
+      await now();
+      await frame();
+      expect(RENDERS, "a settled entry is served from cache").toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

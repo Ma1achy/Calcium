@@ -26,6 +26,7 @@ import { RenderCache } from "../../src/shell/render-cache.js";
 import type { EntryParts } from "../../src/shell/render-cache.js";
 import { entryLayout, measureEntry, renderEntryPieces, windowEntry } from "../../src/shell/entry-layout.js";
 import { DARK_THEME, FULL_CAPS, measurable, visible } from "../support/render.js";
+import { hangGuard } from "../support/budget.js";
 
 /**
  * A kind whose renders are counted **per block id** (C22 I101): the claim is
@@ -867,7 +868,7 @@ describe("C22 I103 — a tick miss keeps the parts", () => {
     } finally {
       vi.useRealTimers();
     }
-  }, 20_000);
+  }, hangGuard(20_000));
   it("T4.89f (C22 I104, F1190): a sliced block beside a spinner renders no further time across a tick, once across a one-row scroll with the rows a fresh render lays, and the parts serve a slice at its own window alone and hold one per id", async () => {
     // **At the parts first.** A slice held for one window is not served at
     // another; holding a second window for the same id replaces the first,
@@ -949,7 +950,7 @@ describe("C22 I103 — a tick miss keeps the parts", () => {
     } finally {
       vi.useRealTimers();
     }
-  }, 20_000);
+  }, hangGuard(20_000));
   it("T4.89g (C22 I100, F1191): a session over a patch taller than the region reads the scratch with a hit on every frame after the first, adds no absent miss for it, and lays the same rows a scroll would have laid before the hold", async () => {
     const lines = Array.from({ length: 200 }, (_, i) => ({
       kind: i % 7 === 0 ? "add" : i % 11 === 0 ? "remove" : "context",

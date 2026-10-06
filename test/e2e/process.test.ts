@@ -15,6 +15,7 @@
 // that the application composes them.
 import { describe, expect, it } from "vitest";
 import { interactivePty, PROMPT, promptRow, quitVi, runInPty } from "../support/pty.js";
+import { hangGuard } from "../support/budget.js";
 
 const FIXTURE = "node test/support/fixture.mjs";
 
@@ -35,7 +36,7 @@ describe("C21 e2e", () => {
       expect(files).toContain("CLAUDE.md");
       expect(files.every((f) => f.endsWith(".md"))).toBe(true);
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   it(
@@ -64,7 +65,7 @@ describe("C21 e2e", () => {
         pty.kill();
       }
     },
-    60_000,
+    hangGuard(60_000),
   );
 
   it(
@@ -91,7 +92,7 @@ describe("C21 e2e", () => {
         pty.kill();
       }
     },
-    60_000,
+    hangGuard(60_000),
   );
 
   it(
@@ -106,7 +107,7 @@ describe("C21 e2e", () => {
       expect(refused, run.bytes).not.toBeNull();
       expect(JSON.parse(refused![1]!)).toMatch(/lifecycle\.suspend/);
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   // T5.4 — a real streaming far side at 1,000 lines/s for sixty seconds — is
@@ -152,7 +153,7 @@ describe("C21 e2e", () => {
           // true before anything is spawned — the next `/tail` then went out
           // while this one was still starting and the run held two children
           // rather than three. The control caught it; the claim would not have.
-          const upTo = Date.now() + 20_000;
+          const upTo = Date.now() + hangGuard(20_000);
           while ((await survivors()).length < i + 1 && Date.now() < upTo) {
             await new Promise((r) => setTimeout(r, 50));
           }
@@ -169,7 +170,7 @@ describe("C21 e2e", () => {
 
         // Poll rather than sleep: reaping is not instantaneous and a fixed wait
         // is either flaky or slow.
-        const deadline = Date.now() + 20_000;
+        const deadline = Date.now() + hangGuard(20_000);
         let left = await survivors();
         while (left.length > 0 && Date.now() < deadline) {
           await new Promise((r) => setTimeout(r, 100));
@@ -180,6 +181,6 @@ describe("C21 e2e", () => {
         pty.kill();
       }
     },
-    90_000,
+    hangGuard(90_000),
   );
 });

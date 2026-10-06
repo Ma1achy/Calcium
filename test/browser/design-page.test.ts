@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { checkPage, selfTest } from "../../tools/design/chromium.mjs";
+import { hangGuard } from "../support/budget.js";
 
 const PAGE = "docs/design/language/calcium-design-language.html";
 
@@ -23,7 +24,7 @@ describe("AUTHORITY §Browser conformance — the page's own checks, executed", 
   // refused, not how fast; a timeout here reports the machine.
   beforeAll(async () => {
     ({ cases, problems } = await selfTest());
-  }, 60_000);
+  }, hangGuard(60_000));
   const mine = (prefix: string) => problems.filter((p) => p.startsWith(`${prefix}:`));
 
   it("self-test: every case was run — seven fabricated pages and two clean controls", () => {

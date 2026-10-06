@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { findTool, validateInvocation, visibleTools } from "../../src/data/manifest/index.js";
 import { fixture } from "../support/manifest.js";
 import { interactivePty, PROMPT, promptRow, type InteractivePty } from "../support/pty.js";
+import { hangGuard } from "../support/budget.js";
 
 
 const session = (variant = ""): InteractivePty =>
@@ -110,7 +111,7 @@ describe("C05 e2e", () => {
     } finally {
       pty.kill();
     }
-  }, 60_000);
+  }, hangGuard(60_000));
 
   it("T5.4: a manifest omitting a tool reports it unavailable, and the session continues", async () => {
     // The variant drops `ps` from the parsed manifest before construction, so
@@ -133,7 +134,7 @@ describe("C05 e2e", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
 
   it.todo(
     "T5.2: replacing the fixture with a manifest fetched from a real binary changes the completable surface — not deferred on a component, and that is the honest label: C05 is built and B6's fetch path is unbuilt work inside it, so naming C05 would expire the moment it was read. What is missing is `TuiConfig.manifest` accepting something that runs a binary; it takes a parsed manifest or a file path, and neither does: `TuiConfig.manifest` takes a parsed manifest or a file path, and neither runs a binary",
@@ -190,5 +191,5 @@ describe("C05 e2e", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
 });

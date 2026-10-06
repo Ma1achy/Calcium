@@ -14,6 +14,7 @@
 
 import { describe, expect, it } from "vitest";
 import { interactivePty, PROMPT, promptRow, runInPty } from "../support/pty.js";
+import { hangGuard } from "../support/budget.js";
 
 const FIXTURE = "node test/support/fixture.mjs";
 const RESULT = /SCHEDULER_RESULT (\{[^\n]*\})/;
@@ -41,52 +42,82 @@ describe("C03 e2e", () => {
       // Exceeding the ceiling would mean the window is not being honoured;
       // collapsing below 40/s would mean it is being honoured badly.
       expect(r["framesPerSecond"], "the 16 ms ceiling must hold").toBeLessThanOrEqual(62.5);
-      expect(r["framesPerSecond"], "and must not collapse").toBeGreaterThan(40);
+      // **Against the loop's own cadence, not against 40** (RULING-a, F1447).
+      // A ceiling is safe under load — load only lowers a rate — and a floor is
+      // not: a process the machine starves draws fewer frames with the
+      // scheduler doing everything right. The fixture runs a bare re-arming
+      // 16 ms timer beside the stream, so the floor is three quarters of what
+      // this process could deliver at that period under this load.
+      expect(
+        r["framesPerSecond"],
+        `and must not collapse: ${r["framesPerSecond"]!.toFixed(1)}/s against the bare timer's ${r["controlPerSecond"]!.toFixed(1)}/s`,
+      ).toBeGreaterThan(0.75 * r["controlPerSecond"]!);
 
       // Coalescing is the point: an order of magnitude fewer frames than
       // commits, and a quarter of a core is the ceiling.
       expect(r["frames"]).toBeLessThan(r["commits"]! / 10);
       expect(r["cpuFraction"]).toBeLessThan(0.25);
     },
-    60_000,
+    hangGuard(60_000),
   );
 
   it(
-    "T5.2: input-to-frame latency stays under 16 ms at p95 while that stream runs",
+    "T5.2: input-to-frame latency while that stream runs exceeds the same keystroke's with it paused by under 16 ms at p95",
     async () => {
       const pty = interactivePty(`${FIXTURE} scheduler-typing`);
       await pty.waitFor(/READY/);
 
-      const latencies: number[] = [];
       // Typed through the PTY and timed from outside it, so the measurement
       // includes everything a user's keystroke actually crosses. Timing inside
       // the fixture would measure commit() calling render() synchronously.
       // No `q` — that is the fixture's quit sentinel, and a key that doubles as
       // one ends the run 24 keystrokes early.
       const KEYS = "abcdefghijklmnop";
-      for (let i = 0; i < 40; i += 1) {
-        const key = KEYS[i % KEYS.length]!;
+      const typed = async (key: string): Promise<number> => {
         const sent = performance.now();
         pty.type(key);
         // **After the key, not anywhere in the stream** (F1525): with sixteen
         // keys cycled forty times, every sample from the seventeenth on was
         // answered by the frame the same key drew a lap earlier, and timed nothing.
         await pty.waitForNew(new RegExp(`KEYFRAME ${key}`), 5_000);
-        latencies.push(performance.now() - sent);
+        return performance.now() - sent;
+      };
+
+      // **Paired, since RULING-a** (F1447). `p95 < 16` ms was a verdict on the
+      // machine as much as the scheduler: the PTY, the event loop and the
+      // terminal's read all take their time under load, and T5.2 failed in a
+      // full-directory run and passed alone. Each keystroke with the stream
+      // running is paired with one typed while it is paused (`-` and `+` in the
+      // fixture), the two adjacent in time, so what the machine adds lands on
+      // both and what the stream adds lands on one.
+      const streaming: number[] = [];
+      const paused: number[] = [];
+      for (let i = 0; i < 24; i += 1) {
+        const key = KEYS[i % KEYS.length]!;
+        // A paused window must close before its keystroke, or the control
+        // meets the stream frame the pause left armed: 50 ms is three windows.
+        pty.type("-");
+        await new Promise((r) => setTimeout(r, 50));
+        paused.push(await typed(key));
+        pty.type("+");
+        await new Promise((r) => setTimeout(r, 50));
+        streaming.push(await typed(key));
         await new Promise((r) => setTimeout(r, 25));
       }
 
       pty.type("q");
       await pty.done();
 
-      latencies.sort((a, b) => a - b);
-      const p95 = latencies[Math.floor(latencies.length * 0.95)]!;
+      const p95 = (xs: readonly number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length * 0.95)]!;
+      const added = p95(streaming) - p95(paused);
+      const shown = (xs: readonly number[]): string => xs.map((n) => n.toFixed(1)).join(" ");
 
       // The starvation property, measured: a keystroke is never queued behind a
-      // stream frame, however hard the stream is committing.
-      expect(p95, `latencies: ${latencies.map((n) => n.toFixed(1)).join(" ")}`).toBeLessThan(16);
+      // stream frame, however hard the stream is committing — so the stream
+      // adds less than one window to the slowest twentieth of keystrokes.
+      expect(added, `streaming: ${shown(streaming)}\npaused: ${shown(paused)}`).toBeLessThan(16);
     },
-    60_000,
+    hangGuard(60_000),
   );
 
   it(
@@ -133,7 +164,7 @@ describe("C03 e2e", () => {
         `a scheduler that polls costs CPU at any load: ${withScheduler} with, ${base} without`,
       ).toBeLessThan(0.005);
     },
-    120_000,
+    hangGuard(120_000),
   );
 
   it.todo(
@@ -233,7 +264,7 @@ describe("C03 e2e", () => {
         pty.kill();
       }
     },
-    120_000,
+    hangGuard(120_000),
   );
   it(
     "T5.5 (C22 §4, C23 §4): suspending to a child and returning — the terminal goes down and comes back",
@@ -274,7 +305,7 @@ describe("C03 e2e", () => {
         //
         // The re-acquire is the event, so it is what the poll watches.
         const reacquired = async (): Promise<number> => {
-          const deadline = Date.now() + 20_000;
+          const deadline = Date.now() + hangGuard(20_000);
           for (;;) {
             const at = pty.output.slice(before).indexOf("\u001b[?1049h", down);
             if (at !== -1) return at;
@@ -300,7 +331,7 @@ describe("C03 e2e", () => {
         pty.kill();
       }
     },
-    90_000,
+    hangGuard(90_000),
   );
 
   // **The sixteenth structural gap, and the row that closes it** (C01 I18a).
@@ -352,6 +383,6 @@ describe("C03 e2e", () => {
         pty.kill();
       }
     },
-    90_000,
+    hangGuard(90_000),
   );
 });

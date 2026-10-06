@@ -14,6 +14,7 @@ import {
   trackWrap,
   type PtyRun,
 } from "../support/pty.js";
+import { hangGuard } from "../support/budget.js";
 
 const FIXTURE = "node test/support/fixture.mjs";
 
@@ -21,7 +22,7 @@ let baseline: PtyRun;
 
 beforeAll(async () => {
   baseline = await control();
-}, 30_000);
+}, hangGuard(30_000));
 
 /** The whole comparison, in one place, so every path asserts the same thing. */
 function expectCleanTerminal(run: PtyRun): void {
@@ -49,7 +50,7 @@ describe("C01 e2e — the terminal is given back", () => {
         expectCleanTerminal(run);
       }
     },
-    60_000,
+    hangGuard(60_000),
   );
 
   it(
@@ -63,7 +64,7 @@ describe("C01 e2e — the terminal is given back", () => {
       expect(primary).not.toContain("FRAME-CONTENT");
       expect(run.decset.altScreen).toBe(false);
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   it(
@@ -77,7 +78,7 @@ describe("C01 e2e — the terminal is given back", () => {
       expect(afterRelease).toContain("DELIBERATE-CRASH");
       expectCleanTerminal(run);
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   it(
@@ -104,7 +105,7 @@ describe("C01 e2e — the terminal is given back", () => {
       // handler reinstatement are covered at tier 3 by T3.13, where the signal
       // is delivered directly to the handler.
     },
-    30_000,
+    hangGuard(30_000),
   );
 
   it(
@@ -116,7 +117,7 @@ describe("C01 e2e — the terminal is given back", () => {
       expect(run.bytes).toContain("SIGINT-LISTENERS=0");
       expectCleanTerminal(run);
     },
-    60_000,
+    hangGuard(60_000),
   );
 
   it(
@@ -178,7 +179,7 @@ describe("C01 e2e — the terminal is given back", () => {
       expect(clean.wrapped, "the control run does not wrap").toBe(false);
       expect(hazard.rows, "the wrap costs a row nobody counted").toBeGreaterThan(clean.rows);
     },
-    60_000,
+    hangGuard(60_000),
   );
 
   it(
@@ -211,7 +212,7 @@ describe("C01 e2e — the terminal is given back", () => {
       expect(final.altScreen).toBe(false);
       expect(final.cursorVisible).toBe(true);
     },
-    60_000,
+    hangGuard(60_000),
   );
   it(
     "T5.6 (C22 I36, C22 I37): piping the shell to `cat` emits no escape sequence at all",
@@ -259,7 +260,7 @@ describe("C01 e2e — the terminal is given back", () => {
         direct.kill();
       }
     },
-    60_000,
+    hangGuard(60_000),
   );
 });
 
@@ -301,7 +302,7 @@ describe("C22 §4 gate 4 — a terminal too small (C22 I8, I9, C01 I12b, F67)", 
           pty.kill();
         }
       },
-      30_000,
+      hangGuard(30_000),
     );
   }
 
@@ -334,6 +335,6 @@ describe("C22 §4 gate 4 — a terminal too small (C22 I8, I9, C01 I12b, F67)", 
         pty.kill();
       }
     },
-    45_000,
+    hangGuard(45_000),
   );
 });

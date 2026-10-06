@@ -23,6 +23,7 @@ import type { InputEvent } from "../../src/interaction/router/types.js";
 import { registry } from "../support/overlay.js";
 import { openWith } from "../support/history.js";
 import { interactivePty, PROMPT, promptRow } from "../support/pty.js";
+import { hangGuard } from "../support/budget.js";
 
 const escape = (): InputEvent => ({
   kind: "key",
@@ -116,7 +117,7 @@ describe("C15 e2e — layers under real input", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
   // T5.2, written on the commit C20 landed. C15 §3's "overlays nest freely" is
   // the sentence under test and reverse-i-search over a completion menu is the
   // case it was written for — three components' worth of state, and the only
@@ -216,7 +217,7 @@ describe("C15 e2e — layers under real input", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
   // C01 already delivers the SIGWINCH snapshot this needs; what is missing is
   // the thing that composes a frame from it, so the blocker is L4 alone. Naming
   // C01 alongside it made this expire the moment the rule ran, which is TD2
@@ -277,7 +278,7 @@ describe("C15 e2e — layers under real input", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
   // **The trace was ruled out, not deferred.** S12 §3 records it: an earlier
   // draft had C23 write `logs a3f9b21 — 1,284 lines … (esc 14:24:08)` and it
   // could not be built — the trace is an entry, an entry freezes its
@@ -312,5 +313,5 @@ describe("C15 e2e — layers under real input", () => {
     } finally {
       pty.kill();
     }
-  }, 40_000);
+  }, hangGuard(40_000));
 });

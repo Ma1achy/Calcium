@@ -26,6 +26,7 @@ import {
   type ViewDocument,
 } from "../../src/data/viewmodel/index.js";
 import { ADVERSARIAL, doc, tableOf } from "../support/blocks.js";
+import { describeReading, paired } from "../support/paired.js";
 import type { BlockDefinition, RenderContext } from "../../src/presentation/blocks/index.js";
 import { rows } from "../../src/presentation/blocks/paint.js";
 // C04 I98's dispatcher clause is C04's rule and C23's code (F1015) — T3.83 is
@@ -461,17 +462,16 @@ describe("C04 validation edges", () => {
     );
     const d = document({ ...doc(), blocks, meta: { ...doc().meta, truncated: true } });
 
-    const started = process.hrtime.bigint();
     const r = validateDocument(d);
-    const elapsedMs = Number(process.hrtime.bigint() - started) / 1e6;
-
     expect(r.ok, r.ok === false ? r.error.slice(0, 3).join("\n") : "").toBe(true);
     expect(d.meta.truncated).toBe(true);
-    // Generous, and the point is the shape rather than the number: the id
-    // uniqueness check is a Map, not a nested scan, so this stays linear.
-    expect(elapsedMs, `validation of 10,000 blocks took ${elapsedMs.toFixed(0)}ms`).toBeLessThan(
-      2_000,
-    );
+    // **The shape, not the number, since RULING-a** (F1447): the id uniqueness
+    // check is a Map, not a nested scan, so an eighth of the document costs an
+    // eighth. 8× is linear and 64× a nested scan, timed interleaved in one
+    // process; 32 is four times linear.
+    const eighth = document({ ...doc(), blocks: blocks.slice(0, 1_250), meta: { ...doc().meta, truncated: true } });
+    const cost = paired(() => validateDocument(d), () => validateDocument(eighth), { rounds: 9, floorMs: 20 });
+    expect(cost.ratio, `validation of 10,000 blocks against 1,250 · ${describeReading(cost)}`).toBeLessThan(32);
   });
 
   it("every adversarial fixture is a legal block that validates", () => {
@@ -557,12 +557,18 @@ describe("C04 patch edges", () => {
       cells: { name: { text: `new ${i}` } },
     }));
 
-    const started = process.hrtime.bigint();
     const after = unwrap(applyPatch(d, { op: "merge", blockId: "t", rows }));
-    const elapsedMs = Number(process.hrtime.bigint() - started) / 1e6;
-
     expect((after.blocks[0] as Table).rows).toHaveLength(1_000);
-    expect(elapsedMs, `merge took ${elapsedMs.toFixed(1)}ms`).toBeLessThan(500);
+
+    // **A shape since RULING-a** (F1447): a merge adding 4,000 rows to 4,000 is
+    // 8× the work of 500 to 500 if linear and 64× if nested, timed interleaved.
+    const mergeOf = (n: number): (() => unknown) => {
+      const base = doc({ blocks: [tableOf(n)] });
+      const added = Array.from({ length: n }, (_, i) => ({ id: `n${i}`, cells: { name: { text: `new ${i}` } } }));
+      return () => applyPatch(base, { op: "merge", blockId: "t", rows: added });
+    };
+    const cost = paired(mergeOf(4_000), mergeOf(500), { rounds: 9, floorMs: 20 });
+    expect(cost.ratio, `merge at 8× the rows · ${describeReading(cost)}`).toBeLessThan(32);
   });
 
   it("T3.19: an append whose id collides with a nested block is refused", () => {

@@ -12,6 +12,7 @@ import {
 import { FRAMEWORK_TOOLS } from "../../src/data/manifest/framework.js";
 import { fixture, largeManifest, raw, toolNamed } from "../support/manifest.js";
 import { contextAt, verbSource } from "../../src/interaction/completion/index.js";
+import { describeReading, paired } from "../support/paired.js";
 
 function parsedOrThrow(source: unknown) {
   const result = parseManifest(source);
@@ -109,30 +110,46 @@ describe("C05 parse edges", () => {
     expect(findTool(m, ["a", "b", "c", "d", "e", "f"])?.tool.name).toBe("a b c d e f");
   });
 
-  it("T3.14: 5,000 tools parse within budget and findTool stays sub-millisecond", () => {
+  it("T3.14: 5,000 tools parse in time linear in the document, and findTool's cost does not grow with it", () => {
     const source = largeManifest(5000);
+    const eighth = largeManifest(625);
     const size = JSON.stringify(source).length;
-
-    const parseStart = process.hrtime.bigint();
     const m = parsedOrThrow(source);
-    const parseMs = Number(process.hrtime.bigint() - parseStart) / 1e6;
+    const small = parsedOrThrow(eighth);
 
     expect(m.appTools).toHaveLength(5000);
     expect(m.tools).toHaveLength(5000 + FRAMEWORK_TOOLS.length);
     expect(size, "the spec names 10 MB; a smaller document would test a budget nobody set").toBeGreaterThan(
       9_000_000,
     );
-    expect(parseMs, `parsing ${(size / 1e6).toFixed(1)} MB took ${parseMs.toFixed(0)} ms`).toBeLessThan(2000);
+
+    // **The shape, not the milliseconds, since RULING-a** (F1447). `< 2000` ms
+    // over a parse measured at 32 ms idle read 295 ms at load 10 on this
+    // machine: the bound's headroom was a statement about the host. Eight times
+    // the tools is 8× for a linear parse and 64× for one that rescans what it
+    // has read, timed interleaved in this process (`support/paired.ts`), so
+    // the load lands on both sides. Measured at load 9–13: medians 10.5–12.9×
+    // for the validator's equivalent; 32 is four times linear.
+    const parse = paired(() => parseManifest(source), () => parseManifest(eighth), { rounds: 9, floorMs: 20 });
+    expect(parse.ratio, `8× the tools · ${describeReading(parse)}`).toBeLessThan(32);
 
     // The first call builds the index; every later one is the steady state that
-    // C19 pays per keystroke.
+    // C19 pays per keystroke. **An index answers in the same time at any size**,
+    // so the same lookups against an eighth of the tools are the control: a
+    // scan reads 8×, an index about 1×.
     findTool(m, ["group0", "verb0"]);
-    const lookups = 1000;
-    const start = process.hrtime.bigint();
-    for (let i = 0; i < lookups; i++) findTool(m, [`group${i % 100}`, `verb${i}`, "subject"]);
-    const perCallUs = Number(process.hrtime.bigint() - start) / 1000 / lookups;
-
-    expect(perCallUs, `findTool averaged ${perCallUs.toFixed(2)} µs per call`).toBeLessThan(1000);
+    findTool(small, ["group0", "verb0"]);
+    // Every lookup hits: tool k is `group{k % 100} verb{k}` in both manifests.
+    const lookups = (manifest: typeof m, tools: number): (() => unknown) => {
+      let k = 0;
+      return () => {
+        k = (k + 1) % tools;
+        return findTool(manifest, [`group${k % 100}`, `verb${k}`, "subject"]);
+      };
+    };
+    expect(lookups(m, 5000)(), "the lookups find what they ask for").not.toBeNull();
+    const find = paired(lookups(m, 5000), lookups(small, 625), { floorMs: 20 });
+    expect(find.ratio, `findTool at 8× the tools · ${describeReading(find)}`).toBeLessThan(4);
   });
 
   it("T3.15: duplicate flag names within one tool are a parse error", () => {

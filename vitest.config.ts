@@ -1,4 +1,5 @@
 import { configDefaults, defineConfig } from "vitest/config";
+import { hangGuard } from "./test/support/budget.js";
 
 export default defineConfig({
   test: {
@@ -67,7 +68,15 @@ export default defineConfig({
      *
      * **A hang still fails, six seconds later.** What this removes is a default
      * nobody chose deciding whether `make all` means anything.
+     *
+     * **Stretched by the machine's contention since RULING-a** (F1447): a
+     * correctness row's limit is a hang guard, its verdict is *stuck* and never
+     * *slow*, and `budget.ts` says why the stretch rather than a bigger number.
+     * The hook limit is vitest's own 10 s, stretched the same way — a
+     * `beforeAll` running nine browser pages went red on it under load (F1406)
+     * and a hook is no more a performance claim than a row is.
      */
-    testTimeout: 30_000,
+    testTimeout: hangGuard(30_000),
+    hookTimeout: hangGuard(10_000),
   },
 });
