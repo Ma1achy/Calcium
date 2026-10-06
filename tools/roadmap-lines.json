@@ -1,0 +1,492 @@
+{
+  "pins": {
+    "capabilities.ts:65": {
+      "file": "src/terminal/capabilities.ts",
+      "text": "* says nothing may be reachable only with it."
+    },
+    "code.ts:31": {
+      "file": "src/presentation/blocks/kinds/code.ts",
+      "text": "import rust from \"highlight.js/lib/languages/rust\";"
+    },
+    "data/manifest/types.ts:70": {
+      "file": "src/data/manifest/types.ts",
+      "text": "*   on a spawned tool now, and the \"only `local`\" clause is stale."
+    },
+    "data/manifest/validate.ts:254": {
+      "file": "src/data/manifest/validate.ts",
+      "text": "if (f?.shellOnly === true) {"
+    },
+    "engine.ts:115": {
+      "file": "src/interaction/completion/engine.ts",
+      "text": "*"
+    },
+    "engine.ts:152": {
+      "file": "src/interaction/completion/engine.ts",
+      "text": "const first = values[0];"
+    },
+    "escapes.ts:49": {
+      "file": "src/terminal/escapes.ts",
+      "text": "export const MOUSE = mode(\"\\x1b[?1002h\\x1b[?1006h\", \"\\x1b[?1006l\\x1b[?1002l\");"
+    },
+    "examples/docker/src/banner.ts:199": {
+      "file": "examples/docker/src/banner.ts",
+      "text": "direction: \"row\","
+    },
+    "examples/docker/src/dashboard.ts:466": {
+      "file": "examples/docker/src/dashboard.ts",
+      "text": "// container stopped — walk A3's ruling, and the reason a row of absences is"
+    },
+    "examples/docker/src/inspect.ts:153": {
+      "file": "examples/docker/src/inspect.ts",
+      "text": "Id: short(str(inspected, \"Id\")),"
+    },
+    "examples/docker/src/inspect.ts:193": {
+      "file": "examples/docker/src/inspect.ts",
+      "text": "? result.stderr.trim() || `docker exited ${String(result.exitCode)}`"
+    },
+    "frame-scheduler.ts:175": {
+      "file": "src/terminal/frame-scheduler.ts",
+      "text": "}"
+    },
+    "frame.ts:4": {
+      "file": "src/shell/frame.ts",
+      "text": "* Calcium owns the structure — a one-row header with a rule under it, two rules bounding the"
+    },
+    "interaction/router/focus.ts:240": {
+      "file": "src/interaction/router/focus.ts",
+      "text": "* it.** `focusFor` is a per-frame read and must write nothing, so a fall-forward"
+    },
+    "interaction/router/types.ts:248": {
+      "file": "src/interaction/router/types.ts",
+      "text": "* attached to a guarantee nobody verified is F84's shape one rule over."
+    },
+    "keymap.ts:390": {
+      "file": "src/interaction/router/keymap.ts",
+      "text": "{ target: \"prompt\", key: { name: \"e\", ctrl: true }, action: \"end\" },"
+    },
+    "keys.ts:1303": {
+      "file": "src/shell/keys.ts",
+      "text": "// answers, none of them the invariant's. Resolution falls forward before"
+    },
+    "keys.ts:709": {
+      "file": "src/shell/keys.ts",
+      "text": "wheeled = null;"
+    },
+    "keys.ts:756": {
+      "file": "src/shell/keys.ts",
+      "text": "const before = deps.editor.text;"
+    },
+    "presentation/blocks/kinds/structured.ts:246": {
+      "file": "src/presentation/blocks/kinds/structured.ts",
+      "text": "* one kind over): the window says what its parent measured rather than"
+    },
+    "README.md:517": {
+      "file": "README.md",
+      "text": "draw its own, which is what `plots-tui`'s `/report` does."
+    },
+    "refresh.ts:221": {
+      "file": "src/shell/refresh.ts",
+      "text": "* for the whole backoff and jumped — measured over 26 seconds of `/faults`:"
+    },
+    "shell/construct.ts:3641": {
+      "file": "src/shell/construct.ts",
+      "text": "const held = stores.scrollOffsets.get(entryId, child.id);"
+    },
+    "shell/construct.ts:5218": {
+      "file": "src/shell/construct.ts",
+      "text": "syncChipPreview();"
+    },
+    "shell/keys.ts:1124": {
+      "file": "src/shell/keys.ts",
+      "text": "const entry = (deps.reply() ?? deps.history).previous(deps.editor.text);"
+    },
+    "shell/keys.ts:593": {
+      "file": "src/shell/keys.ts",
+      "text": "contextAt(deps.editor.text, deps.editor.cursor, deps.manifest);"
+    },
+    "shell/keys.ts:756": {
+      "file": "src/shell/keys.ts",
+      "text": "const before = deps.editor.text;"
+    },
+    "shell/session.ts:1421": {
+      "file": "src/shell/session.ts",
+      "text": "return selectionSpans("
+    },
+    "shell/session.ts:1466": {
+      "file": "src/shell/session.ts",
+      "text": "contextAt("
+    },
+    "src/data/adapters/mapping.ts:193": {
+      "file": "src/data/adapters/mapping.ts",
+      "text": "if (tool.flags.length > 0) {"
+    },
+    "src/data/manifest/framework.ts:169": {
+      "file": "src/data/manifest/framework.ts",
+      "text": "// the alternative is a second positional nobody else can use. The"
+    },
+    "src/data/manifest/parse.ts:717": {
+      "file": "src/data/manifest/parse.ts",
+      "text": "seen.set(parsed.name, i);"
+    },
+    "src/data/manifest/validate.ts:147": {
+      "file": "src/data/manifest/validate.ts",
+      "text": "export function suggestName("
+    },
+    "src/data/manifest/validate.ts:284": {
+      "file": "src/data/manifest/validate.ts",
+      "text": "const hint = suggest(name, tool.flags);"
+    },
+    "src/data/viewmodel/measure.ts:79": {
+      "file": "src/data/viewmodel/measure.ts",
+      "text": "*"
+    },
+    "src/data/viewmodel/types.ts:2784": {
+      "file": "src/data/viewmodel/types.ts",
+      "text": "// No cartesian area, or one row, or a composition."
+    },
+    "src/data/viewmodel/validate.ts:2362": {
+      "file": "src/data/viewmodel/validate.ts",
+      "text": "`rows shows nothing and has no reading to fall back on`,"
+    },
+    "src/data/viewmodel/validate.ts:3503": {
+      "file": "src/data/viewmodel/validate.ts",
+      "text": "`optionally \"THH\", \":MM\", \":SS\" and a trailing \"Z\"; a zone offset is refused rather than ` +"
+    },
+    "src/data/viewmodel/validate.ts:3648": {
+      "file": "src/data/viewmodel/validate.ts",
+      "text": "const PLOT_FORM_MEMBERS = {"
+    },
+    "src/index.ts:281": {
+      "file": "src/index.ts",
+      "text": "Candidate,"
+    },
+    "src/interaction/completion/menu.ts:219": {
+      "file": "src/interaction/completion/menu.ts",
+      "text": "export function menuWindow("
+    },
+    "src/interaction/editor/editor.ts:536": {
+      "file": "src/interaction/editor/editor.ts",
+      "text": "this.#text = removeBetween(this.#text, this.#cursor, this.#cursor + 1);"
+    },
+    "src/interaction/editor/layout.ts:263": {
+      "file": "src/interaction/editor/layout.ts",
+      "text": "* Which display row the walk is on."
+    },
+    "src/interaction/parser/parse.ts:183": {
+      "file": "src/interaction/parser/parse.ts",
+      "text": "const hint = suggestName("
+    },
+    "src/interaction/parser/policy.ts:33": {
+      "file": "src/interaction/parser/policy.ts",
+      "text": "export function prefixPolicy(prefix: string): CommandPolicy {"
+    },
+    "src/interaction/router/decode.ts:180": {
+      "file": "src/interaction/router/decode.ts",
+      "text": "function modifiersOf("
+    },
+    "src/interaction/router/focus.ts:366": {
+      "file": "src/interaction/router/focus.ts",
+      "text": "/**"
+    },
+    "src/presentation/blocks/kinds/structured.ts:256": {
+      "file": "src/presentation/blocks/kinds/structured.ts",
+      "text": "window: (block: KeyValue, width: number, from: number, to: number): Windowed => {"
+    },
+    "src/presentation/blocks/kinds/structured.ts:439": {
+      "file": "src/presentation/blocks/kinds/structured.ts",
+      "text": "window: (block: Logs, _width: number, from: number, to: number): Windowed => {"
+    },
+    "src/presentation/blocks/kinds/structured.ts:532": {
+      "file": "src/presentation/blocks/kinds/structured.ts",
+      "text": "// **A cut label is not a label**, so the type is a threshold rather"
+    },
+    "src/presentation/blocks/types.ts:165": {
+      "file": "src/presentation/blocks/types.ts",
+      "text": "* job is one bit and a static mark still carries it*. **`reduced` stops the"
+    },
+    "src/presentation/blocks/types.ts:220": {
+      "file": "src/presentation/blocks/types.ts",
+      "text": "* **Absent is the block's own** `camera`, completed from `CAMERA_DEFAULT`."
+    },
+    "src/presentation/blocks/types.ts:39": {
+      "file": "src/presentation/blocks/types.ts",
+      "text": "* A fault carrying only the kind is enough to write a diagnostic and not"
+    },
+    "src/presentation/patch/definition.ts:281": {
+      "file": "src/presentation/patch/definition.ts",
+      "text": "window: (block: Patch, width: number, from: number, to: number, _measure, scratch) => {"
+    },
+    "src/presentation/plot/project3.ts:171": {
+      "file": "src/presentation/plot/project3.ts",
+      "text": "export const dot = (a: Vec3, b: Vec3): number => a.x * b.x + a.y * b.y + a.z * b.z;"
+    },
+    "src/presentation/table/definition.ts:342": {
+      "file": "src/presentation/table/definition.ts",
+      "text": "window("
+    },
+    "src/presentation/table/definition.ts:647": {
+      "file": "src/presentation/table/definition.ts",
+      "text": "const hidden = hiddenCount(row, plan);"
+    },
+    "src/presentation/text.ts:108": {
+      "file": "src/presentation/text.ts",
+      "text": "* character is ambiguous. Roadmap 51 carries the sweep of the remaining sites and"
+    },
+    "src/presentation/theme/contrast.ts:394": {
+      "file": "src/presentation/theme/contrast.ts",
+      "text": "export function selectionPairs("
+    },
+    "src/presentation/theme/contrast.ts:490": {
+      "file": "src/presentation/theme/contrast.ts",
+      "text": "const errors: ThemeError[] = [];"
+    },
+    "src/presentation/theme/store.ts:174": {
+      "file": "src/presentation/theme/store.ts",
+      "text": "get names(): readonly string[] {"
+    },
+    "src/presentation/theme/tokens-dark.ts:36": {
+      "file": "src/presentation/theme/tokens-dark.ts",
+      "text": "// why someone might think it should be: on light it measures 2.14–2.42"
+    },
+    "src/presentation/theme/types.ts:125": {
+      "file": "src/presentation/theme/types.ts",
+      "text": "* `SELECTION_SLOTS`, and the same argument for its narrowness."
+    },
+    "src/presentation/theme/types.ts:137": {
+      "file": "src/presentation/theme/types.ts",
+      "text": "* **Two members rather than a ground beside the existing foreground**, and"
+    },
+    "src/presentation/theme/types.ts:219": {
+      "file": "src/presentation/theme/types.ts",
+      "text": "background: \"terminal\" | \"surface\";"
+    },
+    "src/shell/cameras.ts:126": {
+      "file": "src/shell/cameras.ts",
+      "text": "key(entryId: string): string {"
+    },
+    "src/shell/cameras.ts:59": {
+      "file": "src/shell/cameras.ts",
+      "text": "export class Cameras {"
+    },
+    "src/shell/choice-selection.ts:36": {
+      "file": "src/shell/choice-selection.ts",
+      "text": "let count = size;"
+    },
+    "src/shell/config.ts:377": {
+      "file": "src/shell/config.ts",
+      "text": "// it always did. The listener exists only when a recording does."
+    },
+    "src/shell/config.ts:76": {
+      "file": "src/shell/config.ts",
+      "text": "export const MAX_FOOTER_ROWS ="
+    },
+    "src/shell/confirm.ts:312": {
+      "file": "src/shell/confirm.ts",
+      "text": "function choiceBlock(choices: readonly Choice[], selected: number): Block {"
+    },
+    "src/shell/confirm.ts:334": {
+      "file": "src/shell/confirm.ts",
+      "text": "/** The widest `[k]`, so the labels line up whatever the accelerators are. */"
+    },
+    "src/shell/construct.ts:2021": {
+      "file": "src/shell/construct.ts",
+      "text": "else stores.editor.resume(heldDraft);"
+    },
+    "src/shell/construct.ts:3045": {
+      "file": "src/shell/construct.ts",
+      "text": "const next = fields[fields.findIndex((f) => f.id === b.fieldId) + 1];"
+    },
+    "src/shell/construct.ts:3749": {
+      "file": "src/shell/construct.ts",
+      "text": "const orbitBlock = (direction: 1 | -1): void => {"
+    },
+    "src/shell/cursor-style.ts:104": {
+      "file": "src/shell/cursor-style.ts",
+      "text": "if (style === null || !style.blink) return style;"
+    },
+    "src/shell/cursor-style.ts:57": {
+      "file": "src/shell/cursor-style.ts",
+      "text": "const targets = config?.targets;"
+    },
+    "src/shell/documents.ts:962": {
+      "file": "src/shell/documents.ts",
+      "text": "export function usageDoc(command: string, tool: ToolDef): ViewDocument {"
+    },
+    "src/shell/execution.ts:1153": {
+      "file": "src/shell/execution.ts",
+      "text": "const invoke = async () => handler(argv, {"
+    },
+    "src/shell/execution.ts:1165": {
+      "file": "src/shell/execution.ts",
+      "text": "ask: deps.confirm.ask,"
+    },
+    "src/shell/execution.ts:182": {
+      "file": "src/shell/execution.ts",
+      "text": "// registered for verbs nothing can route to."
+    },
+    "src/shell/execution.ts:1862": {
+      "file": "src/shell/execution.ts",
+      "text": "(result.kind === \"app\" || result.kind === \"local\") &&"
+    },
+    "src/shell/execution.ts:378": {
+      "file": "src/shell/execution.ts",
+      "text": "* whole of C23 T4.7b: a reset issued before the append is undone by nothing,"
+    },
+    "src/shell/frame.ts:251": {
+      "file": "src/shell/frame.ts",
+      "text": "// **The footer is its content** (I82, §6l.4 B): measured at this frame's"
+    },
+    "src/shell/frame.ts:359": {
+      "file": "src/shell/frame.ts",
+      "text": "* The clamps above mean this cannot fail today, which is exactly why it is"
+    },
+    "src/shell/frame.ts:70": {
+      "file": "src/shell/frame.ts",
+      "text": "footerRows: number;"
+    },
+    "src/shell/keys.ts:1302": {
+      "file": "src/shell/keys.ts",
+      "text": "// and `focusFor` drew no highlight at all — three call sites, three"
+    },
+    "src/shell/keys.ts:586": {
+      "file": "src/shell/keys.ts",
+      "text": "* Without it the next character reopens what was just dismissed and `Esc`"
+    },
+    "src/shell/local/handlers.ts:157": {
+      "file": "src/shell/local/handlers.ts",
+      "text": "* `warn` notice naming `TuiConfig.profile` on every arm when there is no"
+    },
+    "src/shell/local/registry.ts:44": {
+      "file": "src/shell/local/registry.ts",
+      "text": "* nobody chose; a caller for whom the difference matters — an approval, which"
+    },
+    "src/shell/local/registry.ts:74": {
+      "file": "src/shell/local/registry.ts",
+      "text": "* marked, and without a way to it a reader approves a change they cannot"
+    },
+    "src/shell/paint.ts:1030": {
+      "file": "src/shell/paint.ts",
+      "text": "// footer of zero rows too: a frame whose bottom edge moved with whether"
+    },
+    "src/shell/paint.ts:1096": {
+      "file": "src/shell/paint.ts",
+      "text": "export function cursorFor("
+    },
+    "src/shell/paint.ts:173": {
+      "file": "src/shell/paint.ts",
+      "text": "* Whether the user has turned the theme's background off for this invocation"
+    },
+    "src/shell/paint.ts:399": {
+      "file": "src/shell/paint.ts",
+      "text": "// command is the reader's line and this row is not a block, so C09 I127's"
+    },
+    "src/shell/paint.ts:563": {
+      "file": "src/shell/paint.ts",
+      "text": "}"
+    },
+    "src/shell/paint.ts:643": {
+      "file": "src/shell/paint.ts",
+      "text": "* the transcript's width, whose rows are in the entry's block space, as `from`"
+    },
+    "src/shell/paint.ts:896": {
+      "file": "src/shell/paint.ts",
+      "text": "const suggestion = deps.ghost();"
+    },
+    "src/shell/refresh.ts:348": {
+      "file": "src/shell/refresh.ts",
+      "text": "* which is what makes a part refusing on every tick say it once."
+    },
+    "src/shell/render-frame.ts:183": {
+      "file": "src/shell/render-frame.ts",
+      "text": "* **`SGR_RESET` leads every row and the reason is asymmetry** (I57). Measured"
+    },
+    "src/shell/session.ts:1449": {
+      "file": "src/shell/session.ts",
+      "text": "// (C22 I38). `spinning` changes with the clock, not with the frame, so a"
+    },
+    "src/shell/types.ts:480": {
+      "file": "src/shell/types.ts",
+      "text": "* wake-up, and a session whose only live parts were off screen would never"
+    },
+    "src/shell/types.ts:492": {
+      "file": "src/shell/types.ts",
+      "text": "* reaches the emulator through the write queue, so it cannot land between the"
+    },
+    "src/terminal/capabilities.ts:19": {
+      "file": "src/terminal/capabilities.ts",
+      "text": "* Whether `East_Asian_Width=Ambiguous` glyphs occupy one cell or two (C02 I9)."
+    },
+    "src/terminal/escapes.ts:94": {
+      "file": "src/terminal/escapes.ts",
+      "text": "export const FOCUS_REPORT = mode(\"\\x1b[?1004h\", \"\\x1b[?1004l\");"
+    },
+    "src/terminal/frame-scheduler.ts:361": {
+      "file": "src/terminal/frame-scheduler.ts",
+      "text": "function suspend(): void {"
+    },
+    "src/terminal/lifecycle.ts:440": {
+      "file": "src/terminal/lifecycle.ts",
+      "text": "if (typeof stdin.setRawMode !== \"function\") return;"
+    },
+    "src/terminal/lifecycle.ts:692": {
+      "file": "src/terminal/lifecycle.ts",
+      "text": "onFatal(err);"
+    },
+    "src/viewport/overlay/manager.ts:188": {
+      "file": "src/viewport/overlay/manager.ts",
+      "text": "this.#subscribers.delete(cb);"
+    },
+    "src/viewport/viewport/viewport.ts:274": {
+      "file": "src/viewport/viewport/viewport.ts",
+      "text": "resize(size: Readonly<{ width: number; height: number }>): void {"
+    },
+    "src/viewport/viewport/viewport.ts:424": {
+      "file": "src/viewport/viewport/viewport.ts",
+      "text": ") {"
+    },
+    "structured.ts:246": {
+      "file": "src/presentation/blocks/kinds/structured.ts",
+      "text": "* one kind over): the window says what its parent measured rather than"
+    },
+    "test/e2e/editor.test.ts:54": {
+      "file": "test/e2e/editor.test.ts",
+      "text": "// as-you-type menu opens on it and `--mine` is on the screen again — as a"
+    },
+    "test/unit/parser.test.ts:213": {
+      "file": "test/unit/parser.test.ts",
+      "text": "expect(beyond.error.message, \"distance 3 is beyond the cutoff\").not.toContain(\"did you mean\");"
+    }
+  },
+  "records": {
+    "construct.ts:2682": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "construct.ts:2684": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "construct.ts:652": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "construct.ts:674": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "construct.ts:782": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "construct.ts:936": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "decode.ts:262": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "decode.ts:305": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "decode.ts:346": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "decode.ts:394": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "documents.ts:215": "quoted: the sentence says what the entry's evidence used to cite, which is history and not a claim about the line",
+    "execution.ts:1045": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "execution.ts:365": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "execution.ts:904": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "focus.ts:42": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "paint.ts:137": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "paint.ts:241": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "paint.ts:886": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "paint.ts:89": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "router.ts:192": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "router.ts:215": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "router.ts:221": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "router.ts:271": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "session.ts:373": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "session.ts:415": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "session.ts:553": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "session.ts:554": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "session.ts:555": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "session.ts:931": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)",
+    "validate.ts:284": "a bare basename naming two files, at a line measured before the history this repository keeps (the root commit 2a312147); its line has moved and the referent cannot be mapped forward — a record of the measurement. Owed: re-derive it and pin it, or say it is history (F1444)"
+  }
+}

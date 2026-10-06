@@ -2,6 +2,8 @@
 //
 //     node tools/roadmap-status.mjs                  # the real roadmap
 //     node tools/roadmap-status.mjs --file <path>    # a fixture's
+//     node tools/roadmap-status.mjs --pin            # pin every unpinned line citation
+//     node tools/roadmap-status.mjs --repoint        # follow every pinned line that moved
 //
 // **45 rows of hand-maintained claims about the tree is the population
 // `UNCONSUMED_MEMBERS` and `BUILDER_OMISSIONS` compare by equality**, and for the
@@ -93,12 +95,15 @@
 // it holds here. What this buys over a hand-list is that a row written in the
 // existing form is checked for free.
 
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, writeFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 
 const ROOT = process.cwd();
 const fileFlag = process.argv.indexOf("--file");
 const ROADMAP = fileFlag === -1 ? "CALCIUM_ROADMAP.md" : (process.argv[fileFlag + 1] ?? "");
+const pinsFlag = process.argv.indexOf("--pins");
+const pinsAt = pinsFlag === -1 ? "tools/roadmap-lines.json" : (process.argv[pinsFlag + 1] ?? "");
+const PINS = isAbsolute(pinsAt) ? pinsAt : join(ROOT, pinsAt);
 
 /** Entries the Order list is expected to run over. Derived, then compared. */
 function parse(text) {
@@ -428,6 +433,126 @@ function byBasename(path) {
   }
   bodyCitationCount = bodyCites;
   bodyAmbiguous = ambiguous;
+}
+
+// --- 1c. a line citation is pinned to the text of the line it names (F1444) --
+//
+// **Existence and non-blankness are all 1 and 1a ask of a line number, and a
+// line number decays without failing either.** The shell lane's integration
+// moved 41 citations' lines and nothing went red: the cited line still existed,
+// it was simply a different line. The anchorage signal below can see a drift
+// only where the cell carries a symbol, and it reports rather than gates,
+// because its window is a judgement (F904).
+//
+// **A pin has no window.** `tools/roadmap-lines.json` holds, for every
+// `path:line` the roadmap cites — table and body, keyed as written — the file
+// it resolves to and the trimmed text of that line. A line that moves fails
+// here with where its text went, and `--repoint` follows it, rewriting every
+// occurrence in the roadmap and asserting each one matched. A line whose text
+// changed or recurs fails for a person to re-point, which is the case that
+// needs one.
+//
+// **Records are not claims.** A body sentence quoting where a citation *used*
+// to point (`documents.ts:215` in entry 47's history) is a record of a past
+// line, and pinning it would fail it on the day the file moves for a reason
+// that has nothing to do with it. Those are listed by key with a reason, and
+// the list is compared by equality like the pins: a cited key is pinned or
+// recorded, and every pin and record is cited.
+//
+// **A bare basename naming two files is pinned by hand**, with the file the
+// prose means; `--pin` refuses to guess one.
+//
+// **Measured on arrival, over 149 line citations.** 51 had moved since the
+// commit that last wrote their roadmap line, mapped through each file's diff,
+// and two named a line that had since been rewritten; all were re-pointed
+// before the pins were taken except one quoted record. 31 name a bare
+// basename two files share, at a line older than the history this repository
+// keeps, so nothing maps them forward: they are recorded with that reason,
+// and re-deriving them is what F1444 still owes. Re-pointing moved the
+// anchorage signal below from 32/72 to 40/72.
+let pinned = 0;
+let recorded = 0;
+{
+  const store = existsSync(PINS) ? JSON.parse(readFileSync(PINS, "utf8")) : { pins: {}, records: {} };
+  const pins = store.pins ?? {};
+  const records = store.records ?? {};
+  const cited = new Set();
+  for (const line of text.split("\n")) {
+    for (const [, path, at] of line.matchAll(CITE)) if (at !== undefined) cited.add(`${path}:${at}`);
+  }
+  const mode = process.argv.includes("--repoint") ? "repoint" : process.argv.includes("--pin") ? "pin" : "check";
+  let roadmap = text;
+  const moves = [];
+  for (const key of [...cited].sort()) {
+    if (key in records) {
+      recorded += 1;
+      continue;
+    }
+    const [path, at] = [key.slice(0, key.lastIndexOf(":")), Number(key.slice(key.lastIndexOf(":") + 1))];
+    const pin = pins[key];
+    if (pin === undefined) {
+      const found = locate(path) ?? byBasename(path);
+      if (mode === "pin" && found !== null) {
+        const line = (readFileSync(join(ROOT, found), "utf8").split("\n")[at - 1] ?? "").trim();
+        if (line !== "") pins[key] = { file: found, text: line };
+        continue;
+      }
+      fail.push(
+        `pins: \`${key}\` is cited and neither pinned nor recorded` +
+          (found === null ? " — it names no unique file, so pin it by hand with the file the prose means" : " — run --pin"),
+      );
+      continue;
+    }
+    if (!existsSync(join(ROOT, pin.file))) {
+      fail.push(`pins: \`${key}\` is pinned to ${pin.file}, which does not exist`);
+      continue;
+    }
+    const lines = readFileSync(join(ROOT, pin.file), "utf8").split("\n");
+    if ((lines[at - 1] ?? "").trim() === pin.text) {
+      pinned += 1;
+      continue;
+    }
+    const where = lines.flatMap((l, i) => (l.trim() === pin.text ? [i + 1] : []));
+    if (mode === "repoint" && where.length === 1) {
+      moves.push({ key, path, to: where[0], pin });
+      continue;
+    }
+    fail.push(
+      `pins: \`${key}\` names a line that moved — ` +
+        (where.length === 1
+          ? `its pinned text is at :${String(where[0])} now; run --repoint`
+          : where.length === 0
+            ? `its pinned text is in ${pin.file} nowhere now, so the line changed; re-point it by hand`
+            : `its pinned text recurs at ${where.map((n) => `:${String(n)}`).join(", ")}; re-point it by hand`) +
+        ` (pinned: ${JSON.stringify(pin.text.slice(0, 60))})`,
+    );
+  }
+  for (const key of Object.keys(pins)) {
+    if (!cited.has(key)) fail.push(`pins: \`${key}\` is pinned and the roadmap no longer cites it; remove the pin`);
+  }
+  for (const key of Object.keys(records)) {
+    if (!cited.has(key)) fail.push(`pins: \`${key}\` is recorded and the roadmap no longer cites it; remove the record`);
+  }
+  if (mode === "repoint") {
+    for (const m of moves) {
+      const from = `\`${m.key}\``;
+      const to = `\`${m.path}:${String(m.to)}\``;
+      const count = roadmap.split(from).length - 1;
+      if (count === 0) throw new Error(`repoint: ${from} is cited and was not found to rewrite`);
+      if (`${m.path}:${String(m.to)}` in pins || `${m.path}:${String(m.to)}` in records) {
+        throw new Error(`repoint: ${to} is already pinned or recorded; re-point ${from} by hand`);
+      }
+      roadmap = roadmap.split(from).join(to);
+      delete pins[m.key];
+      pins[`${m.path}:${String(m.to)}`] = m.pin;
+      console.log(`  repointed ${from} → ${to} (${String(count)} occurrence${count === 1 ? "" : "s"})`);
+    }
+    writeFileSync(isAbsolute(ROADMAP) ? ROADMAP : join(ROOT, ROADMAP), roadmap);
+  }
+  if (mode !== "check") {
+    const sorted = (o) => Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
+    writeFileSync(PINS, `${JSON.stringify({ pins: sorted(pins), records: sorted(records) }, null, 2)}\n`);
+  }
 }
 
 // --- 1b. the two records of one entry's status agree -------------------------
@@ -854,6 +979,10 @@ console.log(
       " (F904, reported not gated)",
   );
 }
+console.log(
+  `  line pins · ${String(pinned)} cited lines hold the text they were pinned to, ${String(recorded)} ` +
+    `recorded as history rather than claims (F1444, gated)`,
+);
 for (const f of fail) console.error(`  ${f}`);
 if (fail.length > 0) {
   console.error(`\n${String(fail.length)} problems.`);

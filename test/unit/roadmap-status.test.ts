@@ -33,8 +33,27 @@ function run(text?: string): { ok: boolean; out: string } {
     file = join(DIR, "fixture.md");
     writeFileSync(file, text);
   }
+  const args = ["tools/roadmap-status.mjs", "--file", file];
+  if (text !== undefined) {
+    // **A fabricated roadmap cites lines the real pins never saw, and the pin
+    // arm (F1444) is not what these rows are about.** So the pins follow the
+    // fixture: kept where it still cites them, and every other citation recorded.
+    // RS15 runs the arm itself, against the real file.
+    const real = JSON.parse(readFileSync("tools/roadmap-lines.json", "utf8")) as {
+      pins: Record<string, unknown>;
+      records: Record<string, string>;
+    };
+    const cited = new Set(
+      [...text.matchAll(/`([\w./-]+\.(?:ts|mjs|py|md|yml)):(\d+)`/gu)].map((m) => `${m[1]}:${m[2]}`),
+    );
+    const pins = Object.fromEntries(Object.entries(real.pins).filter(([k]) => cited.has(k)));
+    const records = Object.fromEntries([...cited].filter((k) => !(k in pins)).map((k) => [k, real.records[k] ?? "fixture"]));
+    const at = join(DIR, "fixture-pins.json");
+    writeFileSync(at, JSON.stringify({ pins, records }));
+    args.push("--pins", at);
+  }
   try {
-    return { ok: true, out: execFileSync("node", ["tools/roadmap-status.mjs", "--file", file], {
+    return { ok: true, out: execFileSync("node", args, {
       encoding: "utf8", stdio: "pipe",
     }) };
   } catch (e) {
@@ -705,5 +724,116 @@ describe("roadmap-status — the Order column's verifier", () => {
     const r = run(mutate("**Not checked, and named", "**Left for later"));
     expect(r.ok).toBe(false);
     expect(r.out).toContain("no `Not checked, and named` paragraph");
+  });
+});
+
+describe("roadmap-status — a line citation is pinned to its line (F1444)", () => {
+  // **Every fixture here is the real roadmap and the real pins, one thing
+  // changed**, so each row's red is the arm's and not a fabrication's. The
+  // pins are copied, because `--repoint` writes them.
+  const PINS = JSON.parse(readFileSync("tools/roadmap-lines.json", "utf8")) as {
+    pins: Record<string, { file: string; text: string }>;
+    records: Record<string, string>;
+  };
+
+  function runPins(
+    pins: typeof PINS,
+    text = ROADMAP,
+    ...flags: string[]
+  ): { ok: boolean; out: string; roadmap: string; pins: typeof PINS } {
+    const file = join(DIR, "pinned.md");
+    const at = join(DIR, "pins.json");
+    writeFileSync(file, text);
+    writeFileSync(at, JSON.stringify(pins));
+    let ok = true;
+    let out: string;
+    try {
+      out = execFileSync("node", ["tools/roadmap-status.mjs", "--file", file, "--pins", at, ...flags], {
+        encoding: "utf8", stdio: "pipe",
+      });
+    } catch (e) {
+      const err = e as { stdout?: string; stderr?: string };
+      ok = false;
+      out = `${err.stdout ?? ""}${err.stderr ?? ""}`;
+    }
+    return { ok, out, roadmap: readFileSync(file, "utf8"), pins: JSON.parse(readFileSync(at, "utf8")) as typeof PINS };
+  }
+
+  /** A pinned citation whose file holds some other line exactly once — the move a fabrication needs. */
+  function movable(): { key: string; to: number; text: string } {
+    for (const [key, pin] of Object.entries(PINS.pins)) {
+      const lines = readFileSync(pin.file, "utf8").split("\n");
+      const n = Number(key.slice(key.lastIndexOf(":") + 1));
+      for (let i = n + 3; i < lines.length; i++) {
+        const t = (lines[i] ?? "").trim();
+        if (t.length > 20 && lines.filter((l) => l.trim() === t).length === 1) return { key, to: i + 1, text: t };
+      }
+    }
+    throw new Error("no pinned file holds a unique line below its citation");
+  }
+
+  it("RS15: the roadmap as it stands holds every pin, and it is a corpus", () => {
+    const r = runPins(PINS);
+    expect(r.ok, r.out).toBe(true);
+    const m = /line pins · (\d+) cited lines hold the text they were pinned to, (\d+) recorded/u.exec(r.out);
+    expect(Number(m?.[1]), "114 pinned when the arm landed").toBeGreaterThan(100);
+    expect(Number(m?.[1]), "every pin is held").toBe(Object.keys(PINS.pins).length);
+    expect(Number(m?.[2])).toBe(Object.keys(PINS.records).length);
+  });
+
+  it("RS15b: a cited line that moved fails, and says where its text went", () => {
+    // **The fabricated violation**: the pin says the line holds another line's
+    // text, which is what the file looks like after an edit above the citation.
+    const { key, to, text } = movable();
+    const pins = { ...PINS, pins: { ...PINS.pins, [key]: { file: PINS.pins[key]!.file, text } } };
+    const r = runPins(pins);
+    expect(r.ok).toBe(false);
+    expect(r.out).toContain(`\`${key}\` names a line that moved — its pinned text is at :${String(to)} now`);
+  });
+
+  it("RS15c: --repoint follows the move, in the roadmap and in the pins, and the check passes after", () => {
+    const { key, to, text } = movable();
+    const pins = { ...PINS, pins: { ...PINS.pins, [key]: { file: PINS.pins[key]!.file, text } } };
+    const moved = runPins(pins, ROADMAP, "--repoint");
+    const path = key.slice(0, key.lastIndexOf(":"));
+    const after = `${path}:${String(to)}`;
+    expect(moved.roadmap, "every occurrence rewritten").not.toContain(`\`${key}\``);
+    expect(moved.roadmap).toContain(`\`${after}\``);
+    expect(moved.pins.pins[after]?.text).toBe(text);
+    expect(moved.pins.pins[key], "the old key is gone").toBeUndefined();
+    // **The control**: a fresh check over what the repoint wrote.
+    const again = runPins(moved.pins, moved.roadmap);
+    expect(again.out).not.toContain("names a line that moved");
+  });
+
+  it("RS15d: an unpinned citation, a pin nothing cites and a record nothing cites each fail", () => {
+    const [key] = Object.keys(PINS.pins);
+    const rest = Object.fromEntries(Object.entries(PINS.pins).filter(([k]) => k !== key));
+    const unpinned = runPins({ ...PINS, pins: rest });
+    expect(unpinned.ok).toBe(false);
+    expect(unpinned.out).toContain(`\`${key}\` is cited and neither pinned nor recorded`);
+
+    const stale = runPins({ ...PINS, pins: { ...PINS.pins, "src/index.ts:1": { file: "src/index.ts", text: "x" } } });
+    expect(stale.out).toContain("`src/index.ts:1` is pinned and the roadmap no longer cites it");
+
+    const record = runPins({ ...PINS, records: { ...PINS.records, "gone.ts:9": "a record of nothing" } });
+    expect(record.out).toContain("`gone.ts:9` is recorded and the roadmap no longer cites it");
+  });
+
+  it("RS15e: a pinned line whose text changed fails for a person, and --repoint leaves it", () => {
+    const [key, pin] = Object.entries(PINS.pins)[0]!;
+    const pins = { ...PINS, pins: { ...PINS.pins, [key]: { ...pin, text: "a line no file in this tree holds" } } };
+    const r = runPins(pins, ROADMAP, "--repoint");
+    expect(r.ok).toBe(false);
+    expect(r.out).toContain(`\`${key}\` names a line that moved — its pinned text is in ${pin.file} nowhere now`);
+    expect(r.roadmap, "nothing rewritten").toBe(ROADMAP);
+
+    // **And a text that recurs is not followed either**: two lines hold it, and
+    // a rewrite would pick one. `*/` closes every doc comment in the file.
+    const recurring = { ...PINS, pins: { ...PINS.pins, [key]: { ...pin, text: "*/" } } };
+    expect(readFileSync(pin.file, "utf8").split("\n").filter((l) => l.trim() === "*/").length).toBeGreaterThan(1);
+    const again = runPins(recurring, ROADMAP, "--repoint");
+    expect(again.out).toContain("recurs at");
+    expect(again.roadmap, "nothing rewritten").toBe(ROADMAP);
   });
 });
