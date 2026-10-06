@@ -1183,8 +1183,17 @@ function patch(
   );
 }
 
-function pills(chips: readonly ChipInput[], opts?: BlockOpts): Pills {
-  return finish<Pills>({ kind: "pills", id: idOf(opts, "pills"), chips } as Pills, opts, false);
+/**
+ * `buttons` draws each chip as a button (C04 I151, C09 I139): a row of answers
+ * that wraps whole, which is what the confirm host's choices are (C23 I104).
+ */
+function pills(chips: readonly ChipInput[], opts?: BlockOpts & Readonly<{ buttons?: boolean }>): Pills {
+  const buttons = opts?.buttons;
+  return finish<Pills>(
+    { kind: "pills", id: idOf(opts, "pills"), chips, ...(buttons === undefined ? {} : { buttons }) } as Pills,
+    opts,
+    false,
+  );
 }
 
 /**

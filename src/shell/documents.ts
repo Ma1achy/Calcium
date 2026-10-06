@@ -801,9 +801,32 @@ export function refusalNotice(text: string, id: string): Block {
   return warnBlock(text, id);
 }
 
-/** The confirm layer's question (C15 §2a): the one warn notice the host draws. */
+/**
+ * The confirm layer's question (C15 §2a, C23 I104): `⟩` in `warn` and the
+ * question in the default ink — §028, §051, §052's lead, which is a question's
+ * and not a warning's (`R-GLY-003`: `question` leads a question, `warn` is the
+ * vocabulary's `▲`). The lead is the notice's glyph at its tone and the words are
+ * one `default` span over the whole text, so the two tones are one notice.
+ */
 export function questionNotice(text: string, id: string): Block {
-  return warnBlock(text, id);
+  const built = block({
+    kind: "notice",
+    id,
+    tone: "warn",
+    glyph: "question",
+    text,
+    spans: text === "" ? [] : [{ from: 0, to: text.length, tone: "default" }], // cells-ok — a code-unit offset
+    padding: { l: 1 },
+  });
+  defaulted(built);
+  return built;
+}
+
+/** What waits behind the open question (C23 I91, I104): the count, muted, beside the question. */
+export function queuedNotice(more: number, separator: string, id: string): Block {
+  const built = block({ kind: "notice", id, tone: "muted", text: `${separator} ${String(more)} more` });
+  defaulted(built);
+  return built;
 }
 
 // **`hiddenRowsNotice` went with the pushed view** (C22 §13a, R-EXA-082, F1253). It

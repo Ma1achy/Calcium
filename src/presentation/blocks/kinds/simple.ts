@@ -565,13 +565,12 @@ function headMarked(
  */
 function buttonSpans(
   line: readonly Run[],
-  block: Notice,
+  name: Tone,
   ctx: RenderContext,
   focused: boolean,
   base: NonNullable<Span["style"]>,
   paintCtx: Parameters<typeof paintRuns>[2],
-): readonly Span[] | null {
-  if (buttonCells(block) === 0) return null;
+): readonly Span[] {
   const ref = focused ? "surface.pick" : "surface.bgElev";
   const ground = background(ref, ctx.theme, ctx.capabilities);
   // **The ground OR the alphabet**, and §073 says both in its own words —
@@ -593,7 +592,7 @@ function buttonSpans(
         ...withBackground(surface("surface.pickInk", ctx.theme, ctx.capabilities), ground),
         bold: true,
       }
-    : withBackground(tone(block.tone, ctx.theme, ctx.capabilities, "bgElev"), ground);
+    : withBackground(tone(name, ctx.theme, ctx.capabilities, "bgElev"), ground);
   const mark = focused ? `${glyphFor("current", ctx.capabilities)} ` : "";
   return [
     { text: ` ${mark}`, style },
@@ -713,7 +712,7 @@ export const noticeDefinition: BlockDefinition<Notice> = {
                 : " ".repeat(prefix),
             style,
           },
-          ...(index === 0 ? (buttonSpans(line, block, ctx, focused, style, paintCtx) ?? paintRuns(line, style, paintCtx)) : paintRuns(line, style, paintCtx)),
+          ...(index === 0 && buttonCells(block) > 0 ? buttonSpans(line, block.tone, ctx, focused, style, paintCtx) : paintRuns(line, style, paintCtx)),
         ]),
       ),
     );
@@ -971,6 +970,9 @@ function alphabetOf(style: string | undefined, granularity: Progress["granularit
 
 // --- pills -----------------------------------------------------------------
 
+/** The cells a chip's chrome adds: a button's four (C09 I102, I138), a chip's none. */
+const chipChrome = (block: Pills): number => (block.buttons === true ? BUTTON_CELLS : 0);
+
 /**
  * One logical row that may wrap (C04 §3). The chips are laid out once, and both
  * halves read the same layout — a `pills` block whose measurer counted cells
@@ -989,7 +991,9 @@ function chipRows(
 
   for (const chip of block.chips) {
     const text = stripControl(chip.label);
-    const w = cells(text, ambiguous);
+    // **A button's chrome is priced into the chip** (C09 I139): `BUTTON_CELLS`,
+    // the maximum of the three rungs, so the wrap is the same at all of them.
+    const w = cells(text, ambiguous) + chipChrome(block);
     const needed = line.length === 0 ? w : w + CHIP_GAP; // cells-ok
     if (used + needed > limit && line.length > 0) { // cells-ok
       out.push(line);
@@ -1048,7 +1052,7 @@ function pillsElements(block: Pills, width: number): readonly NavElement[] {
       const chip = block.chips[index];
       // `chipRows` measured the line under the default convention, so the
       // element is where the row it was measured into says it is (C02 I9).
-      const cw = cells(text, "narrow"); // narrow-ok — `chipRows`' own default, so the geometry matches the measure
+      const cw = cells(text, "narrow") + chipChrome(block); // narrow-ok — `chipRows`' own default, so the geometry matches the measure
       const from = Math.min(col, w);
       const action = chip?.action;
       out.push(
@@ -1087,7 +1091,7 @@ export const pillsDefinition: BlockDefinition<Pills> = {
     let widest = 0;
     for (const row of chipRows(block, w)) {
       let used = 0;
-      row.forEach((text, i) => { used += cells(text) + (i > 0 ? CHIP_GAP : 0); }); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
+      row.forEach((text, i) => { used += cells(text) + chipChrome(block) + (i > 0 ? CHIP_GAP : 0); }); // narrow-ok — `width` is pure in (block, width) as `measure` is (C09 I42), and narrow is the measurer's convention
       widest = Math.max(widest, used);
     }
     return Math.max(1, Math.min(w, widest));
@@ -1119,6 +1123,20 @@ export const pillsDefinition: BlockDefinition<Pills> = {
           index += 1;
           const name = chip?.active === true ? "accent" : (chip?.tone ?? "muted");
           if (spans.length > 0) spans.push({ text: " ".repeat(CHIP_GAP) }); // cells-ok
+          if (block.buttons === true) {
+            // **A button, drawn by the notice's own three rungs** (C09 I139, I102): the
+            // render focus is what selects, and it names the chip as a chip's head is
+            // named — `chip-N` — so nothing else about the focus changes.
+            const focused = id === head;
+            const own = chip?.tone ?? "default";
+            const base = focused
+              ? { ...tone(own, ctx.theme, ctx.capabilities, "focusGround"), ...focusShapeStyle(ctx.theme, ctx.capabilities) }
+              : tone(own, ctx.theme, ctx.capabilities);
+            spans.push(
+              ...buttonSpans([{ text }], own, ctx, focused, base, { theme: ctx.theme, capabilities: ctx.capabilities, tick: ctx.tick }),
+            );
+            continue;
+          }
           // **The head is `accent` over the selection ground** (C26 §7), where
           // the table's head is `accent` alone. `active` already spends
           // `accent` as data, so a focused inactive chip beside an active one

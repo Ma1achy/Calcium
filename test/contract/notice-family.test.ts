@@ -64,12 +64,19 @@ const runLocal = async (line: string): Promise<readonly string[]> => {
 
 /** Captured at 73882a4f — the literal's frame. */
 const BEFORE: Record<string, readonly string[]> = {
+  // **The one capture re-taken for the form, and it moved for the other reason**
+  // (C23 I104, §028, 2026-10-06). The panel is gone and the lead is the question's
+  // own `⟩` (`R-GLY-003`), so this row no longer records the literal's bytes: it
+  // records the family's `questionNotice` as the design draws it — `⟩` in `warn`,
+  // the words in the default ink, one cell in. The old row also held the table's
+  // **raw JSON** (`{"kind":"table",...`), because this harness registers no
+  // `table` and an unregistered kind draws as `raw`: a record that recorded a
+  // fixture's gap beside the thing it was written to check. The answers are a
+  // `pills` block now, a default kind, so the row reads them.
   "confirm-question": [
-    "\u001b[38;2;138;138;138m┌\u001b[38;2;232;168;124m Confirm \u001b[38;2;138;138;138m─────────────────────────────────────────────────────────────────────┐\u001b[39m",
-    "\u001b[38;2;138;138;138m│\u001b[38;2;212;179;90m▲ remove 3 containers?\u001b[39m                                                        \u001b[38;2;138;138;138m│\u001b[39m",
-    "│                                                                              │",
-    "│{\"kind\":\"table\",\"id\":\"confirm-choices\",\"padding\":{\"t\":1},\"columns\":[{\"key\":\"m…│",
-    "\u001b[38;2;138;138;138m└──────────────────────────────────────────────────────────────────────────────┘\u001b[39m",
+    " \u001b[38;2;212;179;90m⟩ \u001b[38;2;212;212;212mremove 3 containers?\u001b[39m",
+    "",
+    " \u001b[38;2;212;212;212m\u001b[48;2;34;34;34m yes \u001b[49m\u001b[39m  \u001b[38;2;212;212;212m\u001b[48;2;34;34;34m no \u001b[49m\u001b[39m",
   ],
   cleared: [
     "\u001b[38;2;98;98;98mtranscript cleared\u001b[39m",

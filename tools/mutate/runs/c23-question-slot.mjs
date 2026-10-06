@@ -143,8 +143,8 @@ const results = runPass({
       // checking *the reply is up* cannot see it.
       name: "THE DEFECT: choosing reply… opens a second question rather than moving the first",
       file: CONFIRM,
-      from: "      deps.overlays.update(CONFIRM_LAYER_ID, {\n        content: draw(selected(), cut, refused),\n        placement: { kind: \"anchored\"",
-      to: "      disposable[Symbol.dispose]();\n      deps.overlays.push({ ...layer, blocking: false });\n      deps.overlays.update(CONFIRM_LAYER_ID, {\n        content: draw(selected(), cut, refused),\n        placement: { kind: \"anchored\"",
+      from: "      deps.overlays.update(CONFIRM_LAYER_ID, {\n        content: draw(cut, refused),\n        placement: { kind: \"anchored\"",
+      to: "      disposable[Symbol.dispose]();\n      deps.overlays.push({ ...layer, blocking: false });\n      deps.overlays.update(CONFIRM_LAYER_ID, {\n        content: draw(cut, refused),\n        placement: { kind: \"anchored\"",
       expect: "T1.69",
     },
     {

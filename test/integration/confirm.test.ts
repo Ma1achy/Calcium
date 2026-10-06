@@ -39,7 +39,7 @@ import { createViewport } from "../../src/viewport/viewport/index.js";
 import { createFocusStore } from "../../src/interaction/router/focus.js";
 import { createKeymap, defaultKeymap } from "../../src/interaction/router/keymap.js";
 import { createRouter, type RouterDeps } from "../../src/interaction/router/router.js";
-import { CONFIRM_WIDTH, createConfirmHost } from "../../src/shell/confirm.js";
+import { CONFIRM_WIDTH, createConfirmHost, type ConfirmHost } from "../../src/shell/confirm.js";
 import type { InputEvent, Key } from "../../src/interaction/router/types.js";
 import { measureSequence, rowsDoc } from "../support/viewport.js";
 import { tableDefinition } from "../../src/presentation/table/index.js";
@@ -52,6 +52,14 @@ import type { TerminalCapabilities } from "../../src/terminal/capabilities.js";
 import { buildGraph, buildSession } from "../support/session.js";
 import { MENU_ID } from "../../src/interaction/completion/index.js";
 import { fakeStdin } from "../support/fake-terminal.js";
+import { styledScreenFrom, washRuns } from "../support/styled-screen.js";
+import { DARK_THEME, FULL_CAPS, MONO_UNICODE_CAPS } from "../support/render.js";
+import { background, slot, tone } from "../../src/presentation/blocks/paint.js";
+import { sgr } from "../../src/terminal/escapes.js";
+
+/** The SGR parameters a style resolves to, as `styled-screen` records them. */
+const sgrParams = (style: Parameters<typeof sgr>[0]): string =>
+  sgr(style).replace(/^\u001b\[/u, "").replace(/m$/u, "");
 
 /**
  * The confirm's layer, rendered — the frame rather than the blocks.
@@ -61,12 +69,17 @@ import { fakeStdin } from "../support/fake-terminal.js";
  * structural assertion on the block sees the marker on the right row and cannot
  * see either.
  */
-function frameOf(overlays: OverlayManager, caps?: TerminalCapabilities): readonly string[] {
+function frameOf(overlays: OverlayManager, caps?: TerminalCapabilities, host?: ConfirmHost): readonly string[] {
   const layer = overlays.top;
   if (layer === null) throw new Error("no layer to read");
+  // **The host's own focus, because the selection is the render focus** (C23 I104):
+  // a frame read without it draws every answer at rest, which is a question with
+  // nothing selected.
+  const focus = host?.focusedBox("confirm") ?? null;
   const r = measurable({
     definitions: [tableDefinition],
     ...(caps === undefined ? {} : { capabilities: caps }),
+    ...(host === undefined ? {} : { focus }),
   });
   return layer.content.flatMap((b) => r.renderToLines(b, 72).map(visible));
 }
@@ -489,7 +502,7 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     expect(w.router.lastStages).toContain("cancel");
   });
 
-  it("T4.12 (C23 I36, entry 16 R1): the marker opens on the default, not on the first", () => {
+  it("T4.12 (C23 I36, I104, entry 16 R1): the focus opens on the default, not on the first", () => {
     // **The mutation this row exists for**, and it is a safety defect rather
     // than a navigation one: every assertion about arrows moving agrees with an
     // index that opens at 0, and a destructive verb's confirm then sits on
@@ -499,12 +512,12 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     const w = world();
     void present(w, { question: "Remove 6 containers?", choices: YES_NO });
 
-    const drawn = frameOf(w.overlays);
-    expect(drawn.find((l) => l.includes("[n]")), "the default carries the marker").toContain("•");
-    expect(drawn.find((l) => l.includes("[y]")), "and nothing else does").not.toContain("•");
+    const row = frameOf(w.overlays, undefined, w.confirm).find((l) => l.includes("yes"));
+    expect(row, "the default carries the mark").toMatch(/› no/u);
+    expect(row, "and nothing else does").not.toMatch(/› yes/u);
   });
 
-  it("T4.13 (C09 I22, F122, entry 16 A5): the choices are a block, and no glyph is written here", () => {
+  it("T4.13 (C09 I22, F122, entry 16 A5, I104): the choices are a block, and no glyph is written here", () => {
     // **The seam this deletes.** `ConfirmDeps` carried `capabilities` for one
     // reason — a `raw` block holds text, so a marker written at L4 could never
     // be substituted — and a cell holds a slot instead. The assertion is on the
@@ -514,28 +527,31 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     const w = world();
     void present(w, { question: "Remove 6 containers?", choices: YES_NO });
 
-    const ascii = frameOf(w.overlays, ASCII_CAPS);
-    expect(ascii.find((l) => l.includes("[n]"))).toContain("-");
-    expect(ascii.join("\n"), "the Unicode marker never reaches an ASCII terminal").not.toContain("•");
+    const ascii = frameOf(w.overlays, ASCII_CAPS, w.confirm);
+    expect(ascii.find((l) => l.includes("[ no ]")), "every answer is bracketed at ASCII (C09 I139)").toContain("[ yes ]");
+    expect(ascii[0], "and the lead is the question mark").toMatch(/^ \? Remove/u);
+    expect(ascii.join("\n"), "the Unicode marks never reach an ASCII terminal").not.toMatch(/[›⟩•▲]/u);
   });
 
-  it("T4.14 (entry 16 A5): the labels align whether or not a row is marked", () => {
-    // **The frame, not the arithmetic.** A glyph is part of a cell's width
-    // rather than an addition to it, so a marker sharing the key's cell shifts
-    // the selected row two columns left of the others — self-consistent in
-    // every count, and visible only by reading the rows against each other.
-    // The `raw` form got this by padding with a space; the marker's own column
-    // is what replaces that.
+  it("T4.14 (entry 16 A5, C23 I104): the answers are one row, in the caller's order, and the focus moves only what follows it", () => {
+    // **One row, and the order is the caller's.** The row this replaces asserted
+    // that the labels lined up down a column. Side by side, what survives is
+    // that the focused chip's `›` and its pad take cells **inside its own wash**,
+    // so the chips before it do not move and the ones after it move by those
+    // cells — read by column, because the count of labels is the same either way.
     const w = world();
-    void present(w, { question: "Remove 6 containers?", choices: YES_NO });
+    void present(w, { question: "Which?", choices: YES_NO });
 
-    const drawn = frameOf(w.overlays);
-    const at = (needle: string): number => {
-      const line = drawn.find((l) => l.includes(needle));
-      return line === undefined ? -1 : line.indexOf(needle);
-    };
-    expect(at("[y]"), "both keys start in the same column").toBe(at("[n]"));
-    expect(at("[y]")).toBeGreaterThan(0);
+    const resting = frameOf(w.overlays).filter((l) => l.includes("yes") || l.includes("no"));
+    expect(resting, "one row holds every answer").toHaveLength(1);
+    const row0 = resting[0] ?? "";
+    expect(row0.indexOf("yes"), "in the caller's order").toBeLessThan(row0.indexOf("no"));
+
+    const focused = frameOf(w.overlays, undefined, w.confirm).find((l) => l.includes("yes")) ?? "";
+    expect(focused.indexOf("yes"), "the chip before the focus has not moved").toBe(row0.indexOf("yes"));
+    expect(focused.indexOf("no"), "the focused chip's mark is two cells, drawn inside its wash").toBe(
+      row0.indexOf("no") + 2,
+    );
   });
 
   it("T4.15 (C23 I36, entry 16 R1): an unmarked question falls back to the last choice", () => {
@@ -554,29 +570,24 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
       ],
     });
 
-    const drawn = frameOf(w.overlays);
-    expect(drawn.find((l) => l.includes("[n]")), "the last, which is the safe one").toContain("•");
-    expect(drawn.find((l) => l.includes("[y]"))).not.toContain("•");
+    const row = frameOf(w.overlays, undefined, w.confirm).find((l) => l.includes("yes"));
+    expect(row, "the last, which is the safe one").toMatch(/› no/u);
+    expect(row).not.toMatch(/› yes/u);
   });
 
-  it("T4.16 (entry 16 A5): the key column fits the widest accelerator", () => {
-    // Two-character keys are legal — `AskOptions` puts no width on `key` — and a
-    // floor taken from one of them truncates whichever is longer. That reads as
-    // a rendering flicker rather than as a width defect, which is C19's own
-    // argument for putting its glyph in the floor (`menu.ts:39`).
+  it("T4.16 (entry 16 A5, C23 I104): the accelerators are not drawn and still answer", async () => {
+    // **The design's row draws no `[y]`** and the tree still binds the letter
+    // (`classify`), so a key with no label on the screen is the state this row
+    // holds. It was a row about fitting the key column to the widest accelerator,
+    // two-character keys being legal; there is no column to fit. What survives is
+    // that dropping the label did not drop the binding, and that no bracket of
+    // the old form is drawn.
     const w = world();
-    void present(w, {
-      question: "Which?",
-      choices: [
-        { key: "y", label: "yes" },
-        { key: "no", label: "no", default: true as const },
-      ],
-    });
+    const answer = present(w, { question: "Which?", choices: YES_NO });
 
-    const drawn = frameOf(w.overlays);
-    expect(drawn.join("\n"), "`[no]` is whole").toContain("[no]");
-    const at = (n: string): number => drawn.find((l) => l.includes(n))?.indexOf(n) ?? -1;
-    expect(at("yes"), "and the labels still line up").toBe(at("no ") === -1 ? at("no") : at("no "));
+    expect(frameOf(w.overlays, undefined, w.confirm).join("\n"), "no accelerator is drawn").not.toMatch(/\[[yn]\]/u);
+    w.router.dispatch(key("y"));
+    await expect(answer, "and `y` still answers").resolves.toEqual({ key: "y", outcome: "answered" });
   });
 
   it("T4.17 (entry 16 A3, A6, C15 I20): placement is a parameter, and width is not derived from it", () => {
@@ -630,7 +641,13 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     //
     // So the payload is dropped rather than marked: an appended indicator is
     // the first row lost. `…` costs the reader what they could not read anyway.
-    const w = world({}, { width: 80, height: 12 });
+    // **At 8 rows, and it was 12.** The form is shorter than the panel was by its two
+    // rails and its padding row, so at 12 rows the collapsed question fits even
+    // under C15's default fraction and the 0.8 this host asks for (`maxHeightFraction`)
+    // is not exercised — the c19-menu-window run found that mutation surviving
+    // (C23 I104). 8 rows is where half the region (4) cannot hold the lead, the `...`
+    // and the answers (5) and 0.8 of it (6) can, so the row reads the fraction again.
+    const w = world({}, { width: 80, height: 8 });
     void present(w, {
       question: "Remove 6 stopped containers?",
       detail: block({
@@ -641,13 +658,13 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
       choices: YES_NO,
     });
 
-    const placed = w.overlays.layout({ width: 80, height: 12 })[0];
+    const placed = w.overlays.layout({ width: 80, height: 8 })[0];
     if (placed === undefined) throw new Error("unreachable");
     const r = measurable({ definitions: [tableDefinition] });
     const all = placed.layer.content.flatMap((b) => r.renderToLines(b, placed.width).map(visible));
     const drawn = all.slice(0, placed.height);
 
-    expect(drawn.some((l) => l.includes("[n]")), "the answers are on the frame").toBe(true);
+    expect(drawn.some((l) => l.includes("yes") && l.includes("no")), "the answers are on the frame").toBe(true);
     expect(drawn.some((l) => l.includes("...")), "and the payload says it was dropped").toBe(true);
     expect(all.length, "nothing is cut at all").toBeLessThanOrEqual(placed.height);
     expect(drawn.some((l) => l.includes("row 0")), "the payload itself is gone").toBe(false);
@@ -741,8 +758,8 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
       question: "Remove 6 containers?",
       choices: [{ key: "y", label: "yes" }, { key: "n", label: "no" }],
     });
-    const drawn = frameOf(w.overlays);
-    expect(drawn.find((l) => l.includes("[n]")), "opens on the last").toContain("•");
+    const drawn = frameOf(w.overlays, undefined, w.confirm);
+    expect(drawn.find((l) => l.includes("yes")), "opens on the last").toMatch(/› no/u);
 
     w.router.dispatch(key("escape"));
     return expect(answer, "and escapes to it").resolves.toEqual({ key: "n", outcome: "answered" });
@@ -779,11 +796,12 @@ describe("ctx.ask — routed, not called (C23 I36, C16 I25)", () => {
     expect(all.some((l) => l.includes("...")), "the payload says it was dropped").toBe(true);
     expect(all.some((l) => l.includes("container-0")), "and is gone").toBe(false);
 
-    const marked = all.find((l) => l.includes("[n]"));
-    expect(marked, "the safe answer is drawn").toBeDefined();
-    expect(marked, "and it is the one marked").toContain("•");
-    expect(all.find((l) => l.includes("[y]"))).not.toContain("•");
-    expect(all[all.length - 1] ?? "", "and the box closes").toMatch(/[└+]/u);
+    const row = all.find((l) => l.includes("yes"));
+    expect(row, "the safe answer is drawn").toContain("no");
+    // The frame is read at rest — the focus is the host's and this row has no
+    // host — so the mark is T4.12's and the claim here is that the row is whole
+    // and is the last thing drawn, where the panel's closing rail was.
+    expect(all[all.length - 1] ?? "", "and the answers close the form").toBe(row);
   });
 
   it("T4.8 (C23 I36): resolves with a choice on every path, never null", async () => {
@@ -850,7 +868,7 @@ describe("C23 I82 — a question refuses once and says so (review batch 2, M5)",
     const all = placed.layer.content.flatMap((b) => r.renderToLines(b, placed.width).map(visible));
     const drawn = all.slice(0, placed.height);
     expect(drawn.join("\n"), "the refusal is drawn").toContain("answer this first");
-    expect(drawn.some((l) => l.includes("[n]")), "and so are the answers").toBe(true);
+    expect(drawn.some((l) => l.includes("yes") && l.includes("no")), "and so are the answers").toBe(true);
     expect(all.length, "nothing is cut").toBeLessThanOrEqual(placed.height);
   });
 
@@ -1057,7 +1075,7 @@ describe("C23 §7g — a question's life in a built session", () => {
     await new Promise((r) => setTimeout(r, 80));
     await w.flush();
     expect(w.answers, "esc did not answer").toEqual([]);
-    expect(w.text().some((l) => l.includes("[r]")), "the choices are back").toBe(true);
+    expect(w.text().some((l) => l.includes("reply…")), "the choices are back").toBe(true);
     expect(w.prompt().includes("because"), "the line is the reader's again").toBe(false);
     await w.type("r");
     expect(w.prompt(), "the composed text comes back").toContain("because");
@@ -1080,7 +1098,7 @@ describe("C23 §7g — a question's life in a built session", () => {
     ]);
   });
 
-  it("T4.91 (C23 I91): two local verbs ask at once; one question on screen titled · 1 more; a menu open before them comes back after the second answer", async () => {
+  it("T4.91 (C23 I91, I104): two local verbs ask at once; one question on screen with · 1 more on its row; a menu open before them comes back after the second answer", async () => {
     // **One verb asking twice at once** — two verbs submitted together are
     // deferred one behind the other by the submission guard (C23 I5), which
     // queues the *verbs*; this row is about two *questions* at once.
@@ -1097,8 +1115,8 @@ describe("C23 §7g — a question's life in a built session", () => {
     expect(menuUp(), "the menu is open").toBe(true);
 
     await w.open();
-    const confirms = w.text().filter((l) => l.startsWith("┌ Confirm"));
-    expect(confirms, "one question on screen, counting the other").toEqual([expect.stringMatching(/^┌ Confirm · 1 more/u)]);
+    const asked = (): string[] => w.text().filter((l) => l.includes("question?"));
+    expect(asked(), "one question on screen, counting the other").toEqual([expect.stringMatching(/First question\?.*· 1 more/u)]);
     expect(w.text().some((l) => l.includes("First question?"))).toBe(true);
     expect(w.text().some((l) => l.includes("Second question?")), "the second is not drawn").toBe(false);
     expect(menuUp(), "the menu was displaced").toBe(false);
@@ -1106,7 +1124,7 @@ describe("C23 §7g — a question's life in a built session", () => {
     w.s.clock.advance(1_000);
     await w.type("y");
     expect(w.text().some((l) => l.includes("Second question?")), "the second is shown").toBe(true);
-    expect(w.text().filter((l) => l.startsWith("┌ Confirm")), "uncounted now").toEqual([expect.stringMatching(/^┌ Confirm ─/u)]);
+    expect(asked(), "uncounted now").toEqual([expect.stringMatching(/^ ⟩ Second question\? *$/u)]);
     expect(menuUp(), "the menu waits for the last question").toBe(false);
 
     w.s.clock.advance(1_000);
@@ -1244,14 +1262,202 @@ describe("C23 §7g — a question's life in a built session", () => {
   });
 });
 
-describe("C23 §7h — the question's form in a built session, owed at the spec commit", () => {
-  it.todo(
-    "T4.108 (C23 I104, §028, C09 I139): at 80 columns and 24 bits the lead is in warn and the question in default, the answers are one row with the default washed pick and the rest bgElev, and the arrow moves the wash while the content stays equal — not deferred on a component: the same round's code commit replaces it",
-  );
-  it.todo(
-    "T4.109 (C23 I104, C09 I139, R-BLK-573): at ASCII the lead is a question mark and every chip is bracketed, at 1-bit only the focused chip is bracketed and inverse, and at 60 columns four choices are all on screen wrapped whole — not deferred on a component: the same round's code commit replaces it",
-  );
-  it.todo(
-    "T4.110 (C23 I104, I82, I91, I73, I75): the refusal and the count sit on the question's row in that order and a two-line question wraps within the rest, a reply draws the lead and no answers and esc restores them on the same chip, and the inspection draws a panel with the count in its title — not deferred on a component: the same round's code commit replaces it",
-  );
+describe("C23 §7h — the question's form in a built session (I104)", () => {
+  const APPROVAL = {
+    question: "Apply this change?",
+    detail: block({ kind: "raw", id: "d", text: "src/parser/parse.ts  +214 -88\n- let inQuote = false;\n+ let depth = 0;" }),
+    choices: [
+      { key: "a", label: "approve" },
+      { key: "n", label: "deny", default: true as const },
+      { key: "i", label: "show full diff", inspect: true as const },
+    ],
+  };
+  const FULL_ENV = { TERM: "xterm-256color", COLORTERM: "truecolor", LANG: "en_GB.UTF-8" };
+
+  /** A built session with one local verb, `q`, whose handler asks `asks` in order and never finishes. */
+  const built = async (
+    env: Record<string, string>,
+    columns: number,
+    asks: readonly object[],
+  ) => {
+    const stdin = fakeStdin();
+    const size = { columns, rows: 30 };
+    const answers: unknown[] = [];
+    const s = await buildSession(
+      {
+        stdin: stdin as never,
+        env,
+        manifest: {
+          schema: "tui.manifest/1",
+          binary: "prism",
+          version: "1.0.0",
+          tools: [{ name: "q", local: true, summary: "ask", args: [], flags: [] }],
+        },
+        localHandlers: {
+          q: async (_argv: unknown, ctx: { ask: (o: unknown) => Promise<unknown> }) => {
+            const got = await Promise.all(asks.map((a) => ctx.ask(a)));
+            answers.push(got);
+            return { schema: "tui.view/1", status: "ok", blocks: [] };
+          },
+        },
+      } as never,
+      size,
+    );
+    const flush = async (): Promise<void> => {
+      for (let i = 0; i < 4; i += 1) await Promise.resolve();
+      await new Promise((r) => setTimeout(r, 20));
+    };
+    const type = async (text: string): Promise<void> => {
+      for (const ch of text) {
+        stdin.emit(ch);
+        await flush();
+      }
+    };
+    await type("/q\r");
+    await flush();
+    return {
+      s,
+      type,
+      flush,
+      answers,
+      clock: s.clock,
+      text: () => s.screen().text,
+      grid: () => styledScreenFrom(s.stdout.chunks, size),
+      /** The row the lead is on, or -1. */
+      leadRow: () => s.screen().rows.findIndex((r) => /^ [⟩?] /u.test(r)),
+    };
+  };
+
+  it("T4.108 (C23 I104, §028, C09 I139): the lead, the payload and the answers read by cell at 24 bits, and the arrow moves the wash while the content stays equal", async () => {
+    const w = await built(FULL_ENV, 80, [APPROVAL]);
+    const at = w.leadRow();
+    expect(at, "the lead is on the screen").toBeGreaterThan(0);
+    const grid = w.grid();
+    const rows = w.s.screen().rows;
+
+    // **The figure, row by row** — §028's: the lead, a blank row, the payload one
+    // cell in, a blank row, the answers.
+    expect(rows[at]!.trimEnd(), "` ⟩ ` and the question").toBe(" ⟩ Apply this change?");
+    expect(rows[at + 1]!.trim(), "a blank row").toBe("");
+    expect(rows[at + 2]!, "the payload one cell in").toMatch(/^ src\/parser\/parse\.ts/u);
+    expect(rows[at + 5]!.trim(), "a blank row").toBe("");
+    expect(rows[at + 6]!.trimEnd(), "the answers, one row, the default focused").toBe(" " + " approve    › deny    show full diff");
+
+    const cell = (row: number, col: number) => grid[row]![col]!;
+    expect(cell(at, 1).ch).toBe("⟩");
+    expect(cell(at, 1).style.fg, "the lead is warn").toBe(sgrParams(tone("warn", DARK_THEME, FULL_CAPS)));
+    expect(cell(at, 3).style.fg, "and the words are the default ink").toBe(sgrParams(tone("default", DARK_THEME, FULL_CAPS)));
+
+    const runs = washRuns(grid, at + 6);
+    expect(runs.map((r) => r.text), "three washes, `›` inside the focused one").toEqual([" approve ", " › deny ", " show full diff "]);
+    expect(runs[1]!.bg, "the default is `pick`").toBe(sgrParams(background("surface.pick", DARK_THEME, FULL_CAPS)));
+    expect(runs[1]!.fg, "with `pickInk`").toBe(sgrParams(slot("surface.pickInk", DARK_THEME, FULL_CAPS)));
+    expect(runs[1]!.attrs, "bold").toContain(1);
+    expect(runs[0]!.bg, "the rest are `bgElev`").toBe(sgrParams(background("surface.bgElev", DARK_THEME, FULL_CAPS)));
+    expect(runs[2]!.bg).toBe(runs[0]!.bg);
+
+    // **`→` moves the wash and the content is the same blocks.** A render cache
+    // keyed on content would draw the first frame again: nothing about the data
+    // changed, and the answer pointed at has.
+    w.clock.advance(1_000);
+    await w.type("\u001b[C");
+    const after = washRuns(w.grid(), w.leadRow() + 6);
+    expect(after.map((r) => r.text), "the wash is on the next chip").toEqual([" approve ", " deny ", " › show full diff "]);
+    expect(after[2]!.bg, "and it is `pick`").toBe(sgrParams(background("surface.pick", DARK_THEME, FULL_CAPS)));
+    expect(after[1]!.bg, "while the one it left is `bgElev`").toBe(runs[0]!.bg);
+
+    await w.s.tui.stop("exit");
+  });
+
+  it("T4.109 (C23 I104, C09 I139, R-BLK-573): ASCII brackets every answer and leads with `?`; at 1-bit the focused chip alone is bracketed and inverse; at 60 columns four choices are all on the screen", async () => {
+    // ASCII, in a built session.
+    const ascii = await built({ ...FULL_ENV, LANG: "C" }, 80, [APPROVAL]);
+    const at = ascii.leadRow();
+    expect(ascii.s.screen().rows[at]!.trimEnd(), "the lead is `?`").toBe(" ? Apply this change?");
+    expect(ascii.s.screen().rows[at + 6]!.trimEnd(), "every answer is bracketed").toBe(" [ approve ]  [ deny ]  [ show full diff ]");
+    expect(ascii.s.screen().rows.join("\n"), "and no Unicode mark reaches an ASCII terminal").not.toMatch(/[›⟩▲]/u);
+    await ascii.s.tui.stop("exit");
+
+    // 1-bit, at the layer — a session cannot be built on a `dumb` terminal, and the
+    // frame is what the host's content and focus draw.
+    const w = world();
+    void present(w, { question: "Apply this change?", choices: [{ key: "a", label: "approve" }, { key: "n", label: "deny", default: true }] });
+    const kit = measurable({ capabilities: MONO_UNICODE_CAPS, focus: w.confirm.focusedBox("confirm") });
+    const lines = (w.overlays.top?.content ?? []).flatMap((b) => kit.renderToLines(b, 60));
+    const row = lines.find((l) => visible(l).includes("approve")) ?? "";
+    expect(visible(row).trimEnd(), "brackets carry it").toBe(" [ approve ]  [ deny ]");
+    const inverse = [...row.matchAll(/\u001b\[7m([^\u001b]*)\u001b\[27m/gu)].map((m) => m[1]);
+    expect(inverse, "and the focused chip alone is inverse — what carries the default where there is no colour").toEqual(["[ deny ]"]);
+
+    // **Four choices at 60 columns** — the first draft was a `group` row and drew
+    // three. Every label is on the screen, wrapped whole.
+    const narrow = await built(FULL_ENV, 60, [
+      {
+        question: "Apply this change?",
+        choices: [
+          { key: "n", label: "deny", default: true as const },
+          { key: "y", label: "approve once" },
+          { key: "i", label: "show full diff", inspect: true as const },
+          { key: "g", label: "always allow edits here" },
+        ],
+      },
+    ]);
+    const text = narrow.s.screen().rows.join("\n");
+    for (const label of ["deny", "approve once", "show full diff", "always allow edits here"]) {
+      expect(text, `"${label}" is on the screen at 60 columns`).toContain(label);
+    }
+    await narrow.s.tui.stop("exit");
+  });
+
+  it("T4.110 (C23 I104, I82, I91, I73, I75): the refusal and the count share the question's row, a reply draws no answers and `esc` restores them on the same chip, and the inspection is a panel with the count in its title", async () => {
+    const w = await built(FULL_ENV, 60, [
+      {
+        question: "Which branch should this change be applied to, in the end?",
+        choices: [
+          { key: "n", label: "deny", default: true as const },
+          { key: "y", label: "approve" },
+          { key: "r", label: "reply…", reply: true as const },
+          { key: "i", label: "show full diff", inspect: true as const },
+        ],
+      },
+      { question: "Second?", choices: [{ key: "n", label: "no", default: true as const }, { key: "y", label: "yes" }] },
+    ]);
+    const lead = (): number => w.leadRow();
+    const rowsFrom = (n: number): string => w.s.screen().rows.slice(lead(), lead() + n).join("\n");
+
+    // The count, on the question's row; the question is longer than the rest
+    // of the row and wraps within it, with the lead on its first row only.
+    expect(rowsFrom(3), "the count sits on the first row").toMatch(/^ ⟩ Which branch.*· 1 more/mu);
+    expect(rowsFrom(3), "and the question wrapped within the rest").toMatch(/\n\s+(be applied|in the end)/u);
+    expect(w.s.screen().rows.filter((r) => /⟩/u.test(r)), "the lead is drawn once").toHaveLength(1);
+
+    // A key that is no answer: the refusal, once, **before** the count.
+    w.clock.advance(1_000);
+    await w.type("q");
+    expect(rowsFrom(3), "the refusal and then the count, on one row").toMatch(/⟩ .*▲ answer this first.*· 1 more/mu);
+    expect(w.answers, "nothing was answered").toEqual([]);
+
+    // The reply draws no answers; `esc` brings them back on the chip it was on.
+    await w.type("\u001b[C");
+    await w.type("\u001b[C");
+    await w.type("r");
+    const replying = w.s.screen().rows.join("\n");
+    expect(replying, "the question is still there").toContain("Which branch");
+    expect(replying, "and no answer is drawn").not.toMatch(/approve|deny/u);
+    w.clock.advance(1_000);
+    await w.type("\u001b");
+    w.clock.advance(80);
+    await new Promise((r) => setTimeout(r, 80));
+    await w.flush();
+    const back = washRuns(w.grid(), lead() + w.s.screen().rows.slice(lead()).findIndex((r) => r.includes("approve")));
+    expect(back.map((r) => r.text).some((t) => t.includes("› reply…")), "the answers are back, on `reply…`").toBe(true);
+
+    // The inspection is a panel, and the count is in its title.
+    await w.type("\u001b[C");
+    await w.type("\r");
+    const panel = w.s.screen().rows.join("\n");
+    expect(panel, "a panel with the count in its title").toMatch(/┌ Confirm [·-] 1 more/u);
+    expect(panel, "and the answers are not drawn under it").not.toMatch(/approve/u);
+    await w.s.tui.stop("exit");
+  });
 });

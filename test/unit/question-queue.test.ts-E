@@ -42,7 +42,7 @@ type World = Readonly<{
   fire: () => void;
   /** How many timers are armed and not disposed. */
   armed: () => number;
-  /** The count of waiting questions as the open one's row reads it ((C23 I104)), or `null` when it carries none. */
+  /** The count of waiting questions as the open one's row reads it (I104), or `null` when it carries none. */
   count: () => string | null;
 }>;
 
@@ -341,7 +341,7 @@ describe("C23 §7g — the reply, the queue, the three resolutions", () => {
         { key: "s", label: "show", inspect: true },
       ],
     });
-    expect(w.confirm.focusedBox("confirm"), "the selection opens on b, the second chip ((C23 I104))").toEqual({
+    expect(w.confirm.focusedBox("confirm"), "the selection opens on b, the second chip (I104)").toEqual({
       blockId: "confirm-choices",
       rowId: "chip-1",
     });
@@ -437,7 +437,7 @@ describe("C23 §7h — the question's form (I104)", () => {
       "and carry no action — nothing in the layer is activated by a press",
     ).toBe(false);
 
-    // The control: an inspection's content **is** a panel ((C23 I75)), so the first
+    // The control: an inspection's content **is** a panel (I75), so the first
     // arm cannot be satisfied by a host that never draws one.
     w.press("i");
     expect(w.overlays.top?.content.map((b) => b.kind)).toEqual(["panel"]);
@@ -461,7 +461,7 @@ describe("C23 §7h — the question's form (I104)", () => {
     expect(chip(), "← moves it back, and wraps as the selection does").toEqual(at(0));
     w.press("right");
 
-    // A reply names no chip, and the same chip is back after `esc` ((C23 I89)).
+    // A reply names no chip, and the same chip is back after `esc` (I89).
     w.press("right");
     expect(chip()).toEqual(at(2));
     w.press("return");

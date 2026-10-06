@@ -139,3 +139,29 @@ export function styleAt(row: readonly StyledCell[], needle: string): CellStyle |
   const at = row.map((c) => c.ch).join("").indexOf(needle);
   return at === -1 ? null : row[at]!.style;
 }
+
+/**
+ * The maximal runs of one background on a row, each with its text, ink, ground and
+ * attributes (C09 I139, C23 I104). A cell with **no** background ends a run, so two
+ * washes with a gap between them are two runs even when they share a ground — the
+ * answers row's resting chips are exactly that.
+ */
+export function washRuns(
+  grid: readonly (readonly StyledCell[])[],
+  row = 0,
+): readonly { text: string; fg: string; bg: string; attrs: readonly number[] }[] {
+  const out: { text: string; fg: string; bg: string; attrs: readonly number[] }[] = [];
+  let inside = false;
+  for (const c of grid[row] ?? []) {
+    if (c.style.bg === "") {
+      inside = false;
+      continue;
+    }
+    const last = out[out.length - 1];
+    if (inside && last !== undefined && last.bg === c.style.bg && last.fg === c.style.fg && last.attrs.join() === c.style.attrs.join()) {
+      last.text += c.ch;
+    } else out.push({ text: c.ch, fg: c.style.fg, bg: c.style.bg, attrs: c.style.attrs });
+    inside = true;
+  }
+  return out;
+}

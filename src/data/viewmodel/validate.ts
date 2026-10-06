@@ -1983,7 +1983,14 @@ const KIND_CHECKS: Readonly<Record<KnownBlockKind, KindCheck>> = Object.freeze({
       e.push(`${at}: "numberWidth" must be a positive integer (C25 I21a)`);
     }
   },
-  pills: (b, e, at) => requireArray(b, "chips", e, at),
+  pills: (b, e, at) => {
+    requireArray(b, "chips", e, at);
+    // **A boolean or absent** (C04 I151): `"yes"` would read as truthy to nothing
+    // and falsy to everything, and a row of answers drawn as chips is a row whose
+    // buttons are not buttons.
+    const buttons = b["buttons"];
+    if (buttons !== undefined && typeof buttons !== "boolean") e.push(`${at}: "buttons" must be a boolean (C04 I151)`);
+  },
   // **`chosen` is not required and is not checked against the set** (C09 I105).
   // A radio group with nothing chosen is the state a producer is in before the
   // reader has picked, and a checkbox row with two things on is the ordinary

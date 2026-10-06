@@ -324,8 +324,9 @@ describe("roadmap-status — the Order column's verifier", () => {
     // *anchored* and the row went red by one. **A third time with review
     // batch 2's M5** (169 → 243), which grew the question's refusal notice,
     // and a fourth with review batch 4's §7g (243 → 312), which split `ask`
-    // into `ask` and `show` for the question queue.
-    const anchoredCite = "`src/shell/confirm.ts:312`";
+    // into `ask` and `show` for the question queue, and a fifth with C23 §7h (312 → 306), which
+    // took the panel's chrome out of `confirm.ts` and drew the answers as one `pills` row.
+    const anchoredCite = "`src/shell/confirm.ts:306`";
     // Line 150 — inside the file, non-blank, and sixty lines clear of the
     // nearest symbol this cell names, so the *gate* has nothing to say about
     // it. A line past the end or on a blank one fails for the gate's own
@@ -342,7 +343,7 @@ describe("roadmap-status — the Order column's verifier", () => {
     // The control in the other direction: the same cell pointed back at a line
     // that does carry the symbol restores the count, so the counter is reading
     // the citation rather than the edit.
-    const back = run(mutate(anchoredCite, "`src/shell/confirm.ts:313`"));
+    const back = run(mutate(anchoredCite, "`src/shell/confirm.ts:307`"));
     expect(Number(/citation anchorage · (\d+)\//u.exec(back.out)?.[1]), "the control").toBe(anchored);
   });
 

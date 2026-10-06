@@ -127,8 +127,8 @@ const MUTATIONS = [
     // the choices are still gone.
     name: "the confirm appends the elision instead of replacing the payload",
     file: CONFIRM,
-    from: '        ? // ASCII, because this text is authored where the capability is not\n          // (C09 I22, F122) — the same reason C19 writes its indicator flat.\n          block({ kind: "raw", id: "confirm-elided", text: "..." })\n        : opts.detail,',
-    to: '        ? opts.detail\n        : opts.detail,',
+    from: 'block({ kind: "raw", id: "confirm-elided", text: "...", padding: { t: 1, l: 1 } })',
+    to: "opts.detail",
     expect: "T4.28",
   },
   {

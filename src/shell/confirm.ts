@@ -26,7 +26,7 @@ import type { Block } from "../data/viewmodel/types.js";
 import type { InputEvent, Verdict } from "../interaction/router/types.js";
 import type { Layer, OverlayManager, Placement } from "../viewport/overlay/index.js";
 import type { AskAnswer, AskOptions, Choice, QuestionOutcome } from "./local/registry.js";
-import { questionNotice, warnNotice } from "./documents.js";
+import { queuedNotice, questionNotice, warnNotice } from "./documents.js";
 import { questionConsumer, routingFor } from "./question-routing.js";
 import { cells } from "../presentation/text.js";
 import { createChoiceSelection, defaultStart, invalidChoices } from "./choice-selection.js";
@@ -289,56 +289,28 @@ function defaultChoice(choices: readonly Choice[]): Choice {
   return choices[defaultStart(choices)]!;
 }
 
-/**
- * The choices, as a table rather than as written text (entry 16 A5).
- *
- * **Three columns, and the first holds nothing but the marker.** A glyph is part
- * of a cell's width rather than an addition to it (`table/cells.ts:123`), so a
- * marker sharing the key's cell would shift the selected row two columns left of
- * the others — the alignment the `raw` form got by padding with a space.
- *
- * **The marker is `bullet` and it used to be `expand`, which is a collision the
- * `raw` form concealed.** C11 renders `expand`/`collapse` for a row that can be
- * opened (`table/cells.ts:91`), so `▸` inside a table row already means
- * *expandable* to the same renderer. While the choices were text nothing could
- * notice; as blocks the two meanings arrive in one place. `bullet` is what the
- * completion menu marks a selected row with, and one marker across the popups is
- * the drift this entry exists to close.
- *
- * And the capability is gone from this file with the written character: a `raw`
- * block carries text where a cell carries a slot, so L1 substitutes and L4 never
- * spells the glyph (C09 I22, F122).
- */
-function choiceBlock(choices: readonly Choice[], selected: number): Block {
-  return block({
-    kind: "table",
-    id: "confirm-choices",
-    padding: { t: 1 },
-    columns: [
-      { key: "mark", label: "", align: "left", priority: 3, minWidth: 1, sortable: false },
-      { key: "key", label: "", align: "left", priority: 2, minWidth: keyWidth(choices), sortable: false },
-      { key: "label", label: "", align: "left", priority: 1, minWidth: 1, flex: true, sortable: false },
-    ],
-    rows: choices.map((c, i) => ({
-      id: `confirm-choice-${c.key}`,
-      cells: {
-        mark: { text: "", ...(i === selected ? { glyph: "bullet" as const } : {}) },
-        key: { text: `[${c.key}]` },
-        label: { text: c.label },
-      },
-    })),
-    showHeader: false,
-  });
-}
+/** The id of the question's row of answers (C23 I104). */
+const CHOICES_ID = "confirm-choices";
 
-/** The widest `[k]`, so the labels line up whatever the accelerators are. */
-function keyWidth(choices: readonly Choice[]): number {
-  let widest = 1;
-  // narrow-ok — a choice's `key` is the keyboard key that selects it, so it
-  // is one ASCII character by construction (C15's confirm builder refuses
-  // anything a keystroke cannot produce).
-  for (const c of choices) widest = Math.max(widest, cells(c.key) + 2); // narrow-ok
-  return widest;
+/**
+ * The choices, as one row of buttons (C23 I104, §028, §051, §052, `R-BLK-573`).
+ *
+ * **A `pills` block drawn as buttons** (C09 I139), because the row has to wrap
+ * whole at a width this file is not told: a `group` row sheds a child it cannot
+ * place, and a shed answer is one the reader cannot be asked to choose
+ * (measured: four choices at 60 columns lost the fourth). The selection is not
+ * in the data. It is the render focus the host hands the layer (`focusedBox`),
+ * so a move of the selection changes what is drawn and not what is measured
+ * (C09 I2).
+ */
+function choiceBlock(choices: readonly Choice[]): Block {
+  return block<Block>({
+    kind: "pills",
+    id: CHOICES_ID,
+    buttons: true,
+    padding: { t: 1, l: 1 },
+    chips: choices.map((c) => ({ label: c.label })),
+  });
 }
 
 /**
@@ -433,29 +405,44 @@ function inspection(opts: AskOptions, rows: number, unicode: boolean, more = 0, 
  * notice's width and the question takes the rest — `clusters`' shape in the
  * footer.
  */
-function questionRow(opts: AskOptions, refused: boolean): Block {
+function questionRow(opts: AskOptions, refused: boolean, more: number, separator: string): Block {
   const question = questionNotice(opts.question, "confirm-question");
-  if (!refused) return question;
+  // **What sits beside the question, in the order it was asked of the reader**:
+  // the refusal, then the count of what waits (C23 I82, I91).
+  const beside: Block[] = [];
+  const flex: { cells: number }[] = [];
+  if (refused) {
+    beside.push(warnNotice(REFUSED_TEXT, "confirm-refused"));
+    // The glyph and its gap are two cells at both rungs (`▲ `, `! `).
+    // narrow-ok — REFUSED_TEXT is ASCII written here, so no ambiguous-width cell.
+    flex.push({ cells: cells(REFUSED_TEXT) + 2 }); // narrow-ok
+  }
+  if (more > 0) {
+    const queued = queuedNotice(more, separator, "confirm-queued");
+    beside.push(queued);
+    // narrow-ok — the separator is one cell at each rung and the count is digits.
+    flex.push({ cells: cells(`${separator} ${String(more)} more`) }); // narrow-ok
+  }
+  if (beside.length === 0) return question;
   return block<Block>({
     kind: "group",
     id: "confirm-question-row",
     direction: "row",
-    children: [question, warnNotice(REFUSED_TEXT, "confirm-refused")],
-    // The glyph and its gap are two cells at both rungs (`▲ `, `! `).
-    // narrow-ok — REFUSED_TEXT is ASCII written here, so no ambiguous-width cell.
-    flex: [1, { cells: cells(REFUSED_TEXT) + 2 }], // narrow-ok
+    children: [question, ...beside],
+    flex: [1, ...flex],
+    childGap: 2,
   });
 }
 
 function render(
   opts: AskOptions,
-  selected: number,
   cut = false,
   refused = false,
   more = 0,
   separator = "-",
+  replying = false,
 ): readonly Block[] {
-  const children: Block[] = [questionRow(opts, refused)];
+  const children: Block[] = [questionRow(opts, refused, more, separator)];
   // Ruling C's payload — what the answer will affect, shown with the question
   // rather than in the entry that follows it.
   if (opts.detail !== undefined) {
@@ -463,14 +450,15 @@ function render(
       cut
         ? // ASCII, because this text is authored where the capability is not
           // (C09 I22, F122) — the same reason C19 writes its indicator flat.
-          block({ kind: "raw", id: "confirm-elided", text: "..." })
-        : opts.detail,
+          block({ kind: "raw", id: "confirm-elided", text: "...", padding: { t: 1, l: 1 } })
+        : block<Block>({ kind: "group", id: "confirm-detail", direction: "column", padding: { t: 1, l: 1 }, children: [opts.detail] }),
     );
   }
 
-  children.push(choiceBlock(opts.choices, selected));
-
-  return [block({ kind: "panel", id: "confirm-panel", title: titleOf(more, separator), children })];
+  // **A reply has no choices drawn** (§052): the prompt is live beneath and the
+  // question is what the answer is *to*; `esc` goes back to the list (I89).
+  if (!replying) children.push(choiceBlock(opts.choices));
+  return children;
 }
 
 /**
@@ -548,6 +536,8 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
   let consumer: ReturnType<typeof questionConsumer> | null = null;
   /** The `reply…` choice the reader picked, or `null` — §101's third row. */
   let replying: Choice | null = null;
+  /** Which choice the open question's selection is on (C23 I104), or `null` when none is open. */
+  let selectedAt: (() => number) | null = null;
   /**
    * Whether the open question is **suspended** in an inspection (I75).
    *
@@ -599,13 +589,14 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
     const resolve = q.resolve;
     current = q;
     /** `render`, with the count of what waits behind this question (C23 I91). */
-    const draw = (sel: number, cut = false, refused = false): readonly Block[] =>
-      render(opts, sel, cut, refused, waiting.length, deps.separator?.());
+    const draw = (cut = false, refused = false): readonly Block[] =>
+      render(opts, cut, refused, waiting.length, deps.separator?.(), replying !== null);
 
     // The shared store, with this caller's start (entry 16). The cycling is
     // the menu's; the start is what differs, and it is supplied.
     const selection = createChoiceSelection(opts.choices.length, defaultStart(opts.choices));
     const selected = (): number => selection.at ?? 0;
+    selectedAt = selected;
     /** The choice a digit names on the linear route (C22 I122), or none. */
     const numberedPick = (name: string): Choice | undefined =>
       deps.numbered === true && /^[1-9]$/u.test(name) ? opts.choices[Number(name) - 1] : undefined;
@@ -621,7 +612,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       id: CONFIRM_LAYER_ID,
       kind: "overlay",
       ...placementOf(opts, deps),
-      content: draw(selected()),
+      content: draw(),
       blocking: routing.blocking,
       dismissal: routing.dismissal,
       // **Declared, not inferred** (C15 I29, C16 I63, R-QST-001): *a question
@@ -656,7 +647,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
     // (entry 16 R2). See `collapsed`.
     if (truncated(deps)) {
       cut = true;
-      deps.overlays.update(CONFIRM_LAYER_ID, { content: draw(selected(), true) });
+      deps.overlays.update(CONFIRM_LAYER_ID, { content: draw(true) });
     }
     /** A reply the reader left with `esc`, kept for the next `reply…` (C23 I89). */
     let kept: unknown = null;
@@ -693,6 +684,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       refuseOpen = null;
       vocabularyOpen = null;
       meaning = null;
+      selectedAt = null;
       consumer = null;
       replying = null;
       suspended = false;
@@ -751,7 +743,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       }
       const at = deps.anchor();
       deps.overlays.update(CONFIRM_LAYER_ID, {
-        content: draw(selected(), cut, refused),
+        content: draw(cut, refused),
         placement: { kind: "anchored", row: at.row, rows: at.rows, prefer: "above" },
       });
       deps.invalidate();
@@ -811,7 +803,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       routing = routingFor(consumer);
       const placed = placementOf(opts, deps);
       deps.overlays.update(CONFIRM_LAYER_ID, {
-        content: draw(selected(), cut, refused),
+        content: draw(cut, refused),
         placement: placed.placement,
         ...(placed.width === undefined ? {} : { width: placed.width }),
       });
@@ -825,7 +817,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
     };
 
     const redraw = (): boolean => {
-      deps.overlays.update(CONFIRM_LAYER_ID, { content: draw(selected(), cut, refused) });
+      deps.overlays.update(CONFIRM_LAYER_ID, { content: draw(cut, refused) });
       deps.invalidate();
       return true;
     };
@@ -847,13 +839,13 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
     const refuse = (): void => {
       if (refused || suspended || replying !== null) return;
       refused = true;
-      deps.overlays.update(CONFIRM_LAYER_ID, { content: draw(selected(), cut, true) });
+      deps.overlays.update(CONFIRM_LAYER_ID, { content: draw(cut, true) });
       // **The notice can take the row the choices needed** — a long question
       // beside it wraps once more. The same second pass as at `ask`, and the
       // only case this spends a second update on.
       if (!cut && truncated(deps)) {
         cut = true;
-        deps.overlays.update(CONFIRM_LAYER_ID, { content: draw(selected(), true, true) });
+        deps.overlays.update(CONFIRM_LAYER_ID, { content: draw(true, true) });
       }
       deps.invalidate();
     };
@@ -863,7 +855,7 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
       deps.overlays.update(CONFIRM_LAYER_ID, {
         content: suspended
           ? inspection(opts, interior, deps.unicode?.() ?? true, waiting.length, deps.separator?.())
-          : draw(selected(), cut, refused),
+          : draw(cut, refused),
       });
     };
     vocabularyOpen = () => ({
@@ -996,9 +988,12 @@ export function createConfirmHost(deps: ConfirmDeps): ConfirmHost {
 
   return {
     focusedBox(id) {
-      return suspended && handler !== null && id === CONFIRM_LAYER_ID
-        ? { blockId: INSPECTION_BOX_ID, rowId: null }
-        : null;
+      if (handler === null || id !== CONFIRM_LAYER_ID) return null;
+      if (suspended) return { blockId: INSPECTION_BOX_ID, rowId: null };
+      // **The selection is a render focus** (C23 I104): the button it is on is
+      // drawn focused, and in a reply there are no buttons to point at.
+      const on = replying === null ? selectedAt?.() : undefined;
+      return on === undefined ? null : { blockId: CHOICES_ID, rowId: `chip-${String(on)}` };
     },
 
     get open() {

@@ -1374,9 +1374,3 @@ describe("C09 §7f — the scrollbar", () => {
     expect(at("wide"), "and two each at wide, which is this tree and not the property").toEqual([2, 2, 2, 2]);
   });
 });
-
-describe("C09 I139 — a pills row of buttons, owed at the spec commit", () => {
-  it.todo(
-    "T1.153 (C09 I139, I102, C04 I151, R-BLK-573): the three rungs read by cell, with pick and pickInk bold and the chevron inside the ground on the focused chip, bracketed chips at ASCII and an inverse bracketed chip at 1-bit, and whole chips wrapping with every label drawn and measure equal to the rows — not deferred on a component: the same round's code commit replaces it",
-  );
-});

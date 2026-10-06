@@ -8,18 +8,18 @@ import { describe, expect, it } from "vitest";
 import { validateDocument, TRAIL_FORMS } from "../../src/data/viewmodel/index.js";
 import type { Block, Notice } from "../../src/data/viewmodel/index.js";
 import { OneShots } from "../../src/shell/one-shots.js";
-import { measurable, visible, FULL_CAPS, DARK_THEME } from "../support/render.js";
+import { measurable, visible, FULL_CAPS, DARK_THEME, ASCII_CAPS as ASCII_CAPS_ROW, MONO_UNICODE_CAPS as MONO_UNICODE_CAPS_ROW } from "../support/render.js";
 import { cells, truncate } from "../../src/presentation/text.js";
 import { capabilities } from "../support/fake-terminal.js";
 import { spinnerFrames } from "../../src/presentation/blocks/glyphs.js";
-import { background, slot } from "../../src/presentation/blocks/paint.js";
+import { background, slot, tone as toneStyle } from "../../src/presentation/blocks/paint.js";
 import { sgr } from "../../src/terminal/escapes.js";
 
 /** The SGR parameters a style resolves to, as `styled-screen` records them. */
 const sgrParams = (style: Parameters<typeof sgr>[0]): string =>
   sgr(style).replace(/^\u001b\[/u, "").replace(/m$/u, "");
 import { tickIntervalOf } from "../../src/presentation/blocks/index.js";
-import { applySgr, styledScreenFrom, type CellStyle } from "../support/styled-screen.js";
+import { applySgr, styledScreenFrom, washRuns, type CellStyle } from "../support/styled-screen.js";
 import { rampStyle, resolveTone } from "../../src/presentation/theme/index.js";
 import { nearestAnsi256 } from "../../src/presentation/theme/colormap.js";
 import type { Ramp, Tone } from "../../src/data/viewmodel/index.js";
@@ -554,6 +554,114 @@ describe("C09 §073 — the button's three rungs", () => {
     const grid = gridOf(head as Notice);
     expect(grid[0]!.some((c) => c.style.bg !== ""), "a call head takes no ground").toBe(false);
     expect(runOf(gridOf(button())).painted, "and the same notice with an action does").not.toBe("");
+  });
+
+  /** A `pills` row of three answers, as the confirm host draws them (C23 I104). */
+  const ROW = (over: object = {}): Block =>
+    ({
+      kind: "pills",
+      id: "row",
+      buttons: true,
+      chips: [{ label: "approve" }, { label: "deny" }, { label: "show full diff" }],
+      ...over,
+    }) as unknown as Block;
+  const rowGrid = (b: Block, caps = FULL_CAPS, focus?: unknown, width = 60) => {
+    const kit = measurable({ capabilities: caps, ...(focus === undefined ? {} : { focus }) } as never);
+    const lines = kit.renderToLines(b, width);
+    return styledScreenFrom(lines.map((l, i) => (i === 0 ? l : `\r\n${l}`)), { columns: width, rows: lines.length });
+  };
+  const washes = washRuns;
+  const rowText = (grid: ReturnType<typeof rowGrid>, row = 0): string =>
+    (grid[row] ?? []).map((c) => c.ch).join("").replace(/\s+$/u, "");
+  const ON = { blockId: "row", rowId: "chip-1" };
+
+  it("T1.153 (C09 I139, I102, C04 I151, §073): a pills row of buttons — the three rungs by cell, and whole chips wrapping with every label drawn", () => {
+    // **Ground rung.** The chip the focus names is `pick` with `pickInk`, bold, `›`
+    // inside the ground; the others are `bgElev`, a cell either side of the label.
+    const grid = rowGrid(ROW(), FULL_CAPS, ON);
+    const runs = washes(grid);
+    expect(runs.map((r) => r.text), "the chips are the labels with one cell either side, and `›` inside the focused one").toEqual([
+      " approve ",
+      " › deny ",
+      " show full diff ",
+    ]);
+    expect(runs[1]!.bg, "the focused chip takes `pick`").toBe(sgrParams(background("surface.pick", DARK_THEME, FULL_CAPS)));
+    expect(runs[1]!.fg, "with `pickInk`").toBe(sgrParams(slot("surface.pickInk", DARK_THEME, FULL_CAPS)));
+    expect(runs[1]!.attrs, "bold").toContain(1);
+    expect(runs[0]!.bg, "the others are `bgElev`").toBe(sgrParams(background("surface.bgElev", DARK_THEME, FULL_CAPS)));
+    expect(runs[2]!.bg).toBe(runs[0]!.bg);
+    expect(rowText(grid), "two cells between the washes — each wash is padded, so four between the labels").toBe(" approve    › deny    show full diff");
+
+    // **With no focus on the block every chip is at rest** — the focus is the
+    // render's and a block naming another id selects nothing.
+    expect(washes(rowGrid(ROW(), FULL_CAPS, { blockId: "other", rowId: "chip-1" })).map((r) => r.text)).toEqual([
+      " approve ",
+      " deny ",
+      " show full diff ",
+    ]);
+
+    // **ASCII**: every chip bracketed, and no `›`.
+    expect(rowText(rowGrid(ROW(), ASCII_CAPS_ROW, ON))).toBe("[ approve ]  [ deny ]  [ show full diff ]");
+
+    // **1-bit with Unicode** — the rung the claim is about: brackets, and the
+    // focused chip alone inverse. `›` has no place in a bracketed chip.
+    const mono = rowGrid(ROW(), MONO_UNICODE_CAPS_ROW, ON);
+    expect(rowText(mono)).toBe("[ approve ]  [ deny ]  [ show full diff ]");
+    const inverse = (grid: ReturnType<typeof rowGrid>): string[] => {
+      const out: string[] = [];
+      let cur = "";
+      for (const c of grid[0] ?? []) {
+        if (c.style.attrs.includes(7)) cur += c.ch;
+        else if (cur !== "") {
+          out.push(cur);
+          cur = "";
+        }
+      }
+      return cur === "" ? out : [...out, cur];
+    };
+    expect(inverse(mono), "at 1-bit one chip is inverse, and it is the focused one").toEqual(["[ deny ]"]);
+
+    // **A chip's tone is the button's ink at rest** — the destructive pair §073
+    // draws, green to go and red to stop. Without this row a button that ignored
+    // its chip's tone would pass every assertion above.
+    const toned = washes(rowGrid(ROW({ chips: [{ label: "approve", tone: "ok" }, { label: "deny" }] }), FULL_CAPS));
+    expect(toned[0]!.fg, "the toned chip's ink is its tone").toBe(
+      sgrParams(toneStyle("ok", DARK_THEME, FULL_CAPS, "bgElev")),
+    );
+    expect(toned[1]!.fg, "and an untoned one is the default ink").toBe(
+      sgrParams(toneStyle("default", DARK_THEME, FULL_CAPS, "bgElev")),
+    );
+    expect(toned[0]!.fg, "which is a different ink").not.toBe(toned[1]!.fg);
+
+    // **The control**: the same chips without `buttons` are chips at every rung.
+    const chips = rowGrid(ROW({ buttons: undefined }), ASCII_CAPS_ROW, ON);
+    expect(rowText(chips), "no brackets").toBe("approve  deny  show full diff");
+    expect(washes(rowGrid(ROW({ buttons: undefined }), FULL_CAPS)), "and no ground at rest").toEqual([]);
+  });
+
+  it("T1.153b (C09 I139, I2, C04 I151, I20): whole chips wrap, none is shed, and measure is the rows rendered at every width", () => {
+    // Sizes are `label + 4`: 11, 8 and 18 with two gaps of two — 41 cells.
+    const kit = measurable();
+    expect(kit.measure(ROW(), 41), "fits in one row at 41").toBe(1);
+    expect(kit.measure(ROW(), 40), "one cell short, the third wraps").toBe(2);
+    const wrapped = rowGrid(ROW(), FULL_CAPS, undefined, 40);
+    expect(rowText(wrapped, 0), "two chips on the first row").toBe(" approve    deny");
+    expect(rowText(wrapped, 1), "and the third whole on the second").toBe(" show full diff");
+
+    // From the widest chip: a chip wider than the row is clamped to it (`pillsDefinition`), which is
+    // the kind's own limit and not this form's.
+    for (let width = 18; width <= 60; width += 1) { // cells-ok — a width sweep
+      const promised = kit.measure(ROW(), width);
+      for (const caps of [FULL_CAPS, ASCII_CAPS_ROW, MONO_UNICODE_CAPS_ROW]) {
+        const drawn = measurable({ capabilities: caps }).renderToLines(ROW(), width);
+        expect(drawn.length, `rows at ${String(width)} match the one measure`).toBe(promised);
+        const text = drawn.map(visible).join("\n");
+        for (const label of ["approve", "deny", "show full diff"]) {
+          expect(text, `"${label}" is drawn at ${String(width)}`).toContain(label);
+        }
+        for (const line of drawn) expect(cells(visible(line)), `no row overruns ${String(width)}`).toBeLessThanOrEqual(width);
+      }
+    }
   });
 });
 

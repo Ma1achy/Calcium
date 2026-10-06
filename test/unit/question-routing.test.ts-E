@@ -413,7 +413,7 @@ describe("C23 I88 — an inspection owns scrolling its payload, owed at the spec
     press("down");
     press("down");
     expect(press("escape")).toBe(true);
-    expect(confirm.focusedBox("confirm")?.blockId, "no box has the keys at the choices — the answers have the focus ((C23 I104))").toBe(
+    expect(confirm.focusedBox("confirm")?.blockId, "no box has the keys at the choices — the answers have the focus (I104)").toBe(
       "confirm-choices",
     );
     press("s");

@@ -3348,6 +3348,14 @@ export type Pills = Readonly<{
     action?: Action;
     active?: boolean;
   }>[];
+  /**
+   * Draw each chip as a **button** (C09 I139, §073 `R-BLK-573`, §028): `bgElev` at
+   * rest, `pick` with `›` inside it where the render focus is, and `[ ]` where no
+   * ground resolves. Absent is a chip. The geometry is the button's — each chip
+   * `label + 4` cells, whole chips wrapping and none shed — so a producer that
+   * wants a row of answers gets the row without writing its own wrap.
+   */
+  buttons?: boolean;
 }> & Padded & Floor;
 
 /**

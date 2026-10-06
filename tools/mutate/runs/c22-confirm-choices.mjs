@@ -10,8 +10,13 @@
 // destructive verb's confirm on `yes`. A safety defect where the replaced one
 // was a navigation defect.
 //
-// The rest attack the joint the block form created: a marker that is now a slot
-// in a cell rather than a character this file wrote.
+// The rest attack the joint the block form created: a marker that is a slot
+// rather than a character this file wrote. **They were rewritten for C23 I104**
+// (§028): the choices stopped being a table with a `bullet` column and became one
+// `pills` row of buttons, so the four mutations that named the table's columns
+// have no anchor, and what replaces them are the mutations the new form has —
+// the selection as a render focus, the lead's glyph and tone, the reply drawing
+// no answers, and the first draft of the answers, a `group` row that shed a choice.
 //
 // A mutation that fails nothing indicts the tests or the prose, not the code.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -20,9 +25,10 @@ import { execSync } from "node:child_process";
 import { report, runPass } from "../mutate.mjs";
 
 const ROOT = process.cwd();
-const CMD = "npx vitest run test/integration/confirm.test.ts";
+const CMD = "npx vitest run test/integration/confirm.test.ts test/unit/question-queue.test.ts";
 const CONFIRM = "src/shell/confirm.ts";
 const SELECTION = "src/shell/choice-selection.ts";
+const DOCUMENTS = "src/shell/documents.ts";
 
 const read = (f) => readFileSync(`${ROOT}/${f}`, "utf8");
 const write = (f, s) => writeFileSync(`${ROOT}/${f}`, s);
@@ -80,50 +86,88 @@ const MUTATIONS = [
     expect: "T4.32",
   },
   {
-    // **The marker shares the key's cell.** A glyph is part of a cell's width
-    // rather than an addition to it, so the marked row shifts two columns left
-    // of the others. Every count agrees; only the rows read against each other
-    // disagree.
-    name: "the marker goes in the key's cell instead of its own column",
+    // **The selection stops being the render focus**: the chip named is the first
+    // whichever answer the reader is on. Arrows still move the store, `⏎` still
+    // answers the right choice, every key-path row agrees — and the wash sits on
+    // the first answer, which for `deny`-first is right and for any other order
+    // points the reader at a choice they are not on.
+    name: "the render focus names the first chip rather than the selection's",
     file: CONFIRM,
-    from: '        mark: { text: "", ...(i === selected ? { glyph: "bullet" as const } : {}) },\n        key: { text: `[${c.key}]` },',
-    to: '        mark: { text: "" },\n        key: { text: `[${c.key}]`, ...(i === selected ? { glyph: "bullet" as const } : {}) },',
-    expect: "T4.14",
+    from: "rowId: `chip-${String(on)}`",
+    to: "rowId: `chip-0`",
+    expect: "T1.109",
   },
   {
-    // **The character written here again.** The form the block replaced, with
-    // the capability gone — so it compiles, draws correctly on a Unicode
-    // terminal, and puts a `•` on a `LANG=C` one. F122's defect restored
-    // through the door the merge closed.
-    name: "the marker is a written character rather than a slot",
+    // **The answers lose their `buttons` flag**, and are chips again: the data is
+    // the same labels in the same order, so only a row that reads the field or
+    // the wash can tell.
+    name: "the answers are chips and not buttons",
     file: CONFIRM,
-    from: '        mark: { text: "", ...(i === selected ? { glyph: "bullet" as const } : {}) },',
-    to: '        mark: { text: i === selected ? "\\u2022" : "" },',
-    expect: "T4.13",
+    from: "    buttons: true,\n    padding: { t: 1, l: 1 },",
+    to: "    padding: { t: 1, l: 1 },",
+    expect: "T1.108",
   },
   {
-    // **`expand` restored as the marker.** The glyph this file used while the
-    // choices were text, and a collision the `raw` form concealed: C11 renders
-    // `expand` for a row that can be opened, so `▸` inside a table row already
-    // means *expandable* to the same renderer.
-    name: "the marker is expand, as it was before the block form",
+    // **The first draft of the answers, restored**: a `group` row of buttons. It
+    // draws the figure at 80 columns and **sheds the fourth of four at 60** — a
+    // `group` places the children that fit and drops the rest, and nothing on the
+    // screen says so. The row that holds it reads the narrow frame.
+    name: "THE DEFECT: the answers are a group row, which sheds a choice it cannot place",
     file: CONFIRM,
-    from: '{ glyph: "bullet" as const }',
-    to: '{ glyph: "expand" as const }',
-    expect: "T4.13",
+    from: '    kind: "pills",\n    id: CHOICES_ID,\n    buttons: true,\n    padding: { t: 1, l: 1 },\n    chips: choices.map((c) => ({ label: c.label })),',
+    to: '    kind: "group",\n    id: CHOICES_ID,\n    direction: "row",\n    padding: { t: 1, l: 1 },\n    childGap: 2,\n    children: choices.map((c) => block({ kind: "notice", id: `x-${c.key}`, tone: "default", text: c.label, action: { kind: "fill", label: c.label, command: c.key } })),\n    flex: choices.map((c) => ({ cells: c.label.length + 4 })),',
+    expect: "T4.109",
   },
   {
-    // **The key column's floor taken from one key.** Two-character
-    // accelerators are legal — `AskOptions` puts no width on `key` — and a
-    // floor of 3 truncates whichever is longer, which reads as a rendering
-    // flicker rather than as a width defect. C19's menu carries the same
-    // argument for its glyph.
-    name: "the key column's floor is a constant rather than the widest",
+    // **A reply draws the answers under the prompt it has just made live.** The
+    // question then offers choices to someone typing a sentence, and `esc` is the
+    // only way back that the screen does not mention.
+    name: "a reply still draws the answers",
     file: CONFIRM,
-    from: "minWidth: keyWidth(choices)",
-    to: "minWidth: 3",
-    expect: "T4.16",
+    from: "  if (!replying) children.push(choiceBlock(opts.choices));",
+    to: "  children.push(choiceBlock(opts.choices));",
+    expect: "T4.110",
   },
+  {
+    // **The count before the refusal.** Both are on the question's row and the
+    // order is a ruling: the refusal answers the key just pressed, the count is a
+    // standing fact. Swapping them draws every cell and fails only the row that
+    // reads their order.
+    name: "the count sits before the refusal on the question's row",
+    file: CONFIRM,
+    from: "  const flex: { cells: number }[] = [];",
+    to: "  const flex: { cells: number }[] = [];\n  if (more > 0 && refused) { beside.push(queuedNotice(more, separator, \"confirm-queued\")); flex.push({ cells: cells(`${separator} ${String(more)} more`) }); more = 0; }",
+    expect: "T4.110",
+  },
+  {
+    // **The lead is `▲` again.** The tree's old form, and `warn`'s glyph where
+    // `question`'s belongs: the notice is the same tone and the same words, and
+    // only the character is wrong — which is the character the registry names.
+    name: "the lead is the warning's glyph rather than the question's",
+    file: DOCUMENTS,
+    from: '    glyph: "question",',
+    to: '    glyph: "warn",',
+    expect: "T1.108",
+  },
+  {
+    // **The words take the lead's tone.** One span too few and the question reads
+    // in `warn` throughout, which is §028's `⟩` and its sentence in one colour.
+    name: "the question's words lose their default span",
+    file: DOCUMENTS,
+    from: '    spans: text === "" ? [] : [{ from: 0, to: text.length, tone: "default" }], // cells-ok — a code-unit offset',
+    to: "    spans: [],",
+    expect: "T1.108",
+  },
+  {
+    // **The question gets its panel back.** Everything inside is the same, and
+    // the form is the one the design does not draw.
+    name: "the question is wrapped in a panel again",
+    file: CONFIRM,
+    from: "  if (!replying) children.push(choiceBlock(opts.choices));\n  return children;",
+    to: '  if (!replying) children.push(choiceBlock(opts.choices));\n  return [block({ kind: "panel", id: "confirm-panel", title: titleOf(more, separator), children })];',
+    expect: "T1.108",
+  },
+
 ];
 
 /**
@@ -148,8 +192,8 @@ const results = await runPass({
   run,
   control: {
     file: CONFIRM,
-    from: "    rows: choices.map((c, i) => ({",
-    to: "    rows: [].map((c, i) => ({",
+    from: "    chips: choices.map((c) => ({ label: c.label })),",
+    to: "    chips: [],",
     why:
       "no choice reaches the frame at all — if this survives, nothing in the set reads " +
       "the rendering and every kill below is unearned",
