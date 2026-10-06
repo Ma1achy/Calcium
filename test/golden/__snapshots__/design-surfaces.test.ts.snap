@@ -587,7 +587,7 @@ aaaaaaaaaaaa.................................... which is why
 AAAAAAAAAAA............................. [ Approve ]
   A = bg 48;2;46;46;46
 
-── §19 · the resolved keymap, the reader's own rung first — 157 bindings across 10 scopes · the registry's current 69
+── §19 · the resolved keymap, the reader's own rung first — 159 bindings across 10 scopes · the registry's current 71
 -- prompt — where you are               
 Enter        submit
 S-Enter      insertNewline
@@ -702,6 +702,8 @@ Esc       dismiss
 C-r       searchOlder
 M-S-Up    previewScrollUp
 M-S-Down  previewScrollDown
+M-k       previewScrollUp
+M-j       previewScrollDown
 M-o       previewOpen
 -- interaction                          
 Left   insideLeft
@@ -1349,7 +1351,7 @@ aaaaaaaaaaaa.................................... which is why
 AAAAAAAAAAA..................................................................... [ Approve ]
   A = bg 48;2;46;46;46
 
-── §19 · the resolved keymap, the reader's own rung first — 157 bindings across 10 scopes · the registry's current 69
+── §19 · the resolved keymap, the reader's own rung first — 159 bindings across 10 scopes · the registry's current 71
 -- prompt — where you are                                                       
 Enter        submit
 S-Enter      insertNewline
@@ -1464,6 +1466,8 @@ Esc       dismiss
 C-r       searchOlder
 M-S-Up    previewScrollUp
 M-S-Down  previewScrollDown
+M-k       previewScrollUp
+M-j       previewScrollDown
 M-o       previewOpen
 -- interaction                                                                  
 Left   insideLeft
@@ -2059,7 +2063,7 @@ raw             0     — atomic: nothing to focus
 · focused — the chosen pair, and \`›\` INSIDE the ground rather than before it
 ........................................ [ Approve ]
 
-── §19 · the resolved keymap, the reader's own rung first — 157 bindings across 10 scopes · the registry's current 69
+── §19 · the resolved keymap, the reader's own rung first — 159 bindings across 10 scopes · the registry's current 71
 ── prompt — where you are               
 ⏎       submit
 ⇧⏎      insertNewline
@@ -2174,6 +2178,8 @@ esc  dismiss
 ⌃R   searchOlder
 ⌥⇧↑  previewScrollUp
 ⌥⇧↓  previewScrollDown
+⌥k   previewScrollUp
+⌥j   previewScrollDown
 ⌥o   previewOpen
 ── interaction                          
 ←    insideLeft
@@ -2760,7 +2766,7 @@ raw             0     — atomic: nothing to focus
 · focused — the chosen pair, and \`›\` INSIDE the ground rather than before it
 ................................................................................ [ Approve ]
 
-── §19 · the resolved keymap, the reader's own rung first — 157 bindings across 10 scopes · the registry's current 69
+── §19 · the resolved keymap, the reader's own rung first — 159 bindings across 10 scopes · the registry's current 71
 ── prompt — where you are                                                       
 ⏎       submit
 ⇧⏎      insertNewline
@@ -2875,6 +2881,8 @@ esc  dismiss
 ⌃R   searchOlder
 ⌥⇧↑  previewScrollUp
 ⌥⇧↓  previewScrollDown
+⌥k   previewScrollUp
+⌥j   previewScrollDown
 ⌥o   previewOpen
 ── interaction                                                                  
 ←    insideLeft
@@ -3531,7 +3539,7 @@ AAAAAAAAA...............................  Approve
 AAAAAAAAAAA.............................  › Approve
   A = bg 48;2;232;168;124
 
-── §19 · the resolved keymap, the reader's own rung first — 157 bindings across 10 scopes · the registry's current 69
+── §19 · the resolved keymap, the reader's own rung first — 159 bindings across 10 scopes · the registry's current 71
 ── prompt — where you are               
 ⏎       submit
 ⇧⏎      insertNewline
@@ -3646,6 +3654,8 @@ esc  dismiss
 ⌃R   searchOlder
 ⌥⇧↑  previewScrollUp
 ⌥⇧↓  previewScrollDown
+⌥k   previewScrollUp
+⌥j   previewScrollDown
 ⌥o   previewOpen
 ── interaction                          
 ←    insideLeft
@@ -4294,7 +4304,7 @@ AAAAAAAAA.......................................................................
 AAAAAAAAAAA.....................................................................  › Approve
   A = bg 48;2;232;168;124
 
-── §19 · the resolved keymap, the reader's own rung first — 157 bindings across 10 scopes · the registry's current 69
+── §19 · the resolved keymap, the reader's own rung first — 159 bindings across 10 scopes · the registry's current 71
 ── prompt — where you are                                                       
 ⏎       submit
 ⇧⏎      insertNewline
@@ -4409,6 +4419,8 @@ esc  dismiss
 ⌃R   searchOlder
 ⌥⇧↑  previewScrollUp
 ⌥⇧↓  previewScrollDown
+⌥k   previewScrollUp
+⌥j   previewScrollDown
 ⌥o   previewOpen
 ── interaction                                                                  
 ←    insideLeft
