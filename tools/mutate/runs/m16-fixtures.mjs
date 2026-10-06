@@ -92,7 +92,7 @@ const results = runPass({
       file: TOOL,
       from: '      out.push({ section: r.section, target, unlocated: true, reason: "" });\n      continue;',
       to: "      continue;",
-      expect: "T1.7",
+      expect: "T1.11",
     },
     {
       // **Every heading is the section's**: the locator takes the whole
@@ -110,7 +110,7 @@ const results = runPass({
       file: TOOL,
       from: "  return found ? out : null;",
       to: "  return out;",
-      expect: "T1.7",
+      expect: "T1.11",
     },
     {
       // **A range read as its first line**: the figure shrinks and its marks
@@ -164,7 +164,7 @@ const results = runPass({
       name: "DATA: a reason blanked",
       file: ALLOWED,
       from:
-        '"reason": "plot-forms.test.ts is indexed by plot form and capability rung (`bar · full · 80`), not by the design\'s sections"',
+        "\"reason\": \"The figure draws one collapsed head and one open head with a `│` rail; the frame draws the `tree` kind, the nearest built shape (there is no reasoning kind). The marks agree; the difference is the em dash in the figure's `collapsed — the default` annotation, which is the figure's caption and not a drawn mark\"",
       to: '"reason": ""',
       expect: "T1.8",
     },

@@ -32,7 +32,8 @@
  * out. T1.7 asks what the probe stood in for — does the frame draw what the
  * figure draws — and the probes stay in the column as a reader's pointer.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -219,5 +220,45 @@ describe("M16 — the design fixtures, mapped", () => {
     expect(rungWidth([80, 40], figureWidth(wide)), "the narrowest golden that holds it").toBe(80);
     expect(rungWidth([80, 40], 40), "a figure exactly the width takes that golden").toBe(40);
     expect(rungWidth([80, 40], 81), "and wider than every golden takes the widest").toBe(80);
+  });
+
+  it("T1.11 (M16.1, F1466): a framed row whose golden has no heading for it is unlocated, and one whose heading is there and whose marks differ is a located difference", () => {
+    // **Constructed, because the corpus emptied the arm.** F1466 drew all 58
+    // framed fixtures under their headings, so no real row is unlocated any
+    // more and two mutations of `differences` (an unlocated frame read as no
+    // difference; a missing heading read as an empty frame) survived `T1.7` —
+    // nothing in the tree reached them. A root of its own does: one framed row
+    // over a snapshot that holds a frame for section 2 and none for section 1.
+    const root = mkdtempSync(join(tmpdir(), "m16-"));
+    try {
+      mkdirSync(join(root, "test/golden/__snapshots__"), { recursive: true });
+      mkdirSync(join(root, "docs/design/language/fixtures"), { recursive: true });
+      const row = (n: number) => `| ${String(n)} | surface | \`probe\` | \`design-surfaces.test.ts\` | 1 | a figure |`;
+      writeFileSync(
+        join(root, MAP),
+        `## The table\n\n${row(1)}\n${row(2)}\n\n## The two with no fixture\n`,
+      );
+      writeFileSync(
+        join(root, "docs/design/language/fixtures/INDEX.json"),
+        JSON.stringify([{ section: 1, file: "a.txt" }, { section: 2, file: "b.txt" }]),
+      );
+      writeFileSync(join(root, "docs/design/language/fixtures/a.txt"), "● one\n");
+      writeFileSync(join(root, "docs/design/language/fixtures/b.txt"), "● two\n");
+      // Section 2's frame draws `✓` where the figure draws `●`; section 1 has no heading at all.
+      writeFileSync(
+        join(root, "test/golden/__snapshots__/design-surfaces.test.ts.snap"),
+        "exports[`g > dark-unicode at 80 1`] = `\n\"── §2 · two\n✓ two\"\n`;\n",
+      );
+      const found = differences(root);
+      expect(found.map((d) => d.section), "both rows are differences").toEqual([1, 2]);
+      expect("unlocated" in found[0]!, "§1 has no heading, so it is unlocated").toBe(true);
+      expect(found[1], "§2 is located and names its marks").toMatchObject({
+        section: 2,
+        figureOnly: ["● U+25CF"],
+        frameOnly: ["✓ U+2713"],
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
