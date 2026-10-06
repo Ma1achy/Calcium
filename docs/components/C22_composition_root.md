@@ -2976,7 +2976,7 @@ is a table (C18 §8a's shape). The rows are the cells where two rules could both
 
 | # | sequence | what is on screen | the rule it forced |
 |---|---|---|---|
-| 1 | a 47-line paste at a 20-row region | the preview: title, a box of `floor(20 / 2) − 3 = 7` rows with a bar, and `⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor` | the box's height is C15's own fraction less the panel's chrome, so the layer is never cut (I143) |
+| 1 | a 47-line paste at a 20-row region | the preview: title, a box of `floor(20 / 2) − 3 = 7` rows with a bar, and `⌥⇧↑↓ scroll  ⌥o open in editor` | the box's height is C15's own fraction less the panel's chrome, so the layer is never cut (I143) |
 | 2 | row 1, then `⌥⇧↓` three times | lines 4–10; the thumb moved | the offset is `layer:chip-preview`'s, and the chrome cache keys on it (I141) — keyed by content alone, the frame would not move |
 | 3 | row 2, the caret moves to chip `#2` | `#2` from its top | a new chip is a new document: the namespace goes with the old one (I143) |
 | 4 | row 2, the caret leaves the chips | no preview; back on `#1`, it opens at its top | dismissal deletes the namespace (I141) |
@@ -3031,9 +3031,14 @@ Taken while building group A, each against something the tree already does:
 9. **An editor's added final newline is dropped** (I144). `vi` and most editors end a file with
    one, so a paste without one came back a line longer and never *unchanged* — row 8 of the trace
    could not happen. One newline the content did not have is the file's, not the paste's.
-10. **A pair's chord keeps both spellings: `⌥⇧↑⌥⇧↓`** (I143). A collapsed `⌥⇧↑↓` was tried and
-    broke `⇧↑⇧↓ extend` in the shipped key rows (C22 T1.50, T1.80, T1.171, T1.46b); *the repo is
-    right about what ships*, so the pair rule stays `chordText`'s and 6q.3 row 1 is respelled.
+10. **A run of arrows under one modifier set names the modifiers once: `⌥⇧↑↓`** (I143, b5-forms,
+    §101, §016). The design writes `⇧↑↓ select` and `⌥⇧↑↓`, never `⇧↑⇧↓`: *the design is normative
+    for appearance*. An earlier ruling kept both spellings because a collapse broke `⇧↑⇧↓ extend`
+    in the shipped key rows (C22 T1.50, T1.80, T1.171, T1.46b), which was *the repo is right about
+    what ships* used against a rule written for exactly this. Those rows are respelled with it. The
+    collapse is `chrome.ts`'s `hint` and is narrow: every member an arrow and every member the same
+    non-empty modifiers, so `⌥↑⌥↓`-style pairs of unlike chords and the ASCII rung (`S-Up/S-Down`)
+    are unchanged.
 11. **An inspection's box is sized to the prompt's slot** (C23 I88). A replacing question is drawn
     there (C23 I74, I142), and S01 §3 caps the slot at half the terminal; the region is the height
     of a place the question is not drawn. `promptCap` is the frame's function, read by both.
@@ -3166,7 +3171,7 @@ ground, which holds at rest, and a trace for the preview and the search, which c
    §6l.12's superseded paragraph left it out because the motion needs no binding of the preview's.
    *A consistent picture beats a lone rule*: the binding exists — it is the prompt's — and the
    legend names it. The three chords stay as `R-KEY-010` and the `preview.*` bindings spell them,
-   `⌥⇧↑⌥⇧↓` and `⌥o`, not the specimen's `↑↓` and `⏎`: *structured data beats prose*, and
+   `⌥⇧↑↓` and `⌥o`, not the specimen's `↑↓` and `⏎`: *structured data beats prose*, and
    `⏎` sends (I51).
 5. **Find is C20 I30's**: the upper rule, no `width`, the caret on row 1.
 6. **The transcript half is unchanged** (§6l.12): the general peek, which draws for any element
@@ -4117,7 +4122,7 @@ PTY harness.
 - **T4.115** (I142, C23 I74): an approval replacing the prompt, suspended into its inspection; a wheel over the prompt's rows moves the box, and a wheel over the middle of the region moves no box and answers nothing — the transcript beneath takes it (6q.2).
 - **T6.142** (I141): `layerRows` handed no `scrollOffsets` → **T1.174** fails on the scrolled arm, which draws lines 1–4 at every offset. `tools/mutate/runs/c22-layer-scroll.mjs`.
 - **T6.143** (I142): the pointer's `placed` unfiltered again → **T4.115** fails: the wheel over the prompt's rows reaches no layer.
-- **T1.175** (I143, ruling 53, §6s.3 rows 1–2): through a built graph over a 24-row region, the preview's content is `[rule, raw, scroll, raw]` — the edge, the header, the box and the key row. Over a 47-line chip the box is 8 rows and the key row reads `⌥⇧↑⌥⇧↓ scroll  ⌥o open in editor`; over a 9-line chip the box is 9 rows and the row names `⌥o` alone; over a 10-line chip the box is 8. In all three the placed layer is not `truncated`. *It read a 20-row region and 7 rows while its test drove 24 and asserted 9, and the cap counted two borders.*
+- **T1.175** (I143, ruling 53, §6s.3 rows 1–2): through a built graph over a 24-row region, the preview's content is `[rule, raw, scroll, raw]` — the edge, the header, the box and the key row. Over a 47-line chip the box is 8 rows and the key row reads `⌥⇧↑↓ scroll  ⌥o open in editor`; over a 9-line chip the box is 9 rows and the row names `⌥o` alone; over a 10-line chip the box is 8. In all three the placed layer is not `truncated`. *It read a 20-row region and 7 rows while its test drove 24 and asserted 9, and the cap counted two borders.*
 - **T4.116** (I143, I51, ruling 53): a paste chip, `⏎` → the prompt is submitted with the chip's content, and the preview is gone; `⌥⇧↓` with the preview up moves its box one row and leaves the prompt's caret where it was.
 - **T6.144** (I143): the preview's content reverted to the bare `code` block → **T1.175** fails, and T4.116's `⌥⇧↓` moves nothing.
 - **T1.176** (I144, C02 I19): `openChipInEditor` with no editor → the refusal's words, and no handoff; with an editor and a fake runner that rewrites the file → `editChip` is called once with the new content and its line count; with a runner that leaves it → not called; the temporary directory is gone on all three paths; the argv is `sh -c '<editor> "$1"' sh <path>`.

@@ -963,7 +963,7 @@ block or entry, and I42 clips it there; a column past the block's edge is past
 the entry's too, so storing it would only make coming back cost presses the
 reader cannot see.
 
-**The keys in rectangle mode.** `⇧↑⇧↓⇧←⇧→` move the head and leave the
+**The keys in rectangle mode.** `⇧↑↓←→` move the head and leave the
 anchor; a plain arrow moves both, a 1×1 rectangle — which is how the anchor gets
 anywhere but the block's first column without the pointer. A press plants both
 at the pointer's cell and a drag moves the head, the row by I42's clip and the
@@ -1016,12 +1016,12 @@ Structural: every cell is a state at rest. Mode × selection × the waiting coun
 | mode | selection | owner line, in order |
 |---|---|---|
 | native | — | `native` · `mouse tracking off` · `the terminal owns the mouse` · `esc out` · `the screen is frozen` |
-| blocks | none | `copy` · `⇧↑⇧↓ extend` · `⏎ copy` · `esc out` · `the screen is frozen` · `⌃V rect` |
+| blocks | none | `copy` · `⇧↑↓ extend` · `⏎ copy` · `esc out` · `the screen is frozen` · `⌃V rect` |
 | blocks | some | … `esc clear` · the count · `the screen is frozen` · `⌃V rect` |
 | blocks | only blocks that copy nothing | … `esc clear` · **no count** · `the screen is frozen` · `⌃V rect` |
 | blocks | every span (`A`) | … `esc clear` · the count · `the screen is frozen` · `all loaded entries` · `⌃V rect` |
 | blocks | every span, the transcript empty | as *none*: `all` over an empty set is not said |
-| rect | unresolved | `copy` · `RECT` · `cells, not source` · `⇧↑⇧↓⇧←⇧→ extend` · `⏎ copy` · `esc clear` · `the screen is frozen` · `⌃V blocks` |
+| rect | unresolved | `copy` · `RECT` · `cells, not source` · `⇧↑↓←→ extend` · `⏎ copy` · `esc clear` · `the screen is frozen` · `⌃V blocks` |
 | rect | resolved | `copy` · `RECT w×h` · `cells, not source` · … `esc clear` · the count over the cells · `the screen is frozen` · `⌃V blocks` |
 | rect | blocks also selected underneath | as *rect*: never `all loaded entries`, and the count is the rectangle's |
 | any semantic | waiting > 0 | … `N waiting` straight after `the screen is frozen` |
