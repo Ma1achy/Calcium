@@ -55,16 +55,18 @@ const MUTATIONS = [
     // The line ignores the rung: Unicode chords on an ASCII terminal.
     name: "the owner line asks for the Unicode spelling at every rung",
     file: CHROME,
-    from: '  const unicode = caps.unicode !== "ascii";\n  return `${keys',
-    to: '  const unicode = true;\n  return `${keys',
+    // Re-anchored (C19 I33): the chords' spelling is `spell`, which `hint` and
+    // the menu's status row share; the mutation is unchanged.
+    from: '  const unicode = caps.unicode !== "ascii";\n  return keys.map(',
+    to: '  const unicode = true;\n  return keys.map(',
     expect: "T1.111",
   },
   {
     // One pair rule for the line: `/` between two keys at Unicode as well.
     name: "a pair joins with / at Unicode",
     file: CHROME,
-    from: '.join(unicode ? "" : "/")} ${does}`',
-    to: '.join("/")} ${does}`',
+    from: '.join(unicode ? "" : "/");',
+    to: '.join("/");',
     expect: "T1.111",
   },
   {
@@ -84,8 +86,9 @@ const results = await runPass({
   control: {
     // **A change the corpus can see**: every chip loses its chord.
     file: CHROME,
-    from: '  return `${keys.map((k) => chordText(k, unicode)).join(unicode ? "" : "/")} ${does}`;',
-    to: "  return does;",
+    // Re-anchored (C19 I33): the chords are `spell`'s, which `hint` and `keyed` share.
+    from: '  return keys.map((k) => chordText(k, unicode)).join(unicode ? "" : "/");',
+    to: '  return "";',
     why: "the owner line draws no chord — if this survives, nothing reads the line",
   },
   mutations: MUTATIONS,

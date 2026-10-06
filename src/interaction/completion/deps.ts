@@ -13,7 +13,7 @@
  * that consumes it (I5).
  */
 
-export type { Block, Tone } from "../../data/viewmodel/index.js";
+export type { Block, TextSpan, Tone } from "../../data/viewmodel/index.js";
 export type { ArgDef, FlagDef, Manifest, ToolDef } from "../../data/manifest/index.js";
 export { findTool, visibleTools } from "../../data/manifest/index.js";
 export type { Layer, OverlayManager, Placed } from "../../viewport/overlay/index.js";

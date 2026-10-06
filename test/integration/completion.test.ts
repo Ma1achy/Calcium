@@ -197,21 +197,19 @@ describe("C19 + C15 — the menu is an overlay (I8)", () => {
       manager.update(MENU_ID, {
         content: menuBlocks(many.slice(w.start, w.start + w.shown), 0, remainder),
       });
+      // **The indicator is the status row's count since I33**: `shown of total`.
+      const counted = `${String(w.shown)} of ${String(many.length)}`;
 
       const placed = manager.layout(region)[0];
       if (placed === undefined) throw new Error("unreachable");
       const lines = placed.layer.content.flatMap((b) => r.renderToLines(b, placed.width));
       const drawn = lines.slice(0, placed.height).map(visible);
 
-      expect(drawn.some((l) => l.includes(`+ ${String(remainder)} more`)), `${form}: the indicator is drawn`).toBe(
-        true,
-      );
+      expect(drawn.some((l) => l.includes(counted)), `${form}: the indicator is drawn`).toBe(true);
       expect(lines.length, `${form}: and nothing is cut at all now`).toBeLessThanOrEqual(placed.height);
       // **The indicator is the box's last row** (ruling 90): the edge under it
       // is the prompt's own rule, which the frame draws and the layer does not.
-      expect(drawn[drawn.length - 1] ?? "", `${form}: the indicator closes the box`).toContain(
-        `+ ${String(remainder)} more`,
-      );
+      expect(drawn[drawn.length - 1] ?? "", `${form}: the indicator closes the box`).toContain(counted);
       // **And the window fills the box it was sized for, in both arms** (T6.27).
       // A chrome count charging a row the menu no longer draws hands back a
       // window one row short, which fits inside the box and so passes the

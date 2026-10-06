@@ -249,14 +249,16 @@ describe("C19 §6 — the menu", () => {
   it("T3.13: a large set still produces one block tree and a declared width", () => {
     const many = Array.from({ length: 5_000 }, (_, i) => ({ value: `candidate-${String(i)}` }));
     const blocks = menuBlocks(many.slice(0, 40), 0, many.length - 40);
-    // An edge, the body, the indicator (C19 I23). The bottom edge is the
-    // prompt's own rule since ruling 90, so the indicator is the last row.
+    // An edge, the body, the status row (C19 I23, I33). The bottom edge is the
+    // prompt's own rule since ruling 90, so the status row is the last.
     expect(blocks).toHaveLength(3);
     expect(blocks[0]).toMatchObject({ kind: "rule" });
     // ASCII, because C19 is L3 and the substitution happens at L1 (C09 I22,
     // F122). A `raw` block carries text rather than a slot, so `…` here could
     // never have been resolved against the capability.
-    expect(blocks[2]).toMatchObject({ kind: "raw", text: "+ 4960 more" });
+    // The count is `shown of total`, so four thousand nine hundred and sixty
+    // are missing by arithmetic and the row says 40 of 5000 (I33).
+    expect(blocks[2]).toMatchObject({ kind: "raw", text: "  40 of 5000" });
     expect(menuWidth(many.slice(0, 40))).toBeGreaterThan(0);
   });
 
@@ -319,9 +321,10 @@ describe("C19 §6 — the menu", () => {
       const rows = rowsAt(detailed, width);
       // One row per candidate, under an edge (C19 I23); the edge below is
       // the prompt's rule since ruling 90, which this row does not draw.
-      expect(rows, `${String(width)}: one row per candidate, plus the top edge`).toHaveLength(3);
+      expect(rows, `${String(width)}: one row per candidate, under the top edge and over the status row`).toHaveLength(4);
       expect(rows[0], `${String(width)}: the first row is an edge`).toMatch(/^[─-]/);
-      expect(rows[2], `${String(width)}: and the last is a candidate`).not.toMatch(/^[─-]/);
+      expect(rows[2], `${String(width)}: the last candidate row is not an edge`).not.toMatch(/^[─-]/);
+      expect(rows[3], `${String(width)}: the status row closes the menu (I33)`).toMatch(/^\s+2 of 2\b/u);
       for (const [i, candidate] of detailed.entries()) {
         expect(rows[i + 1], `${String(width)}: ${candidate.value} is legible`).toContain(
           candidate.value,
@@ -347,7 +350,7 @@ describe("C19 §6 — the menu", () => {
     // candidate, and nothing in the hint cell.
     for (const width of [menuWidth(plain), 60, 100]) {
       const rows = rowsAt(plain, width);
-      expect(rows, `${String(width)}: the edge and one row a candidate`).toHaveLength(1 + plain.length);
+      expect(rows, `${String(width)}: the edge, one row a candidate and the status row`).toHaveLength(2 + plain.length);
       for (const [i, candidate] of plain.entries()) {
         expect(rows[i + 1]?.replace(/^\s*[›*]?\s*/u, "").trimEnd(), `${String(width)}: ${candidate.value}, and no hint`).toBe(
           candidate.value,

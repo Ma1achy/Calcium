@@ -196,8 +196,14 @@ describe("C22 §6b — the write is a difference", () => {
     expect(after.prompt, "the prompt moved with the region").toBeGreaterThan(before.prompt);
     expect(after.rule.trim(), "the row above the prompt is I81's rule").toMatch(/^─+$/u);
     expect(after.edge, "and the menu came with it, with no gap beneath").toBe(after.prompt - 2);
-    expect(after.candidate - after.prompt, "at the distance from the prompt it had before").toBe(
-      before.candidate - before.prompt,
+    // **The menu is measured again at the new region** (C19 I33): the status
+    // row sheds keys to the width and the window is sized to the placement's
+    // rows, so a taller region shows more candidates and never fewer. It was
+    // "the distance it had before" while the window kept the old region's
+    // count, which is the stale measure this row now refuses; `edge` above is
+    // what says there is no gap beneath it.
+    expect(after.prompt - after.candidate, "at least the distance from the prompt it had before").toBeGreaterThanOrEqual(
+      before.prompt - before.candidate,
     );
   });
 
@@ -221,7 +227,7 @@ describe("C22 §6b — the write is a difference", () => {
     // The row directly above the prompt is the frame's own rule (C22 I81); the
     // menu's rows end above it.
     const menu = rows.slice(0, prompt - 1);
-    expect(menu.some((r) => /\+ \d+ more/u.test(r)), "the indicator is drawn").toBe(true);
+    expect(menu.some((r) => /\d+ of \d+/u.test(r)), "the indicator is drawn: the status row's count (I33)").toBe(true);
     // **And the box closes**, which is the half a row about the indicator alone
     // does not cover: an edge sits between the menu and the prompt, and C19 §6
     // argues it is what stops the list reading as continuous with the line
@@ -234,7 +240,7 @@ describe("C22 §6b — the write is a difference", () => {
     // where §097's panel floats between two rules and the lower one is the
     // prompt's. So the indicator sits directly on I81's rule.
     expect(rows[prompt - 1] ?? "", "the prompt's rule closes the menu").toMatch(/^[─-]{20,}/u);
-    expect(menu[menu.length - 1] ?? "", "with the indicator directly on it").toMatch(/\+ \d+ more/u);
+    expect(menu[menu.length - 1] ?? "", "with the indicator directly on it").toMatch(/\d+ of \d+/u);
     expect(menu[menu.length - 2] ?? "", "and no second rule above it").not.toMatch(/^[─-]{20,}/u);
   });
 
@@ -312,7 +318,11 @@ describe("C22 I150 — the completion footer at rest and after Tab", () => {
     // **The difference is the claim** (ruling 96). The menu's rows are the same
     // text in both states — ruling 89 marks the current at rest and after `⇥`
     // alike — so the footer is the one thing on screen that tells them apart.
-    expect(s.menu(), "the menu reads the same after ⇥").toEqual(restMenu);
+    // **Its candidates, and the status row is the exception** (C19 I33): it
+    // names the same keys the footer does, so it differs in step with it.
+    expect(s.menu().slice(0, -1), "the menu's candidates read the same after ⇥").toEqual(restMenu.slice(0, -1));
+    expect(restMenu.at(-1), "the status row at rest names the rest keys").toMatch(/3 of 3 +⏎ run +⇥ complete +esc close/u);
+    expect(s.menu().at(-1), "and after ⇥ the selection's").toMatch(/3 of 3 +↑↓ move +⏎ accept +esc close/u);
     expect(selected, "and the footer does not").not.toBe(rest);
 
     await s.press(DOWN);

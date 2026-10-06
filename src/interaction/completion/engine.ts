@@ -221,6 +221,23 @@ function rank(
   );
 }
 
+/**
+ * The text a ghost shows for `candidate` under `prefix`: its value past the
+ * prefix, or `null` (I7, I34).
+ *
+ * **One rule for both ghosts.** A unique static match's and an open menu's
+ * current are the same question — what would `→` insert — so the shell asks
+ * this for the menu and the engine asks it for the unique match. `null` where
+ * the value does not begin with the prefix or equals it, and **for a
+ * candidate that accepts into a chip** (I28): accepting it inserts the chip,
+ * so the text would not be what lands.
+ */
+export function ghostOf(prefix: string, candidate: Candidate | undefined): string | null {
+  if (candidate === undefined || candidate.chip !== undefined) return null;
+  if (!candidate.value.startsWith(prefix) || candidate.value === prefix) return null;
+  return candidate.value.slice(prefix.length); // graphemes-ok: both are in the tokeniser's coordinate system
+}
+
 export function createEngine(opts: EngineOptions): CompletionEngine {
   const sources: CompletionSource[] = [];
   const cache = opts.cache ?? createCache(opts.now);
@@ -286,9 +303,7 @@ export function createEngine(opts: EngineOptions): CompletionEngine {
       // The same call `suggest` exposes, not a second filter beside it.
       const candidates = staticCandidates(ctx);
       const only = candidates.length === 1 ? candidates[0] : undefined; // graphemes-ok: a candidate count, not text
-      if (only === undefined) return null;
-      if (!only.value.startsWith(ctx.prefix) || only.value === ctx.prefix) return null;
-      return only.value.slice(ctx.prefix.length); // graphemes-ok: both are in the tokeniser's coordinate system
+      return ghostOf(ctx.prefix, only);
     },
 
     async request(ctx, requested) {

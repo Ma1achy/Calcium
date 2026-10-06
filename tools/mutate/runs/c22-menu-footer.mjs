@@ -22,8 +22,9 @@ const FILES = ["test/unit/session-paint.test.ts", "test/integration/session.test
 const CONTROL = {
   // **A change the corpus can see** (F1254): the owner's word on the rest arm.
   file: CHROME,
-  from: "          if (hints.promptUnderMenu === true) {\n            return [\n              { label: \"complete\", tone: \"accent\" },",
-  to: "          if (hints.promptUnderMenu === true) {\n            return [\n              { label: \"completion\", tone: \"accent\" },",
+  // Re-anchored (C19 I33): the keys are `completeKeys`' and the word is the arm's.
+  from: "            { label: \"complete\", tone: \"accent\" },\n            ...completeKeys(",
+  to: "            { label: \"completion\", tone: \"accent\" },\n            ...completeKeys(",
   why: "the rest line's first chip renamed — if this survives, no row reads the rest line",
 };
 
@@ -32,8 +33,8 @@ const MUTATIONS = [
     // **T6.152, F1486 itself**: the line reads no hint.
     name: "T6.152: the complete arm ignores promptUnderMenu",
     file: CHROME,
-    from: "          if (hints.promptUnderMenu === true) {",
-    to: "          if (hints.substate === undefined) {",
+    from: "completeKeys(hints, hints.promptUnderMenu === true, caps)",
+    to: "completeKeys(hints, hints.substate === undefined, caps)",
     expect: "T1.182",
   },
   {
@@ -57,32 +58,32 @@ const MUTATIONS = [
     // **The rest arm offering the key the prompt holds**: `⏎ accept` kept.
     name: "the rest arm keeps ⏎ accept",
     file: CHROME,
-    from: "              ...keyed(hints, \"prompt\", [\"complete\"], \"complete\", caps),\n              ...one(\"panel\", \"dismiss\", \"close\"),",
-    to: "              ...keyed(hints, \"prompt\", [\"complete\"], \"complete\", caps),\n              ...keyed(hints, \"panel\", [\"menuAccept\"], \"accept\", caps),\n              ...one(\"panel\", \"dismiss\", \"close\"),",
+    from: "      ...keyParts(hints, \"prompt\", [\"complete\"], \"complete\", caps),\n      ...keyParts(hints, \"panel\", [\"dismiss\"], \"close\", caps),",
+    to: "      ...keyParts(hints, \"prompt\", [\"complete\"], \"complete\", caps),\n      ...keyParts(hints, \"panel\", [\"menuAccept\"], \"accept\", caps),\n      ...keyParts(hints, \"panel\", [\"dismiss\"], \"close\", caps),",
     expect: "T1.182",
   },
   {
     // **T6.152, ruling 99's amendment undone**: the rest line drops `⏎ run`.
     name: "T6.152: the rest arm drops ⏎ run",
     file: CHROME,
-    from: "              ...keyed(hints, \"prompt\", [\"submit\"], \"run\", caps),\n",
-    to: "              // ⏎ run dropped\n",
+    from: "      ...keyParts(hints, \"prompt\", [\"submit\"], \"run\", caps),\n",
+    to: "      // ⏎ run dropped\n",
     expect: "T4.120",
   },
   {
     // **`⏎ run` spelled literally** (C22 I133): a rebound `submit` is not named.
     name: "the rest arm spells ⏎ itself",
     file: CHROME,
-    from: "              ...keyed(hints, \"prompt\", [\"submit\"], \"run\", caps),\n",
-    to: "              { label: \"⏎ run\", tone: \"muted\" as const },\n",
+    from: "      ...keyParts(hints, \"prompt\", [\"submit\"], \"run\", caps),\n",
+    to: "      { keys: \"⏎\", does: \"run\" },\n",
     expect: "T1.182",
   },
   {
     // **A literal chord** (C22 I133): the chip stops following the keymap.
     name: "the rest arm spells ⇥ itself",
     file: CHROME,
-    from: "              ...keyed(hints, \"prompt\", [\"complete\"], \"complete\", caps),\n              ...one(\"panel\", \"dismiss\", \"close\"),",
-    to: "              { label: \"⇥ complete\", tone: \"muted\" as const },\n              ...one(\"panel\", \"dismiss\", \"close\"),",
+    from: "      ...keyParts(hints, \"prompt\", [\"complete\"], \"complete\", caps),\n      ...keyParts(hints, \"panel\", [\"dismiss\"], \"close\", caps),",
+    to: "      { keys: \"⇥\", does: \"complete\" },\n      ...keyParts(hints, \"panel\", [\"dismiss\"], \"close\", caps),",
     expect: "T1.182",
   },
 ];

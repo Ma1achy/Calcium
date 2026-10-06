@@ -123,8 +123,9 @@ const results = runPass({
       // placement's again; the mutation is unchanged.
       name: "a selection out of the window is still marked",
       file: KEYS,
-      from: "    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, remainder);\n",
-      to: "    return menuBlocks(slice, Math.min(Math.max(at, 0), w.shown - 1), remainder);\n",
+      // Re-anchored (C19 I32, I33): the call carries the menu's facts now.
+      from: "    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, remainder, facts());\n",
+      to: "    return menuBlocks(slice, Math.min(Math.max(at, 0), w.shown - 1), remainder, facts());\n",
       expect: "T4.92",
     },
   ],

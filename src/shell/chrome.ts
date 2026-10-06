@@ -22,6 +22,7 @@ import type { ChromeContext, ChromeFn, CopyState, GuardRefusal, OwnerHints, Watc
 import type { TerminalCapabilities } from "../terminal/capabilities.js";
 import type { Binding, FocusTarget, KeyAction, OwnerRung } from "../interaction/router/types.js";
 import { chordText, defaultKeymap } from "../interaction/router/keymap.js";
+import type { MenuKey } from "../interaction/completion/index.js";
 import { QUESTION_KEYS } from "./confirm.js";
 
 type Chip = Pills["chips"][number];
@@ -213,9 +214,13 @@ const mark = (m: Mark, caps: TerminalCapabilities): string =>
  * `⌃c` stood where the registry writes `⌃C`. A pair of keys joins with nothing
  * at Unicode (`↑↓`) and `/` in text names (`Up/Down`), one rule for every pair.
  */
-const hint = (keys: readonly Binding["key"][], does: string, caps: TerminalCapabilities): string => {
+const hint = (keys: readonly Binding["key"][], does: string, caps: TerminalCapabilities): string =>
+  `${spell(keys, caps)} ${does}`;
+
+/** The chords alone, as `hint` spells them — `keyParts`' half (C19 I33). */
+const spell = (keys: readonly Binding["key"][], caps: TerminalCapabilities): string => {
   const unicode = caps.unicode !== "ascii";
-  return `${keys.map((k) => chordText(k, unicode)).join(unicode ? "" : "/")} ${does}`;
+  return keys.map((k) => chordText(k, unicode)).join(unicode ? "" : "/");
 };
 
 /**
@@ -252,10 +257,51 @@ const keyed = (
   actions: readonly KeyAction[],
   does: string,
   caps: TerminalCapabilities,
-): Chip[] => {
+): Chip[] => keyParts(hints, target, actions, does, caps).map((k) => ({ label: `${k.keys} ${k.does}`, tone: "muted" }));
+
+/**
+ * `keyed`, before it is a chip: the chord spelled at the terminal's rung and
+ * what it does, apart — for a row that tones the two differently (C19 I33).
+ * `hint` is this joined by a space, so the two cannot spell a chord two ways.
+ */
+const keyParts = (
+  hints: OwnerHints,
+  target: FocusTarget,
+  actions: readonly KeyAction[],
+  does: string,
+  caps: TerminalCapabilities,
+): MenuKey[] => {
   const keys = actions.flatMap((a) => hints.chord(target, a) ?? []);
-  return keys.length === 0 ? [] : [{ label: hint(keys, does, caps), tone: "muted" }];
+  return keys.length === 0 ? [] : [{ keys: spell(keys, caps), does }];
 };
+
+/**
+ * The completion menu's keys for the state the frame shows (C22 I150, C19
+ * I33, ruling 96, ruling 99) — **one lookup for two rows**: the owner line's
+ * completion arm draws these, and so does the menu's own status row, so the
+ * two cannot name different keys.
+ *
+ * **At rest the prompt answers first** (C19 I20): `⏎` submits and `↑` is
+ * history, so `⏎ accept` and `↑↓ move` would name keys that go somewhere
+ * else. The key that acts on the marked candidate is the prompt's `complete`,
+ * which selects it. **`⏎ run` first** (ruling 99's amendment to 96): §029's
+ * footer draws it, and at rest the prompt's `submit` does run the line.
+ * §029's status row draws `↑↓ move` at rest too, and ruling 99 declined it.
+ */
+export function completeKeys(hints: OwnerHints, atRest: boolean, caps: TerminalCapabilities): readonly MenuKey[] {
+  if (atRest) {
+    return [
+      ...keyParts(hints, "prompt", ["submit"], "run", caps),
+      ...keyParts(hints, "prompt", ["complete"], "complete", caps),
+      ...keyParts(hints, "panel", ["dismiss"], "close", caps),
+    ];
+  }
+  return [
+    ...keyParts(hints, "panel", ["menuPrev", "menuNext"], "move", caps),
+    ...keyParts(hints, "panel", ["menuAccept"], "accept", caps),
+    ...keyParts(hints, "panel", ["dismiss"], "close", caps),
+  ];
+}
 
 /**
  * The gap `pills` puts between chips, so the shed measures what will be drawn
@@ -663,28 +709,16 @@ function ownerChips(
       // `find`, over a completion menu and a chip preview alike.
       switch (hints.substate) {
         case "complete":
-          // **At rest the prompt answers first** (C22 I150, C19 I20, ruling 96):
-          // `⏎` submits and `↑` is history, so `⏎ accept` and `↑↓ move` would
-          // name keys that go somewhere else. The key that acts on the marked
-          // candidate is the prompt's `complete`, which selects it. And this
-          // line is the only thing on screen that tells rest from a selection,
-          // because the mark is drawn in both (C19 I29).
-          //
-          // **`⏎ run` first** (ruling 99's amendment to 96): §029's footer draws
-          // it, and at rest the prompt's `submit` does run the line.
-          if (hints.promptUnderMenu === true) {
-            return [
-              { label: "complete", tone: "accent" },
-              ...keyed(hints, "prompt", ["submit"], "run", caps),
-              ...keyed(hints, "prompt", ["complete"], "complete", caps),
-              ...one("panel", "dismiss", "close"),
-            ];
-          }
+          // **`completeKeys`, which the menu's status row also draws** (C22
+          // I150, C19 I33): this line and that row tell rest from a selection,
+          // because the mark is drawn in both (C19 I29), and one lookup is
+          // what keeps them from disagreeing.
           return [
             { label: "complete", tone: "accent" },
-            ...keyed(hints, "panel", ["menuPrev", "menuNext"], "move", caps),
-            ...keyed(hints, "panel", ["menuAccept"], "accept", caps),
-            ...one("panel", "dismiss", "close"),
+            ...completeKeys(hints, hints.promptUnderMenu === true, caps).map((k) => ({
+              label: `${k.keys} ${k.does}`,
+              tone: "muted" as const,
+            })),
           ];
         case "preview":
           // The preview composes nothing and the prompt keeps its keys

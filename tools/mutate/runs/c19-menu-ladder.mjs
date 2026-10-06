@@ -29,8 +29,9 @@ const FILES = [
 const CONTROL = {
   // **A change the corpus can see** (F1254): every label blank.
   file: MENU,
-  from: "        value: { text: c.display ?? c.value, ...",
-  to: "        value: { text: \"\", ...",
+  // Re-anchored (C19 I32): the cell is `cellOf`'s, which carries the match too.
+  from: "        value: cellOf(c.display ?? c.value, prefix, c.tone),",
+  to: "        value: cellOf(\"\", prefix, c.tone),",
   why: "no candidate's label is drawn — if this survives, no row reads the menu's rows",
 };
 
@@ -51,16 +52,17 @@ const MUTATIONS = [
     // no reader left.
     name: "T6.28: the value cell drops the candidate's tone",
     file: MENU,
-    from: "value: { text: c.display ?? c.value, ...(c.tone === undefined ? {} : { tone: c.tone }) },",
-    to: "value: { text: c.display ?? c.value },",
+    // Re-anchored (C19 I32): the tone is `cellOf`'s; the mutation is unchanged.
+    from: "return { text: label, ...(tone === undefined ? {} : { tone }), ",
+    to: "return { text: label, ",
     expect: "T1.72",
   },
   {
     // **The hint cell filled for a candidate with none**: the label twice.
     name: "the empty hint cell takes the label",
     file: MENU,
-    from: "        detail: { text: c.detail ?? \"\" },",
-    to: "        detail: { text: c.detail ?? c.value },",
+    from: "        detail: { text: c.detail ?? \"\", tone: \"muted\" },",
+    to: "        detail: { text: c.detail ?? c.value, tone: \"muted\" },",
     expect: "T3.30",
   },
   {
@@ -75,8 +77,8 @@ const MUTATIONS = [
     // **The indicator off by one**: N is no longer the rest.
     name: "the indicator counts one more than the window leaves out",
     file: KEYS,
-    from: "    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, remainder);",
-    to: "    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, remainder + 1);",
+    from: "    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, remainder, facts());",
+    to: "    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, remainder + 1, facts());",
     expect: "T3.30",
   },
 ];

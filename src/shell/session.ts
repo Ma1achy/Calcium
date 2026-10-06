@@ -53,7 +53,6 @@ import type { Group } from "../data/viewmodel/index.js";
 import { framesOf, placesAtProtocol } from "../presentation/blocks/kinds/image.js";
 import type { FocusState } from "../presentation/blocks/index.js";
 import type { RenderScratch } from "../presentation/blocks/types.js";
-import { contextAt } from "../interaction/completion/index.js";
 import { chipSpans, cursorCell, layout, selectionSpans, type CellSpan } from "../interaction/editor/index.js";
 import { extentOf } from "../interaction/router/focus.js";
 import { layerLines } from "./composite.js";
@@ -1461,14 +1460,10 @@ class Session implements TuiInstance {
       // tree, on the accept path, which *inserts* it. C22 T4.7 has claimed the
       // compositing since C22 was written and `test/contract/editor.test.ts`
       // recorded the other half as deferred "when C22 lands".
-      ghost: () =>
-        graph.completion.ghost(
-          contextAt(
-            graph.editor.text,
-            graph.editor.cursor,
-            graph.manifest.manifest,
-          ),
-        ),
+      //
+      // **The effect table's answer** (C19 I34): under an open menu, the
+      // current candidate's remainder, which is what `→` inserts.
+      ghost: () => graph.ghost(),
       // **The region comes from the frame, not from a fresh one** (C22 I28).
       // `#frameQueries` serves the same value to the router, and a second
       // computation here is the two-records defect S01 §3 already produced once

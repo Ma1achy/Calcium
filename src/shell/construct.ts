@@ -26,7 +26,7 @@
 
 import { createAdapterRegistry } from "../data/adapters/index.js";
 import { blankRowsAbove, commandRows } from "./paint.js";
-import { childBorderLegend, guardRefusal, keyHint } from "./chrome.js";
+import { childBorderLegend, completeKeys, guardRefusal, keyHint } from "./chrome.js";
 import { compose, noticeDoc, settledDoc } from "./documents.js";
 import {
   answerEvent,
@@ -582,6 +582,12 @@ export type Graph = Readonly<{
   toggleSeries: (n: number) => void;
   /** Is the prompt answering keys under the top layer (I51, C19 I20)? */
   promptUnderMenu: () => boolean;
+  /**
+   * The ghost the prompt draws (C19 I7, I34): the open menu's current
+   * candidate's remainder, or a unique static match's — the effect table's
+   * answer, which is also what `→` inserts.
+   */
+  ghost: () => string | null;
   /** Past the blink threshold since the last key (C22 I64). */
   cursorIdle: () => boolean;
   /**
@@ -3963,6 +3969,14 @@ export async function constructGraph(
     schedule: config.schedule,
     anchor: deps.frame.promptAnchor,
     overlayRegion: deps.frame.overlayRegion,
+    // **The owner line's lookup, on the session's table** (C19 I33, C22 I150):
+    // the menu's status row and the line under the prompt name one set of keys.
+    menuKeys: (atRest) =>
+      completeKeys(
+        { chord: (target, action) => keymap.entries().find((b) => b.target === target && b.action === action)?.key },
+        atRest,
+        detection.capabilities,
+      ),
     focus,
     // The entry half of B1's pair; the exit is already on the `⌃c` rung below.
     enterNativeSelection: deps.frame.enterNativeSelection,
@@ -5406,6 +5420,7 @@ export async function constructGraph(
      * taking keys.
      */
     promptUnderMenu,
+    ghost: () => keys.ghost(),
     suppressBackground: () => suppressBackground,
     /**
      * Whether the cursor is past its idle threshold (C22 I64).

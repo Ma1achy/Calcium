@@ -348,9 +348,10 @@ describe("C19 §6 — the menu's edges", () => {
     // rows exist to avoid. What is claimed is what the defect was: sixty
     // candidates over a table block is one box, and one box shown of sixty
     // gives fifty-nine.
-    const missing = Number(
-      /\+ (\d+) more/.exec(String(indicator?.text ?? ""))?.[1] ?? "0",
-    );
+    // **The count is `shown of total` since C19 I33**, so what is missing is the
+    // difference and the row is drawn whether or not anything was cut.
+    const counted = /(\d+) of (\d+)/.exec(String(indicator?.text ?? ""));
+    const missing = Number(counted?.[2] ?? "0") - Number(counted?.[1] ?? "0");
     expect(
       missing,
       "the block count's answer, which is what it used to say",
@@ -414,7 +415,10 @@ describe("C19 I30 — the menu is a ladder in every case (ruling 99)", () => {
   }
   /** The candidate a row names, or `null` for a row that is not one candidate. */
   const label = (row: string): string | null => /^\s*[›*]?\s*(\/z\d+-entry)(?:\s+a verb)?$/u.exec(row)?.[1] ?? null;
-  const more = (box: readonly string[]): number => Number(/\+ (\d+) more/u.exec(box.at(-1) ?? "")?.[1] ?? "NaN");
+  const more = (box: readonly string[]): number => {
+    const m = /(\d+) of (\d+)/u.exec(box.at(-1) ?? "");
+    return m === null ? Number.NaN : Number(m[2]) - Number(m[1]);
+  };
 
   it("T3.30 (C19 I30, I23, ruling 99, F1496): sixty candidates with no detail draw one a row, the first marked, the box full and N the rest", async () => {
     // **The control first: the same source with a detail on every candidate.**
@@ -562,7 +566,11 @@ describe("C19 I31 — a line that goes away takes its menu and its hold (F1497, 
       const at = r.findIndex((l) => /^\s*› \//u.test(l));
       if (at < 0) return [];
       const end = r.findIndex((l, i) => i > at && /^[─-]{20,}/u.test(l));
-      return r.slice(at, end).map((l) => l.replace(/^\s*›?\s*/u, "").split(/\s{2,}/u)[0] ?? "");
+      // Without the status row, which is the menu's last row and no candidate (C19 I33).
+      return r
+        .slice(at, end)
+        .filter((l) => !/^\s*\d+ of \d+\b/u.test(l))
+        .map((l) => l.replace(/^\s*›?\s*/u, "").split(/\s{2,}/u)[0] ?? "");
     };
     const escape = async (): Promise<void> => {
       stdin.emit("\u001b");
@@ -611,7 +619,8 @@ describe("C19 I31 — a line that goes away takes its menu and its hold (F1497, 
     await h.key(UP);
     expect(h.prompt()).toBe("❯ /help");
     for (let i = 0; i < 3; i++) await h.key("\u007f");
-    expect(h.prompt()).toBe("❯ /h");
+    // `/h`, and the open menu's current completes it in muted text (C19 I34).
+    expect(h.prompt()).toBe("❯ /help");
     expect(h.menu(), "the menu opens over the recalled line's edit").toEqual(["/help", "/history"]);
 
     // **The control: nothing to recall, nothing replaced.** The line and the
@@ -621,7 +630,8 @@ describe("C19 I31 — a line that goes away takes its menu and its hold (F1497, 
     const before = none.menu();
     expect(before, "the menu is up").toEqual(["/capabilities", "/clear", "/config"]);
     await none.key(UP);
-    expect(none.prompt(), "an empty history recalls nothing").toBe("❯ /c");
+    // The buffer is still `/c`; the rest of the row is the current's ghost (C19 I34).
+    expect(none.prompt(), "an empty history recalls nothing").toBe("❯ /capabilities");
     expect(none.menu(), "and the menu stays").toEqual(before);
   });
 });
@@ -795,7 +805,8 @@ describe("C19 I15 — a key behind an in-flight request (ruling 106, F1524)", ()
     const s = await behind();
     await s.typed("/");
     await s.read("\th");
-    expect(s.prompt()).toBe("❯ /h");
+    // `/help` is the menu's current, and its remainder is the ghost (I34).
+    expect(s.prompt()).toBe("❯ /help");
     // **At a1284cb0 this was empty**: `h` cancelled in the composition root and
     // opened `/help` and `/history`, and the superseded result — empty by C19
     // I13 — reached §5's *none* arm and closed them.

@@ -34,11 +34,12 @@ describe("C19 T6.25, T6.26, T6.27", () => {
   });
 
   it("T6.27 (C19 I23): menuRowsShown still charging the bottom edge → T4.9 fails, the window one candidate short of its box", () => {
-    // The chrome is the top edge, and the indicator when truncated: the bottom
-    // edge is the prompt's rule (ruling 90), so neither arm charges it.
+    // The chrome is the top edge and the status row, whether or not anything
+    // was cut (C19 I33): the bottom edge is the prompt's rule (ruling 90), so
+    // neither arm charges it.
     const placed = (height: number, truncated: boolean) =>
       ({ height, truncated }) as unknown as Parameters<typeof menuRowsShown>[0];
-    expect(menuRowsShown(placed(6, false)), "untruncated: one row of chrome").toBe(5);
-    expect(menuRowsShown(placed(6, true)), "truncated: the edge and the indicator").toBe(4);
+    expect(menuRowsShown(placed(6, false)), "untruncated: the edge and the status row").toBe(4);
+    expect(menuRowsShown(placed(6, true)), "truncated: the same two").toBe(4);
   });
 });

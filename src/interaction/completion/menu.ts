@@ -14,7 +14,7 @@
  */
 
 import { cells } from "../../presentation/text.js";
-import type { Block, Layer, Placed } from "./deps.js";
+import type { Block, Layer, Placed, TextSpan } from "./deps.js";
 import type { Candidate } from "./types.js";
 
 /** The id C15 knows the menu by; one layer for a whole completion (§6). */
@@ -41,7 +41,7 @@ const GLYPH_CELLS = 2;
  */
 const OUT_OF_VIEW = `${MENU_ID}-out-of-view`;
 
-/** The widest hint, in cells — the detail column's floor, since the label flexes. */
+/** The widest hint, in cells — the detail column's floor, and the hint flexes past it (I32). */
 function widestDetail(candidates: readonly Candidate[]): number {
   let widest = 1;
   for (const c of candidates) widest = Math.max(widest, c.detail === undefined ? 0 : cells(c.detail));
@@ -61,6 +61,78 @@ function widestLabel(candidates: readonly Candidate[]): number {
   return widest + GLYPH_CELLS;
 }
 
+/**
+ * A key the status row offers: the chord as the terminal spells it, and what
+ * it does (I33). **Spelled by the shell**, because the keymap and the
+ * terminal's rung are both L4's (C22 I150); this file only lays them out.
+ */
+export type MenuKey = Readonly<{ keys: string; does: string }>;
+
+/**
+ * What the menu is drawn against, beyond its candidates (I32, I33).
+ *
+ * `prefix` is the typed token the candidates matched, for the match mark;
+ * `keys` are the status row's keys for the state the frame shows; `width` is
+ * the region's, which the status row sheds whole keys to fit. Each is
+ * optional, and absent draws the row without it.
+ */
+export type MenuFacts = Readonly<{ prefix?: string; keys?: readonly MenuKey[]; width?: number }>;
+
+/** The cells between the status row's parts — §029's three. */
+const STATUS_GAP = "   ";
+
+/**
+ * The status row's lead: the table's gutter, so the count stands in the
+ * current mark's column as §029's does (C11 I15).
+ */
+const STATUS_LEAD = "  ";
+
+/**
+ * The label's match mark (I32): `accent` bold over the typed prefix, or bold
+ * alone where the candidate carries a `tone` (ruling 105 a) — the tone is the
+ * label's in every row, and an accent over its first characters would take
+ * part of it back. **None where the label does not begin with the prefix**:
+ * a basename under a path prefix matched through its value, and a mark over
+ * characters that did not match would say why it did not.
+ */
+function matchSpans(label: string, prefix: string, toned: boolean): readonly TextSpan[] | undefined {
+  if (prefix === "" || !label.startsWith(prefix)) return undefined;
+  // A span is a code-unit offset (C04 §3am), and so is the prefix.
+  return [{ from: 0, to: prefix.length, bold: true, ...(toned ? {} : { tone: "accent" as const }) }]; // graphemes-ok: code-unit span offsets
+}
+
+/**
+ * The status row (I33, §029): `shown of total`, then the keys the state
+ * offers, `muted` count, `accent` chords and `muted` words.
+ *
+ * **Whole keys shed from the end, and never the count**: the count is the
+ * row's reason, and half a key is a different key. A `raw` row rather than a
+ * table or pills, because the gap is §029's three cells and a row of pills
+ * would draw its own.
+ */
+function statusRow(shown: number, total: number, keys: readonly MenuKey[], width: number | undefined): Block {
+  const count = `${String(shown)} of ${String(total)}`;
+  const fits = (n: number): boolean =>
+    width === undefined ||
+    cells(STATUS_LEAD + count + keys.slice(0, n).map((k) => STATUS_GAP + k.keys + " " + k.does).join("")) <= width; // graphemes-ok: a slice of keys, measured in cells
+  let n = keys.length; // graphemes-ok: a key count, not text
+  while (n > 0 && !fits(n)) n -= 1;
+  let text = STATUS_LEAD;
+  const spans: TextSpan[] = [];
+  const run = (part: string, tone: "muted" | "accent"): void => {
+    // Span offsets are code units (C04 §3am).
+    spans.push({ from: text.length, to: text.length + part.length, tone }); // graphemes-ok: code-unit span offsets
+    text += part;
+  };
+  run(count, "muted");
+  for (const k of keys.slice(0, n)) { // graphemes-ok: a slice of keys, not text
+    text += STATUS_GAP;
+    run(k.keys, "accent");
+    text += " ";
+    run(k.does, "muted");
+  }
+  return { kind: "raw", id: `${MENU_ID}-status`, text, spans };
+}
 
 /**
  * A ladder in every case: one candidate a row, drawn as a table (§6, I30).
@@ -84,8 +156,10 @@ export function menuBlocks(
    */
   current: number | null,
   remainder: number,
+  facts: MenuFacts = {},
 ): readonly Block[] {
   // The caller windows; this draws what it is given (`menuWindow`).
+  const prefix = facts.prefix ?? "";
 
   const body: Block = {
     kind: "table",
@@ -100,27 +174,33 @@ export function menuBlocks(
         // the detail's `2` meant the labels were dropped first — at 80
         // columns over a diff the menu drew four summaries and not one verb
         // name, which is I18's own claim failing in the direction it was
-        // written about. §6 says which way round it goes in as many words:
-        // the label is what the user is reading, and the hint is
-        // right-aligned against it.
+        // written about. The label is what the user is reading, so a narrow
+        // region drops the hint first.
         priority: 2,
+        // **The label sits at its floor, and the floor is what keeps it
+        // whole** (I18, I32): the widest label and the mark's lead. A column
+        // with no `flex` gets its minimum and nothing more (plan.ts step 8),
+        // which is exactly the column §029 draws — the hints start where the
+        // widest label ends.
         minWidth: widestLabel(candidates),
-        // **The flex is C19's declaration, not a default C11 should
-        // change** (I18). C11 gives residual width only to a `flex` column
-        // — plan.ts step 8, a stated decision — and every surface's drop
-        // table was computed against it, so widening the default would
-        // invalidate twelve column declarations to repair one programmatic
-        // table. The label is the column that should absorb: it is what the
-        // user is reading, and the hint is right-aligned against it.
-        flex: true,
         sortable: false,
       },
       {
         key: "detail",
         label: "",
-        align: "right",
+        // **A muted column beside the label, not right-aligned against the
+        // edge** (I32, §029, §097). It drew right-aligned in default ink,
+        // which §6 had ruled; the registry is normative on appearance.
+        align: "left",
         priority: 1,
         minWidth: widestDetail(candidates),
+        // **The flex is C19's declaration, not a default C11 should
+        // change** (I18). C11 gives residual width only to a `flex` column
+        // — plan.ts step 8, a stated decision — and every surface's drop
+        // table was computed against it. The hint is the column that absorbs
+        // now (I32), so the table still spans the region and the current's
+        // ground still runs the whole row (C11 §5c).
+        flex: true,
         sortable: false,
       },
     ],
@@ -130,8 +210,11 @@ export function menuBlocks(
         // **The tone goes on the label** (I30). The pills form was the only
         // reader of `Candidate.tone`, and retiring it alone would have left
         // a public field that nothing draws.
-        value: { text: c.display ?? c.value, ...(c.tone === undefined ? {} : { tone: c.tone }) },
-        detail: { text: c.detail ?? "" },
+        //
+        // **And the match is marked over it** (I32): `accent` bold, or bold
+        // alone under a tone, so a reader sees why the row is here.
+        value: cellOf(c.display ?? c.value, prefix, c.tone),
+        detail: { text: c.detail ?? "", tone: "muted" },
       },
     })),
     // **The current is the table's, not a cell's** (I29, C04 I150, ruling
@@ -180,17 +263,26 @@ export function menuBlocks(
   // **C19 renders the indicator, because only C19 knows the remainder** (C15
   // I8). C15 reports *that* it truncated through `Placed.truncated`; it holds no
   // candidates and cannot say how many were lost.
-  if (remainder <= 0) return Object.freeze([top, body]);
-  return Object.freeze([
-    top,
-    body,
-    // **ASCII, because this text is authored where the capability is not**
-    // (C09 I22, F122). C19 is L3 and the substitution happens at L1; a `raw`
-    // block carries text rather than a slot, so the ellipsis could never have
-    // been resolved. `…` has no `Glyph` either — C09 I5 wants 1:1 by cell
-    // count and the ASCII form is three cells.
-    { kind: "raw", id: `${MENU_ID}-more`, text: `+ ${String(remainder)} more` } satisfies Block,
-  ]);
+  //
+  // **The indicator is the status row's count, and the row is always drawn**
+  // (I33, §029). It was a `+ N more` row drawn only when something was cut;
+  // §029 draws `3 of 14` with the keys beside it and no residue row, so the
+  // count says how many are missing and the menu does not grow a row the
+  // moment truncation starts. **ASCII text, because it is authored where the
+  // capability is not** (C09 I22, F122): the chords arrive spelled for the
+  // rung by the shell.
+  const shown = candidates.length; // graphemes-ok: a candidate count, not text
+  return Object.freeze([top, body, statusRow(shown, shown + Math.max(0, remainder), facts.keys ?? [], facts.width)]);
+}
+
+/** The value cell: the label, its tone, and the match mark over it (I30, I32). */
+function cellOf(
+  label: string,
+  prefix: string,
+  tone: Candidate["tone"],
+): Readonly<{ text: string; tone?: NonNullable<Candidate["tone"]>; spans?: readonly TextSpan[] }> {
+  const spans = matchSpans(label, prefix, tone !== undefined);
+  return { text: label, ...(tone === undefined ? {} : { tone }), ...(spans === undefined ? {} : { spans }) };
 }
 
 /**
@@ -273,6 +365,7 @@ export function menuLayer(
   selected: number | null,
   remainder: number,
   anchor: Readonly<{ row: number; rows: number }>,
+  facts: MenuFacts = {},
 ): Layer {
   return Object.freeze({
     id: MENU_ID,
@@ -293,7 +386,7 @@ export function menuLayer(
     // **The current at rest is the first candidate** (I29, ruling 89): a typed
     // menu holds no selection (I20), and it still shows which candidate `Tab`
     // and `↓` reach first.
-    content: menuBlocks(candidates, selected ?? 0, remainder),
+    content: menuBlocks(candidates, selected ?? 0, remainder, facts),
     blocking: false,
     dismissal: "escape",
     // The substate names itself (C15 I29), so the footer says *complete* and
@@ -336,14 +429,17 @@ export function remainderOf(placed: Placed | null, total: number, shown: number)
 /**
  * The rows of a placement that hold candidates (I23).
  *
- * The top rule costs one, and the indicator costs one whenever it is drawn
- * — which is whenever anything was cut, which is the case this is called in.
- * The bottom edge costs nothing: it is the prompt's rule (ruling 90).
- * Subtracting both here rather than at the call site keeps the menu's own
- * chrome a fact of this file, where the blocks are built.
+ * The top rule costs one, and the status row costs one, **at every height**
+ * (I33): it used to be an indicator drawn only when something was cut, and
+ * the count charged it only then. The bottom edge costs nothing: it is the
+ * prompt's rule (ruling 90). Subtracting both here rather than at the call
+ * site keeps the menu's own chrome a fact of this file, where the blocks are
+ * built.
  */
 export function menuRowsShown(placed: Placed | null): number {
   if (placed === null) return 0;
-  const chrome = placed.truncated ? 2 : 1;
-  return Math.max(0, placed.height - chrome);
+  return Math.max(0, placed.height - MENU_CHROME);
 }
+
+/** The menu's rows that are not candidates: the top rule and the status row (I23, I33). */
+const MENU_CHROME = 2;

@@ -15,6 +15,7 @@ export { contextAt, accept } from "./context.js";
 export {
   createEngine,
   createSourceErrorSink,
+  ghostOf,
   SPINNER_MS,
   type CompletionEngine,
   type EngineOptions,
@@ -31,7 +32,17 @@ export {
   type DirEntry,
   type ReadDir,
 } from "./sources.js";
-export { MENU_ID, menuBlocks, menuLayer, menuRowsShown, menuWindow, menuWindowOf, remainderOf } from "./menu.js";
+export {
+  MENU_ID,
+  menuBlocks,
+  menuLayer,
+  menuRowsShown,
+  menuWindow,
+  menuWindowOf,
+  remainderOf,
+  type MenuFacts,
+  type MenuKey,
+} from "./menu.js";
 export {
   CompletionError,
   SLOT_KINDS,

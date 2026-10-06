@@ -22,6 +22,7 @@
 import {
   accept,
   contextAt,
+  ghostOf,
   menuBlocks,
   menuLayer,
   menuRowsShown,
@@ -36,6 +37,8 @@ import type {
   Candidate,
   CompletionContext,
   CompletionEngine,
+  MenuFacts,
+  MenuKey,
 } from "../interaction/completion/index.js";
 import type { LineEditor } from "../interaction/editor/index.js";
 import type { HistoryStore, Navigator } from "../interaction/history/index.js";
@@ -147,8 +150,14 @@ export type KeyDeps = Readonly<{
   detachChild: () => void;
   /** Where the prompt sits, from the composed frame rather than a fresh read. */
   anchor: () => PromptAnchor;
-  /** How big a layer may be (C15 `Region`), for the menu's "… n more". */
+  /** How big a layer may be (C15 `Region`), for the menu's count and its status row's width. */
   overlayRegion: () => Readonly<{ width: number; height: number }>;
+  /**
+   * The menu's status-row keys for the state the frame shows (C19 I33, C22
+   * I150): `true` is at rest. **The owner line's own lookup**, so the row
+   * under the candidates and the line under the prompt name the same keys.
+   */
+  menuKeys: (atRest: boolean) => readonly MenuKey[];
   /** C16's stored focus — the one piece of it in the system (C16 §3). */
   focus: FocusStore;
   /**
@@ -415,6 +424,12 @@ export interface KeyEffects {
    */
   readonly selected: number | null;
   /**
+   * The ghost the prompt shows (C19 I7, I34): the open menu's current
+   * candidate's remainder, or a unique static match's. **What `→` inserts**,
+   * so the paint and the key read one answer.
+   */
+  ghost(): string | null;
+  /**
    * The buffer changed by typing — recompute the as-you-type menu (C19 §6a).
    *
    * Called by the composition root after a printable key or a paste, and by the
@@ -593,6 +608,18 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     contextAt(deps.editor.text, deps.editor.cursor, deps.manifest);
 
   /**
+   * The ghost (C19 I7, I34). **Under an open menu, the current candidate's
+   * remainder**: the selection's, or the first's at rest, which is the one
+   * `⇥` and `↓` reach first (I29). §029 draws `❯ /prof` with `ile` muted over
+   * a menu whose current is `/profile`; the ghost was a unique match's alone,
+   * so a menu of two drew none. With no menu, the unique match's, as before.
+   */
+  const ghostNow = (): string | null => {
+    const ctx = ctxNow();
+    return hasMenu() ? ghostOf(ctx.prefix, candidates[selection.at ?? 0]) : deps.completion.ghost(ctx);
+  };
+
+  /**
    * The visible slice, so the menu draws exactly what its placement holds.
    *
    * `fits` is 0 until `countRemainder` has run, which means *not yet measured*
@@ -601,6 +628,16 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
    * has always had and for the same reason (C15 answers only once the layer is
    * on the stack).
    */
+  /**
+   * What the menu draws against beyond its candidates (C19 I32, I33): the
+   * prefix it matched, the keys for the state the frame shows — at rest while
+   * nothing is selected, the predicate `promptLive` carries (C22 I145) — and
+   * the region's width, which the status row sheds to.
+   */
+  function facts(): MenuFacts {
+    return { prefix: builtFor, keys: deps.menuKeys(selection.at === null), width: deps.overlayRegion().width };
+  }
+
   function windowedBlocks(): ReturnType<typeof menuBlocks> {
     // `fits` is 0 until the placement has been measured, and `menuWindow`
     // answers *the whole list* for that — so there is no arm here. The first
@@ -616,7 +653,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // **The current is the selection, or the first candidate while a typed
     // menu holds none** (C19 I29, ruling 89): marked at rest, and not chosen.
     const current = selection.at ?? 0;
-    if (remainder <= 0) return menuBlocks(candidates, current, 0);
+    if (remainder <= 0) return menuBlocks(candidates, current, 0, facts());
     // **The keys own the window again once they move the selection** (§3d Q2).
     if (wheeled !== null && wheeled.at !== selection.at) wheeled = null;
     const w = windowFrom(wheeled?.start ?? null);
@@ -628,7 +665,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     //
     // **The indicator is the placement's count**: a row is a candidate (C19
     // I30), so the window shows `fits` whatever its start.
-    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, remainder);
+    return menuBlocks(slice, at < 0 || at >= w.shown ? null : at, remainder, facts());
   }
 
   /** The window over the candidates (C19 I23), for the draw and the wheel alike. */
@@ -672,7 +709,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     // beside it were the first disposition. They read identically in a report.
     fits = 0;
     wheeled = null;
-    const layer = menuLayer(candidates, selection.at, remainder, deps.anchor());
+    const layer = menuLayer(candidates, selection.at, remainder, deps.anchor(), facts());
     if (
       deps.overlays.update(MENU_ID, {
         content: layer.content,
@@ -683,7 +720,7 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
       return;
     }
     remainder = 0;
-    deps.overlays.push(menuLayer(candidates, selection.at, 0, deps.anchor()));
+    deps.overlays.push(menuLayer(candidates, selection.at, 0, deps.anchor(), facts()));
   }
 
   function hasMenu(): boolean {
@@ -1067,8 +1104,9 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         deps.editor.move("charRight");
         return;
       }
-      const ctx = contextAt(deps.editor.text, deps.editor.cursor, deps.manifest);
-      const ghost = deps.completion.ghost(ctx);
+      // **The ghost the prompt shows, whichever drew it** (C19 I34): an open
+      // menu's current, or a unique match's — one answer for the paint and the key.
+      const ghost = ghostNow();
       if (ghost === null || ghost === "") {
         deps.editor.move("charRight");
         return;
@@ -1775,6 +1813,11 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
         placement: menuLayer(candidates, selection.at, remainder, at).placement,
       });
       deps.overlays.update(SEARCH_ID, { placement: deps.history.searchLayer(at).placement });
+      // **And the menu re-measured at the new region** (C19 I33): the status
+      // row sheds its keys to the region's width, and the window is sized to
+      // the placement's rows, so a resize that left both as they were drew a
+      // row sized for the old width under a window sized for the old height.
+      if (hasMenu()) countRemainder();
     },
 
     reset: () => {
@@ -1789,5 +1832,6 @@ export function createKeyEffects(deps: KeyDeps): KeyEffects {
     get selected() {
       return selection.at;
     },
+    ghost: () => ghostNow(),
   };
 }
