@@ -3346,6 +3346,67 @@ and neither is an `evict`.
 - **f — Width sheds the words, never the number.** `↓ N new messages` → `↓ N new` → `↓ N`; below the width of
   the last, nothing, rather than a cut label.
 
+### 6u.4 — §046: the history search is a list with a count (C20 I31, I32, I157)
+
+**The figure** (`calcium-registry.json`, *reverse search expands the prompt too — same surface, different
+content*): a header `reverse search      3 of 214`, a **list** of matches with `›` on the current, the prompt's rule,
+**the query on the prompt's own line** (`❯ a3f9b21▌`), the rule, and the footer `⌥r older   ⌥s newer   ⏎ accept   esc cancel`.
+
+**Measured at 762e9b1d.** The tree draws `(reverse-i-search) \`his': /history` — one line, in the layer, with the caret
+on it; the prompt line below is the reader's own, untouched (`❯` and blank). No count, no list, and the owner line
+says `find ↑↓ hits ⏎ open esc close` for keys that do nothing in a search. And a probe of `⌃r his` then `⏎`, `⇥` shows the
+frame **unchanged** — *accepting a search result is unwired*: `menuAccept` is the completion menu's and reads the menu's
+candidates, which a search has none of (C20 §5 says `Enter` executes and `Tab` accepts; neither is reachable).
+
+**Classification table (structural: which rule answers at rest).**
+
+| the search holds | header | rows | prompt line |
+|---|---|---|---|
+| an empty query | `reverse search` | none | the empty query, caret at its end |
+| a query with M ≥ 1 matches, the hit the Nth most recent | `reverse search  N of M` | the hit with `›`, then up to two older matches | the query, caret at its end |
+| a query matching nothing (`failed`, M = 0) | `reverse search  no match` | the retained hit, marked as before | the query |
+| the oldest match reached and `⌃r` pressed (`failed`, M ≥ 1) | `N of M` unchanged — the count is still true | unchanged | the query |
+
+**Rulings (b5-forms).**
+
+a. **"N of M" is matches of entries, N the hit's rank from the most recent.** Not entries in the file (a list of 10,000
+   with a query is not "3 of 10000") and not a position in a scroll: the figure's `3 of 214` beside `a3f9b21` is the
+   count of lines containing the query.
+b. **The list is the hit and the two older matches, as a one-column `table` with `current`** — C19's menu form
+   (C19 I30), so the mark, the ground and the degradation are C11's and this file names none. A window of three, not
+   the whole 214: the layer is a transient panel and the region is not its to take (C15 I8).
+c. **The query is the prompt's line while the search is open** and the caret is the prompt's, at the end of it. The
+   layer therefore declares **no cursor**: it had one on its own row, which is the one-liner. Both prompt readers take
+   it — the paint's rows and the frame's `promptRows` count (I80) — or the frame reserves a height the paint did not
+   draw (T6.30's pair). It is held beside `fieldHeld`'s mechanism and not through it: that is the *reader's* line
+   while a field has the editor (I118), and this is a *derived* one.
+d. **`⏎` and `⇥` accept: the hit goes into the prompt for editing and nothing runs** (§046's `⏎ accept`; the
+   design is normative for the interaction). C20 §5 said `Enter` executes. A recalled command is one the reader has
+   not looked at, and running it in the keystroke that chose it is the failure `fill` over `exec` exists for (C20 §6).
+   `esc` cancels and the buffer is as it was (I21's stash).
+e. **The key is `⌃r`, not `⌥r`**, kept: the keymap's `reverseSearch` is the registry's (C16), the footer names it from
+   the keymap (I133), and moving a chord is not this item's. **`⌥s newer` is owed**: no key steps toward the newest,
+   so the footer does not name one — a hint for a key that does nothing is the defect this section removes from
+   `↑↓ hits`.
+f. **The matched run in the accent is owed** — the table's cells carry a tone for the whole cell and no span; a
+   per-run emphasis is a C11 cell change, not C20's.
+
+**Sequence trace (event-mediated: the search with something happening in between).** Five rows; each states the
+whole record after.
+
+| # | event | state after |
+|---|---|---|
+| 1 | `⌃r` at `❯ ` over `[/help, /history, /ps, /history --all]` | query `""`, no hit; header `reverse search`, no rows; prompt shows `""` |
+| 2 | `h` | query `h`, matches 3 (`/help`, `/history`, `/history --all`; `/ps` has no `h`): hit `/history --all`, rank 1 of 3; rows: hit, `/history`, `/help` |
+| 3 | `⌃r` | hit `/history`, rank 2 of 3; rows: `/history`, `/help` — **two, because only one older remains besides it** |
+| 4 | `z` | query `hz`, M = 0, failed; header `no match`; the retained hit and its rows stay (I22) |
+| 5 | backspace, then `⏎` | query `h`, hit `/history`; the editor holds `/history`, the search is gone, the prompt line is the editor's again, nothing ran |
+
+**Walk finding (row 2).** The window below the hit cannot be taken from the *entries* adjacent to it — those are
+`/ps` and `/history`, one of which is no match. It is the next matches, which is why the search computes them rather
+than the layer slicing the entry list.
+
+
 ## 7. Health and identity
 
 **Identity comes from the app, through `config.identity`.** C22 owns the cadence
@@ -3690,6 +3751,7 @@ A third table, small, and structural rather than event-mediated: the gate's stat
 - **I154** — *(§6u.2, §067, `R-BLK-494`, `R-BLK-495`)* **The count is entries that settled while the transcript was not following the tail.** `settle` and an `append` of an entry born settled count; a `patch`, an `evict`, the running entry and an entry the reader initiated (`meta.origin` `user` or `action`) do not, at either arrival. It resets to 0 when `followTail` is true and on `clear`. L4's, held in `construct.ts`; no change to C13 or C14. → T1.188, T4.123, T6.158
 - **I155** — *(§6u.2, §067, `R-BLK-490`–`R-BLK-500`)* **The button is drawn over the region's last row while the count is above zero, and a press on it goes to the tail.** The row is the region's last, `bgElev` at colour and bracketed at 1-bit, `↓ N new message(s)` shedding to `↓ N new` then `↓ N`, indented by the content margin; it is drawn only where at least two region rows remain and the transcript bar's column is left to the bar (I109). The press is `scrollBy` to the tail, which is what `transcript.bottom` does, and `followTail` resets the count. Withheld, and owed: `⏎`, the focused state and the hovered state (§6u.2 ruling d). → T1.189, T4.123, T6.158
 - **I156** — *(§6u.3, I109)* **At every width the frame composes at, no painted row is wider than the terminal.** The size gate is policy (C02 §8) and the row width is the frame's own: each row is padded or cut to `size.columns` (I109), so the property is independent of where the gate sits and a gate lowered below 60 inherits it. → T4.124
+- **I157** — *(§6u.4, §046, C20 I31, I32)* **While a reverse search is open the prompt's line and caret are the query's.** The paint's rows (`promptRows`), its caret (`promptCursor`, `promptFocused`), its selection and chips, and the frame's own row count (`SessionConfig.promptRows`, I80) all read the one value; the layer declares no cursor. The owner line names `⌃r` older, `⏎` accept and `esc` cancel from the keymap (I133) and no key a search does not bind. → T4.125, T6.159
 
 ## 11. Commitments
 
@@ -3944,6 +4006,8 @@ Six tiers. Every cell of the §9 table is covered. Tiers 1–4 use fake clock, f
 - **T1.189** (I155, §6u.2 rulings e, f): the button's spans at the three rungs — `bgElev` ground at colour, `[…]` at 1-bit, `v` for the arrow at ASCII — and the shed ladder at the widths where each word goes. *Fails on revert*: painting the row at 1-bit fails the bracket assertion.
 - **T4.123** (I154, I155, §6u.2): a built session at 80 × 24 with a long transcript, scrolled up with the wheel; an entry settles → the region's last row is the button and the row count is unchanged; a second arrival → `2 new messages`; a press on the button row reaches the tail and the row is gone; a scrolled-up transcript with nothing new draws none. *Fails on revert*: drawing the button at the tail fails the last step of the first arm; counting a patch fails the count.
 - **T6.158** (I154, I155): the mutations of T1.188 and T4.123 recorded, each by the row that kills it.
+- **T4.125** (I157, C20 I31, I32, §6u.4 trace rows 1–5): through a built session at 80 × 24 with `/help`, `/history`, `/clear` submitted, `⌃r` then `h`: the header reads `N of M`, the rows are the hit and its older matches, **the prompt line reads the query with the caret at its end**, and the footer names `⌃r`, `⏎` and `esc`; `⏎` puts the hit in the prompt and runs nothing, `esc` restores the line; at 1-bit the `›` is carried and at ASCII it is `>`. *Fails on revert*: leaving `promptRows` on the editor while `promptCursor` reads the query fails the pair check.
+- **T6.159** (I157): the mutations of T4.125, each by the row that kills it.
 - **T3.8f** (I153, §047): the figure's two lines, exactly — `▲ 34×8`, `needs 60×16` at Unicode and `! 34x8`, `needs 60x16` at ASCII.
 - **T3.9**: shrinking below minimum mid-session → fallback replaces the frame; scrollback and history survive.
 - **T3.40** (I99, F158, F1024): a greeting whose producer resolves **after** a submission has settled → the greeting is still the transcript's first entry and the result sits below it. Read off the frame by row index, because *above* is the finding's own word and an assertion about `entries.length` would be green for the defect too. The control is T3.9b: without it a row asserting an order proves nothing about whether either thing drew.

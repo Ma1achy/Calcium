@@ -190,6 +190,8 @@ Duplicate consecutive commands are stored once. Running `/ps` five times leaves 
 
 Substring, case-insensitive, most-recent-first. Typing narrows; another `⌃r` steps to an older match; `Enter` executes; `Esc` returns to the buffer unchanged; `Tab` accepts the match into the buffer for editing.
 
+**Amended (§6u.4, §046):** the search is a *list with a count*, the query is the prompt's line, `Enter` and `Tab` accept into the buffer and nothing runs (I31, I32). The one-line form above is the superseded one.
+
 The overlay content is `Block[]` like every layer (C15 I4), so it is themed and degrades. The bindings are C16's, dispatched to the `overlay` target.
 
 Searching an empty query shows nothing rather than the whole history — a full listing is `/history`.
@@ -407,6 +409,8 @@ Redaction has no events. Its rules all hold at rest and interact structurally �
 - **I28** — A load that warned is repaired at open: both files are rewritten from what survived, so damage is not inherited by the next session.
 - **I29** — The entropy net measures each half of an assignment and the whole of anything else. Neither half alone is sufficient, and each miss is a shape the other catches.
 - **I30** — *(§097, `R-BLK-775`, `R-BLK-776`, ruling 90, F1502)* **Reverse search is a panel between two rules, at the region's width.** `searchLayer`'s content opens with a `rule` block whose label is empty — the upper edge; the lower is the prompt's rule (C22 I81) — and the search line follows it. The layer declares no `width`, so C15 gives it the region's (I16) at every narrowing, and the caret is on row 1 at the end of the query. → T1.21, T4.9, T6.27, T6.28
+- **I31** — *(§6u.4, §046, C19 I30)* **The search layer is a header, a list and no cursor.** Its content is the edge `rule` labelled `reverse search  N of M` (M the entries containing the query, N the hit's rank from the most recent; `no match` when M is 0; the bare label for an empty query), then a one-column `table` with `current` on the hit and the next two older matches. `SearchState` carries `total`, `rank` and `older` so the layer is a pure function of it. The layer declares no `cursor`: the query is drawn on the prompt's line (C22 I157). → T1.22, T1.23, T4.10, T6.29
+- **I32** — *(§6u.4, §046)* **`accept` ends the search with the hit and runs nothing.** `searchEnd("accept")` returns the hit's command and moves the navigator to it (I21); L4 puts it in the buffer. *Supersedes §5's "Enter executes".* → T4.10, T6.29
 
 ---
 
@@ -441,6 +445,7 @@ Redaction has no events. Its rules all hold at rest and interact structurally �
 27. A damaged file is repaired at open, so no session inherits it (I28).
 28. The entropy net measures both halves of an assignment and every piece of a quoted compound (I29, I25).
 29. Reverse search opens between two rules and spans the region, so the hit is drawn whole where it fits (I30).
+30. Reverse search is a list with a count, and accepting it runs nothing (I31, I32).
 
 ---
 
@@ -531,6 +536,9 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T4.7** (with L4): `/history` renders as a block table whose rows carry `fill` actions.
 - **T4.8** (with C17, L4, I3): the `setText` L4 applies for a navigation step does not reset navigation, and a keystroke the user types does. §7a Trace 3, and the only tier that can see both halves.
 - **T4.9** (I30, C22 I81, §097): through a built session at 80 × 24 with `/help`, `/history`, `/clear` submitted, `⌃r` then `his` → the frame row above the search line is a rule, the row below it is the prompt's rule, and the line reads ``(reverse-i-search) `his': /history`` whole. *It read `…` alone, the width taken at the push.*
+- **T1.22** (I31): `searchLayer` over `[/help, /history, /ps, /history --all]` with `h` → the edge label is `reverse search  1 of 3`, the table holds `/history --all`, `/history`, `/help` with `current` on the first, and the layer has no `cursor`; after `⌃r` it is `2 of 3` with two rows; after `hz` it is `no match` and the retained hit's rows stay. *Fails on revert*: counting entries rather than matches makes M 4.
+- **T1.23** (I31, I32): `matches` of a query is the count the header states, in most-recent-first order, and `searchEnd("accept")` returns the captured command and leaves the navigator on the hit. *Fails on revert*: returning `entries[index]` fails when an append lands during the search (I23).
+- **T4.10** (I31, I32, C22 I157): the frame of T4.125 read from C20's side — the layer's rows between the two rules, the query on the prompt line. Cited from C22.
 
 ### Tier 5 — e2e
 
@@ -572,6 +580,7 @@ Six tiers. Every cell of both §7 tables is covered.
 - **T6.27** (I30): `width: cells(searchLine(state)) + 4` restored on the layer → **T4.9** fails on the hit and **T1.21** on the declared width.
 - **T6.28** (I30): the upper rule dropped from `searchBlocks` → **T1.21** fails on the content and the cursor row, and **T4.9** on the row above the line.
 - **T6.23** (I27): draining from the last issued write rather than the last confirmed one → T5.7 fails, and the command lost is the one just typed.
+- **T6.29** (I31, I32): dropping `total` from the header → **T1.22** fails on `1 of 3`; accepting through `entries[index]` → **T1.23** fails; the layer's cursor restored → **T1.22** fails on `cursor`, and the frame shows two carets (**T4.125**).
 
 ---
 
